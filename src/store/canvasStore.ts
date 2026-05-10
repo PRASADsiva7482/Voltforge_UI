@@ -1,5 +1,8 @@
 import { create } from 'zustand';
-import type { CanvasNode, Wire, ElectronicComponent } from '../types';
+import type { CanvasNode, Wire, ElectronicComponent, WireBendPoint } from '../types';
+import { rerouteAutoWires, routeWireBetweenNodes } from '../utils/wireRouting';
+
+type RoutingMode = Wire['routingMode'];
 
 interface CanvasState {
   nodes: CanvasNode[];
@@ -8,9 +11,11 @@ interface CanvasState {
   selectedWireId: string | null;
   isWiring: boolean;
   wiringFrom: { nodeId: string; pinId: string } | null;
+  wiringColor: string;
+  wiringMode: RoutingMode;
   viewport: { x: number; y: number; scale: number };
   componentLibrary: ElectronicComponent[];
-  
+
   // Undo/Redo History
   history: { nodes: CanvasNode[]; wires: Wire[] }[];
   historyIndex: number;
@@ -21,21 +26,29 @@ interface CanvasState {
   removeNode: (id: string) => void;
   selectNode: (id: string | null) => void;
   addWire: (wire: Wire) => void;
+  updateWire: (id: string, updates: Partial<Wire>) => void;
   removeWire: (id: string) => void;
   selectWire: (id: string | null) => void;
   startWiring: (nodeId: string, pinId: string) => void;
   finishWiring: (nodeId: string, pinId: string) => void;
   cancelWiring: () => void;
+  setWiringColor: (color: string) => void;
+  setWiringMode: (mode: RoutingMode) => void;
+  addBendPoint: (wireId: string, index: number, point: WireBendPoint) => void;
+  updateBendPoint: (wireId: string, index: number, point: WireBendPoint) => void;
+  removeBendPoint: (wireId: string, index: number) => void;
   setViewport: (viewport: { x: number; y: number; scale: number }) => void;
   setComponentLibrary: (components: ElectronicComponent[]) => void;
   clearCanvas: () => void;
   loadCanvas: (nodes: CanvasNode[], wires: Wire[]) => void;
-  
+
   // History Actions
   pushHistory: () => void;
   undo: () => void;
   redo: () => void;
 }
+
+const WIRE_COLORS = ['#22c55e', '#ef4444', '#3b82f6', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4', '#f97316'];
 
 let wireCounter = 0;
 
@@ -46,6 +59,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   selectedWireId: null,
   isWiring: false,
   wiringFrom: null,
+  wiringColor: WIRE_COLORS[0],
+  wiringMode: 'straight',
   viewport: { x: 0, y: 0, scale: 1 },
   componentLibrary: [],
   history: [],
@@ -57,9 +72,14 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   updateNode: (id, updates) =>
-    set((state) => ({
-      nodes: state.nodes.map((n) => (n.id === id ? { ...n, ...updates } : n)),
-    })),
+    set((state) => {
+      const nodes = state.nodes.map((n) => (n.id === id ? { ...n, ...updates } : n));
+      const geometryChanged = ['x', 'y', 'width', 'height', 'rotation', 'pins'].some((key) => key in updates);
+      return {
+        nodes,
+        wires: geometryChanged ? rerouteAutoWires(nodes, state.wires) : state.wires,
+      };
+    }),
 
   removeNode: (id) => {
     get().pushHistory();
@@ -74,8 +94,24 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   addWire: (wire) => {
     get().pushHistory();
-    set((state) => ({ wires: [...state.wires, wire] }));
+    set((state) => {
+      const routedWire = wire.routingMode === 'auto'
+        ? { ...wire, bendPoints: routeWireBetweenNodes(wire, state.nodes) }
+        : wire;
+      return { wires: [...state.wires, routedWire] };
+    });
   },
+
+  updateWire: (id, updates) =>
+    set((state) => ({
+      wires: state.wires.map((w) => {
+        if (w.id !== id) return w;
+        const next = { ...w, ...updates };
+        return next.routingMode === 'auto'
+          ? { ...next, bendPoints: routeWireBetweenNodes(next, state.nodes) }
+          : next;
+      }),
+    })),
 
   removeWire: (id) => {
     get().pushHistory();
@@ -90,8 +126,17 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   startWiring: (nodeId, pinId) => set({ isWiring: true, wiringFrom: { nodeId, pinId } }),
 
   finishWiring: (nodeId, pinId) => {
-    const { wiringFrom } = get();
+    const { wiringFrom, wiringColor, wiringMode } = get();
     if (wiringFrom && (wiringFrom.nodeId !== nodeId || wiringFrom.pinId !== pinId)) {
+      // Prevent duplicate wires between same pins
+      const existing = get().wires.find(w =>
+        (w.fromNodeId === wiringFrom.nodeId && w.fromPinId === wiringFrom.pinId && w.toNodeId === nodeId && w.toPinId === pinId) ||
+        (w.fromNodeId === nodeId && w.fromPinId === pinId && w.toNodeId === wiringFrom.nodeId && w.toPinId === wiringFrom.pinId)
+      );
+      if (existing) {
+        set({ isWiring: false, wiringFrom: null });
+        return;
+      }
       get().pushHistory();
       const wire: Wire = {
         id: `wire_${++wireCounter}_${Date.now()}`,
@@ -99,9 +144,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         fromPinId: wiringFrom.pinId,
         toNodeId: nodeId,
         toPinId: pinId,
-        color: '#22c55e',
-        points: [],
+        color: wiringColor,
+        bendPoints: [],
+        routingMode: wiringMode,
       };
+      if (wire.routingMode === 'auto') {
+        wire.bendPoints = routeWireBetweenNodes(wire, get().nodes);
+      }
       set((state) => ({
         wires: [...state.wires, wire],
         isWiring: false,
@@ -114,6 +163,44 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   cancelWiring: () => set({ isWiring: false, wiringFrom: null }),
 
+  setWiringColor: (color) => set({ wiringColor: color }),
+
+  setWiringMode: (mode) => set({ wiringMode: mode }),
+
+  addBendPoint: (wireId, index, point) => {
+    get().pushHistory();
+    set((state) => ({
+      wires: state.wires.map((w) => {
+        if (w.id !== wireId) return w;
+        const bp = [...w.bendPoints];
+        bp.splice(index, 0, point);
+        return { ...w, bendPoints: bp };
+      }),
+    }));
+  },
+
+  updateBendPoint: (wireId, index, point) =>
+    set((state) => ({
+      wires: state.wires.map((w) => {
+        if (w.id !== wireId) return w;
+        const bp = [...w.bendPoints];
+        bp[index] = point;
+        return { ...w, bendPoints: bp };
+      }),
+    })),
+
+  removeBendPoint: (wireId, index) => {
+    get().pushHistory();
+    set((state) => ({
+      wires: state.wires.map((w) => {
+        if (w.id !== wireId) return w;
+        const bp = [...w.bendPoints];
+        bp.splice(index, 1);
+        return { ...w, bendPoints: bp };
+      }),
+    }));
+  },
+
   setViewport: (viewport) => set({ viewport }),
 
   setComponentLibrary: (components) => set({ componentLibrary: components }),
@@ -123,32 +210,34 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({ nodes: [], wires: [], selectedNodeId: null, selectedWireId: null });
   },
 
-  loadCanvas: (nodes, wires) => set({ nodes, wires }),
+  loadCanvas: (nodes, wires) => {
+    // Migrate old wire format if needed
+    const migratedWires = wires.map(w => ({
+      ...w,
+      bendPoints: w.bendPoints || [],
+      routingMode: (['straight', 'orthogonal', 'curved', 'auto'].includes(w.routingMode) ? w.routingMode : 'straight') as RoutingMode,
+    }));
+    set({ nodes, wires: rerouteAutoWires(nodes, migratedWires) });
+  },
 
   // History Implementation
   pushHistory: () => {
     const { nodes, wires, history, historyIndex } = get();
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push({ nodes: JSON.parse(JSON.stringify(nodes)), wires: JSON.parse(JSON.stringify(wires)) });
-    
+
     // Limit history size
-    if (newHistory.length > 30) newHistory.shift();
-    
-    set({ 
-      history: newHistory, 
-      historyIndex: newHistory.length - 1 
+    if (newHistory.length > 50) newHistory.shift();
+
+    set({
+      history: newHistory,
+      historyIndex: newHistory.length - 1
     });
   },
 
   undo: () => {
-    const { history, historyIndex, nodes, wires } = get();
+    const { history, historyIndex } = get();
     if (historyIndex < 0) return;
-
-    // Save current state to history if we're at the end
-    if (historyIndex === history.length - 1) {
-       // but only if it's different from the last history item
-    }
-
     const prevState = history[historyIndex];
     set({
       nodes: prevState.nodes,
@@ -160,7 +249,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   redo: () => {
     const { history, historyIndex } = get();
     if (historyIndex >= history.length - 1) return;
-
     const nextIndex = historyIndex + 1;
     const nextState = history[nextIndex];
     set({
@@ -170,3 +258,5 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     });
   }
 }));
+
+export { WIRE_COLORS };

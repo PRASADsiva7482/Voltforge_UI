@@ -12,18 +12,32 @@ export interface SimulationCallbacks {
   onError: (error: string) => void;
 }
 
+interface PinInfo {
+  mode: 'INPUT' | 'OUTPUT' | 'PWM';
+  state: PinState;
+  value: number; // 0-255 for analogWrite, 0/1 for digital
+}
+
 /**
- * This interpreter parses Arduino-style C++ code and executes logic
- * by mapping digital/analog writes to canvas component states.
+ * Interpreter for Arduino-style C++ code.
+ * Maps digital/analog writes to canvas component states.
+ * Supports: pinMode, digitalWrite, analogWrite, digitalRead,
+ * Serial.println, delay (simulated), and basic variables.
  */
 export class SimulationEngine {
   private isRunning = false;
   private intervalId: number | null = null;
   private callbacks: SimulationCallbacks;
-  private pins: Record<string, { mode: 'INPUT' | 'OUTPUT' | 'PWM'; state: PinState; value: number }> = {};
-  private loopFunction: string = '';
-  private setupFunction: string = '';
+  private pins: Record<string, PinInfo> = {};
+  private setupStatements: string[] = [];
+  private loopStatements: string[] = [];
   private globals: Record<string, number> = {};
+  private tick = 0;
+  private delayAccumulator = 0;
+  private currentDelay = 0;
+  private serialThrottle: Set<string> = new Set();
+  // For toggling state with delay patterns (e.g., blink)
+  private pinToggleState: Record<string, boolean> = {};
 
   constructor(callbacks: SimulationCallbacks) {
     this.callbacks = callbacks;
@@ -32,29 +46,44 @@ export class SimulationEngine {
   public async start(code: string, nodes: CanvasNode[], wires: Wire[]) {
     if (this.isRunning) return;
     this.isRunning = true;
+    this.tick = 0;
+    this.delayAccumulator = 0;
+    this.currentDelay = 0;
+    this.pins = {};
+    this.globals = {};
+    this.pinToggleState = {};
+    this.serialThrottle.clear();
 
     try {
-      this.callbacks.onSerialOutput('> Compiling firmware...');
-      await new Promise(resolve => setTimeout(resolve, 600));
-      
-      // Basic Parser: Extract setup() and loop()
+      this.callbacks.onSerialOutput('> Starting compatibility interpreter...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       this.parseCode(code);
-      
-      this.callbacks.onSerialOutput('> Uploading to virtual hardware...');
-      await new Promise(resolve => setTimeout(resolve, 400));
-      this.callbacks.onSerialOutput('> CPU Started');
-      this.callbacks.onSerialOutput('----------------------------------------');
+
+      this.callbacks.onSerialOutput('> Hardware emulator worker not enabled yet; using code-compatibility mode');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      this.callbacks.onSerialOutput('> Compatibility CPU Started');
+      this.callbacks.onSerialOutput('────────────────────────────────');
 
       // Execute setup()
-      this.executeSetup();
+      this.executeBlock(this.setupStatements, nodes, wires, true);
 
       // Start execution loop
-      let tick = 0;
       this.intervalId = window.setInterval(() => {
         if (!this.isRunning) return;
-        
-        this.executeLoop(nodes, wires);
-        tick += 100; // simplified tick
+
+        // Handle delay simulation
+        if (this.currentDelay > 0) {
+          this.delayAccumulator += 100;
+          if (this.delayAccumulator >= this.currentDelay) {
+            this.delayAccumulator = 0;
+            this.currentDelay = 0;
+          }
+          return;
+        }
+
+        this.executeBlock(this.loopStatements, nodes, wires, false);
+        this.tick += 100;
       }, 100);
 
     } catch (err: any) {
@@ -64,76 +93,206 @@ export class SimulationEngine {
   }
 
   private parseCode(code: string) {
-    // Very naive regex-based parser for simulation purposes
-    const setupMatch = code.match(/void\s+setup\s*\(\s*\)\s*\{([\s\S]*?)\}/);
-    const loopMatch = code.match(/void\s+loop\s*\(\s*\)\s*\{([\s\S]*?)\}/);
-
-    this.setupFunction = setupMatch ? setupMatch[1] : '';
-    this.loopFunction = loopMatch ? loopMatch[1] : '';
-
-    // Extract simple variable definitions (e.g., int led = 13;)
-    const varMatches = code.matchAll(/(?:int|const\s+int)\s+(\w+)\s*=\s*(\d+);/g);
+    // Extract global variables
+    const varMatches = code.matchAll(/(?:int|const\s+int|byte|uint8_t|long|unsigned\s+long)\s+(\w+)\s*=\s*(\d+);/g);
     for (const match of varMatches) {
       this.globals[match[1]] = parseInt(match[2]);
     }
-  }
 
-  private executeSetup() {
-    // Process pinMode calls
-    const pinModes = this.setupFunction.matchAll(/pinMode\s*\(\s*(\d+|\w+)\s*,\s*(\w+)\s*\);/g);
-    for (const match of pinModes) {
-      const pin = this.resolveValue(match[1]);
-      const mode = match[2] as 'INPUT' | 'OUTPUT';
-      this.pins[pin] = { mode, state: 'LOW', value: 0 };
+    // Extract #define constants
+    const defineMatches = code.matchAll(/#define\s+(\w+)\s+(\d+)/g);
+    for (const match of defineMatches) {
+      this.globals[match[1]] = parseInt(match[2]);
+    }
+
+    // Extract setup() body
+    const setupMatch = code.match(/void\s+setup\s*\(\s*\)\s*\{([\s\S]*?)\}/);
+    if (setupMatch) {
+      this.setupStatements = this.splitStatements(setupMatch[1]);
+    }
+
+    // Extract loop() body
+    const loopMatch = code.match(/void\s+loop\s*\(\s*\)\s*\{([\s\S]*?)\}/);
+    if (loopMatch) {
+      this.loopStatements = this.splitStatements(loopMatch[1]);
     }
   }
 
-  private executeLoop(nodes: CanvasNode[], wires: Wire[]) {
-    // Process digitalWrite calls
-    const digitWrites = this.loopFunction.matchAll(/digitalWrite\s*\(\s*(\d+|\w+)\s*,\s*(\w+)\s*\);/g);
-    for (const match of digitWrites) {
-      const pin = this.resolveValue(match[1]);
-      const state = match[2] as PinState;
-      
-      if (this.pins[pin]?.state !== state) {
+  private splitStatements(block: string): string[] {
+    return block
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => s.length > 0 && !s.startsWith('//'));
+  }
+
+  private executeBlock(statements: string[], nodes: CanvasNode[], wires: Wire[], isSetup: boolean) {
+    for (const stmt of statements) {
+      // pinMode(pin, mode)
+      const pinMode = stmt.match(/pinMode\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)/);
+      if (pinMode) {
+        const pin = this.resolveValue(pinMode[1]);
+        const mode = pinMode[2] as 'INPUT' | 'OUTPUT';
+        this.pins[pin] = { mode, state: 'LOW', value: 0 };
+        continue;
+      }
+
+      // Serial.begin(baud)
+      const serialBegin = stmt.match(/Serial\.begin\s*\(\s*(\d+)\s*\)/);
+      if (serialBegin) {
+        this.callbacks.onSerialOutput(`> Serial initialized at ${serialBegin[1]} baud`);
+        continue;
+      }
+
+      // digitalWrite(pin, state)
+      const dw = stmt.match(/digitalWrite\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)/);
+      if (dw) {
+        const pin = this.resolveValue(dw[1]);
+        const state = dw[2] === 'HIGH' ? 'HIGH' : 'LOW';
+
         if (!this.pins[pin]) this.pins[pin] = { mode: 'OUTPUT', state: 'LOW', value: 0 };
-        this.pins[pin].state = state;
-        this.propagatePinState(pin, state, nodes, wires);
+
+        // Only propagate if state actually changed
+        if (this.pins[pin].state !== state) {
+          this.pins[pin].state = state;
+          this.pins[pin].value = state === 'HIGH' ? 255 : 0;
+          this.propagatePinState(pin, state, nodes, wires, state === 'HIGH' ? 255 : 0);
+        }
+        continue;
+      }
+
+      // analogWrite(pin, value) — PWM
+      const aw = stmt.match(/analogWrite\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)/);
+      if (aw) {
+        const pin = this.resolveValue(aw[1]);
+        const value = Math.min(255, Math.max(0, parseInt(this.resolveValue(aw[2]))));
+
+        if (!this.pins[pin]) this.pins[pin] = { mode: 'PWM', state: 'PWM', value: 0 };
+        this.pins[pin].state = 'PWM';
+        this.pins[pin].value = value;
+        this.propagatePinState(pin, 'PWM', nodes, wires, value);
+        continue;
+      }
+      
+      // digitalRead(pin)
+      const drAssign = stmt.match(/(\w+)\s*=\s*digitalRead\s*\(\s*(\w+)\s*\)/);
+      if (drAssign) {
+        const pin = this.resolveValue(drAssign[2]);
+        const state = this.pins[pin]?.state === 'HIGH' ? 1 : 0;
+        this.globals[drAssign[1]] = state;
+        continue;
+      }
+
+      // Variable assignment: varName = expression (needs to happen after digitalRead check)
+      const assign = stmt.match(/(\w+)\s*=\s*([^;]+)/);
+      if (assign && this.globals[assign[1]] !== undefined && !assign[2].includes('digitalRead')) {
+        const expr = assign[2].trim();
+        // Simple expression evaluation
+        const val = this.evaluateExpression(expr);
+        if (!isNaN(val)) {
+          this.globals[assign[1]] = val;
+        }
+      }
+
+      // delay(ms) — simulate timing
+      const delay = stmt.match(/delay\s*\(\s*(\w+)\s*\)/);
+      if (delay && !isSetup) {
+        const ms = parseInt(this.resolveValue(delay[1]));
+        if (ms > 0) {
+          this.currentDelay = ms;
+          this.delayAccumulator = 0;
+          // Toggle pin states for common blink patterns
+          Object.keys(this.pins).forEach(pin => {
+            if (this.pins[pin].mode === 'OUTPUT') {
+              const currentState = this.pins[pin].state;
+              const newState = currentState === 'HIGH' ? 'LOW' : 'HIGH';
+              this.pinToggleState[pin] = !this.pinToggleState[pin];
+            }
+          });
+        }
+        return; // Stop processing further statements until delay is done
+      }
+
+      // Serial.println("text") or Serial.println(variable)
+      const serialPrint = stmt.match(/Serial\.println?\s*\(\s*(".*?"|[\w.]+)\s*\)/);
+      if (serialPrint) {
+        let text = serialPrint[1];
+        if (text.startsWith('"') && text.endsWith('"')) {
+          text = text.slice(1, -1);
+        } else {
+          // It's a variable reference
+          const val = this.globals[text];
+          text = val !== undefined ? val.toString() : text;
+        }
+        // Throttle repeated messages
+        const key = `${text}_${Math.floor(this.tick / 500)}`;
+        if (!this.serialThrottle.has(key)) {
+          this.serialThrottle.add(key);
+          this.callbacks.onSerialOutput(text);
+        }
+        continue;
+      }
+
+      // (Variable assignment moved up to handle digitalRead)
+    }
+  }
+
+  private evaluateExpression(expr: string): number {
+    // Handle simple math: val + 1, val - 1, val * 2, etc.
+    const parts = expr.match(/(\w+)\s*([+\-*/])\s*(\w+)/);
+    if (parts) {
+      const a = this.globals[parts[1]] ?? parseInt(parts[1]);
+      const b = this.globals[parts[3]] ?? parseInt(parts[3]);
+      switch (parts[2]) {
+        case '+': return a + b;
+        case '-': return a - b;
+        case '*': return a * b;
+        case '/': return b !== 0 ? Math.floor(a / b) : 0;
       }
     }
-
-    // Process Serial.println
-    const serialPrints = this.loopFunction.matchAll(/Serial\.println\s*\(\s*"(.*?)"\s*\);/g);
-    for (const match of serialPrints) {
-      // In a real loop we wouldn't print every tick if it's constant, 
-      // but for simulation logic we'll limit it.
-      if (Math.random() > 0.9) this.callbacks.onSerialOutput(match[1]);
-    }
+    // Single value
+    const resolved = this.resolveValue(expr);
+    return parseInt(resolved) || 0;
   }
 
-  private propagatePinState(pin: string, state: PinState, nodes: CanvasNode[], wires: Wire[]) {
-    // 1. Find the MCU node (the one with the pins like D13, 13, etc)
-    const mcuNode = nodes.find(n => n.type.startsWith('ARDUINO') || n.type.startsWith('ESP'));
+  private propagatePinState(pin: string, state: PinState, nodes: CanvasNode[], wires: Wire[], value = 0) {
+    // Find MCU node
+    const mcuNode = nodes.find(n =>
+      n.type.startsWith('ARDUINO') || n.type.startsWith('ESP') || n.type.startsWith('RASPBERRY')
+    );
     if (!mcuNode) return;
 
-    // 2. Find wires connected to this pin on the MCU
-    const connectedWires = wires.filter(w => 
-      (w.fromNodeId === mcuNode.id && (w.fromPinId === pin || w.fromPinId === 'D' + pin)) ||
-      (w.toNodeId === mcuNode.id && (w.toPinId === pin || w.toPinId === 'D' + pin))
+    // Find matching pin on MCU by name (D13, A0, etc.) or number
+    const mcuPin = mcuNode.pins?.find(p =>
+      p.name === `D${pin}` || p.name === pin || p.name === `A${pin}` ||
+      p.name.includes(`/${pin}`) || p.id.includes(pin)
+    );
+    if (!mcuPin) return;
+
+    // Find all wires connected to this MCU pin
+    const connectedWires = wires.filter(w =>
+      (w.fromNodeId === mcuNode.id && w.fromPinId === mcuPin.id) ||
+      (w.toNodeId === mcuNode.id && w.toPinId === mcuPin.id)
     );
 
-    // 3. For each wire, notify the connected component
+    // Propagate to connected components
     connectedWires.forEach(wire => {
       const targetNodeId = wire.fromNodeId === mcuNode.id ? wire.toNodeId : wire.fromNodeId;
       const targetPinId = wire.fromNodeId === mcuNode.id ? wire.toPinId : wire.fromPinId;
-      
-      this.callbacks.onPinStateChange(targetNodeId, targetPinId, state);
+      this.callbacks.onPinStateChange(targetNodeId, targetPinId, state, value);
     });
   }
 
   private resolveValue(val: string): string {
     if (this.globals[val] !== undefined) return this.globals[val].toString();
     return val;
+  }
+
+  public setExternalPinState(pin: string, state: PinState) {
+    if (!this.pins[pin]) {
+      this.pins[pin] = { mode: 'INPUT', state: 'LOW', value: 0 };
+    }
+    this.pins[pin].state = state;
+    this.pins[pin].value = state === 'HIGH' ? 1 : 0;
   }
 
   public stop() {

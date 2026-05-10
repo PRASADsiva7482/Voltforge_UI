@@ -15,6 +15,8 @@ import type {
   AiGenerateResponse,
   AiChatRequest,
   AiChatResponse,
+  FirmwareCompileRequest,
+  FirmwareCompileResponse,
 } from '../types';
 
 // ── Auth APIs ─────────────────────────────────────────────────────────────
@@ -95,4 +97,10 @@ export const projectExportApi = {
   getStats: (projectId: string) => api.get<ApiResponse<any>>(`/projects/${projectId}/stats`),
   exportZip: (projectId: string) =>
     api.get(`/projects/${projectId}/export/zip`, { responseType: 'blob' }),
+};
+
+// Simulation APIs
+export const simulationApi = {
+  compileFirmware: (data: FirmwareCompileRequest) =>
+    api.post<ApiResponse<FirmwareCompileResponse>>('/simulation/compile', data),
 };

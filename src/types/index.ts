@@ -145,6 +145,11 @@ export interface PinPosition {
   type: 'input' | 'output' | 'bidirectional' | 'power' | 'ground';
 }
 
+export interface WireBendPoint {
+  x: number;
+  y: number;
+}
+
 export interface Wire {
   id: string;
   fromNodeId: string;
@@ -152,7 +157,9 @@ export interface Wire {
   toNodeId: string;
   toPinId: string;
   color: string;
-  points: number[];
+  bendPoints: WireBendPoint[];
+  routingMode: 'straight' | 'orthogonal' | 'curved' | 'auto';
+  label?: string;
 }
 
 export interface CanvasLayout {
@@ -201,6 +208,25 @@ export interface AiChatResponse {
   reply: string;
   generatedCode?: string;
   hasCode: boolean;
+}
+
+// Simulation / firmware compile types
+export interface FirmwareCompileRequest {
+  source: string;
+  boardType?: BoardType;
+  sketchName?: string;
+}
+
+export interface FirmwareCompileResponse {
+  success: boolean;
+  boardType: string;
+  fqbn: string;
+  compiler: string;
+  hex?: string;
+  stdout?: string;
+  stderr?: string;
+  diagnostics?: string[];
+  metadata?: Record<string, unknown>;
 }
 
 // ── Request Types ─────────────────────────────────────────────────────────

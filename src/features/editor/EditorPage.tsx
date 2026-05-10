@@ -13,14 +13,41 @@ import MultimeterPanel from './MultimeterPanel';
 import OscilloscopePanel from './OscilloscopePanel';
 import BomPanel from './BomPanel';
 import AiValidatorPanel from './AiValidatorPanel';
-import { projectApi, aiApi, projectExportApi } from '../../api/services';
+import { projectApi, aiApi, projectExportApi, simulationApi } from '../../api/services';
 import { useProjectStore } from '../../store/projectStore';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useCollaboration } from '../../hooks/useCollaboration';
 import { SimulationEngine } from '../simulator/SimulationEngine';
 import { LogicRegistry } from '../simulator/logic/LogicRegistry';
+import { analyzeCircuitSafety } from '../canvas/pinRegistry';
+import type { CanvasNode, PinPosition } from '../../types';
 
 type ActivePanel = 'canvas' | 'code' | 'split';
+
+const normalizeRef = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+function resolveSuggestedNode(ref: string, nodes: CanvasNode[]): CanvasNode | null {
+  const normalized = normalizeRef(ref || '');
+  if (!normalized) return null;
+  return nodes.find(node =>
+    normalizeRef(node.id) === normalized ||
+    normalizeRef(node.type) === normalized ||
+    normalizeRef(node.name) === normalized ||
+    normalizeRef(node.type).includes(normalized) ||
+    normalized.includes(normalizeRef(node.type))
+  ) || null;
+}
+
+function resolveSuggestedPin(ref: string, node: CanvasNode): PinPosition | null {
+  const normalized = normalizeRef(ref || '');
+  if (!normalized) return null;
+  return node.pins.find(pin =>
+    normalizeRef(pin.id) === normalized ||
+    normalizeRef(pin.name) === normalized ||
+    normalizeRef(pin.name).includes(normalized) ||
+    normalized.includes(normalizeRef(pin.name))
+  ) || null;
+}
 
 export default function EditorPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -37,11 +64,45 @@ export default function EditorPage() {
   const [showOscilloscope, setShowOscilloscope] = useState(false);
   const [showBom, setShowBom] = useState(false);
   const [showValidator, setShowValidator] = useState(false);
+  const [splitRatio, setSplitRatio] = useState(50); // percentage for canvas width
+  const isDraggingSplit = useRef(false);
 
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<SimulationEngine | null>(null);
 
-  const { setCurrentProject, currentProject, isDirty, setSaving, activeCodeFile, updateCodeFileContent } = useProjectStore();
+  // Split resize handlers
+  const handleSplitDragStart = (e: React.MouseEvent) => {
+    isDraggingSplit.current = true;
+    e.preventDefault();
+  };
+
+  useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (!isDraggingSplit.current) return;
+      const windowWidth = window.innerWidth;
+      const componentPanelWidth = (activePanel === 'canvas' || activePanel === 'split') ? 224 : 0; // w-56 is 224px
+      const availableWidth = windowWidth - componentPanelWidth;
+      const mouseX = e.clientX - componentPanelWidth;
+      
+      let newRatio = (mouseX / availableWidth) * 100;
+      // Constraint to reasonable bounds (e.g., 20% to 80%)
+      newRatio = Math.max(20, Math.min(80, newRatio));
+      setSplitRatio(newRatio);
+    };
+
+    const handleGlobalMouseUp = () => {
+      isDraggingSplit.current = false;
+    };
+
+    window.addEventListener('mousemove', handleGlobalMouseMove);
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [activePanel]);
+
+  const { setCurrentProject, currentProject, isDirty, isSaving, setSaving, activeCodeFile, updateCodeFileContent } = useProjectStore();
   const { nodes, wires, addWire, updateNode, selectedNodeId, undo, redo, historyIndex, history } = useCanvasStore();
   const { isConnected, broadcastCanvasSync } = useCollaboration(projectId || '');
 
@@ -85,6 +146,27 @@ export default function EditorPage() {
 
   const handleSave = useCallback(() => saveMutation.mutate(), [saveMutation]);
 
+  // Track canvas changes as dirty
+  useEffect(() => {
+    const unsub = useCanvasStore.subscribe((state, prev) => {
+      if (state.nodes !== prev.nodes || state.wires !== prev.wires) {
+        useProjectStore.getState().setDirty(true);
+      }
+    });
+    return unsub;
+  }, []);
+
+  // Auto-save every 10 seconds if dirty
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const { isDirty, isSaving } = useProjectStore.getState();
+      if (isDirty && !isSaving && projectId) {
+        handleSave();
+      }
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [handleSave, projectId]);
+
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); handleSave(); }
@@ -112,6 +194,36 @@ export default function EditorPage() {
       setIsSimulating(true);
       setSerialLogs([`> Simulation started at ${new Date().toLocaleTimeString()}`]);
       setShowSerialMonitor(true);
+
+      const safety = analyzeCircuitSafety(nodes, wires);
+      Object.entries(safety.nodeStates).forEach(([nodeId, properties]) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node) updateNode(nodeId, { properties: { ...node.properties, ...properties } });
+      });
+      if (safety.issues.length > 0) {
+        setSerialLogs(prev => [
+          ...prev,
+          ...safety.issues.map(issue => `[${issue.severity}] ${issue.message} ${issue.suggestedFix}`)
+        ]);
+      }
+
+      try {
+        const compile = await simulationApi.compileFirmware({
+          source: activeCodeFile?.content || '',
+          boardType: currentProject?.boardType,
+          sketchName: currentProject?.name || 'VoltForgeSketch',
+        });
+        const result = compile.data.data;
+        setSerialLogs(prev => [
+          ...prev,
+          result.success
+            ? `> Firmware compiled by ${result.compiler} (${result.hex?.length || 0} HEX chars)`
+            : `> Firmware compile failed: ${result.stderr || result.diagnostics?.[0] || 'unknown compiler error'}`,
+        ]);
+      } catch (err: any) {
+        setSerialLogs(prev => [...prev, `> Firmware compiler unavailable: ${err?.message || 'request failed'}`]);
+      }
+
       await engineRef.current?.start(activeCodeFile?.content || '', nodes, wires);
     } else {
       setIsSimulating(false);
@@ -121,15 +233,72 @@ export default function EditorPage() {
     }
   };
 
+  const handleComponentInteraction = useCallback((nodeId: string, event: 'press' | 'release') => {
+    if (!engineRef.current || !isSimulating) return;
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    // Simulate sending high/low for buttons
+    const nodePinIds = node.pins?.map(p => p.id) || [];
+    const connectedWires = wires.filter(w => 
+      (w.fromNodeId === nodeId && nodePinIds.includes(w.fromPinId)) || 
+      (w.toNodeId === nodeId && nodePinIds.includes(w.toPinId))
+    );
+
+    connectedWires.forEach(wire => {
+      const isFromNode = wire.fromNodeId === nodeId;
+      const targetNodeId = isFromNode ? wire.toNodeId : wire.fromNodeId;
+      const targetPinId = isFromNode ? wire.toPinId : wire.fromPinId;
+      
+      const targetNode = nodes.find(n => n.id === targetNodeId);
+      if (targetNode && (targetNode.type.startsWith('ARDUINO') || targetNode.type.startsWith('ESP'))) {
+        const mcuPin = targetNode.pins?.find(p => p.id === targetPinId);
+        if (mcuPin) {
+          // Extract pin number from name (e.g., "D2" -> "2", "2" -> "2")
+          const pinNum = mcuPin.name.replace(/[^0-9]/g, '');
+          engineRef.current?.setExternalPinState(pinNum, event === 'press' ? 'HIGH' : 'LOW');
+        }
+      }
+    });
+  }, [nodes, wires, isSimulating]);
+
   const handleAiRouting = async () => {
     if (nodes.length < 2) return alert('Add at least 2 components');
     setIsAiRouting(true);
     try {
-      const res = await aiApi.suggestWiring({ prompt: `Connect: ${nodes.map(n => n.type).join(', ')}`, boardType: currentProject?.boardType, componentTypes: nodes.map(n => n.type) });
+      const prompt = [
+        `Board: ${currentProject?.boardType || 'ARDUINO_UNO'}`,
+        'Components and pins:',
+        ...nodes.map(n => `- ${n.id}: ${n.name} (${n.type}) pins: ${n.pins.map(p => `${p.id}/${p.name}`).join(', ')}`),
+        'Return wiring suggestions using the exact component ids and pin ids where possible.',
+      ].join('\n');
+      const res = await aiApi.suggestWiring({ prompt, boardType: currentProject?.boardType, componentTypes: nodes.map(n => n.type) });
+      let applied = 0;
       (res.data.data.wireSuggestions || []).forEach((s, i) => {
-        const from = nodes[0], to = nodes[Math.min(i + 1, nodes.length - 1)];
-        if (from && to) addWire({ id: `ai_${Date.now()}_${i}`, fromNodeId: from.id, fromPinId: from.pins[0]?.id || '', toNodeId: to.id, toPinId: to.pins[0]?.id || '', color: s.color || '#3b82f6', points: [] });
+        const from = resolveSuggestedNode(s.fromComponentId, nodes);
+        const to = resolveSuggestedNode(s.toComponentId, nodes);
+        const fromPin = from ? resolveSuggestedPin(s.fromPin, from) : null;
+        const toPin = to ? resolveSuggestedPin(s.toPin, to) : null;
+        if (!from || !to || !fromPin || !toPin || from.id === to.id) return;
+        const duplicate = wires.some(w =>
+          (w.fromNodeId === from.id && w.fromPinId === fromPin.id && w.toNodeId === to.id && w.toPinId === toPin.id) ||
+          (w.fromNodeId === to.id && w.fromPinId === toPin.id && w.toNodeId === from.id && w.toPinId === fromPin.id)
+        );
+        if (duplicate) return;
+        addWire({
+          id: `ai_${Date.now()}_${i}`,
+          fromNodeId: from.id,
+          fromPinId: fromPin.id,
+          toNodeId: to.id,
+          toPinId: toPin.id,
+          color: s.color || '#3b82f6',
+          bendPoints: [],
+          routingMode: 'auto',
+          label: s.description,
+        });
+        applied += 1;
       });
+      if (applied === 0) alert('AI returned suggestions, but none matched the current component pins.');
     } catch (e) { console.error(e); }
     finally { setIsAiRouting(false); }
   };
@@ -202,7 +371,7 @@ export default function EditorPage() {
           <button onClick={toggleSimulation} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium bg-volt-500/10 text-volt-500 hover:bg-volt-500/20 border border-volt-500/20"><Play className="w-3 h-3 fill-current" /> Run</button>
         )}
         <button onClick={handleExportZip} disabled={!currentProject} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700 transition-all border border-white/5"><Download className="w-3 h-3" /> Export ZIP</button>
-        <button onClick={handleSave} disabled={!isDirty} className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all ${isDirty ? 'bg-volt-500 text-white hover:bg-volt-400 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'bg-surface-800 text-surface-500'}`}><Save className="w-3 h-3" /> Save</button>
+        <button onClick={handleSave} disabled={!isDirty && !isSaving} className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all ${isSaving ? 'bg-volt-500/30 text-volt-300 animate-pulse' : isDirty ? 'bg-volt-500 text-white hover:bg-volt-400 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'bg-surface-800 text-surface-500'}`}><Save className={`w-3 h-3 ${isSaving ? 'animate-spin' : ''}`} /> {isSaving ? 'Saving…' : 'Save'}</button>
       </div>
 
       {/* Main Content */}
@@ -210,15 +379,46 @@ export default function EditorPage() {
         {(activePanel === 'canvas' || activePanel === 'split') && <ComponentPanel />}
         <div className="flex flex-1">
           {(activePanel === 'canvas' || activePanel === 'split') && (
-            <div ref={canvasContainerRef} className={`${activePanel === 'split' ? 'w-1/2' : 'flex-1'} bg-[#0a0a14] border-r border-white/5 relative`}>
+            <div 
+              ref={canvasContainerRef} 
+              className="bg-[#0a0a14] relative flex flex-col"
+              style={{ width: activePanel === 'split' ? `${splitRatio}%` : '100%' }}
+            >
               {isSimulating && <div className="absolute top-3 right-3 z-10 glass px-2.5 py-1 rounded-full flex items-center gap-1.5 border border-volt-500/30"><span className="w-1.5 h-1.5 rounded-full bg-volt-500 animate-pulse" /><span className="text-[10px] font-medium text-volt-400">Simulating</span></div>}
               {isAiRouting && <div className="absolute top-3 right-3 z-10 glass px-2.5 py-1 rounded-full flex items-center gap-1.5 border border-purple-500/30"><Wand2 className="w-3 h-3 text-purple-400 animate-spin" /><span className="text-[10px] font-medium text-purple-400">AI Routing...</span></div>}
-              <CircuitCanvas width={canvasSize.width} height={canvasSize.height} />
-              {selectedNodeId && <PropertyEditor />}
+              <div className="flex-1 relative min-h-0 min-w-0">
+                <CircuitCanvas 
+                  width={canvasSize.width} 
+                  height={canvasSize.height} 
+                  onComponentInteraction={handleComponentInteraction}
+                />
+              </div>
             </div>
           )}
-          {(activePanel === 'code' || activePanel === 'split') && <div className={`${activePanel === 'split' ? 'w-1/2' : 'flex-1'} relative`}><CodeEditor /></div>}
+          
+          {activePanel === 'split' && (
+            <div 
+              className="w-1.5 bg-surface-900 border-x border-white/5 cursor-col-resize hover:bg-volt-500/50 active:bg-volt-500 flex-shrink-0 z-10 transition-colors"
+              onMouseDown={handleSplitDragStart}
+            />
+          )}
+
+          {(activePanel === 'code' || activePanel === 'split') && (
+            <div 
+              className="relative min-w-0"
+              style={{ width: activePanel === 'split' ? `${100 - splitRatio}%` : '100%' }}
+            >
+              <CodeEditor />
+            </div>
+          )}
         </div>
+        
+        {/* Right Panel for Property Editor */}
+        {(selectedNodeId || useCanvasStore.getState().selectedWireId) && (activePanel === 'canvas' || activePanel === 'split') && (
+          <div className="flex-shrink-0 h-full border-l border-white/5 shadow-[-10px_0_20px_rgba(0,0,0,0.5)] z-20">
+            <PropertyEditor />
+          </div>
+        )}
 
         {/* Floating Panels */}
         <AiChatPanel isOpen={showAiChat} onClose={() => setShowAiChat(false)} onApplyCode={(c) => { if (activeCodeFile) updateCodeFileContent(activeCodeFile.id, c); }} projectContext={currentProject ? `Board: ${currentProject.boardType}, Components: ${nodes.map(n => n.type).join(', ')}` : undefined} />

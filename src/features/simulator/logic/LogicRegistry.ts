@@ -17,6 +17,7 @@ export class LedLogic implements IComponentLogic {
     const { updateNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
+    if (node.properties?.isBlown) return;
 
     // HIGH on anode means lit
     if (pinId.toLowerCase().includes('anode') || pinId === '1' || pinId === 'pos') {
