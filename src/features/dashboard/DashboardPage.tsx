@@ -20,7 +20,16 @@ export default function DashboardPage() {
     },
   });
 
+  const { data: templatesData } = useQuery({
+    queryKey: ['templates'],
+    queryFn: async () => {
+      const res = await projectApi.getTemplates(0, 4);
+      return res.data.data;
+    },
+  });
+
   const projects = projectsData?.content || [];
+  const templates = templatesData?.content || [];
 
   return (
     <div className="p-8 max-w-7xl mx-auto pt-16 pb-20">
@@ -77,6 +86,25 @@ export default function DashboardPage() {
           <p className="text-sm text-surface-400">Let AI build your circuit</p>
         </button>
       </motion.div>
+
+      {/* Starter Templates */}
+      {templates.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="mb-16"
+        >
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-2xl font-semibold text-white">Starter Templates</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {templates.map((template: ProjectSummary) => (
+              <ProjectCard key={template.id} project={template} onClick={() => navigate(`/explore?template=${template.id}`)} />
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       {/* Recent Projects */}
       <motion.div

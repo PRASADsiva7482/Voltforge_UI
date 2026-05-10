@@ -21,7 +21,7 @@ export default function ExplorePage() {
         const res = await projectApi.searchPublic(searchQuery, page, 12);
         return res.data.data;
       }
-      const res = await projectApi.getPublicProjects(page, 12);
+      const res = await projectApi.getPublic(page, 12);
       return res.data.data;
     },
   });
@@ -33,7 +33,7 @@ export default function ExplorePage() {
 
   const filteredProjects = selectedBoard === 'ALL'
     ? projects
-    : projects.filter(p => p.boardType === selectedBoard);
+    : projects.filter((p: ProjectSummary) => p.boardType === selectedBoard);
 
   const boardColors: Record<string, string> = {
     ARDUINO_UNO: 'from-blue-500 to-cyan-500',

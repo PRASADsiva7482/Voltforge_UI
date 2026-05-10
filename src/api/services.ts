@@ -42,12 +42,9 @@ export const projectApi = {
   fork: (id: string) => api.post<ApiResponse<Project>>(`/projects/${id}/fork`),
   getUserProjects: (page = 0, size = 20) =>
     api.get<ApiResponse<PagedResponse<ProjectSummary>>>('/projects', { params: { page, size } }),
-  getPublicProjects: (page = 0, size = 20) =>
-    api.get<ApiResponse<PagedResponse<ProjectSummary>>>('/projects/public', { params: { page, size } }),
-  searchPublic: (query: string, page = 0, size = 20) =>
-    api.get<ApiResponse<PagedResponse<ProjectSummary>>>('/projects/public/search', {
-      params: { query, page, size },
-    }),
+  getPublic: (page = 0, size = 20) => api.get<ApiResponse<PagedResponse<ProjectSummary>>>(`/projects/public?page=${page}&size=${size}`),
+  searchPublic: (query: string, page = 0, size = 20) => api.get<ApiResponse<PagedResponse<ProjectSummary>>>(`/projects/public/search?query=${query}&page=${page}&size=${size}`),
+  getTemplates: (page = 0, size = 20) => api.get<ApiResponse<PagedResponse<ProjectSummary>>>(`/projects/templates?page=${page}&size=${size}`),
 };
 
 // ── Component APIs ────────────────────────────────────────────────────────
@@ -79,9 +76,23 @@ export const aiApi = {
     api.post<ApiResponse<AiGenerateResponse>>('/ai/generate-code', data),
   chat: (data: AiChatRequest) =>
     api.post<ApiResponse<AiChatResponse>>('/ai/chat', data),
+  reviewCode: (data: { code: string; boardType?: string; componentTypes?: string[] }) =>
+    api.post<ApiResponse<any>>('/ai/review-code', data),
+  schematicToCode: (data: { boardType?: string; components?: any[]; wires?: any[]; additionalInstructions?: string }) =>
+    api.post<ApiResponse<AiGenerateResponse>>('/ai/schematic-to-code', data),
+  validateCircuit: (data: { boardType?: string; components?: any[]; wires?: any[] }) =>
+    api.post<ApiResponse<any>>('/ai/validate-circuit', data),
 };
 
 // ── Admin APIs ────────────────────────────────────────────────────────────
 export const adminApi = {
   getDashboardStats: () => api.get<ApiResponse<DashboardStats>>('/admin/stats'),
+};
+
+// ── Project Export APIs ───────────────────────────────────────────────────
+export const projectExportApi = {
+  getBom: (projectId: string) => api.get<ApiResponse<any[]>>(`/projects/${projectId}/bom`),
+  getStats: (projectId: string) => api.get<ApiResponse<any>>(`/projects/${projectId}/stats`),
+  exportZip: (projectId: string) =>
+    api.get(`/projects/${projectId}/export/zip`, { responseType: 'blob' }),
 };
