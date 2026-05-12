@@ -7,7 +7,8 @@ import { CanvasNode, Wire } from '../../types';
 export type PinState = 'HIGH' | 'LOW' | 'INPUT' | 'OUTPUT' | 'PWM';
 
 export interface SimulationCallbacks {
-  onSerialOutput: (text: string) => void;
+  onSerialOutput: (text: string, options?: { newline?: boolean }) => void;
+  onBaudRateChange?: (baudRate: number) => void;
   onPinStateChange: (componentId: string, pinId: string, state: PinState, value?: number) => void;
   onError: (error: string) => void;
 }
@@ -36,6 +37,7 @@ export class SimulationEngine {
   private delayAccumulator = 0;
   private currentDelay = 0;
   private serialThrottle: Set<string> = new Set();
+  private serialLineBuffer = '';
   // For toggling state with delay patterns (e.g., blink)
   private pinToggleState: Record<string, boolean> = {};
 
@@ -52,6 +54,7 @@ export class SimulationEngine {
     this.pins = {};
     this.globals = {};
     this.pinToggleState = {};
+    this.serialLineBuffer = '';
     this.serialThrottle.clear();
 
     try {
@@ -67,6 +70,7 @@ export class SimulationEngine {
 
       // Execute setup()
       this.executeBlock(this.setupStatements, nodes, wires, true);
+      this.updateDiagnosticProbes(nodes, wires);
 
       // Start execution loop
       this.intervalId = window.setInterval(() => {
@@ -83,6 +87,7 @@ export class SimulationEngine {
         }
 
         this.executeBlock(this.loopStatements, nodes, wires, false);
+        this.updateDiagnosticProbes(nodes, wires);
         this.tick += 100;
       }, 100);
 
@@ -139,7 +144,9 @@ export class SimulationEngine {
       // Serial.begin(baud)
       const serialBegin = stmt.match(/Serial\.begin\s*\(\s*(\d+)\s*\)/);
       if (serialBegin) {
-        this.callbacks.onSerialOutput(`> Serial initialized at ${serialBegin[1]} baud`);
+        const baudRate = Number(serialBegin[1]);
+        this.callbacks.onBaudRateChange?.(baudRate);
+        this.callbacks.onSerialOutput(`> Serial initialized at ${baudRate} baud`);
         continue;
       }
 
@@ -212,22 +219,18 @@ export class SimulationEngine {
         return; // Stop processing further statements until delay is done
       }
 
-      // Serial.println("text") or Serial.println(variable)
-      const serialPrint = stmt.match(/Serial\.println?\s*\(\s*(".*?"|[\w.]+)\s*\)/);
+      // Serial.print(...) / Serial.println(...)
+      const serialPrint = stmt.match(/Serial\.(print|println)\s*\(\s*(.*?)\s*\)$/);
       if (serialPrint) {
-        let text = serialPrint[1];
-        if (text.startsWith('"') && text.endsWith('"')) {
-          text = text.slice(1, -1);
-        } else {
-          // It's a variable reference
-          const val = this.globals[text];
-          text = val !== undefined ? val.toString() : text;
-        }
+        const method = serialPrint[1];
+        const text = this.resolveSerialArgument(serialPrint[2]);
+        const newline = method === 'println';
+
         // Throttle repeated messages
-        const key = `${text}_${Math.floor(this.tick / 500)}`;
+        const key = `${method}_${text}_${Math.floor(this.tick / 500)}`;
         if (!this.serialThrottle.has(key)) {
           this.serialThrottle.add(key);
-          this.callbacks.onSerialOutput(text);
+          this.writeSerial(text, newline);
         }
         continue;
       }
@@ -254,6 +257,57 @@ export class SimulationEngine {
     return parseInt(resolved) || 0;
   }
 
+  private resolveSerialArgument(argument: string): string {
+    const raw = argument.trim();
+    if (!raw) return '';
+
+    const parts = raw.split(/\s*\+\s*/);
+    if (parts.length > 1) {
+      return parts.map((part) => this.resolveSerialArgument(part)).join('');
+    }
+
+    if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+      return raw.slice(1, -1)
+        .replace(/\\n/g, '\n')
+        .replace(/\\t/g, '\t')
+        .replace(/\\"/g, '"');
+    }
+
+    if (/^-?\d+(\.\d+)?$/.test(raw)) return raw;
+
+    if (raw.startsWith('digitalRead')) {
+      const match = raw.match(/digitalRead\s*\(\s*(\w+)\s*\)/);
+      if (match) {
+        const pin = this.resolveValue(match[1]);
+        return this.pins[pin]?.state === 'HIGH' ? '1' : '0';
+      }
+    }
+
+    if (raw.startsWith('analogRead')) {
+      const match = raw.match(/analogRead\s*\(\s*(\w+)\s*\)/);
+      if (match) {
+        const pin = this.resolveValue(match[1]);
+        const value = this.pins[pin]?.value ?? 0;
+        return Math.round((value / 255) * 1023).toString();
+      }
+    }
+
+    const value = this.evaluateExpression(raw);
+    if (!Number.isNaN(value)) return value.toString();
+    return raw;
+  }
+
+  private writeSerial(text: string, newline: boolean) {
+    if (!newline) {
+      this.serialLineBuffer += text;
+      this.callbacks.onSerialOutput(text, { newline: false });
+      return;
+    }
+
+    this.serialLineBuffer = '';
+    this.callbacks.onSerialOutput(text, { newline: true });
+  }
+
   private propagatePinState(pin: string, state: PinState, nodes: CanvasNode[], wires: Wire[], value = 0) {
     // Find MCU node
     const mcuNode = nodes.find(n =>
@@ -268,18 +322,82 @@ export class SimulationEngine {
     );
     if (!mcuPin) return;
 
-    // Find all wires connected to this MCU pin
-    const connectedWires = wires.filter(w =>
-      (w.fromNodeId === mcuNode.id && w.fromPinId === mcuPin.id) ||
-      (w.toNodeId === mcuNode.id && w.toPinId === mcuPin.id)
-    );
-
-    // Propagate to connected components
-    connectedWires.forEach(wire => {
-      const targetNodeId = wire.fromNodeId === mcuNode.id ? wire.toNodeId : wire.fromNodeId;
-      const targetPinId = wire.fromNodeId === mcuNode.id ? wire.toPinId : wire.fromPinId;
-      this.callbacks.onPinStateChange(targetNodeId, targetPinId, state, value);
+    const connectedPins = this.getConnectedPins(mcuNode.id, mcuPin.id, wires);
+    connectedPins.forEach(pinRef => {
+      if (pinRef.nodeId === mcuNode.id && pinRef.pinId === mcuPin.id) return;
+      this.callbacks.onPinStateChange(pinRef.nodeId, pinRef.pinId, state, value);
     });
+  }
+
+  private updateDiagnosticProbes(nodes: CanvasNode[], wires: Wire[]) {
+    const meters = nodes.filter(node => node.type === 'MULTIMETER');
+    meters.forEach(meter => {
+      const probePin = meter.pins?.find(pin => /v|vcc|\+|probe/i.test(`${pin.id} ${pin.name}`));
+      const comPin = meter.pins?.find(pin => /com|gnd|ground|-/i.test(`${pin.id} ${pin.name}`));
+      if (!probePin) return;
+
+      const probeVoltage = this.voltageAtPin(meter.id, probePin.id, nodes, wires);
+      const commonVoltage = comPin ? this.voltageAtPin(meter.id, comPin.id, nodes, wires) : 0;
+      const voltage = Math.max(0, probeVoltage - commonVoltage);
+      this.callbacks.onPinStateChange(meter.id, probePin.id, voltage > 0.05 ? 'HIGH' : 'LOW', voltage);
+    });
+  }
+
+  private voltageAtPin(nodeId: string, pinId: string, nodes: CanvasNode[], wires: Wire[]): number {
+    const connectedPins = this.getConnectedPins(nodeId, pinId, wires);
+
+    for (const ref of connectedPins) {
+      const node = nodes.find(item => item.id === ref.nodeId);
+      const pin = node?.pins?.find(item => item.id === ref.pinId);
+      if (!node || !pin) continue;
+
+      const label = pin.name.toUpperCase();
+      if (label.includes('GND') || label === 'COM') return 0;
+      if (label === '3.3V' || label === '3V3') return 3.3;
+      if (label === '5V' || label === 'VCC') return 5;
+      if (label === 'VIN') return 7;
+
+      if (node.type.startsWith('ARDUINO') || node.type.startsWith('ESP')) {
+        const pinNumber = this.pinNumberFromBoardPin(pin);
+        if (!pinNumber) continue;
+        const pinInfo = this.pins[pinNumber];
+        if (!pinInfo) continue;
+        if (pinInfo.state === 'PWM') return (pinInfo.value / 255) * 5;
+        if (pinInfo.state === 'HIGH') return 5;
+      }
+    }
+
+    return 0;
+  }
+
+  private getConnectedPins(nodeId: string, pinId: string, wires: Wire[]) {
+    const start = `${nodeId}:${pinId}`;
+    const visited = new Set<string>([start]);
+    const queue = [start];
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const [currentNodeId, currentPinId] = current.split(':');
+      wires.forEach(wire => {
+        const a = `${wire.fromNodeId}:${wire.fromPinId}`;
+        const b = `${wire.toNodeId}:${wire.toPinId}`;
+        const next = a === current ? b : b === current ? a : null;
+        if (next && !visited.has(next)) {
+          visited.add(next);
+          queue.push(next);
+        }
+      });
+    }
+
+    return Array.from(visited).map(key => {
+      const [connectedNodeId, connectedPinId] = key.split(':');
+      return { nodeId: connectedNodeId, pinId: connectedPinId };
+    });
+  }
+
+  private pinNumberFromBoardPin(pin: { id: string; name: string }) {
+    const match = `${pin.name} ${pin.id}`.match(/\bD?(\d{1,2})\b/i);
+    return match ? match[1] : '';
   }
 
   private resolveValue(val: string): string {

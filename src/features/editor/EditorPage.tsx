@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Save, ArrowLeft, Play, Square, Settings, Code2, Layout, Wand2, Terminal, Sparkles, Undo, Redo, Gauge, Activity, Package, ShieldAlert, Download } from 'lucide-react';
 import CircuitCanvas from '../canvas/CircuitCanvas';
 import ComponentPanel from '../components/ComponentPanel';
@@ -16,6 +15,7 @@ import AiValidatorPanel from './AiValidatorPanel';
 import { projectApi, aiApi, projectExportApi, simulationApi } from '../../api/services';
 import { useProjectStore } from '../../store/projectStore';
 import { useCanvasStore } from '../../store/canvasStore';
+import { useSimulationStore } from '../../store/simulationStore';
 import { useCollaboration } from '../../hooks/useCollaboration';
 import { SimulationEngine } from '../simulator/SimulationEngine';
 import { LogicRegistry } from '../simulator/logic/LogicRegistry';
@@ -55,8 +55,6 @@ export default function EditorPage() {
   const [activePanel, setActivePanel] = useState<ActivePanel>('split');
   const [canvasSize, setCanvasSize] = useState({ width: 600, height: 500 });
   const [isSimulating, setIsSimulating] = useState(false);
-  const [showSerialMonitor, setShowSerialMonitor] = useState(false);
-  const [serialLogs, setSerialLogs] = useState<string[]>([]);
   const [isAiRouting, setIsAiRouting] = useState(false);
   const [showAiChat, setShowAiChat] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -67,7 +65,6 @@ export default function EditorPage() {
   const [splitRatio, setSplitRatio] = useState(50); // percentage for canvas width
   const isDraggingSplit = useRef(false);
 
-  const canvasContainerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<SimulationEngine | null>(null);
 
   // Split resize handlers
@@ -104,6 +101,7 @@ export default function EditorPage() {
 
   const { setCurrentProject, currentProject, isDirty, isSaving, setSaving, activeCodeFile, updateCodeFileContent } = useProjectStore();
   const { nodes, wires, addWire, updateNode, selectedNodeId, undo, redo, historyIndex, history } = useCanvasStore();
+  const { writeSerial, clearSerial, serialPanelOpen, setSerialPanelOpen, setBaudRate } = useSimulationStore();
   const { isConnected, broadcastCanvasSync } = useCollaboration(projectId || '');
 
   const { data: projectData, isLoading } = useQuery({
@@ -136,12 +134,21 @@ export default function EditorPage() {
     onError: () => { setSaving(false); },
   });
 
-  useEffect(() => {
-    const observer = new ResizeObserver(entries => {
-      for (const entry of entries) setCanvasSize({ width: entry.contentRect.width, height: entry.contentRect.height });
-    });
-    if (canvasContainerRef.current) observer.observe(canvasContainerRef.current);
-    return () => observer.disconnect();
+  const observerRef = useRef<ResizeObserver | null>(null);
+
+  const canvasContainerCallbackRef = useCallback((node: HTMLDivElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+    if (node) {
+      const observer = new ResizeObserver(entries => {
+        for (const entry of entries) {
+          setCanvasSize({ width: entry.contentRect.width, height: entry.contentRect.height });
+        }
+      });
+      observer.observe(node);
+      observerRef.current = observer;
+    }
   }, []);
 
   const handleSave = useCallback(() => saveMutation.mutate(), [saveMutation]);
@@ -179,21 +186,23 @@ export default function EditorPage() {
 
   useEffect(() => {
     engineRef.current = new SimulationEngine({
-      onSerialOutput: (text) => setSerialLogs(prev => [...prev.slice(-99), text]),
-      onPinStateChange: (cid, pid, state) => {
-        const node = nodes.find(n => n.id === cid);
-        if (node) LogicRegistry.dispatch(node.type, cid, pid, state);
+      onSerialOutput: (text, options) => writeSerial(text, options),
+      onBaudRateChange: setBaudRate,
+      onPinStateChange: (cid, pid, state, value) => {
+        const node = useCanvasStore.getState().nodes.find(n => n.id === cid);
+        if (node) LogicRegistry.dispatch(node.type, cid, pid, state, value);
       },
-      onError: (err) => setSerialLogs(prev => [...prev.slice(-99), `[ERROR] ${err}`]),
+      onError: (err) => writeSerial(`[ERROR] ${err}`),
     });
     return () => { engineRef.current?.stop(); };
-  }, [nodes]);
+  }, [setBaudRate, writeSerial]);
 
   const toggleSimulation = async () => {
     if (!isSimulating) {
       setIsSimulating(true);
-      setSerialLogs([`> Simulation started at ${new Date().toLocaleTimeString()}`]);
-      setShowSerialMonitor(true);
+      clearSerial();
+      setSerialPanelOpen(true);
+      writeSerial(`> Simulation started at ${new Date().toLocaleTimeString()}`);
 
       const safety = analyzeCircuitSafety(nodes, wires);
       Object.entries(safety.nodeStates).forEach(([nodeId, properties]) => {
@@ -201,10 +210,7 @@ export default function EditorPage() {
         if (node) updateNode(nodeId, { properties: { ...node.properties, ...properties } });
       });
       if (safety.issues.length > 0) {
-        setSerialLogs(prev => [
-          ...prev,
-          ...safety.issues.map(issue => `[${issue.severity}] ${issue.message} ${issue.suggestedFix}`)
-        ]);
+        safety.issues.forEach(issue => writeSerial(`[${issue.severity}] ${issue.message} ${issue.suggestedFix}`));
       }
 
       try {
@@ -214,21 +220,19 @@ export default function EditorPage() {
           sketchName: currentProject?.name || 'VoltForgeSketch',
         });
         const result = compile.data.data;
-        setSerialLogs(prev => [
-          ...prev,
-          result.success
-            ? `> Firmware compiled by ${result.compiler} (${result.hex?.length || 0} HEX chars)`
-            : `> Firmware compile failed: ${result.stderr || result.diagnostics?.[0] || 'unknown compiler error'}`,
-        ]);
+        writeSerial(result.success
+          ? `> Firmware compiled by ${result.compiler} (${result.hex?.length || 0} HEX chars)`
+          : `> Firmware compile failed: ${result.stderr || result.diagnostics?.[0] || 'unknown compiler error'}`
+        );
       } catch (err: any) {
-        setSerialLogs(prev => [...prev, `> Firmware compiler unavailable: ${err?.message || 'request failed'}`]);
+        writeSerial(`> Firmware compiler unavailable: ${err?.message || 'request failed'}`);
       }
 
       await engineRef.current?.start(activeCodeFile?.content || '', nodes, wires);
     } else {
       setIsSimulating(false);
       engineRef.current?.stop();
-      setSerialLogs(prev => [...prev, '> Simulation stopped']);
+      writeSerial('> Simulation stopped');
       nodes.forEach(n => updateNode(n.id, { properties: { ...n.properties, isLit: false, isSpinning: false, isBeeping: false } }));
     }
   };
@@ -359,7 +363,7 @@ export default function EditorPage() {
         <button onClick={() => setShowMultimeter(!showMultimeter)} className={`p-1.5 rounded-lg transition-colors ${showMultimeter ? 'bg-volt-500/20 text-volt-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Multimeter"><Gauge className="w-3.5 h-3.5" /></button>
         <button onClick={() => setShowOscilloscope(!showOscilloscope)} className={`p-1.5 rounded-lg transition-colors ${showOscilloscope ? 'bg-volt-500/20 text-volt-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Oscilloscope"><Activity className="w-3.5 h-3.5" /></button>
         <button onClick={() => setShowBom(!showBom)} className={`p-1.5 rounded-lg transition-colors ${showBom ? 'bg-forge-500/20 text-forge-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Bill of Materials"><Package className="w-3.5 h-3.5" /></button>
-        <button onClick={() => setShowSerialMonitor(!showSerialMonitor)} className={`p-1.5 rounded-lg transition-colors ${showSerialMonitor ? 'bg-surface-800 text-white' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Serial Monitor"><Terminal className="w-3.5 h-3.5" /></button>
+        <button onClick={() => setSerialPanelOpen(!serialPanelOpen)} className={`p-1.5 rounded-lg transition-colors ${serialPanelOpen ? 'bg-surface-800 text-white' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Serial Monitor"><Terminal className="w-3.5 h-3.5" /></button>
         <button onClick={() => setShowSettings(true)} className="p-1.5 rounded-lg hover:bg-white/5 text-surface-400 hover:text-white" title="Settings"><Settings className="w-3.5 h-3.5" /></button>
 
         <div className="h-4 w-px bg-white/10" />
@@ -380,7 +384,7 @@ export default function EditorPage() {
         <div className="flex flex-1">
           {(activePanel === 'canvas' || activePanel === 'split') && (
             <div 
-              ref={canvasContainerRef} 
+              ref={canvasContainerCallbackRef} 
               className="bg-[#0a0a14] relative flex flex-col"
               style={{ width: activePanel === 'split' ? `${splitRatio}%` : '100%' }}
             >
@@ -415,7 +419,7 @@ export default function EditorPage() {
         
         {/* Right Panel for Property Editor */}
         {(selectedNodeId || useCanvasStore.getState().selectedWireId) && (activePanel === 'canvas' || activePanel === 'split') && (
-          <div className="flex-shrink-0 h-full border-l border-white/5 shadow-[-10px_0_20px_rgba(0,0,0,0.5)] z-20">
+          <div className="absolute right-0 top-0 h-full border-l border-white/5 shadow-[-10px_0_20px_rgba(0,0,0,0.5)] z-20 bg-surface-950/50 backdrop-blur-md">
             <PropertyEditor />
           </div>
         )}
@@ -428,21 +432,6 @@ export default function EditorPage() {
         <BomPanel isOpen={showBom} onClose={() => setShowBom(false)} />
       </div>
 
-      {/* Serial Monitor */}
-      <AnimatePresence>
-        {showSerialMonitor && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 200, opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-t border-white/10 z-20 flex flex-col bg-[#0a0a14]">
-            <div className="flex items-center justify-between px-4 py-1.5 border-b border-white/5 bg-surface-900/80">
-              <div className="flex items-center gap-2 text-surface-300"><Terminal className="w-3.5 h-3.5" /><span className="text-[10px] font-semibold uppercase tracking-wider">Serial Monitor</span><span className="text-[9px] bg-surface-800 px-1.5 py-0.5 rounded text-surface-400">9600 baud</span></div>
-              <div className="flex items-center gap-2"><button onClick={() => setSerialLogs([])} className="text-[9px] hover:text-white text-surface-400 uppercase">Clear</button><button onClick={() => setShowSerialMonitor(false)} className="text-surface-400 hover:text-white text-xs">✕</button></div>
-            </div>
-            <div className="flex-1 p-3 overflow-y-auto font-mono text-[11px] text-green-400 flex flex-col gap-0.5">
-              {serialLogs.length === 0 && <span className="text-surface-500 italic">No output yet...</span>}
-              {serialLogs.map((log, i) => <div key={i}>{log}</div>)}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

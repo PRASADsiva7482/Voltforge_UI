@@ -29,19 +29,37 @@ interface RouteRecord extends Cell {
 const keyOf = (cell: Cell) => `${cell.x},${cell.y}`;
 const snap = (value: number) => Math.round(value / ROUTING_GRID) * ROUTING_GRID;
 
+/**
+ * Get the absolute (world-space) position of a pin on a node.
+ *
+ * Konva renders the <Group> with:
+ *   x={node.x}  y={node.y}  rotation={node.rotation}  offsetX={0}  offsetY={0}
+ *
+ * That means Konva transforms local children as:
+ *   global = translate(node.x, node.y) × rotate(rotation) × local
+ *
+ * So a pin at local (pin.x, pin.y) maps to:
+ *   gx = node.x + pin.x·cos(θ) − pin.y·sin(θ)
+ *   gy = node.y + pin.x·sin(θ) + pin.y·cos(θ)
+ *
+ * HOWEVER the Konva Transformer, when the user rotates a component, adjusts
+ * (node.x, node.y) so that the visual rotation appears to pivot around the
+ * **center** of the bounding box.  After that adjustment the stored (x,y) already
+ * incorporate the offset, so the formula above is exactly what matches the
+ * on-screen rendering.
+ */
 export function getPinAbsPos(node: CanvasNode, pinId: string): Point | null {
   const pin = node.pins?.find((p) => p.id === pinId);
   if (!pin) return null;
 
-  const cx = node.width / 2;
-  const cy = node.height / 2;
   const rad = ((node.rotation || 0) * Math.PI) / 180;
-  const dx = pin.x - cx;
-  const dy = pin.y - cy;
-  const rx = dx * Math.cos(rad) - dy * Math.sin(rad) + cx;
-  const ry = dx * Math.sin(rad) + dy * Math.cos(rad) + cy;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
 
-  return { x: node.x + rx, y: node.y + ry };
+  return {
+    x: node.x + pin.x * cos - pin.y * sin,
+    y: node.y + pin.x * sin + pin.y * cos,
+  };
 }
 
 export function routeWireBetweenNodes(wire: Wire, nodes: CanvasNode[]): WireBendPoint[] {
@@ -274,4 +292,22 @@ function unblockAround(blocked: Set<string>, cell: Cell) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * Shortest perpendicular distance from point (px,py) to line segment (p1→p2).
+ * Used for accurate bend-point insertion on wire click.
+ */
+export function distToSegment(
+  px: number, py: number,
+  p1: { x: number; y: number },
+  p2: { x: number; y: number },
+): number {
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - p1.x, py - p1.y);
+  let t = ((px - p1.x) * dx + (py - p1.y) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (p1.x + t * dx), py - (p1.y + t * dy));
 }

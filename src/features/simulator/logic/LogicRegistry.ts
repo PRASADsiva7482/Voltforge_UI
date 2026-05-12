@@ -19,8 +19,11 @@ export class LedLogic implements IComponentLogic {
     if (!node) return;
     if (node.properties?.isBlown) return;
 
+    const pin = node.pins?.find(p => p.id === pinId);
+    const pinLabel = `${pinId} ${pin?.name || ''}`.toLowerCase();
+
     // HIGH on anode means lit
-    if (pinId.toLowerCase().includes('anode') || pinId === '1' || pinId === 'pos') {
+    if (pinLabel.includes('anode') || pinLabel.includes('+') || pinLabel.includes('pos')) {
       updateNode(componentId, { properties: { ...node.properties, isLit: state === 'HIGH' } });
     }
   }
@@ -35,9 +38,27 @@ export class MotorLogic implements IComponentLogic {
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
-    if (pinId.toLowerCase().includes('pin') || pinId === '1') {
+    const pin = node.pins?.find(p => p.id === pinId);
+    const pinLabel = `${pinId} ${pin?.name || ''}`.toLowerCase();
+    if (pinLabel.includes('pin') || pinLabel.includes('m+') || pinLabel.includes('signal')) {
       updateNode(componentId, { properties: { ...node.properties, isSpinning: state === 'HIGH' } });
     }
+  }
+}
+
+export class ServoLogic implements IComponentLogic {
+  onPinStateChange(componentId: string, pinId: string, state: PinState, value?: number): void {
+    const { updateNode, nodes } = useCanvasStore.getState();
+    const node = nodes.find(n => n.id === componentId);
+    if (!node) return;
+
+    const pin = node.pins?.find(p => p.id === pinId);
+    const pinLabel = `${pinId} ${pin?.name || ''}`.toLowerCase();
+    if (!pinLabel.includes('sig') && !pinLabel.includes('signal')) return;
+
+    const pwm = state === 'PWM' ? Math.max(0, Math.min(255, value ?? 0)) : state === 'HIGH' ? 255 : 0;
+    const angle = Math.round((pwm / 255) * 180);
+    updateNode(componentId, { properties: { ...node.properties, servoAngle: angle, isSpinning: false } });
   }
 }
 
@@ -53,6 +74,23 @@ export class BuzzerLogic implements IComponentLogic {
     if (pinId.toLowerCase().includes('pos') || pinId === '1') {
       updateNode(componentId, { properties: { ...node.properties, isBeeping: state === 'HIGH' } });
     }
+  }
+}
+
+export class MultimeterLogic implements IComponentLogic {
+  onPinStateChange(componentId: string, _pinId: string, _state: PinState, value?: number): void {
+    const { updateNode, nodes } = useCanvasStore.getState();
+    const node = nodes.find(n => n.id === componentId);
+    if (!node) return;
+
+    const voltage = Number.isFinite(value) ? Number(value) : 0;
+    updateNode(componentId, {
+      properties: {
+        ...node.properties,
+        measuredVoltage: voltage,
+        displayValue: `${voltage.toFixed(2)}V`,
+      },
+    });
   }
 }
 
@@ -78,8 +116,11 @@ export class LogicRegistry {
   private static handlers: Record<string, IComponentLogic> = {
     'LED_STANDARD': new LedLogic(),
     'MOTOR_DC': new MotorLogic(),
+    'SERVO_MOTOR': new ServoLogic(),
+    'MOTOR_SERVO': new ServoLogic(),
     'BUZZER': new BuzzerLogic(),
     'RELAY_SPDT': new RelayLogic(),
+    'MULTIMETER': new MultimeterLogic(),
   };
 
   public static dispatch(componentType: string, componentId: string, pinId: string, state: PinState, value?: number) {

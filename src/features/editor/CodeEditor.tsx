@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
-import { Maximize2, Minimize2, Plus, X, FileCode2 } from 'lucide-react';
+import { Maximize2, Minimize2, FileCode2 } from 'lucide-react';
 import { useProjectStore } from '../../store/projectStore';
+import SerialMonitor from './SerialMonitor';
 
 export default function CodeEditor() {
   const { currentProject, activeCodeFile, setActiveCodeFile, updateCodeFileContent } = useProjectStore();
@@ -107,6 +108,8 @@ export default function CodeEditor() {
           }}
         />
       </div>
+
+      <SerialMonitor />
     </div>
   );
 }

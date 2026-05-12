@@ -60,7 +60,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   isWiring: false,
   wiringFrom: null,
   wiringColor: WIRE_COLORS[0],
-  wiringMode: 'straight',
+  wiringMode: 'auto',
   viewport: { x: 0, y: 0, scale: 1 },
   componentLibrary: [],
   history: [],
@@ -211,12 +211,17 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   loadCanvas: (nodes, wires) => {
-    // Migrate old wire format if needed
-    const migratedWires = wires.map(w => ({
-      ...w,
-      bendPoints: w.bendPoints || [],
-      routingMode: (['straight', 'orthogonal', 'curved', 'auto'].includes(w.routingMode) ? w.routingMode : 'straight') as RoutingMode,
-    }));
+    // Migrate wire format and upgrade straight wires to auto-routing
+    const migratedWires = wires.map(w => {
+      const mode = (['straight', 'orthogonal', 'curved', 'auto'].includes(w.routingMode) ? w.routingMode : 'auto') as RoutingMode;
+      // Upgrade straight wires with no user bend points to auto-route around components
+      const shouldUpgrade = mode === 'straight' && (!w.bendPoints || w.bendPoints.length === 0);
+      return {
+        ...w,
+        bendPoints: w.bendPoints || [],
+        routingMode: shouldUpgrade ? 'auto' as RoutingMode : mode,
+      };
+    });
     set({ nodes, wires: rerouteAutoWires(nodes, migratedWires) });
   },
 

@@ -82,6 +82,16 @@ export const componentSvgs: Record<string, string> = {
     '<rect x="24" y="76" width="4" height="4" fill="%23b8860b"/>' +
     '<rect x="34" y="76" width="4" height="4" fill="%23b8860b"/>'
   ),
+  SENSOR_DHT11: svg('0 0 60 80',
+    '<rect width="60" height="80" rx="5" fill="%232563eb" stroke="%231e3a8a" stroke-width="1"/>' +
+    '<rect x="9" y="10" width="42" height="42" rx="3" fill="%233b82f6"/>' +
+    '<path d="M16 18h28M16 26h28M16 34h28M16 42h28" stroke="%23bfdbfe" stroke-width="3" stroke-linecap="round"/>' +
+    '<text x="30" y="68" font-size="8" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">DHT11</text>' +
+    '<rect x="12" y="76" width="5" height="4" fill="%23b8860b"/>' +
+    '<rect x="23" y="76" width="5" height="4" fill="%23b8860b"/>' +
+    '<rect x="34" y="76" width="5" height="4" fill="%23b8860b"/>' +
+    '<rect x="45" y="76" width="5" height="4" fill="%23b8860b"/>'
+  ),
   SENSOR_ULTRASONIC: svg('0 0 80 50',
     '<rect width="80" height="50" rx="4" fill="%230ea5e9"/>' +
     '<circle cx="22" cy="22" r="12" fill="%23c0c0c0" stroke="%23888" stroke-width="1"/>' +
@@ -92,10 +102,30 @@ export const componentSvgs: Record<string, string> = {
     '<rect x="68" y="42" width="6" height="6" fill="%23b8860b"/>' +
     '<text x="40" y="48" font-size="6" fill="white" text-anchor="middle" font-family="Arial">HC-SR04</text>'
   ),
+  ULTRASONIC_SENSOR: svg('0 0 80 50',
+    '<rect width="80" height="50" rx="4" fill="%230ea5e9"/>' +
+    '<circle cx="22" cy="22" r="12" fill="%23c0c0c0" stroke="%23888" stroke-width="1"/>' +
+    '<circle cx="58" cy="22" r="12" fill="%23c0c0c0" stroke="%23888" stroke-width="1"/>' +
+    '<circle cx="22" cy="22" r="7" fill="%2394a3b8"/>' +
+    '<circle cx="58" cy="22" r="7" fill="%2394a3b8"/>' +
+    '<rect x="6" y="42" width="6" height="6" fill="%23b8860b"/>' +
+    '<rect x="18" y="42" width="6" height="6" fill="%23b8860b"/>' +
+    '<rect x="56" y="42" width="6" height="6" fill="%23b8860b"/>' +
+    '<rect x="68" y="42" width="6" height="6" fill="%23b8860b"/>' +
+    '<text x="40" y="48" font-size="6" fill="white" text-anchor="middle" font-family="Arial">HC-SR04</text>'
+  ),
   SENSOR_PIR: svg('0 0 60 70',
     '<rect x="5" y="20" width="50" height="50" rx="4" fill="%23059669"/>' +
     '<circle cx="30" cy="28" r="18" fill="%23f8fafc" opacity="0.9"/>' +
     '<circle cx="30" cy="28" r="10" fill="%23e2e8f0" opacity="0.7"/>' +
+    '<rect x="14" y="64" width="6" height="6" fill="%23b8860b"/>' +
+    '<rect x="27" y="64" width="6" height="6" fill="%23b8860b"/>' +
+    '<rect x="40" y="64" width="6" height="6" fill="%23b8860b"/>'
+  ),
+  PIR_SENSOR: svg('0 0 60 70',
+    '<rect x="5" y="20" width="50" height="50" rx="4" fill="%23059669"/>' +
+    '<circle cx="30" cy="28" r="18" fill="%23f8fafc" opacity="0.9"/>' +
+    '<path d="M18 28a12 12 0 0 1 24 0M22 28a8 8 0 0 1 16 0M26 28a4 4 0 0 1 8 0" stroke="%23cbd5e1" stroke-width="1.5" fill="none"/>' +
     '<rect x="14" y="64" width="6" height="6" fill="%23b8860b"/>' +
     '<rect x="27" y="64" width="6" height="6" fill="%23b8860b"/>' +
     '<rect x="40" y="64" width="6" height="6" fill="%23b8860b"/>'
@@ -124,6 +154,14 @@ export const componentSvgs: Record<string, string> = {
     '<rect x="24" y="48" width="8" height="6" fill="%23b8860b"/>' +
     '<rect x="38" y="48" width="8" height="6" fill="%23b8860b"/>' +
     '<rect x="52" y="48" width="8" height="6" fill="%23b8860b"/>'
+  ),
+  LCD_16X2: svg('0 0 170 60',
+    '<rect width="170" height="60" rx="4" fill="%230369a1"/>' +
+    '<circle cx="8" cy="8" r="3" fill="%23111827"/><circle cx="162" cy="8" r="3" fill="%23111827"/>' +
+    '<rect x="12" y="10" width="146" height="34" rx="2" fill="%2384cc16"/>' +
+    '<text x="85" y="25" font-size="8" fill="%23365f07" text-anchor="middle" font-family="monospace">VoltForge</text>' +
+    '<text x="85" y="38" font-size="8" fill="%23365f07" text-anchor="middle" font-family="monospace">LCD 16x2</text>' +
+    '<rect x="8" y="52" width="154" height="4" fill="%23b8860b" opacity="0.6"/>'
   ),
   DISPLAY_OLED: svg('0 0 80 60',
     '<rect width="80" height="60" rx="4" fill="%23111827"/>' +
@@ -179,6 +217,15 @@ export const componentSvgs: Record<string, string> = {
     '<rect x="18" y="40" width="6" height="8" fill="%23a16207"/>' +
     '<rect x="28" y="40" width="6" height="8" fill="%23f97316"/>' +
     '<text x="25" y="30" font-size="7" fill="white" text-anchor="middle" font-family="Arial">SG90</text>'
+  ),
+  SERVO_MOTOR: svg('0 0 70 50',
+    '<rect x="0" y="9" width="52" height="32" rx="4" fill="%231d4ed8"/>' +
+    '<rect x="52" y="17" width="14" height="16" rx="2" fill="%23cbd5e1"/>' +
+    '<circle cx="58" cy="25" r="7" fill="%23334155"/>' +
+    '<rect x="8" y="41" width="6" height="8" fill="%23ef4444"/>' +
+    '<rect x="20" y="41" width="6" height="8" fill="%23a16207"/>' +
+    '<rect x="32" y="41" width="6" height="8" fill="%23f97316"/>' +
+    '<text x="26" y="29" font-size="8" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">SG90</text>'
   ),
   MOTOR_STEPPER: svg('0 0 70 70',
     '<circle cx="35" cy="35" r="30" fill="%234b5563"/>' +
@@ -241,6 +288,26 @@ export const componentSvgs: Record<string, string> = {
     '<rect x="18" y="46" width="4" height="4" fill="%23a0a0a0"/>' +
     '<rect x="28" y="46" width="4" height="4" fill="%23a0a0a0"/>'
   ),
+  MULTIMETER: svg('0 0 90 70',
+    '<rect x="4" y="2" width="82" height="66" rx="8" fill="%23f59e0b" stroke="%23b45309" stroke-width="2"/>' +
+    '<rect x="14" y="14" width="62" height="28" rx="3" fill="%23111827" stroke="%23222" stroke-width="1"/>' +
+    '<circle cx="45" cy="55" r="8" fill="%23374151" stroke="%23111827" stroke-width="2"/>' +
+    '<path d="M45 49v12M39 55h12" stroke="%239ca3af" stroke-width="1.5"/>' +
+    '<circle cx="24" cy="64" r="3" fill="%23ef4444"/>' +
+    '<circle cx="66" cy="64" r="3" fill="%23111827"/>'
+  ),
+  IC_555_TIMER: svg('0 0 90 50',
+    '<rect x="12" y="6" width="66" height="38" rx="4" fill="%23111827" stroke="%23374151" stroke-width="2"/>' +
+    '<circle cx="45" cy="6" r="3" fill="%23374151"/>' +
+    '<text x="45" y="29" font-size="13" fill="%23e5e7eb" text-anchor="middle" font-family="Arial" font-weight="bold">NE555</text>' +
+    '<path d="M8 12h8M8 20h8M8 28h8M8 36h8M74 12h8M74 20h8M74 28h8M74 36h8" stroke="%23cbd5e1" stroke-width="3"/>'
+  ),
+  IC_74HC595: svg('0 0 120 50',
+    '<rect x="12" y="6" width="96" height="38" rx="4" fill="%23111827" stroke="%23374151" stroke-width="2"/>' +
+    '<circle cx="60" cy="6" r="3" fill="%23374151"/>' +
+    '<text x="60" y="29" font-size="12" fill="%23e5e7eb" text-anchor="middle" font-family="Arial" font-weight="bold">74HC595</text>' +
+    '<path d="M7 11h8M7 17h8M7 23h8M7 29h8M7 35h8M105 11h8M105 17h8M105 23h8M105 29h8M105 35h8" stroke="%23cbd5e1" stroke-width="3"/>'
+  ),
 };
 
 // Default dimensions for each component type (width x height)
@@ -248,7 +315,7 @@ export const componentSvgs: Record<string, string> = {
 export const componentDimensions: Record<string, { w: number; h: number }> = {
   // Boards
   ARDUINO_UNO: { w: 200, h: 150 },
-  ARDUINO_MEGA: { w: 280, h: 120 },
+  ARDUINO_MEGA: { w: 340, h: 170 },
   ARDUINO_NANO: { w: 100, h: 160 },
   ESP32: { w: 100, h: 160 },
   ESP32_S3: { w: 100, h: 160 },
@@ -258,6 +325,9 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
   RESISTOR: { w: 80, h: 40 },
   CAPACITOR: { w: 60, h: 50 },
   POTENTIOMETER: { w: 50, h: 50 },
+  MULTIMETER: { w: 90, h: 70 },
+  IC_555_TIMER: { w: 90, h: 50 },
+  IC_74HC595: { w: 120, h: 50 },
 
   // LEDs
   LED_STANDARD: { w: 50, h: 50 },
@@ -281,6 +351,7 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
 
   // Sensors
   TEMP_SENSOR: { w: 50, h: 50 },
+  SENSOR_DHT11: { w: 60, h: 80 },
   SENSOR_DHT22: { w: 50, h: 50 },
   ULTRASONIC_SENSOR: { w: 60, h: 60 },
   SENSOR_ULTRASONIC: { w: 60, h: 60 },
@@ -306,4 +377,3 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
   // Other
   BREADBOARD: { w: 300, h: 100 },
 };
-

@@ -96,7 +96,7 @@ export const projectExportApi = {
   getBom: (projectId: string) => api.get<ApiResponse<any[]>>(`/projects/${projectId}/bom`),
   getStats: (projectId: string) => api.get<ApiResponse<any>>(`/projects/${projectId}/stats`),
   exportZip: (projectId: string) =>
-    api.get(`/projects/${projectId}/export/zip`, { responseType: 'blob' }),
+    api.get(`/projects/${projectId}/export`, { responseType: 'blob' }),
 };
 
 // Simulation APIs
