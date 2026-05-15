@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { CanvasNode, Wire } from '../../types';
+import { CPU, avrInstruction, AVRIOPort, AVRUSART, AVRTimer, portBConfig, portCConfig, portDConfig, timer0Config, timer1Config, timer2Config, usart0Config, PinState as AvrPinState } from 'avr8js';
 
 export type PinState = 'HIGH' | 'LOW' | 'INPUT' | 'OUTPUT' | 'PWM';
 
@@ -10,6 +11,7 @@ export interface SimulationCallbacks {
   onSerialOutput: (text: string, options?: { newline?: boolean }) => void;
   onBaudRateChange?: (baudRate: number) => void;
   onPinStateChange: (componentId: string, pinId: string, state: PinState, value?: number) => void;
+  onDebugSnapshot?: (snapshot: { currentLine: number | null; variables: Record<string, number | string>; pins: Record<string, PinInfo>; isPaused: boolean; breakpoints: number[] }) => void;
   onError: (error: string) => void;
 }
 
@@ -38,6 +40,11 @@ export class SimulationEngine {
   private currentDelay = 0;
   private serialThrottle: Set<string> = new Set();
   private serialLineBuffer = '';
+  private breakpoints = new Set<number>();
+  private currentLine: number | null = null;
+  private avrCpu: CPU | null = null;
+  private avrPorts: Record<string, AVRIOPort> = {};
+  private avrUsart: AVRUSART | null = null;
   // For toggling state with delay patterns (e.g., blink)
   private pinToggleState: Record<string, boolean> = {};
 
@@ -45,7 +52,7 @@ export class SimulationEngine {
     this.callbacks = callbacks;
   }
 
-  public async start(code: string, nodes: CanvasNode[], wires: Wire[]) {
+  public async start(code: string, nodes: CanvasNode[], wires: Wire[], hex?: string) {
     if (this.isRunning) return;
     this.isRunning = true;
     this.tick = 0;
@@ -56,8 +63,16 @@ export class SimulationEngine {
     this.pinToggleState = {};
     this.serialLineBuffer = '';
     this.serialThrottle.clear();
+    this.currentLine = null;
 
     try {
+      if (hex?.trim()) {
+        this.callbacks.onSerialOutput('> Starting AVR8js ATmega328P emulator...');
+        this.parseCode(code);
+        this.startAvr(hex, nodes, wires);
+        return;
+      }
+
       this.callbacks.onSerialOutput('> Starting compatibility interpreter...');
       await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -88,6 +103,7 @@ export class SimulationEngine {
 
         this.executeBlock(this.loopStatements, nodes, wires, false);
         this.updateDiagnosticProbes(nodes, wires);
+        this.emitDebugSnapshot(false);
         this.tick += 100;
       }, 100);
 
@@ -132,6 +148,7 @@ export class SimulationEngine {
 
   private executeBlock(statements: string[], nodes: CanvasNode[], wires: Wire[], isSetup: boolean) {
     for (const stmt of statements) {
+      this.currentLine = this.findLineForStatement(stmt);
       // pinMode(pin, mode)
       const pinMode = stmt.match(/pinMode\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)/);
       if (pinMode) {
@@ -163,6 +180,7 @@ export class SimulationEngine {
           this.pins[pin].state = state;
           this.pins[pin].value = state === 'HIGH' ? 255 : 0;
           this.propagatePinState(pin, state, nodes, wires, state === 'HIGH' ? 255 : 0);
+          this.emitDebugSnapshot(false);
         }
         continue;
       }
@@ -186,6 +204,7 @@ export class SimulationEngine {
         const pin = this.resolveValue(drAssign[2]);
         const state = this.pins[pin]?.state === 'HIGH' ? 1 : 0;
         this.globals[drAssign[1]] = state;
+        this.emitDebugSnapshot(false);
         continue;
       }
 
@@ -197,6 +216,7 @@ export class SimulationEngine {
         const val = this.evaluateExpression(expr);
         if (!isNaN(val)) {
           this.globals[assign[1]] = val;
+          this.emitDebugSnapshot(false);
         }
       }
 
@@ -411,6 +431,111 @@ export class SimulationEngine {
     }
     this.pins[pin].state = state;
     this.pins[pin].value = state === 'HIGH' ? 1 : 0;
+    const avrPort = this.boardPinToAvrPort(pin);
+    if (avrPort) {
+      this.avrPorts[avrPort.port]?.setPin(avrPort.bit, state === 'HIGH');
+    }
+    this.emitDebugSnapshot(false);
+  }
+
+  public setBreakpoints(lines: number[]) {
+    this.breakpoints = new Set(lines);
+  }
+
+  private startAvr(hex: string, nodes: CanvasNode[], wires: Wire[]) {
+    const program = this.hexToProgram(hex);
+    this.avrCpu = new CPU(program);
+    this.avrPorts = {
+      B: new AVRIOPort(this.avrCpu, portBConfig),
+      C: new AVRIOPort(this.avrCpu, portCConfig),
+      D: new AVRIOPort(this.avrCpu, portDConfig),
+    };
+    new AVRTimer(this.avrCpu, timer0Config);
+    new AVRTimer(this.avrCpu, timer1Config);
+    new AVRTimer(this.avrCpu, timer2Config);
+    this.avrUsart = new AVRUSART(this.avrCpu, usart0Config, 16_000_000);
+    this.avrUsart.onLineTransmit = (line) => this.callbacks.onSerialOutput(line);
+    this.avrUsart.onByteTransmit = (value) => {
+      const text = String.fromCharCode(value);
+      this.callbacks.onSerialOutput(text, { newline: text === '\n' });
+    };
+    this.avrUsart.onConfigurationChange = () => {
+      if (this.avrUsart) this.callbacks.onBaudRateChange?.(this.avrUsart.baudRate);
+    };
+
+    const handlePort = (portName: 'B' | 'C' | 'D', value: number) => {
+      for (let bit = 0; bit < 8; bit += 1) {
+        const pin = this.avrPortToBoardPin(portName, bit);
+        if (!pin) continue;
+        const pinState = this.avrPorts[portName].pinState(bit);
+        const high = pinState === AvrPinState.High || Boolean(value & (1 << bit));
+        this.pins[pin] = { mode: 'OUTPUT', state: high ? 'HIGH' : 'LOW', value: high ? 255 : 0 };
+        this.propagatePinState(pin, high ? 'HIGH' : 'LOW', nodes, wires, high ? 255 : 0);
+      }
+    };
+    this.avrPorts.B.addListener((value) => handlePort('B', value));
+    this.avrPorts.C.addListener((value) => handlePort('C', value));
+    this.avrPorts.D.addListener((value) => handlePort('D', value));
+
+    this.callbacks.onSerialOutput('> AVR8js CPU Started');
+    this.intervalId = window.setInterval(() => {
+      if (!this.isRunning || !this.avrCpu) return;
+      for (let i = 0; i < 50000; i += 1) {
+        avrInstruction(this.avrCpu);
+        this.avrCpu.tick();
+      }
+      this.emitDebugSnapshot(false);
+    }, 16);
+  }
+
+  private hexToProgram(hex: string): Uint16Array {
+    const bytes: number[] = [];
+    for (const line of hex.split(/\r?\n/)) {
+      if (!line.startsWith(':')) continue;
+      const length = parseInt(line.slice(1, 3), 16);
+      const address = parseInt(line.slice(3, 7), 16);
+      const type = parseInt(line.slice(7, 9), 16);
+      if (type !== 0) continue;
+      for (let i = 0; i < length; i += 1) {
+        bytes[address + i] = parseInt(line.slice(9 + i * 2, 11 + i * 2), 16);
+      }
+    }
+    const words = new Uint16Array(Math.ceil(bytes.length / 2));
+    for (let i = 0; i < words.length; i += 1) {
+      words[i] = (bytes[i * 2] || 0) | ((bytes[i * 2 + 1] || 0) << 8);
+    }
+    return words;
+  }
+
+  private avrPortToBoardPin(port: 'B' | 'C' | 'D', bit: number) {
+    if (port === 'D') return String(bit);
+    if (port === 'B' && bit <= 5) return String(bit + 8);
+    if (port === 'C' && bit <= 5) return String(bit + 14);
+    return '';
+  }
+
+  private boardPinToAvrPort(pin: string) {
+    const value = Number(pin);
+    if (value >= 0 && value <= 7) return { port: 'D', bit: value };
+    if (value >= 8 && value <= 13) return { port: 'B', bit: value - 8 };
+    if (value >= 14 && value <= 19) return { port: 'C', bit: value - 14 };
+    return null;
+  }
+
+  private findLineForStatement(statement: string) {
+    const source = [...this.setupStatements, ...this.loopStatements].join('\n');
+    const offset = source.indexOf(statement);
+    return offset < 0 ? null : source.slice(0, offset).split('\n').length;
+  }
+
+  private emitDebugSnapshot(isPaused: boolean) {
+    this.callbacks.onDebugSnapshot?.({
+      currentLine: this.currentLine,
+      variables: { ...this.globals },
+      pins: { ...this.pins },
+      isPaused,
+      breakpoints: Array.from(this.breakpoints),
+    });
   }
 
   public stop() {
@@ -419,5 +544,9 @@ export class SimulationEngine {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
+    this.avrCpu = null;
+    this.avrUsart = null;
+    this.avrPorts = {};
+    this.emitDebugSnapshot(false);
   }
 }

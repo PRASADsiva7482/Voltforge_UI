@@ -17,6 +17,7 @@ import type {
   AiChatResponse,
   FirmwareCompileRequest,
   FirmwareCompileResponse,
+  CustomComponentRequest,
 } from '../types';
 
 // ── Auth APIs ─────────────────────────────────────────────────────────────
@@ -59,6 +60,9 @@ export const componentApi = {
     api.get<ApiResponse<ElectronicComponent[]>>('/components/search', { params: { query } }),
   getById: (id: string) => api.get<ApiResponse<ElectronicComponent>>(`/components/${id}`),
   getCategories: () => api.get<ApiResponse<string[]>>('/components/categories'),
+  createCustom: (data: CustomComponentRequest) =>
+    api.post<ApiResponse<ElectronicComponent>>('/components/custom', data),
+  getCommunity: () => api.get<ApiResponse<ElectronicComponent[]>>('/components/community'),
 };
 
 // ── Subscription APIs ─────────────────────────────────────────────────────
@@ -97,6 +101,8 @@ export const projectExportApi = {
   getStats: (projectId: string) => api.get<ApiResponse<any>>(`/projects/${projectId}/stats`),
   exportZip: (projectId: string) =>
     api.get(`/projects/${projectId}/export`, { responseType: 'blob' }),
+  exportGerber: (projectId: string) =>
+    api.get(`/projects/${projectId}/export/gerber`, { responseType: 'blob' }),
 };
 
 // Simulation APIs

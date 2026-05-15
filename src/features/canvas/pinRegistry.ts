@@ -340,6 +340,21 @@ export function getPinsForComponent(type: string, pinConfig?: Record<string, unk
     }));
   }
 
+  const configuredPins = pinConfig?.pins;
+  if (Array.isArray(configuredPins)) {
+    return configuredPins.map((raw, idx) => {
+      const item = raw as Partial<PinPosition>;
+      return {
+        id: item.id || `custom_pin_${idx}`,
+        name: item.name || `Pin ${idx + 1}`,
+        x: Number(item.x ?? (width / (configuredPins.length + 1)) * (idx + 1)),
+        y: Number(item.y ?? height),
+        type: (item.type || 'bidirectional') as PinType,
+        electrical: item.electrical,
+      };
+    });
+  }
+
   // Fallback: generate from pinConfig
   if (!pinConfig) return [];
   const keys = Object.keys(pinConfig);

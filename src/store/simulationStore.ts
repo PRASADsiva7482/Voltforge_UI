@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { DebugSnapshot } from '../types';
 
 interface SerialWriteOptions {
   newline?: boolean;
@@ -9,7 +10,13 @@ interface SimulationState {
   serialPanelOpen: boolean;
   baudRate: number;
   isSerialLineOpen: boolean;
+  serialInputQueue: string[];
+  debugSnapshot: DebugSnapshot;
   writeSerial: (text: string, options?: SerialWriteOptions) => void;
+  sendSerialInput: (text: string) => void;
+  drainSerialInput: () => string[];
+  setDebugSnapshot: (snapshot: Partial<DebugSnapshot>) => void;
+  setBreakpoints: (breakpoints: number[]) => void;
   clearSerial: () => void;
   setSerialPanelOpen: (open: boolean) => void;
   setBaudRate: (baudRate: number) => void;
@@ -22,6 +29,8 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   serialPanelOpen: false,
   baudRate: 9600,
   isSerialLineOpen: false,
+  serialInputQueue: [],
+  debugSnapshot: { currentLine: null, variables: {}, pins: {}, isPaused: false, breakpoints: [] },
 
   writeSerial: (text, options) => {
     const newline = options?.newline ?? true;
@@ -42,6 +51,28 @@ export const useSimulationStore = create<SimulationState>((set) => ({
       };
     });
   },
+
+  sendSerialInput: (text) => set((state) => ({
+    serialInputQueue: [...state.serialInputQueue, text],
+    serialLogs: [...state.serialLogs, `> ${text}`].slice(-300),
+  })),
+
+  drainSerialInput: () => {
+    let pending: string[] = [];
+    set((state) => {
+      pending = state.serialInputQueue;
+      return { serialInputQueue: [] };
+    });
+    return pending;
+  },
+
+  setDebugSnapshot: (snapshot) => set((state) => ({
+    debugSnapshot: { ...state.debugSnapshot, ...snapshot },
+  })),
+
+  setBreakpoints: (breakpoints) => set((state) => ({
+    debugSnapshot: { ...state.debugSnapshot, breakpoints },
+  })),
 
   clearSerial: () => set({ serialLogs: [], isSerialLineOpen: false }),
 

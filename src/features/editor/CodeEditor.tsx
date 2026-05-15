@@ -1,18 +1,23 @@
-import { useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
-import { Maximize2, Minimize2, FileCode2 } from 'lucide-react';
+import { Maximize2, Minimize2, FileCode2, Bug } from 'lucide-react';
 import { useProjectStore } from '../../store/projectStore';
+import { useSimulationStore } from '../../store/simulationStore';
 import SerialMonitor from './SerialMonitor';
 
 export default function CodeEditor() {
   const { currentProject, activeCodeFile, setActiveCodeFile, updateCodeFileContent } = useProjectStore();
+  const { debugSnapshot, setBreakpoints } = useSimulationStore();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const editorRef = useRef<any>(null);
+  const monacoRef = useRef<any>(null);
+  const decorationIds = useRef<string[]>([]);
 
   const codeFiles = currentProject?.codeFiles || [];
 
-  const handleEditorMount: OnMount = (editor) => {
+  const handleEditorMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
     // Register Arduino keywords
     editor.addAction({
       id: 'find-replace',
@@ -20,7 +25,35 @@ export default function CodeEditor() {
       keybindings: [],
       run: (ed: any) => ed.getAction('editor.action.startFindReplaceAction')?.run(),
     });
+    editor.onMouseDown((event: any) => {
+      if (event.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN && event.target.type !== monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS) return;
+      const lineNumber = event.target.position?.lineNumber;
+      if (!lineNumber) return;
+      const currentBreakpoints = useSimulationStore.getState().debugSnapshot.breakpoints;
+      const next = currentBreakpoints.includes(lineNumber)
+        ? currentBreakpoints.filter(line => line !== lineNumber)
+        : [...currentBreakpoints, lineNumber].sort((a, b) => a - b);
+      setBreakpoints(next);
+      window.dispatchEvent(new CustomEvent('voltforge:breakpoints', { detail: next }));
+    });
   };
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!editor || !monaco) return;
+    const decorations = [
+      ...debugSnapshot.breakpoints.map(line => ({
+        range: new monaco.Range(line, 1, line, 1),
+        options: { glyphMarginClassName: 'vf-breakpoint-glyph', glyphMarginHoverMessage: { value: 'Breakpoint' } },
+      })),
+      ...(debugSnapshot.currentLine ? [{
+        range: new monaco.Range(debugSnapshot.currentLine, 1, debugSnapshot.currentLine, 1),
+        options: { isWholeLine: true, className: 'vf-current-line', glyphMarginClassName: 'vf-current-glyph' },
+      }] : []),
+    ];
+    decorationIds.current = editor.deltaDecorations(decorationIds.current, decorations);
+  }, [debugSnapshot.breakpoints, debugSnapshot.currentLine]);
 
   if (!activeCodeFile) {
     return (
@@ -65,6 +98,10 @@ export default function CodeEditor() {
         <div className="flex items-center gap-1 px-2">
           <span className="text-[9px] text-surface-500 bg-surface-800 px-1.5 py-0.5 rounded font-mono">
             {lang.toUpperCase()}
+          </span>
+          <span className="flex items-center gap-1 text-[9px] text-surface-500 bg-surface-800 px-1.5 py-0.5 rounded">
+            <Bug className="w-3 h-3" />
+            {debugSnapshot.breakpoints.length}
           </span>
           <button onClick={() => setIsFullscreen(!isFullscreen)}
             className="p-1 rounded hover:bg-white/5 text-surface-400 hover:text-white transition-colors"

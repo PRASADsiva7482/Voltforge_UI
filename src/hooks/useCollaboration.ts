@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import * as Y from 'yjs';
 import { useAuthStore } from '../store/authStore';
 import { useCanvasStore } from '../store/canvasStore';
 import keycloak from '../utils/keycloak';
@@ -8,6 +9,7 @@ import keycloak from '../utils/keycloak';
 export function useCollaboration(projectId: string) {
   const { user } = useAuthStore();
   const stompClient = useRef<Client | null>(null);
+  const ydocRef = useRef<Y.Doc>(new Y.Doc());
   const [isConnected, setIsConnected] = useState(false);
   const [activeUsers, setActiveUsers] = useState<Record<string, any>>({});
   const { loadCanvas } = useCanvasStore();
@@ -44,10 +46,13 @@ export function useCollaboration(projectId: string) {
           const event = JSON.parse(message.body);
           // Don't apply our own events
           if (event.userId !== user.id && event.payload) {
-             // In a real implementation, we would selectively merge events (CRDTs). 
-             // For now, we assume full canvas sync payloads.
              if (event.eventType === 'FULL_SYNC') {
-               loadCanvas(event.payload.nodes || [], event.payload.wires || []);
+               const map = ydocRef.current.getMap('canvas');
+               Y.transact(ydocRef.current, () => {
+                 map.set('nodes', event.payload.nodes || []);
+                 map.set('wires', event.payload.wires || []);
+               }, 'remote');
+               loadCanvas((map.get('nodes') as any[]) || [], (map.get('wires') as any[]) || []);
              }
           }
         }
@@ -84,6 +89,12 @@ export function useCollaboration(projectId: string) {
 
   const broadcastCanvasSync = (nodes: any[], wires: any[]) => {
     if (stompClient.current?.connected && user) {
+      const map = ydocRef.current.getMap('canvas');
+      Y.transact(ydocRef.current, () => {
+        map.set('nodes', nodes);
+        map.set('wires', wires);
+        map.set('updatedAt', Date.now());
+      }, 'local');
       stompClient.current.publish({
         destination: `/app/project/${projectId}/canvas.update`,
         body: JSON.stringify({

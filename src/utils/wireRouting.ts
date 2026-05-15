@@ -1,6 +1,6 @@
 import type { CanvasNode, Wire, WireBendPoint } from '../types';
 
-export const ROUTING_GRID = 20;
+export const ROUTING_GRID = 10;
 
 interface Point {
   x: number;
@@ -79,6 +79,44 @@ export function rerouteAutoWires(nodes: CanvasNode[], wires: Wire[]): Wire[] {
     if (wire.routingMode !== 'auto') return wire;
     return { ...wire, bendPoints: routeWireBetweenNodes(wire, nodes) };
   });
+}
+
+export function snapToRoutingGuides(point: Point, anchors: Point[], threshold = 6): Point {
+  let x = point.x;
+  let y = point.y;
+  for (const anchor of anchors) {
+    if (Math.abs(anchor.x - point.x) <= threshold) x = anchor.x;
+    if (Math.abs(anchor.y - point.y) <= threshold) y = anchor.y;
+  }
+  return { x, y };
+}
+
+export function getWireRenderPoints(wire: Wire, nodes: CanvasNode[], bendPoints = wire.bendPoints || []): number[] {
+  const from = nodes.find((node) => node.id === wire.fromNodeId);
+  const to = nodes.find((node) => node.id === wire.toNodeId);
+  if (!from || !to) return [];
+
+  const start = getPinAbsPos(from, wire.fromPinId);
+  const end = getPinAbsPos(to, wire.toPinId);
+  if (!start || !end) return [];
+
+  if (wire.routingMode !== 'orthogonal' && wire.routingMode !== 'auto') {
+    return [start, ...bendPoints, end].flatMap((point) => [point.x, point.y]);
+  }
+
+  const raw = [start, ...bendPoints, end];
+  const points: number[] = [];
+  for (let i = 0; i < raw.length - 1; i += 1) {
+    const p1 = raw[i];
+    const p2 = raw[i + 1];
+    points.push(p1.x, p1.y);
+    if (Math.abs(p1.x - p2.x) > 2 && Math.abs(p1.y - p2.y) > 2) {
+      const horizontalFirst = Math.abs(p1.x - p2.x) >= Math.abs(p1.y - p2.y);
+      points.push(horizontalFirst ? p2.x : p1.x, horizontalFirst ? p1.y : p2.y);
+    }
+  }
+  points.push(end.x, end.y);
+  return points;
 }
 
 export function routeAroundComponents(

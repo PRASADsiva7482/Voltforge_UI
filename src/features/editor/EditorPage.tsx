@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Save, ArrowLeft, Play, Square, Settings, Code2, Layout, Wand2, Terminal, Sparkles, Undo, Redo, Gauge, Activity, Package, ShieldAlert, Download } from 'lucide-react';
+import { Save, ArrowLeft, Play, Square, Settings, Layout, Wand2, Terminal, Sparkles, Undo, Redo, Gauge, Activity, Package, ShieldAlert, Download, Share2, Layers } from 'lucide-react';
 import CircuitCanvas from '../canvas/CircuitCanvas';
 import ComponentPanel from '../components/ComponentPanel';
 import CodeEditor from '../editor/CodeEditor';
@@ -23,6 +23,7 @@ import { analyzeCircuitSafety } from '../canvas/pinRegistry';
 import type { CanvasNode, PinPosition } from '../../types';
 
 type ActivePanel = 'canvas' | 'code' | 'split';
+type CanvasViewMode = 'breadboard' | 'pcb';
 
 const normalizeRef = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -63,6 +64,7 @@ export default function EditorPage() {
   const [showBom, setShowBom] = useState(false);
   const [showValidator, setShowValidator] = useState(false);
   const [splitRatio, setSplitRatio] = useState(50); // percentage for canvas width
+  const [canvasViewMode, setCanvasViewMode] = useState<CanvasViewMode>('breadboard');
   const isDraggingSplit = useRef(false);
 
   const engineRef = useRef<SimulationEngine | null>(null);
@@ -101,8 +103,8 @@ export default function EditorPage() {
 
   const { setCurrentProject, currentProject, isDirty, isSaving, setSaving, activeCodeFile, updateCodeFileContent } = useProjectStore();
   const { nodes, wires, addWire, updateNode, selectedNodeId, undo, redo, historyIndex, history } = useCanvasStore();
-  const { writeSerial, clearSerial, serialPanelOpen, setSerialPanelOpen, setBaudRate } = useSimulationStore();
-  const { isConnected, broadcastCanvasSync } = useCollaboration(projectId || '');
+  const { writeSerial, clearSerial, serialPanelOpen, setSerialPanelOpen, setBaudRate, setDebugSnapshot, debugSnapshot } = useSimulationStore();
+  const { isConnected, activeUsers, broadcastCanvasSync, broadcastCursorMove } = useCollaboration(projectId || '');
 
   const { data: projectData, isLoading } = useQuery({
     queryKey: ['project', projectId],
@@ -192,10 +194,23 @@ export default function EditorPage() {
         const node = useCanvasStore.getState().nodes.find(n => n.id === cid);
         if (node) LogicRegistry.dispatch(node.type, cid, pid, state, value);
       },
+      onDebugSnapshot: setDebugSnapshot,
       onError: (err) => writeSerial(`[ERROR] ${err}`),
     });
     return () => { engineRef.current?.stop(); };
-  }, [setBaudRate, writeSerial]);
+  }, [setBaudRate, setDebugSnapshot, writeSerial]);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      engineRef.current?.setBreakpoints((event as CustomEvent<number[]>).detail || []);
+    };
+    window.addEventListener('voltforge:breakpoints', handler);
+    return () => window.removeEventListener('voltforge:breakpoints', handler);
+  }, []);
+
+  useEffect(() => {
+    engineRef.current?.setBreakpoints(debugSnapshot.breakpoints);
+  }, [debugSnapshot.breakpoints]);
 
   const toggleSimulation = async () => {
     if (!isSimulating) {
@@ -220,6 +235,7 @@ export default function EditorPage() {
           sketchName: currentProject?.name || 'VoltForgeSketch',
         });
         const result = compile.data.data;
+        var compiledHex = result.success ? result.hex : undefined;
         writeSerial(result.success
           ? `> Firmware compiled by ${result.compiler} (${result.hex?.length || 0} HEX chars)`
           : `> Firmware compile failed: ${result.stderr || result.diagnostics?.[0] || 'unknown compiler error'}`
@@ -228,7 +244,7 @@ export default function EditorPage() {
         writeSerial(`> Firmware compiler unavailable: ${err?.message || 'request failed'}`);
       }
 
-      await engineRef.current?.start(activeCodeFile?.content || '', nodes, wires);
+      await engineRef.current?.start(activeCodeFile?.content || '', nodes, wires, compiledHex);
     } else {
       setIsSimulating(false);
       engineRef.current?.stop();
@@ -324,6 +340,29 @@ export default function EditorPage() {
     }
   };
 
+  const handleExportGerber = async () => {
+    if (!currentProject) return;
+    try {
+      const response = await projectExportApi.exportGerber(currentProject.id);
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${currentProject.name.replace(/[^a-zA-Z0-9.-]/g, '_')}_gerber.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+    } catch (e) {
+      console.error('Failed to export Gerber', e);
+      alert('Failed to export Gerber files');
+    }
+  };
+
+  const handleShareLiveSession = async () => {
+    const url = `${window.location.origin}/editor/${projectId}?live=1`;
+    await navigator.clipboard?.writeText(url);
+    writeSerial(`> Live Session link copied: ${url}`);
+  };
+
   if (isLoading) return <div className="flex items-center justify-center h-screen bg-surface-950"><div className="w-8 h-8 border-2 border-volt-500 border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
@@ -363,7 +402,9 @@ export default function EditorPage() {
         <button onClick={() => setShowMultimeter(!showMultimeter)} className={`p-1.5 rounded-lg transition-colors ${showMultimeter ? 'bg-volt-500/20 text-volt-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Multimeter"><Gauge className="w-3.5 h-3.5" /></button>
         <button onClick={() => setShowOscilloscope(!showOscilloscope)} className={`p-1.5 rounded-lg transition-colors ${showOscilloscope ? 'bg-volt-500/20 text-volt-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Oscilloscope"><Activity className="w-3.5 h-3.5" /></button>
         <button onClick={() => setShowBom(!showBom)} className={`p-1.5 rounded-lg transition-colors ${showBom ? 'bg-forge-500/20 text-forge-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Bill of Materials"><Package className="w-3.5 h-3.5" /></button>
+        <button onClick={() => setCanvasViewMode(canvasViewMode === 'breadboard' ? 'pcb' : 'breadboard')} className={`p-1.5 rounded-lg transition-colors ${canvasViewMode === 'pcb' ? 'bg-forge-500/20 text-forge-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Breadboard / PCB View"><Layers className="w-3.5 h-3.5" /></button>
         <button onClick={() => setSerialPanelOpen(!serialPanelOpen)} className={`p-1.5 rounded-lg transition-colors ${serialPanelOpen ? 'bg-surface-800 text-white' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Serial Monitor"><Terminal className="w-3.5 h-3.5" /></button>
+        <button onClick={handleShareLiveSession} className="p-1.5 rounded-lg transition-colors text-surface-400 hover:text-white hover:bg-white/5" title="Copy Live Session Link"><Share2 className="w-3.5 h-3.5" /></button>
         <button onClick={() => setShowSettings(true)} className="p-1.5 rounded-lg hover:bg-white/5 text-surface-400 hover:text-white" title="Settings"><Settings className="w-3.5 h-3.5" /></button>
 
         <div className="h-4 w-px bg-white/10" />
@@ -375,6 +416,7 @@ export default function EditorPage() {
           <button onClick={toggleSimulation} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium bg-volt-500/10 text-volt-500 hover:bg-volt-500/20 border border-volt-500/20"><Play className="w-3 h-3 fill-current" /> Run</button>
         )}
         <button onClick={handleExportZip} disabled={!currentProject} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700 transition-all border border-white/5"><Download className="w-3 h-3" /> Export ZIP</button>
+        <button onClick={handleExportGerber} disabled={!currentProject} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700 transition-all border border-white/5"><Layout className="w-3 h-3" /> Gerber</button>
         <button onClick={handleSave} disabled={!isDirty && !isSaving} className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all ${isSaving ? 'bg-volt-500/30 text-volt-300 animate-pulse' : isDirty ? 'bg-volt-500 text-white hover:bg-volt-400 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'bg-surface-800 text-surface-500'}`}><Save className={`w-3 h-3 ${isSaving ? 'animate-spin' : ''}`} /> {isSaving ? 'Saving…' : 'Save'}</button>
       </div>
 
@@ -394,6 +436,9 @@ export default function EditorPage() {
                 <CircuitCanvas 
                   width={canvasSize.width} 
                   height={canvasSize.height} 
+                  viewMode={canvasViewMode}
+                  collaborators={activeUsers}
+                  onCursorMove={broadcastCursorMove}
                   onComponentInteraction={handleComponentInteraction}
                 />
               </div>

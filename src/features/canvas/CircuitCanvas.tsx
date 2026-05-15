@@ -1,15 +1,21 @@
 import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import { Stage, Layer, Rect, Group, Text, Circle, Line, Image as KonvaImage, Transformer } from 'react-konva';
-import { Download } from 'lucide-react';
+import { Download, Layers } from 'lucide-react';
 import { useCanvasStore, WIRE_COLORS } from '../../store/canvasStore';
 import type { CanvasNode, Wire, PinPosition, WireBendPoint } from '../../types';
 import { componentSvgs } from './componentSvgs';
-import { getPinAbsPos, distToSegment } from '../../utils/wireRouting';
+import { getPinAbsPos, distToSegment, getWireRenderPoints, snapToRoutingGuides } from '../../utils/wireRouting';
 
-interface Props { width: number; height: number; onComponentInteraction?: (nodeId: string, event: 'press' | 'release') => void; }
+interface Props {
+  width: number;
+  height: number;
+  viewMode?: 'breadboard' | 'pcb';
+  collaborators?: Record<string, any>;
+  onComponentInteraction?: (nodeId: string, event: 'press' | 'release') => void;
+  onCursorMove?: (x: number, y: number) => void;
+}
 
 const GRID = 20;
-const snap = (v: number) => Math.round(v / GRID) * GRID;
 
 // ── SVG Image loader hook ──
 const useImage = (url: string) => {
@@ -17,7 +23,9 @@ const useImage = (url: string) => {
   useEffect(() => {
     if (!url) return;
     const img = new window.Image();
-    img.src = url;
+    img.src = url.trim().startsWith('<svg')
+      ? `data:image/svg+xml;utf8,${encodeURIComponent(url)}`
+      : url;
     img.onload = () => setImage(img);
   }, [url]);
   return image;
@@ -45,35 +53,17 @@ const WireShape = ({ wire, nodes, isSelected, onSelect, onWireDragStart, activeN
     currentBendPoints.splice(activeNewBendPoint.index, 0, { x: activeNewBendPoint.x, y: activeNewBendPoint.y });
   }
 
-  // Calculate path points based on routing mode
-  let allPoints: number[] = [];
-
-  if (wire.routingMode === 'orthogonal') {
-    const pts = [startPos, ...currentBendPoints, endPos];
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p1 = pts[i];
-      const p2 = pts[i + 1];
-      allPoints.push(p1.x, p1.y);
-      if (Math.abs(p1.x - p2.x) > 2 && Math.abs(p1.y - p2.y) > 2) {
-        // Consistent H-then-V to avoid jitter
-        allPoints.push(p2.x, p1.y);
-      }
-    }
-    allPoints.push(endPos.x, endPos.y);
-  } else {
-    allPoints.push(startPos.x, startPos.y);
-    for (const bp of currentBendPoints) {
-      allPoints.push(bp.x, bp.y);
-    }
-    allPoints.push(endPos.x, endPos.y);
-  }
+  const allPoints = getWireRenderPoints(wire, nodes, currentBendPoints);
 
   const handleMouseDown = (e: any) => {
     e.cancelBubble = true;
     onSelect();
+  };
+
+  const handleDoubleClick = (e: any) => {
+    e.cancelBubble = true;
     if (wire.routingMode === 'auto') return;
 
-    // Use true distance-to-segment for accurate bend point insertion
     const stage = e.target.getStage();
     const ptr = stage.getPointerPosition();
     const viewport = useCanvasStore.getState().viewport;
@@ -87,7 +77,7 @@ const WireShape = ({ wire, nodes, isSelected, onSelect, onWireDragStart, activeN
       const d = distToSegment(x, y, allPts[i], allPts[i + 1]);
       if (d < minD) { minD = d; bestIdx = i; }
     }
-    onWireDragStart(wire.id, bestIdx, snap(x), snap(y));
+    onWireDragStart(wire.id, bestIdx, x, y);
   };
 
   return (
@@ -106,9 +96,11 @@ const WireShape = ({ wire, nodes, isSelected, onSelect, onWireDragStart, activeN
         hitStrokeWidth={16}
         onMouseDown={handleMouseDown}
         onTouchStart={handleMouseDown}
+        onDblClick={handleDoubleClick}
+        onDblTap={handleDoubleClick}
         onMouseEnter={(e) => {
           const c = e.target.getStage()?.container();
-          if (c) c.style.cursor = 'crosshair';
+          if (c) c.style.cursor = isSelected ? 'pointer' : 'default';
         }}
         onMouseLeave={(e) => {
           const c = e.target.getStage()?.container();
@@ -158,13 +150,12 @@ const BendPointHandle = ({ wireId, index, point }: { wireId: string; index: numb
       shadowBlur={hovered ? 10 : 4}
       draggable
       onDragMove={(e) => {
-        const newX = snap(e.target.x());
-        const newY = snap(e.target.y());
-        updateBendPoint(wireId, index, { x: newX, y: newY });
-      }}
-      onDragEnd={(e) => {
-        e.target.x(snap(e.target.x()));
-        e.target.y(snap(e.target.y()));
+        const state = useCanvasStore.getState();
+        const anchors = state.nodes.flatMap(node =>
+          node.pins.map(pin => getPinAbsPos(node, pin.id)).filter(Boolean) as { x: number; y: number }[]
+        );
+        const snapped = snapToRoutingGuides({ x: e.target.x(), y: e.target.y() }, anchors);
+        updateBendPoint(wireId, index, snapped);
       }}
       onDblClick={(e) => {
         e.cancelBubble = true;
@@ -264,7 +255,7 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
 }) => {
   const shapeRef = useRef<any>(null);
   const trRef = useRef<any>(null);
-  const svgData = componentSvgs[node.type];
+  const svgData = (node.properties?.svgData as string | undefined) || componentSvgs[node.type];
   const image = useImage(svgData || '');
 
   useEffect(() => {
@@ -296,8 +287,17 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
         onTouchStart={() => { if (isButton && onInteraction) onInteraction(node.id, 'press'); }}
         onTouchEnd={() => { if (isButton && onInteraction) onInteraction(node.id, 'release'); }}
         onDragMove={(e) => {
-          const sx = snap(e.target.x());
-          const sy = snap(e.target.y());
+          const state = useCanvasStore.getState();
+          const anchors = state.nodes
+            .filter(item => item.id !== node.id)
+            .flatMap(item => [
+              { x: item.x, y: item.y },
+              { x: item.x + item.width, y: item.y + item.height },
+              { x: item.x + item.width / 2, y: item.y + item.height / 2 },
+            ]);
+          const snapped = snapToRoutingGuides({ x: e.target.x(), y: e.target.y() }, anchors, 5);
+          const sx = snapped.x;
+          const sy = snapped.y;
           e.target.x(sx);
           e.target.y(sy);
           if (sx !== node.x || sy !== node.y) {
@@ -305,7 +305,7 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
           }
         }}
         onDragEnd={(e) => {
-          onChange({ x: snap(e.target.x()), y: snap(e.target.y()) });
+          onChange({ x: e.target.x(), y: e.target.y() });
         }}
         onTransformEnd={() => {
           const n = shapeRef.current;
@@ -484,7 +484,45 @@ const WireToolbar = () => {
 };
 
 // ── Main Canvas ──
-export default function CircuitCanvas({ width, height, onComponentInteraction }: Props) {
+const PcbTraceLayer = ({ nodes, wires }: { nodes: CanvasNode[]; wires: Wire[] }) => (
+  <Layer listening={false}>
+    {wires.map((wire, index) => {
+      const points = getWireRenderPoints({ ...wire, routingMode: 'auto' }, nodes);
+      const isBottom = index % 2 === 1;
+      return (
+        <Line
+          key={`pcb_${wire.id}`}
+          points={points}
+          stroke={isBottom ? '#38bdf8' : '#f97316'}
+          strokeWidth={5}
+          opacity={0.62}
+          lineCap="round"
+          lineJoin="round"
+          dash={isBottom ? [12, 6] : undefined}
+          shadowColor={isBottom ? '#38bdf8' : '#f97316'}
+          shadowBlur={6}
+        />
+      );
+    })}
+    {nodes.flatMap(node => node.pins.map(pin => {
+      const pos = getPinAbsPos(node, pin.id);
+      if (!pos) return null;
+      return (
+        <Circle
+          key={`pad_${node.id}_${pin.id}`}
+          x={pos.x}
+          y={pos.y}
+          radius={5}
+          fill="#0f172a"
+          stroke={pin.type === 'ground' ? '#94a3b8' : '#facc15'}
+          strokeWidth={2}
+        />
+      );
+    }))}
+  </Layer>
+);
+
+export default function CircuitCanvas({ width, height, viewMode = 'breadboard', collaborators = {}, onComponentInteraction, onCursorMove }: Props) {
   const {
     nodes, wires, selectedNodeId, selectedWireId, viewport,
     updateNode, selectNode, selectWire, isWiring, wiringFrom,
@@ -587,7 +625,13 @@ export default function CircuitCanvas({ width, height, onComponentInteraction }:
           if (isWiring) {
             setMousePos({ x, y });
           } else if (activeNewBendPoint) {
-            setActiveNewBendPoint(prev => prev ? { ...prev, x: snap(x), y: snap(y) } : null);
+            const anchors = nodes.flatMap(node =>
+              node.pins.map(pin => getPinAbsPos(node, pin.id)).filter(Boolean) as { x: number; y: number }[]
+            );
+            const snapped = snapToRoutingGuides({ x, y }, anchors);
+            setActiveNewBendPoint(prev => prev ? { ...prev, x: snapped.x, y: snapped.y } : null);
+          } else {
+            onCursorMove?.(x, y);
           }
         }}
         onMouseUp={(e) => {
@@ -602,8 +646,10 @@ export default function CircuitCanvas({ width, height, onComponentInteraction }:
           <GridDots width={width} height={height} scale={viewport.scale} />
         </Layer>
 
+        {viewMode === 'pcb' && <PcbTraceLayer nodes={nodes} wires={wires} />}
+
         {/* Component layer (below wires) */}
-        <Layer>
+        <Layer opacity={viewMode === 'pcb' ? 0.35 : 1}>
           {nodes.map(node => (
             <ComponentNode
               key={node.id} node={node}
@@ -632,6 +678,22 @@ export default function CircuitCanvas({ width, height, onComponentInteraction }:
             <WiringPreview fromPos={getWiringFromPos()} mousePos={mousePos} />
           )}
         </Layer>
+
+        <Layer listening={false}>
+          {Object.values(collaborators).map((user: any) => (
+            <Group key={user.userId || user.displayName} x={Number(user.x || 0)} y={Number(user.y || 0)}>
+              <Circle radius={5} fill={user.color || '#38bdf8'} shadowColor={user.color || '#38bdf8'} shadowBlur={6} />
+              <Text
+                text={user.displayName || 'Collaborator'}
+                x={8}
+                y={-14}
+                fontSize={10}
+                fill="#e5e7eb"
+                fontFamily="Inter"
+              />
+            </Group>
+          ))}
+        </Layer>
       </Stage>
 
       {/* Wire toolbar overlay (HTML, not canvas) */}
@@ -645,6 +707,13 @@ export default function CircuitCanvas({ width, height, onComponentInteraction }:
         <Download className="w-3.5 h-3.5" />
         PNG
       </button>
+
+      {viewMode === 'pcb' && (
+        <div className="absolute top-3 left-20 z-20 glass px-2.5 py-1.5 rounded-lg text-[10px] text-surface-300 border border-white/10 flex items-center gap-1.5">
+          <Layers className="w-3.5 h-3.5 text-forge-400" />
+          2-layer PCB traces
+        </div>
+      )}
 
       {/* Zoom indicator */}
       <div className="absolute bottom-4 right-4 z-20 glass px-2 py-1 rounded-lg text-[9px] text-surface-400 font-mono">

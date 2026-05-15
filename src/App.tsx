@@ -16,16 +16,33 @@ import { Zap } from 'lucide-react';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 30000 } } });
 
+let keycloakInitPromise: Promise<boolean> | null = null;
+let syncUserPromise: Promise<ReturnType<typeof authApi.syncUser> extends Promise<infer T> ? T : never> | null = null;
+
+function initKeycloakOnce() {
+  if (!keycloakInitPromise) {
+    keycloakInitPromise = keycloak.init({ onLoad: 'login-required', checkLoginIframe: false, pkceMethod: 'S256' });
+  }
+  return keycloakInitPromise;
+}
+
+function syncUserOnce() {
+  if (!syncUserPromise) {
+    syncUserPromise = authApi.syncUser();
+  }
+  return syncUserPromise;
+}
+
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, setUser, setAuthenticated, setLoading } = useAuthStore();
   const [kcReady, setKcReady] = useState(false);
 
   const initKeycloak = useCallback(async () => {
     try {
-      const authenticated = await keycloak.init({ onLoad: 'login-required', checkLoginIframe: false, pkceMethod: 'S256' });
+      const authenticated = await initKeycloakOnce();
       setAuthenticated(authenticated);
       if (authenticated) {
-        const res = await authApi.syncUser();
+        const res = await syncUserOnce();
         setUser(res.data.data);
       }
     } catch (err) {

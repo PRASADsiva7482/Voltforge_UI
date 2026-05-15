@@ -101,6 +101,18 @@ export interface ElectronicComponent {
   createdAt: string;
 }
 
+export interface CustomComponentRequest {
+  name: string;
+  description?: string;
+  category?: ComponentCategory;
+  type?: string;
+  svgData: string;
+  width?: number;
+  height?: number;
+  pins: PinPosition[];
+  publishToCommunity?: boolean;
+}
+
 export interface Subscription {
   id: string;
   userId: string;
@@ -143,6 +155,15 @@ export interface PinPosition {
   x: number;
   y: number;
   type: 'input' | 'output' | 'bidirectional' | 'power' | 'ground';
+  electrical?: Record<string, unknown>;
+}
+
+export interface DebugSnapshot {
+  currentLine: number | null;
+  variables: Record<string, number | string>;
+  pins: Record<string, { mode: string; state: string; value: number }>;
+  isPaused: boolean;
+  breakpoints: number[];
 }
 
 export interface WireBendPoint {

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Cpu, Zap, Thermometer, Monitor, Power, Settings2, Search, Radio, BatteryCharging } from 'lucide-react';
+import { Cpu, Zap, Thermometer, Monitor, Power, Settings2, Search, Radio, BatteryCharging, Plus } from 'lucide-react';
 import { componentApi } from '../../api/services';
 import { useCanvasStore } from '../../store/canvasStore';
 import { componentDimensions } from '../canvas/componentSvgs';
 import { getPinsForComponent } from '../canvas/pinRegistry';
 import type { ElectronicComponent, CanvasNode } from '../../types';
+import CustomComponentStudio from './CustomComponentStudio';
 
 const categoryIcons: Record<string, any> = {
   BOARD: Cpu, LED: Zap, SENSOR: Thermometer, DISPLAY: Monitor,
@@ -20,6 +21,7 @@ export default function ComponentPanel() {
   const { setComponentLibrary } = useCanvasStore();
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [studioOpen, setStudioOpen] = useState(false);
 
   const { data } = useQuery({
     queryKey: ['components'],
@@ -45,7 +47,10 @@ export default function ComponentPanel() {
   );
 
   const addToCanvas = (component: ElectronicComponent) => {
-    const dim = componentDimensions[component.type] || { w: 100, h: 60 };
+    const dim = componentDimensions[component.type] || {
+      w: Number(component.defaultProperties?.width || 120),
+      h: Number(component.defaultProperties?.height || 90),
+    };
 
     // Use pin registry for accurate pin positions
     const pins = getPinsForComponent(component.type, component.pinConfig as Record<string, unknown>, dim.w, dim.h);
@@ -59,7 +64,7 @@ export default function ComponentPanel() {
       y: 100 + Math.random() * 200,
       width: dim.w, height: dim.h,
       rotation: 0,
-      properties: component.defaultProperties || {},
+      properties: { ...(component.defaultProperties || {}), svgData: component.svgData },
       pins,
     };
     useCanvasStore.getState().addNode(node);
@@ -71,8 +76,14 @@ export default function ComponentPanel() {
 
   return (
     <div className="w-56 glass border-r border-white/5 h-full overflow-y-auto flex flex-col">
+      <CustomComponentStudio isOpen={studioOpen} onClose={() => setStudioOpen(false)} />
       <div className="p-3 border-b border-white/5">
-        <h3 className="text-xs font-semibold text-white mb-2">Components</h3>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-xs font-semibold text-white">Components</h3>
+          <button onClick={() => setStudioOpen(true)} className="rounded-md p-1 text-surface-400 hover:bg-white/5 hover:text-white" title="Create custom component">
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-surface-500" />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
