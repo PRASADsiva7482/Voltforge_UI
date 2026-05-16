@@ -4,7 +4,7 @@ import { Download, Layers } from 'lucide-react';
 import { useCanvasStore, WIRE_COLORS } from '../../store/canvasStore';
 import type { CanvasNode, Wire, PinPosition, WireBendPoint } from '../../types';
 import { componentSvgs } from './componentSvgs';
-import { getPinAbsPos, distToSegment, getWireRenderPoints, snapToRoutingGuides } from '../../utils/wireRouting';
+import { getPinAbsPos, distToSegment, getWireRenderPoints, getWiringPreviewPoints, snapToRoutingGuides } from '../../utils/wireRouting';
 
 interface Props {
   width: number;
@@ -15,7 +15,8 @@ interface Props {
   onCursorMove?: (x: number, y: number) => void;
 }
 
-const GRID = 20;
+const MAT_GRID_MINOR = 20;
+const MAT_GRID_MAJOR = 100;
 
 // ── SVG Image loader hook ──
 const useImage = (url: string) => {
@@ -33,8 +34,8 @@ const useImage = (url: string) => {
 
 // ── Helper: get absolute pin position ──
 // ── Wire rendering with multi-segment support ──
-const WireShape = ({ wire, nodes, isSelected, onSelect, onWireDragStart, activeNewBendPoint }: {
-  wire: Wire; nodes: CanvasNode[]; isSelected: boolean;
+const WireShape = ({ wire, nodes, wires, isSelected, onSelect, onWireDragStart, activeNewBendPoint }: {
+  wire: Wire; nodes: CanvasNode[]; wires: Wire[]; isSelected: boolean;
   onSelect: () => void;
   onWireDragStart: (wireId: string, index: number, x: number, y: number) => void;
   activeNewBendPoint: { wireId: string, index: number, x: number, y: number } | null;
@@ -53,7 +54,7 @@ const WireShape = ({ wire, nodes, isSelected, onSelect, onWireDragStart, activeN
     currentBendPoints.splice(activeNewBendPoint.index, 0, { x: activeNewBendPoint.x, y: activeNewBendPoint.y });
   }
 
-  const allPoints = getWireRenderPoints(wire, nodes, currentBendPoints);
+  const allPoints = getWireRenderPoints(wire, nodes, currentBendPoints, wires);
 
   const handleMouseDown = (e: any) => {
     e.cancelBubble = true;
@@ -65,10 +66,10 @@ const WireShape = ({ wire, nodes, isSelected, onSelect, onWireDragStart, activeN
     if (wire.routingMode === 'auto') return;
 
     const stage = e.target.getStage();
-    const ptr = stage.getPointerPosition();
-    const viewport = useCanvasStore.getState().viewport;
-    const x = (ptr.x - viewport.x) / viewport.scale;
-    const y = (ptr.y - viewport.y) / viewport.scale;
+    const pos = stage.getRelativePointerPosition();
+    if (!pos) return;
+    const x = pos.x;
+    const y = pos.y;
 
     const allPts = [startPos, ...(wire.bendPoints || []), endPos];
     let bestIdx = 0;
@@ -82,6 +83,16 @@ const WireShape = ({ wire, nodes, isSelected, onSelect, onWireDragStart, activeN
 
   return (
     <>
+      {/* Dark outline for wire separation — prevents merging of adjacent wires */}
+      <Line
+        points={allPoints}
+        stroke="#06060f"
+        strokeWidth={isSelected ? 7 : 5.5}
+        tension={wire.routingMode === 'curved' ? 0.4 : 0}
+        lineCap="round"
+        lineJoin="round"
+        listening={false}
+      />
       {/* Main wire line */}
       <Line
         points={allPoints}
@@ -91,9 +102,9 @@ const WireShape = ({ wire, nodes, isSelected, onSelect, onWireDragStart, activeN
         lineCap="round"
         lineJoin="round"
         shadowColor={wire.color}
-        shadowBlur={isSelected ? 10 : 3}
-        shadowOpacity={0.5}
-        hitStrokeWidth={16}
+        shadowBlur={isSelected ? 10 : 4}
+        shadowOpacity={0.6}
+        hitStrokeWidth={18}
         onMouseDown={handleMouseDown}
         onTouchStart={handleMouseDown}
         onDblClick={handleDoubleClick}
@@ -178,7 +189,7 @@ const BendPointHandle = ({ wireId, index, point }: { wireId: string; index: numb
 // ── Live wiring preview ──
 const WiringPreview = ({ fromPos, mousePos }: { fromPos: { x: number; y: number }; mousePos: { x: number; y: number } }) => (
   <Line
-    points={[fromPos.x, fromPos.y, mousePos.x, mousePos.y]}
+    points={getWiringPreviewPoints(fromPos, mousePos)}
     stroke="#22c55e"
     strokeWidth={2}
     dash={[8, 4]}
@@ -190,7 +201,7 @@ const WiringPreview = ({ fromPos, mousePos }: { fromPos: { x: number; y: number 
   />
 );
 
-// ── Pin component ──
+// ── Pin component — large magnetic snap zones ──
 const PinDot = ({ pin, nodeId, isWiring, wiringFromNodeId, startWiring, finishWiring }: {
   pin: PinPosition; nodeId: string; isWiring: boolean; wiringFromNodeId: string | null;
   startWiring: (n: string, p: string) => void;
@@ -201,24 +212,57 @@ const PinDot = ({ pin, nodeId, isWiring, wiringFromNodeId, startWiring, finishWi
   const pinColor = pin.type === 'power' ? '#ef4444'
     : pin.type === 'ground' ? '#555555'
       : '#cbd5e1';
+  const glowColor = pin.type === 'power' ? '#ef4444'
+    : pin.type === 'ground' ? '#64748b'
+      : '#60a5fa';
 
   return (
     <Group>
-      {/* Valid target highlight ring */}
-      {isValidTarget && hovered && (
-        <Circle x={pin.x} y={pin.y} radius={10} fill="rgba(34,197,94,0.2)" stroke="#22c55e" strokeWidth={1.5} />
+      {/* Magnetic snap zone — large invisible hit area */}
+      {isValidTarget && (
+        <>
+          <Circle
+            x={pin.x} y={pin.y}
+            radius={hovered ? 18 : 14}
+            fill={hovered ? 'rgba(34,197,94,0.22)' : 'rgba(34,197,94,0.06)'}
+            stroke="#22c55e"
+            strokeWidth={hovered ? 2 : 1}
+            dash={hovered ? undefined : [4, 3]}
+            shadowColor="#22c55e"
+            shadowBlur={hovered ? 12 : 0}
+            listening={false}
+          />
+          {/* Direction indicator lines */}
+          {hovered && (
+            <>
+              <Line points={[pin.x - 22, pin.y, pin.x - 14, pin.y]} stroke="#22c55e" strokeWidth={1} opacity={0.5} listening={false} />
+              <Line points={[pin.x + 14, pin.y, pin.x + 22, pin.y]} stroke="#22c55e" strokeWidth={1} opacity={0.5} listening={false} />
+              <Line points={[pin.x, pin.y - 22, pin.x, pin.y - 14]} stroke="#22c55e" strokeWidth={1} opacity={0.5} listening={false} />
+              <Line points={[pin.x, pin.y + 14, pin.x, pin.y + 22]} stroke="#22c55e" strokeWidth={1} opacity={0.5} listening={false} />
+            </>
+          )}
+        </>
+      )}
+      {/* Type glow ring (always visible during wiring) */}
+      {isWiring && !isValidTarget && wiringFromNodeId === nodeId && (
+        <Circle x={pin.x} y={pin.y} radius={10}
+          fill="rgba(96,165,250,0.12)" stroke="#60a5fa" strokeWidth={1.5}
+          shadowColor="#60a5fa" shadowBlur={8} listening={false}
+        />
       )}
       {/* Pin dot */}
       <Circle
-        x={pin.x} y={pin.y} radius={4}
+        x={pin.x} y={pin.y} radius={hovered ? 8 : 6}
         fill={hovered ? (isValidTarget ? '#22c55e' : '#60a5fa') : pinColor}
-        stroke={hovered ? (isValidTarget ? '#22c55e' : '#60a5fa') : 'rgba(255,255,255,0.2)'}
-        strokeWidth={1}
-        hitStrokeWidth={16}
+        stroke={hovered ? (isValidTarget ? '#22c55e' : '#60a5fa') : 'rgba(255,255,255,0.25)'}
+        strokeWidth={1.5}
+        shadowColor={hovered ? glowColor : 'transparent'}
+        shadowBlur={hovered ? 8 : 0}
+        hitStrokeWidth={36}
         onClick={(e) => {
           e.cancelBubble = true;
           if (isWiring) {
-            if (wiringFromNodeId === nodeId) return; // Prevent self-connect
+            if (wiringFromNodeId === nodeId) return;
             finishWiring(nodeId, pin.id);
           } else {
             startWiring(nodeId, pin.id);
@@ -235,10 +279,11 @@ const PinDot = ({ pin, nodeId, isWiring, wiringFromNodeId, startWiring, finishWi
           if (c) c.style.cursor = 'default';
         }}
       />
-      {/* Pin label */}
-      <Text text={pin.name} x={pin.x + 7} y={pin.y - 5} fontSize={7}
-        fill="rgba(255,255,255,0.6)" fontFamily="JetBrains Mono"
-        shadowColor="black" shadowBlur={3} listening={false}
+      {/* Pin label — always visible during wiring */}
+      <Text text={pin.name} x={pin.x + 9} y={pin.y - 5} fontSize={8}
+        fill={hovered ? 'rgba(255,255,255,1)' : isWiring ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.48)'}
+        fontFamily="JetBrains Mono" fontStyle={hovered ? '700' : '400'}
+        shadowColor="black" shadowBlur={4} listening={false}
       />
     </Group>
   );
@@ -288,16 +333,20 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
         onTouchEnd={() => { if (isButton && onInteraction) onInteraction(node.id, 'release'); }}
         onDragMove={(e) => {
           const state = useCanvasStore.getState();
+          // Snap to other components' positions, centers, AND pin positions
           const anchors = state.nodes
             .filter(item => item.id !== node.id)
             .flatMap(item => [
               { x: item.x, y: item.y },
               { x: item.x + item.width, y: item.y + item.height },
               { x: item.x + item.width / 2, y: item.y + item.height / 2 },
+              // Include pin absolute positions for pin-to-pin alignment
+              ...item.pins.map(p => getPinAbsPos(item, p.id)).filter(Boolean) as { x: number; y: number }[],
             ]);
-          const snapped = snapToRoutingGuides({ x: e.target.x(), y: e.target.y() }, anchors, 5);
-          const sx = snapped.x;
-          const sy = snapped.y;
+          const snapped = snapToRoutingGuides({ x: e.target.x(), y: e.target.y() }, anchors, 8);
+          // Grid-snap fallback (20px grid)
+          const sx = anchors.some(a => Math.abs(a.x - snapped.x) <= 8) ? snapped.x : Math.round(snapped.x / MAT_GRID_MINOR) * MAT_GRID_MINOR;
+          const sy = anchors.some(a => Math.abs(a.y - snapped.y) <= 8) ? snapped.y : Math.round(snapped.y / MAT_GRID_MINOR) * MAT_GRID_MINOR;
           e.target.x(sx);
           e.target.y(sy);
           if (sx !== node.x || sy !== node.y) {
@@ -426,24 +475,67 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
   );
 };
 
-// ── Grid Layer (memoized) ──
-const GridDots = ({ width, height, scale }: { width: number; height: number; scale: number }) => {
-  const dots = useMemo(() => {
+// ── Grid Layer (memoized) — professional engineering grid ──
+const CanvasMat = ({ width, height, viewport }: { width: number; height: number; viewport: { x: number; y: number; scale: number } }) => {
+  const guides = useMemo(() => {
     const result: React.ReactNode[] = [];
-    const cols = Math.ceil(width / scale / GRID) + 20;
-    const rows = Math.ceil(height / scale / GRID) + 20;
-    for (let i = 0; i < cols; i++) {
-      for (let j = 0; j < rows; j++) {
-        result.push(
-          <Circle key={`g${i}_${j}`} x={i * GRID} y={j * GRID}
-            radius={0.6} fill="rgba(255,255,255,0.06)" listening={false}
-          />
-        );
-      }
+    const scale = viewport.scale || 1;
+    const pad = 200;
+    const minX = Math.floor((-viewport.x / scale - pad) / MAT_GRID_MINOR) * MAT_GRID_MINOR;
+    const minY = Math.floor((-viewport.y / scale - pad) / MAT_GRID_MINOR) * MAT_GRID_MINOR;
+    const maxX = -viewport.x / scale + width / scale + pad;
+    const maxY = -viewport.y / scale + height / scale + pad;
+
+    // Minor grid lines (fine 20px)
+    for (let x = minX; x <= maxX; x += MAT_GRID_MINOR) {
+      if (x % MAT_GRID_MAJOR === 0) continue;
+      result.push(
+        <Line key={`gm_x_${x}`} points={[x, minY, x, maxY]}
+          stroke="rgba(255,255,255,0.025)" strokeWidth={0.5 / scale} listening={false} />
+      );
     }
+    for (let y = minY; y <= maxY; y += MAT_GRID_MINOR) {
+      if (y % MAT_GRID_MAJOR === 0) continue;
+      result.push(
+        <Line key={`gm_y_${y}`} points={[minX, y, maxX, y]}
+          stroke="rgba(255,255,255,0.025)" strokeWidth={0.5 / scale} listening={false} />
+      );
+    }
+
+    // Major grid lines (100px)
+    const majorMinX = Math.floor(minX / MAT_GRID_MAJOR) * MAT_GRID_MAJOR;
+    const majorMinY = Math.floor(minY / MAT_GRID_MAJOR) * MAT_GRID_MAJOR;
+    for (let x = majorMinX; x <= maxX; x += MAT_GRID_MAJOR) {
+      result.push(
+        <Line key={`gM_x_${x}`} points={[x, minY, x, maxY]}
+          stroke={x === 0 ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.055)'}
+          strokeWidth={(x === 0 ? 1.4 : 0.8) / scale} listening={false} />
+      );
+    }
+    for (let y = majorMinY; y <= maxY; y += MAT_GRID_MAJOR) {
+      result.push(
+        <Line key={`gM_y_${y}`} points={[minX, y, maxX, y]}
+          stroke={y === 0 ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.055)'}
+          strokeWidth={(y === 0 ? 1.4 : 0.8) / scale} listening={false} />
+      );
+    }
+
     return result;
-  }, [Math.ceil(width / scale / GRID), Math.ceil(height / scale / GRID)]);
-  return <>{dots}</>;
+  }, [width, height, viewport.x, viewport.y, viewport.scale]);
+
+  return (
+    <>
+      <Rect
+        x={-viewport.x / viewport.scale}
+        y={-viewport.y / viewport.scale}
+        width={width / viewport.scale}
+        height={height / viewport.scale}
+        fill="#06060f"
+        listening={false}
+      />
+      {guides}
+    </>
+  );
 };
 
 // ── Wire Color Picker Toolbar ──
@@ -476,7 +568,7 @@ const WireToolbar = () => {
           setWiringMode(next as any);
         }}
         className="text-[10px] px-2 py-1 rounded bg-white/5 text-surface-300 hover:text-white hover:bg-white/10">
-        {wiringMode === 'straight' ? 'Straight' : wiringMode === 'orthogonal' ? 'Orthogonal' : wiringMode === 'auto' ? 'Auto-route' : 'Curved'}
+        {wiringMode === 'straight' ? 'Straight' : wiringMode === 'orthogonal' ? 'Orthogonal' : wiringMode === 'auto' ? 'Smart-route' : 'Curved'}
       </button>
       <span className="text-[9px] text-surface-500 ml-1">Click a pin to connect • ESC to cancel</span>
     </div>
@@ -487,7 +579,7 @@ const WireToolbar = () => {
 const PcbTraceLayer = ({ nodes, wires }: { nodes: CanvasNode[]; wires: Wire[] }) => (
   <Layer listening={false}>
     {wires.map((wire, index) => {
-      const points = getWireRenderPoints({ ...wire, routingMode: 'auto' }, nodes);
+      const points = getWireRenderPoints({ ...wire, routingMode: 'auto' }, nodes, [], wires);
       const isBottom = index % 2 === 1;
       return (
         <Line
@@ -546,10 +638,10 @@ export default function CircuitCanvas({ width, height, viewMode = 'breadboard', 
     if (!stage) return;
     const old = viewport.scale;
     const ptr = stage.getPointerPosition();
-    const mp = { x: (ptr.x - viewport.x) / old, y: (ptr.y - viewport.y) / old };
+    const mp = stage.getRelativePointerPosition() || { x: 0, y: 0 };
     const dir = e.evt.deltaY > 0 ? -1 : 1;
     const ns = Math.max(0.15, Math.min(4, dir > 0 ? old * 1.08 : old / 1.08));
-    setViewport({ scale: ns, x: ptr.x - mp.x * ns, y: ptr.y - mp.y * ns });
+    setViewport({ scale: ns, x: (ptr?.x || 0) - mp.x * ns, y: (ptr?.y || 0) - mp.y * ns });
   }, [viewport, setViewport]);
 
   // Keyboard shortcuts
@@ -617,10 +709,10 @@ export default function CircuitCanvas({ width, height, viewMode = 'breadboard', 
         onMouseMove={(e) => {
           const stage = stageRef.current;
           if (!stage) return;
-          const ptr = stage.getPointerPosition();
-          if (!ptr) return;
-          const x = (ptr.x - viewport.x) / viewport.scale;
-          const y = (ptr.y - viewport.y) / viewport.scale;
+          const pos = stage.getRelativePointerPosition();
+          if (!pos) return;
+          const x = pos.x;
+          const y = pos.y;
 
           if (isWiring) {
             setMousePos({ x, y });
@@ -643,7 +735,7 @@ export default function CircuitCanvas({ width, height, viewMode = 'breadboard', 
       >
         {/* Grid layer (below everything) */}
         <Layer ref={gridLayerRef} listening={false}>
-          <GridDots width={width} height={height} scale={viewport.scale} />
+          <CanvasMat width={width} height={height} viewport={viewport} />
         </Layer>
 
         {viewMode === 'pcb' && <PcbTraceLayer nodes={nodes} wires={wires} />}
@@ -667,7 +759,7 @@ export default function CircuitCanvas({ width, height, viewMode = 'breadboard', 
         {/* Wire layer (on top — wires should never be hidden under components) */}
         <Layer>
           {wires.map(w => (
-            <WireShape key={w.id} wire={w} nodes={nodes}
+            <WireShape key={w.id} wire={w} nodes={nodes} wires={wires}
               isSelected={w.id === selectedWireId}
               onSelect={() => selectWire(w.id)}
               onWireDragStart={handleWireDragStart}

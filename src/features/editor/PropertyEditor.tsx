@@ -131,7 +131,7 @@ function WirePropertiesPanel() {
                 onClick={() => updateWire(selectedWire.id, { routingMode: 'auto' })}
                 className={`flex-1 px-3 py-1.5 rounded-lg text-[10px] font-medium border ${selectedWire.routingMode === 'auto' ? 'bg-volt-500/20 text-volt-400 border-volt-500/30' : 'bg-white/5 text-surface-400 border-white/10'}`}
               >
-                Auto
+                Smart
               </button>
             </div>
           </div>

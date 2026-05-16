@@ -218,7 +218,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       const shouldUpgrade = mode === 'straight' && (!w.bendPoints || w.bendPoints.length === 0);
       return {
         ...w,
-        bendPoints: w.bendPoints || [],
+        bendPoints: shouldUpgrade || mode === 'auto' ? [] : w.bendPoints || [],
         routingMode: shouldUpgrade ? 'auto' as RoutingMode : mode,
       };
     });

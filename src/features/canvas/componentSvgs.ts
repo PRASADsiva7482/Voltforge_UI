@@ -313,25 +313,25 @@ export const componentSvgs: Record<string, string> = {
 // Default dimensions for each component type (width x height)
 // These MUST match the SVG viewBox and pin coordinates in pinRegistry.ts
 export const componentDimensions: Record<string, { w: number; h: number }> = {
-  // Boards
+  // Boards (match SVG viewBox exactly)
   ARDUINO_UNO: { w: 200, h: 150 },
-  ARDUINO_MEGA: { w: 340, h: 170 },
+  ARDUINO_MEGA: { w: 280, h: 120 },
   ARDUINO_NANO: { w: 100, h: 160 },
   ESP32: { w: 100, h: 160 },
   ESP32_S3: { w: 100, h: 160 },
   ESP8266: { w: 100, h: 160 },
 
-  // Passives
-  RESISTOR: { w: 80, h: 40 },
-  CAPACITOR: { w: 60, h: 50 },
+  // Passives (match SVG viewBox)
+  RESISTOR: { w: 90, h: 24 },
+  CAPACITOR: { w: 40, h: 50 },
   POTENTIOMETER: { w: 50, h: 50 },
   MULTIMETER: { w: 90, h: 70 },
   IC_555_TIMER: { w: 90, h: 50 },
   IC_74HC595: { w: 120, h: 50 },
 
-  // LEDs
-  LED_STANDARD: { w: 50, h: 50 },
-  LED_RGB: { w: 56, h: 60 },
+  // LEDs (match SVG viewBox)
+  LED_STANDARD: { w: 40, h: 80 },
+  LED_RGB: { w: 50, h: 80 },
   LED_NEOPIXEL: { w: 60, h: 20 },
 
   // Input
@@ -341,33 +341,33 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
   // Output
   BUZZER: { w: 50, h: 50 },
   SERVO_MOTOR: { w: 70, h: 50 },
-  MOTOR_SERVO: { w: 70, h: 50 },
+  MOTOR_SERVO: { w: 60, h: 50 },
   MOTOR_DC: { w: 70, h: 50 },
   STEPPER_MOTOR: { w: 70, h: 70 },
   MOTOR_STEPPER: { w: 70, h: 70 },
-  RELAY_SPDT: { w: 60, h: 60 },
-  RELAY_SINGLE: { w: 60, h: 60 },
+  RELAY_SPDT: { w: 70, h: 50 },
+  RELAY_SINGLE: { w: 70, h: 50 },
   RELAY_4CH: { w: 120, h: 50 },
 
-  // Sensors
-  TEMP_SENSOR: { w: 50, h: 50 },
+  // Sensors (match SVG viewBox)
+  TEMP_SENSOR: { w: 60, h: 80 },
   SENSOR_DHT11: { w: 60, h: 80 },
-  SENSOR_DHT22: { w: 50, h: 50 },
-  ULTRASONIC_SENSOR: { w: 60, h: 60 },
-  SENSOR_ULTRASONIC: { w: 60, h: 60 },
-  PIR_SENSOR: { w: 50, h: 50 },
-  SENSOR_PIR: { w: 50, h: 50 },
-  LDR: { w: 40, h: 30 },
-  SENSOR_LDR: { w: 40, h: 30 },
+  SENSOR_DHT22: { w: 60, h: 80 },
+  ULTRASONIC_SENSOR: { w: 80, h: 60 },
+  SENSOR_ULTRASONIC: { w: 80, h: 60 },
+  PIR_SENSOR: { w: 60, h: 70 },
+  SENSOR_PIR: { w: 60, h: 70 },
+  LDR: { w: 40, h: 40 },
+  SENSOR_LDR: { w: 40, h: 40 },
   SOIL_MOISTURE: { w: 40, h: 50 },
   IR_RECEIVER: { w: 40, h: 40 },
   SENSOR_IMU: { w: 60, h: 60 },
 
-  // Displays
+  // Displays (match SVG viewBox)
   LCD_16X2: { w: 170, h: 60 },
-  DISPLAY_LCD_I2C: { w: 170, h: 60 },
-  OLED_DISPLAY: { w: 60, h: 60 },
-  DISPLAY_OLED: { w: 60, h: 60 },
+  DISPLAY_LCD_I2C: { w: 120, h: 60 },
+  OLED_DISPLAY: { w: 80, h: 60 },
+  DISPLAY_OLED: { w: 80, h: 60 },
   DISPLAY_7SEG: { w: 50, h: 70 },
 
   // Communication
@@ -375,5 +375,5 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
   WIFI_MODULE: { w: 60, h: 50 },
 
   // Other
-  BREADBOARD: { w: 300, h: 100 },
+  BREADBOARD: { w: 200, h: 80 },
 };

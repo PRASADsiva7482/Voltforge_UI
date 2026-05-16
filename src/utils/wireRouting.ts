@@ -1,8 +1,12 @@
 import type { CanvasNode, Wire, WireBendPoint } from '../types';
 
 export const ROUTING_GRID = 10;
+const SMART_STUB = 36;
+const SMART_LANE_GAP = 32;
+const SHORT_LINK_DISTANCE = 100;
+const MIN_WIRE_SEPARATION = 18;
 
-interface Point {
+export interface Point {
   x: number;
   y: number;
 }
@@ -63,6 +67,10 @@ export function getPinAbsPos(node: CanvasNode, pinId: string): Point | null {
 }
 
 export function routeWireBetweenNodes(wire: Wire, nodes: CanvasNode[]): WireBendPoint[] {
+  if (wire.routingMode === 'auto') {
+    return [];
+  }
+
   const from = nodes.find((node) => node.id === wire.fromNodeId);
   const to = nodes.find((node) => node.id === wire.toNodeId);
   if (!from || !to) return wire.bendPoints || [];
@@ -91,7 +99,12 @@ export function snapToRoutingGuides(point: Point, anchors: Point[], threshold = 
   return { x, y };
 }
 
-export function getWireRenderPoints(wire: Wire, nodes: CanvasNode[], bendPoints = wire.bendPoints || []): number[] {
+export function getWireRenderPoints(
+  wire: Wire,
+  nodes: CanvasNode[],
+  bendPoints = wire.bendPoints || [],
+  allWires: Wire[] = [wire],
+): number[] {
   const from = nodes.find((node) => node.id === wire.fromNodeId);
   const to = nodes.find((node) => node.id === wire.toNodeId);
   if (!from || !to) return [];
@@ -100,7 +113,11 @@ export function getWireRenderPoints(wire: Wire, nodes: CanvasNode[], bendPoints 
   const end = getPinAbsPos(to, wire.toPinId);
   if (!start || !end) return [];
 
-  if (wire.routingMode !== 'orthogonal' && wire.routingMode !== 'auto') {
+  if (wire.routingMode === 'auto' || (wire.routingMode === 'orthogonal' && bendPoints.length === 0)) {
+    return smartOrthogonalRoute(wire, from, to, start, end, allWires).flatMap((point) => [point.x, point.y]);
+  }
+
+  if (wire.routingMode !== 'orthogonal') {
     return [start, ...bendPoints, end].flatMap((point) => [point.x, point.y]);
   }
 
@@ -117,6 +134,172 @@ export function getWireRenderPoints(wire: Wire, nodes: CanvasNode[], bendPoints 
   }
   points.push(end.x, end.y);
   return points;
+}
+
+export function getWiringPreviewPoints(start: Point, end: Point): number[] {
+  return routeBetweenPorts(
+    start,
+    end,
+    directionBetween(start, end),
+    directionBetween(end, start),
+    0,
+  ).flatMap((point) => [point.x, point.y]);
+}
+
+function smartOrthogonalRoute(
+  wire: Wire,
+  from: CanvasNode,
+  to: CanvasNode,
+  start: Point,
+  end: Point,
+  allWires: Wire[],
+): Point[] {
+  const laneOffset = wireLaneOffset(wire, allWires);
+  const startDirection = pinExitDirection(from, start);
+  const endDirection = pinExitDirection(to, end);
+  return routeBetweenPorts(start, end, startDirection, endDirection, laneOffset);
+}
+
+function routeBetweenPorts(start: Point, end: Point, startDirection: Point, endDirection: Point, laneOffset: number): Point[] {
+  const distance = Math.hypot(end.x - start.x, end.y - start.y);
+  if (distance < SHORT_LINK_DISTANCE) {
+    // Ensure minimum separation even for short links
+    const baseOffset = shortLinkOffset(start, end);
+    const offset = laneOffset
+      ? (Math.abs(laneOffset) < MIN_WIRE_SEPARATION ? Math.sign(laneOffset) * MIN_WIRE_SEPARATION : laneOffset)
+      : baseOffset;
+    return simplifyRoute(shortLinkRoute(start, end, offset));
+  }
+
+  const stub = SMART_STUB + Math.min(18, Math.abs(laneOffset) * 0.35);
+  const startStub = add(start, multiply(startDirection, stub));
+  const endStub = add(end, multiply(endDirection, stub));
+  const preferVerticalSpine = startDirection.x !== 0 || endDirection.x !== 0;
+
+  if (preferVerticalSpine) {
+    const base = startDirection.x !== 0 && endDirection.x !== 0
+      ? (startStub.x + endStub.x) / 2
+      : startDirection.x !== 0
+        ? startStub.x
+        : endStub.x;
+    const spineX = round(base + laneOffset);
+    return simplifyRoute([
+      start,
+      startStub,
+      { x: spineX, y: startStub.y },
+      { x: spineX, y: endStub.y },
+      endStub,
+      end,
+    ]);
+  }
+
+  const base = startDirection.y !== 0 && endDirection.y !== 0
+    ? (startStub.y + endStub.y) / 2
+    : startDirection.y !== 0
+      ? startStub.y
+      : endStub.y;
+  const spineY = round(base + laneOffset);
+  return simplifyRoute([
+    start,
+    startStub,
+    { x: startStub.x, y: spineY },
+    { x: endStub.x, y: spineY },
+    endStub,
+    end,
+  ]);
+}
+
+function shortLinkRoute(start: Point, end: Point, offset: number): Point[] {
+  if (Math.abs(end.x - start.x) >= Math.abs(end.y - start.y)) {
+    const y = round((start.y + end.y) / 2 + offset);
+    return [start, { x: start.x, y }, { x: end.x, y }, end];
+  }
+  const x = round((start.x + end.x) / 2 + offset);
+  return [start, { x, y: start.y }, { x, y: end.y }, end];
+}
+
+function shortLinkOffset(start: Point, end: Point): number {
+  const sign = Math.abs(end.x - start.x) >= Math.abs(end.y - start.y)
+    ? (end.y >= start.y ? 1 : -1)
+    : (end.x >= start.x ? 1 : -1);
+  return sign * 22;
+}
+
+function wireLaneOffset(wire: Wire, allWires: Wire[]): number {
+  const related = allWires
+    .filter((candidate) => componentPairKey(candidate) === componentPairKey(wire))
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  if (related.length <= 1) {
+    return 0;
+  }
+
+  const index = Math.max(0, related.findIndex((candidate) => candidate.id === wire.id));
+  // Use at least MIN_WIRE_SEPARATION between lanes so wires never overlap
+  const gap = Math.max(SMART_LANE_GAP, MIN_WIRE_SEPARATION);
+  return round((index - (related.length - 1) / 2) * gap);
+}
+
+function componentPairKey(wire: Wire): string {
+  return [wire.fromNodeId, wire.toNodeId].sort().join('|');
+}
+
+function pinExitDirection(node: CanvasNode, pinPosition: Point): Point {
+  const center = {
+    x: node.x + node.width / 2,
+    y: node.y + node.height / 2,
+  };
+  const dx = pinPosition.x - center.x;
+  const dy = pinPosition.y - center.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return { x: dx >= 0 ? 1 : -1, y: 0 };
+  }
+  return { x: 0, y: dy >= 0 ? 1 : -1 };
+}
+
+function directionBetween(from: Point, to: Point): Point {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return { x: dx >= 0 ? 1 : -1, y: 0 };
+  }
+  return { x: 0, y: dy >= 0 ? 1 : -1 };
+}
+
+function simplifyRoute(points: Point[]): Point[] {
+  const unique = points
+    .map((point) => ({ x: round(point.x), y: round(point.y) }))
+    .filter((point, index, list) => index === 0 || point.x !== list[index - 1].x || point.y !== list[index - 1].y);
+
+  if (unique.length <= 2) {
+    return unique;
+  }
+
+  const simplified: Point[] = [unique[0]];
+  for (let i = 1; i < unique.length - 1; i += 1) {
+    const prev = simplified[simplified.length - 1];
+    const current = unique[i];
+    const next = unique[i + 1];
+    const sameX = prev.x === current.x && current.x === next.x;
+    const sameY = prev.y === current.y && current.y === next.y;
+    if (!sameX && !sameY) {
+      simplified.push(current);
+    }
+  }
+  simplified.push(unique[unique.length - 1]);
+  return simplified;
+}
+
+function add(a: Point, b: Point): Point {
+  return { x: round(a.x + b.x), y: round(a.y + b.y) };
+}
+
+function multiply(point: Point, amount: number): Point {
+  return { x: point.x * amount, y: point.y * amount };
+}
+
+function round(value: number): number {
+  return Math.round(value * 10) / 10;
 }
 
 export function routeAroundComponents(

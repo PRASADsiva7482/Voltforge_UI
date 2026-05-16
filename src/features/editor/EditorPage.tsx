@@ -82,7 +82,7 @@ export default function EditorPage() {
       const componentPanelWidth = (activePanel === 'canvas' || activePanel === 'split') ? 224 : 0; // w-56 is 224px
       const availableWidth = windowWidth - componentPanelWidth;
       const mouseX = e.clientX - componentPanelWidth;
-      
+
       let newRatio = (mouseX / availableWidth) * 100;
       // Constraint to reasonable bounds (e.g., 20% to 80%)
       newRatio = Math.max(20, Math.min(80, newRatio));
@@ -260,8 +260,8 @@ export default function EditorPage() {
 
     // Simulate sending high/low for buttons
     const nodePinIds = node.pins?.map(p => p.id) || [];
-    const connectedWires = wires.filter(w => 
-      (w.fromNodeId === nodeId && nodePinIds.includes(w.fromPinId)) || 
+    const connectedWires = wires.filter(w =>
+      (w.fromNodeId === nodeId && nodePinIds.includes(w.fromPinId)) ||
       (w.toNodeId === nodeId && nodePinIds.includes(w.toPinId))
     );
 
@@ -269,7 +269,7 @@ export default function EditorPage() {
       const isFromNode = wire.fromNodeId === nodeId;
       const targetNodeId = isFromNode ? wire.toNodeId : wire.fromNodeId;
       const targetPinId = isFromNode ? wire.toPinId : wire.fromPinId;
-      
+
       const targetNode = nodes.find(n => n.id === targetNodeId);
       if (targetNode && (targetNode.type.startsWith('ARDUINO') || targetNode.type.startsWith('ESP'))) {
         const mcuPin = targetNode.pins?.find(p => p.id === targetPinId);
@@ -425,17 +425,16 @@ export default function EditorPage() {
         {(activePanel === 'canvas' || activePanel === 'split') && <ComponentPanel />}
         <div className="flex flex-1">
           {(activePanel === 'canvas' || activePanel === 'split') && (
-            <div 
-              ref={canvasContainerCallbackRef} 
+            <div
               className="bg-[#0a0a14] relative flex flex-col"
               style={{ width: activePanel === 'split' ? `${splitRatio}%` : '100%' }}
             >
               {isSimulating && <div className="absolute top-3 right-3 z-10 glass px-2.5 py-1 rounded-full flex items-center gap-1.5 border border-volt-500/30"><span className="w-1.5 h-1.5 rounded-full bg-volt-500 animate-pulse" /><span className="text-[10px] font-medium text-volt-400">Simulating</span></div>}
               {isAiRouting && <div className="absolute top-3 right-3 z-10 glass px-2.5 py-1 rounded-full flex items-center gap-1.5 border border-purple-500/30"><Wand2 className="w-3 h-3 text-purple-400 animate-spin" /><span className="text-[10px] font-medium text-purple-400">AI Routing...</span></div>}
-              <div className="flex-1 relative min-h-0 min-w-0">
-                <CircuitCanvas 
-                  width={canvasSize.width} 
-                  height={canvasSize.height} 
+              <div ref={canvasContainerCallbackRef} className="flex-1 relative min-h-0 min-w-0 p-0 m-0 border-0">
+                <CircuitCanvas
+                  width={canvasSize.width}
+                  height={canvasSize.height}
                   viewMode={canvasViewMode}
                   collaborators={activeUsers}
                   onCursorMove={broadcastCursorMove}
@@ -444,16 +443,16 @@ export default function EditorPage() {
               </div>
             </div>
           )}
-          
+
           {activePanel === 'split' && (
-            <div 
+            <div
               className="w-1.5 bg-surface-900 border-x border-white/5 cursor-col-resize hover:bg-volt-500/50 active:bg-volt-500 flex-shrink-0 z-10 transition-colors"
               onMouseDown={handleSplitDragStart}
             />
           )}
 
           {(activePanel === 'code' || activePanel === 'split') && (
-            <div 
+            <div
               className="relative min-w-0"
               style={{ width: activePanel === 'split' ? `${100 - splitRatio}%` : '100%' }}
             >
@@ -461,7 +460,7 @@ export default function EditorPage() {
             </div>
           )}
         </div>
-        
+
         {/* Right Panel for Property Editor */}
         {(selectedNodeId || useCanvasStore.getState().selectedWireId) && (activePanel === 'canvas' || activePanel === 'split') && (
           <div className="absolute right-0 top-0 h-full border-l border-white/5 shadow-[-10px_0_20px_rgba(0,0,0,0.5)] z-20 bg-surface-950/50 backdrop-blur-md">
