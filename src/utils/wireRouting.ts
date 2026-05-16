@@ -53,7 +53,33 @@ const snap = (value: number) => Math.round(value / ROUTING_GRID) * ROUTING_GRID;
  * on-screen rendering.
  */
 export function getPinAbsPos(node: CanvasNode, pinId: string): Point | null {
-  const pin = node.pins?.find((p) => p.id === pinId);
+  if (!node.pins || node.pins.length === 0) return null;
+
+  // 1. Exact ID match (primary)
+  let pin = node.pins.find((p) => p.id === pinId);
+
+  // 2. Fallback: match by name (case-insensitive)
+  if (!pin) {
+    pin = node.pins.find((p) => p.name.toLowerCase() === pinId.toLowerCase());
+  }
+
+  // 3. Fallback: match by partial ID (e.g., wire has 'esp32_pin_3' → strip to index '3')
+  if (!pin) {
+    const idxMatch = pinId.match(/(\d+)$/);
+    if (idxMatch) {
+      const idx = parseInt(idxMatch[1], 10);
+      if (idx >= 0 && idx < node.pins.length) {
+        pin = node.pins[idx];
+      }
+    }
+  }
+
+  // 4. Fallback: partial string match (e.g., pinId 'vcc' matches pin.id 'display_lcd_i2c_pin_vcc')
+  if (!pin) {
+    const lower = pinId.toLowerCase();
+    pin = node.pins.find((p) => p.id.toLowerCase().includes(lower) || lower.includes(p.id.toLowerCase()));
+  }
+
   if (!pin) return null;
 
   const rad = ((node.rotation || 0) * Math.PI) / 180;

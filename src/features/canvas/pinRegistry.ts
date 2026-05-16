@@ -411,12 +411,9 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
  * Otherwise, generate simple pin positions from pinConfig keys.
  */
 export function getPinsForComponent(type: string, pinConfig?: Record<string, unknown>, width = 100, height = 60): PinPosition[] {
-  // Use registry if available
+  // Use registry if available — preserve original pin IDs so wires can reference them
   if (boardPinRegistry[type]) {
-    return boardPinRegistry[type].map((p, i) => ({
-      ...p,
-      id: `${type.toLowerCase()}_pin_${i}`,
-    }));
+    return boardPinRegistry[type].map((p) => ({ ...p }));
   }
 
   const configuredPins = pinConfig?.pins;

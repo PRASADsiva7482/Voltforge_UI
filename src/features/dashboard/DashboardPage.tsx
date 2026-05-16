@@ -139,7 +139,7 @@ export default function DashboardPage() {
             <p className="text-surface-400 mb-6 text-center max-w-sm">Create your first circuit to get started and see it appear here.</p>
             <button
               onClick={() => navigate('/projects/new')}
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-volt-500 to-volt-600 text-white font-medium hover:from-volt-400 hover:to-volt-500 transition-all duration-300 shadow-[0_0_15px_rgba(34,197,94,0.3)]"
+              className="vf-btn vf-btn-primary shadow-[0_0_18px_rgba(34,197,94,0.25)]"
             >
               {t('Create Project')}
             </button>
@@ -180,7 +180,7 @@ function ProjectCard({ project, onClick }: { project: ProjectSummary; onClick: (
 
       {/* Info */}
       <h3 className="text-base font-semibold text-white mb-1 truncate">{project.name}</h3>
-      <p className="text-xs text-surface-400 mb-3 line-clamp-2">{project.description || 'No description'}</p>
+      <p className="text-xs text-surface-400 mb-3 line-clamp-2 min-h-[2.5rem]">{project.description || 'No description'}</p>
 
       {/* Meta */}
       <div className="flex items-center gap-4 text-xs text-surface-500">

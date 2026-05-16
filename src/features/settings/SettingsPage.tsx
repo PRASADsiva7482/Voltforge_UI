@@ -47,7 +47,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="p-8 max-w-3xl mx-auto pt-8 pb-20">
+    <div className="p-8 max-w-4xl mx-auto pt-8 pb-20">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-10">
         <h1 className="text-3xl font-bold text-white mb-2">{t('Settings')}</h1>
@@ -59,7 +59,7 @@ export default function SettingsPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="glass rounded-2xl p-8 mb-6"
+        className="glass rounded-2xl p-8 mb-8"
       >
         <div className="flex items-center gap-3 mb-8">
           <User className="w-5 h-5 text-volt-400" />
@@ -127,7 +127,7 @@ export default function SettingsPage() {
           <button
             onClick={() => updateMutation.mutate()}
             disabled={updateMutation.isPending}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-volt-500 to-volt-600 text-white font-medium hover:from-volt-400 hover:to-volt-500 transition-all shadow-[0_0_15px_rgba(34,197,94,0.3)] disabled:opacity-50"
+            className="vf-btn vf-btn-primary shadow-[0_0_18px_rgba(34,197,94,0.25)] disabled:opacity-50"
           >
             {saved ? <><Check className="w-4 h-4" /> Saved!</> : <><Save className="w-4 h-4" /> {updateMutation.isPending ? 'Saving...' : 'Save Changes'}</>}
           </button>
@@ -139,7 +139,7 @@ export default function SettingsPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
-        className="glass rounded-2xl p-8 mb-6"
+        className="glass rounded-2xl p-8 mb-8"
       >
         <div className="flex items-center gap-3 mb-6">
           <Shield className="w-5 h-5 text-forge-400" />
@@ -199,7 +199,7 @@ export default function SettingsPage() {
               TEAM: ['Everything in PRO', 'Team collaboration', 'Private sharing', 'Admin dashboard'],
             };
             return (
-              <div key={plan} className={`p-5 rounded-xl border transition-all ${isActive ? 'border-volt-500/40 bg-volt-500/5 shadow-[0_0_15px_rgba(34,197,94,0.1)]' : 'border-white/5 bg-white/[0.02]'}`}>
+              <div key={plan} className={`p-7 rounded-xl border transition-all ${isActive ? 'border-volt-500/40 bg-volt-500/5 shadow-[0_0_15px_rgba(34,197,94,0.1)]' : 'border-white/5 bg-white/[0.02]'}`}>
                 <div className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-gradient-to-r ${planColors[plan]} text-white mb-3`}>
                   {plan}
                 </div>

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Save, ArrowLeft, Play, Square, Settings, Layout, Wand2, Terminal, Sparkles, Undo, Redo, Gauge, Activity, Package, ShieldAlert, Download, Share2, Layers } from 'lucide-react';
+import { Save, ArrowLeft, Play, Square, Settings, Layout, Wand2, Terminal, Sparkles, Undo, Redo, Gauge, Activity, Package, ShieldAlert, Download, Share2, Layers, GitFork } from 'lucide-react';
 import CircuitCanvas from '../canvas/CircuitCanvas';
 import ComponentPanel from '../components/ComponentPanel';
 import CodeEditor from '../editor/CodeEditor';
@@ -16,6 +16,7 @@ import { projectApi, aiApi, projectExportApi, simulationApi } from '../../api/se
 import { useProjectStore } from '../../store/projectStore';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useSimulationStore } from '../../store/simulationStore';
+import { useAuthStore } from '../../store/authStore';
 import { useCollaboration } from '../../hooks/useCollaboration';
 import { SimulationEngine } from '../simulator/SimulationEngine';
 import { LogicRegistry } from '../simulator/logic/LogicRegistry';
@@ -105,6 +106,26 @@ export default function EditorPage() {
   const { nodes, wires, addWire, updateNode, selectedNodeId, undo, redo, historyIndex, history } = useCanvasStore();
   const { writeSerial, clearSerial, serialPanelOpen, setSerialPanelOpen, setBaudRate, setDebugSnapshot, debugSnapshot } = useSimulationStore();
   const { isConnected, activeUsers, broadcastCanvasSync, broadcastCursorMove } = useCollaboration(projectId || '');
+  const { user } = useAuthStore();
+
+  // Ownership check — non-owners get a read-only view
+  const isOwner = !currentProject || currentProject.owner.id === user?.id;
+
+  // Fork mutation — duplicates the project to the current user's account
+  const forkMutation = useMutation({
+    mutationFn: async () => {
+      if (!currentProject) return;
+      const response = await projectApi.fork(currentProject.id);
+      return response.data.data;
+    },
+    onSuccess: (forkedProject) => {
+      if (forkedProject) {
+        navigate('/editor/' + forkedProject.id);
+      }
+    },
+  });
+
+  const handleFork = useCallback(() => forkMutation.mutate(), [forkMutation]);
 
   const { data: projectData, isLoading } = useQuery({
     queryKey: ['project', projectId],
@@ -370,59 +391,70 @@ export default function EditorPage() {
       <ProjectSettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/5 glass z-10">
-        <button onClick={() => navigate('/dashboard')} className="p-1.5 rounded-lg hover:bg-white/5 text-surface-400 hover:text-white transition-colors"><ArrowLeft className="w-4 h-4" /></button>
-        <div className="flex-1 min-w-0">
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-white/5 glass z-10">
+        {/* ── Navigation & Project Info ── */}
+        <button onClick={() => navigate('/dashboard')} className="p-2 rounded-lg hover:bg-white/5 text-surface-400 hover:text-white transition-all" title="Back to Dashboard"><ArrowLeft className="w-4 h-4" /></button>
+        <div className="flex-1 min-w-0 ml-1">
           <h2 className="text-xs font-semibold text-white truncate">{currentProject?.name || 'Untitled'}</h2>
           <p className="text-[9px] text-surface-500">{currentProject?.boardType?.replace(/_/g, ' ')}</p>
         </div>
         {isConnected && <span className="w-2 h-2 rounded-full bg-volt-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />}
 
-        {/* View Modes */}
-        <div className="flex items-center gap-0.5 bg-surface-900 rounded-lg p-0.5">
+        {/* ── View Mode Switcher ── */}
+        <div className="flex items-center gap-0.5 bg-surface-900/80 rounded-lg p-0.5">
           {(['canvas', 'split', 'code'] as ActivePanel[]).map(p => (
-            <button key={p} onClick={() => setActivePanel(p)} className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-colors ${activePanel === p ? 'bg-volt-500/20 text-volt-400' : 'text-surface-400 hover:text-white'}`}>
+            <button key={p} onClick={() => setActivePanel(p)} className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${activePanel === p ? 'bg-volt-500/20 text-volt-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`}>
               {p === 'canvas' ? 'Canvas' : p === 'split' ? 'Split' : 'Code'}
             </button>
           ))}
         </div>
 
-        <div className="h-4 w-px bg-white/10" />
+        <div className="toolbar-divider" />
 
-        {/* History */}
-        <button onClick={undo} disabled={historyIndex < 0} className="p-1.5 rounded-lg text-surface-400 hover:text-white hover:bg-white/5 disabled:opacity-30" title="Undo"><Undo className="w-3.5 h-3.5" /></button>
-        <button onClick={redo} disabled={historyIndex >= history.length - 1} className="p-1.5 rounded-lg text-surface-400 hover:text-white hover:bg-white/5 disabled:opacity-30" title="Redo"><Redo className="w-3.5 h-3.5" /></button>
+        {/* ── Canvas Operations (Undo / Redo) ── */}
+        <div className="flex items-center gap-0.5">
+          <button onClick={undo} disabled={!isOwner || historyIndex < 0} className="p-2 rounded-lg text-surface-400 hover:text-white hover:bg-white/5 disabled:opacity-30 transition-all" title="Undo (Ctrl+Z)"><Undo className="w-3.5 h-3.5" /></button>
+          <button onClick={redo} disabled={!isOwner || historyIndex >= history.length - 1} className="p-2 rounded-lg text-surface-400 hover:text-white hover:bg-white/5 disabled:opacity-30 transition-all" title="Redo (Ctrl+Y)"><Redo className="w-3.5 h-3.5" /></button>
+        </div>
 
-        <div className="h-4 w-px bg-white/10" />
+        <div className="toolbar-divider" />
 
-        {/* Tools */}
-        <button onClick={handleAiRouting} disabled={isAiRouting || isSimulating} className={`p-1.5 rounded-lg transition-colors ${isAiRouting ? 'text-purple-400 animate-pulse' : 'text-surface-400 hover:text-purple-400 hover:bg-white/5'}`} title="AI Auto-Router"><Wand2 className="w-3.5 h-3.5" /></button>
-        <button onClick={() => setShowAiChat(!showAiChat)} className={`p-1.5 rounded-lg transition-colors ${showAiChat ? 'bg-purple-500/20 text-purple-400' : 'text-surface-400 hover:text-purple-400 hover:bg-white/5'}`} title="AI Assistant"><Sparkles className="w-3.5 h-3.5" /></button>
-        <button onClick={() => setShowValidator(!showValidator)} className={`p-1.5 rounded-lg transition-colors ${showValidator ? 'bg-purple-500/20 text-purple-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="AI Validator"><ShieldAlert className="w-3.5 h-3.5" /></button>
-        <button onClick={() => setShowMultimeter(!showMultimeter)} className={`p-1.5 rounded-lg transition-colors ${showMultimeter ? 'bg-volt-500/20 text-volt-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Multimeter"><Gauge className="w-3.5 h-3.5" /></button>
-        <button onClick={() => setShowOscilloscope(!showOscilloscope)} className={`p-1.5 rounded-lg transition-colors ${showOscilloscope ? 'bg-volt-500/20 text-volt-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Oscilloscope"><Activity className="w-3.5 h-3.5" /></button>
-        <button onClick={() => setShowBom(!showBom)} className={`p-1.5 rounded-lg transition-colors ${showBom ? 'bg-forge-500/20 text-forge-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Bill of Materials"><Package className="w-3.5 h-3.5" /></button>
-        <button onClick={() => setCanvasViewMode(canvasViewMode === 'breadboard' ? 'pcb' : 'breadboard')} className={`p-1.5 rounded-lg transition-colors ${canvasViewMode === 'pcb' ? 'bg-forge-500/20 text-forge-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Breadboard / PCB View"><Layers className="w-3.5 h-3.5" /></button>
-        <button onClick={() => setSerialPanelOpen(!serialPanelOpen)} className={`p-1.5 rounded-lg transition-colors ${serialPanelOpen ? 'bg-surface-800 text-white' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Serial Monitor"><Terminal className="w-3.5 h-3.5" /></button>
-        <button onClick={handleShareLiveSession} className="p-1.5 rounded-lg transition-colors text-surface-400 hover:text-white hover:bg-white/5" title="Copy Live Session Link"><Share2 className="w-3.5 h-3.5" /></button>
-        <button onClick={() => setShowSettings(true)} className="p-1.5 rounded-lg hover:bg-white/5 text-surface-400 hover:text-white" title="Settings"><Settings className="w-3.5 h-3.5" /></button>
+        {/* ── Instrument & AI Tools ── */}
+        <div className="flex items-center gap-0.5">
+          <button onClick={handleAiRouting} disabled={!isOwner || isAiRouting || isSimulating} className={`p-2 rounded-lg transition-all ${isAiRouting ? 'text-purple-400 animate-pulse' : 'text-surface-400 hover:text-purple-400 hover:bg-white/5'} disabled:opacity-30`} title="AI Auto-Router"><Wand2 className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setShowAiChat(!showAiChat)} disabled={!isOwner} className={`p-2 rounded-lg transition-all ${showAiChat ? 'bg-purple-500/20 text-purple-400' : 'text-surface-400 hover:text-purple-400 hover:bg-white/5'} disabled:opacity-30`} title="AI Assistant"><Sparkles className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setShowValidator(!showValidator)} className={`p-2 rounded-lg transition-all ${showValidator ? 'bg-purple-500/20 text-purple-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="AI Validator"><ShieldAlert className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setShowMultimeter(!showMultimeter)} className={`p-2 rounded-lg transition-all ${showMultimeter ? 'bg-volt-500/20 text-volt-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Multimeter"><Gauge className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setShowOscilloscope(!showOscilloscope)} className={`p-2 rounded-lg transition-all ${showOscilloscope ? 'bg-volt-500/20 text-volt-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Oscilloscope"><Activity className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setShowBom(!showBom)} className={`p-2 rounded-lg transition-all ${showBom ? 'bg-forge-500/20 text-forge-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Bill of Materials"><Package className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setCanvasViewMode(canvasViewMode === 'breadboard' ? 'pcb' : 'breadboard')} className={`p-2 rounded-lg transition-all ${canvasViewMode === 'pcb' ? 'bg-forge-500/20 text-forge-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Breadboard / PCB View"><Layers className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setSerialPanelOpen(!serialPanelOpen)} className={`p-2 rounded-lg transition-all ${serialPanelOpen ? 'bg-surface-800 text-white' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Serial Monitor"><Terminal className="w-3.5 h-3.5" /></button>
+          <button onClick={handleShareLiveSession} className="p-2 rounded-lg transition-all text-surface-400 hover:text-white hover:bg-white/5" title="Copy Live Session Link"><Share2 className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setShowSettings(true)} disabled={!isOwner} className="p-2 rounded-lg hover:bg-white/5 text-surface-400 hover:text-white transition-all disabled:opacity-30" title="Settings"><Settings className="w-3.5 h-3.5" /></button>
+        </div>
 
-        <div className="h-4 w-px bg-white/10" />
+        <div className="toolbar-divider" />
 
-        {/* Run/Stop */}
-        {isSimulating ? (
-          <button onClick={toggleSimulation} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20"><Square className="w-3 h-3 fill-current" /> Stop</button>
-        ) : (
-          <button onClick={toggleSimulation} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium bg-volt-500/10 text-volt-500 hover:bg-volt-500/20 border border-volt-500/20"><Play className="w-3 h-3 fill-current" /> Run</button>
-        )}
-        <button onClick={handleExportZip} disabled={!currentProject} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700 transition-all border border-white/5"><Download className="w-3 h-3" /> Export ZIP</button>
-        <button onClick={handleExportGerber} disabled={!currentProject} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700 transition-all border border-white/5"><Layout className="w-3 h-3" /> Gerber</button>
-        <button onClick={handleSave} disabled={!isDirty && !isSaving} className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all ${isSaving ? 'bg-volt-500/30 text-volt-300 animate-pulse' : isDirty ? 'bg-volt-500 text-white hover:bg-volt-400 shadow-[0_0_12px_rgba(34,197,94,0.3)]' : 'bg-surface-800 text-surface-500'}`}><Save className={`w-3 h-3 ${isSaving ? 'animate-spin' : ''}`} /> {isSaving ? 'Saving…' : 'Save'}</button>
+        {/* ── Project Actions (Run / Export / Save) ── */}
+        <div className="flex items-center gap-1.5 pl-1">
+          {isSimulating ? (
+            <button onClick={toggleSimulation} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-all"><Square className="w-3 h-3 fill-current" /> Stop</button>
+          ) : (
+            <button onClick={toggleSimulation} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-volt-500/10 text-volt-400 hover:bg-volt-500/20 border border-volt-500/20 transition-all"><Play className="w-3 h-3 fill-current" /> Run</button>
+          )}
+          <button onClick={handleExportZip} disabled={!currentProject} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700 transition-all border border-white/5"><Download className="w-3 h-3" /> Export</button>
+          <button onClick={handleExportGerber} disabled={!currentProject} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700 transition-all border border-white/5"><Layout className="w-3 h-3" /> Gerber</button>
+          {isOwner ? (
+            <button onClick={handleSave} disabled={!isDirty && !isSaving} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${isSaving ? 'bg-volt-500/30 text-volt-300 animate-pulse' : isDirty ? 'bg-volt-500 text-white hover:bg-volt-400 shadow-[0_0_16px_rgba(34,197,94,0.25)]' : 'bg-surface-800 text-surface-500'}`}><Save className={`w-3 h-3 ${isSaving ? 'animate-spin' : ''}`} /> {isSaving ? 'Saving…' : 'Save'}</button>
+          ) : (
+            <button onClick={handleFork} disabled={forkMutation.isPending} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${forkMutation.isPending ? 'bg-purple-500/30 text-purple-300 animate-pulse' : 'bg-purple-500 text-white hover:bg-purple-400 shadow-[0_0_16px_rgba(168,85,247,0.25)]'}`}><GitFork className={`w-3 h-3 ${forkMutation.isPending ? 'animate-spin' : ''}`} /> {forkMutation.isPending ? 'Forking…' : 'Fork to Edit'}</button>
+          )}
+        </div>
       </div>
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden relative">
-        {(activePanel === 'canvas' || activePanel === 'split') && <ComponentPanel />}
+        {isOwner && (activePanel === 'canvas' || activePanel === 'split') && <ComponentPanel />}
         <div className="flex flex-1">
           {(activePanel === 'canvas' || activePanel === 'split') && (
             <div
@@ -439,6 +471,7 @@ export default function EditorPage() {
                   collaborators={activeUsers}
                   onCursorMove={broadcastCursorMove}
                   onComponentInteraction={handleComponentInteraction}
+                  readOnly={!isOwner}
                 />
               </div>
             </div>
@@ -456,13 +489,13 @@ export default function EditorPage() {
               className="relative min-w-0"
               style={{ width: activePanel === 'split' ? `${100 - splitRatio}%` : '100%' }}
             >
-              <CodeEditor />
+              <CodeEditor readOnly={!isOwner} />
             </div>
           )}
         </div>
 
         {/* Right Panel for Property Editor */}
-        {(selectedNodeId || useCanvasStore.getState().selectedWireId) && (activePanel === 'canvas' || activePanel === 'split') && (
+        {isOwner && (selectedNodeId || useCanvasStore.getState().selectedWireId) && (activePanel === 'canvas' || activePanel === 'split') && (
           <div className="absolute right-0 top-0 h-full border-l border-white/5 shadow-[-10px_0_20px_rgba(0,0,0,0.5)] z-20 bg-surface-950/50 backdrop-blur-md">
             <PropertyEditor />
           </div>

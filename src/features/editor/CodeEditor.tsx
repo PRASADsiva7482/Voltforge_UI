@@ -1,19 +1,88 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
-import { Maximize2, Minimize2, FileCode2, Bug } from 'lucide-react';
+import { Maximize2, Minimize2, FileCode2, Bug, AlignLeft, Eye, EyeOff } from 'lucide-react';
 import { useProjectStore } from '../../store/projectStore';
 import { useSimulationStore } from '../../store/simulationStore';
+import { useCanvasStore } from '../../store/canvasStore';
 import SerialMonitor from './SerialMonitor';
 
-export default function CodeEditor() {
+// ── Arduino framework boilerplate generator ──
+function generateFullCode(userCode: string, boardType?: string): string {
+  const nodes = useCanvasStore.getState().nodes;
+
+  // Collect pin assignments from connected components
+  const pinDefs: string[] = [];
+  const setupLines: string[] = [];
+  const seenTypes = new Set<string>();
+
+  nodes.forEach(node => {
+    const type = node.type;
+    if (seenTypes.has(type)) return;
+    seenTypes.add(type);
+
+    if (type === 'LED_STANDARD' || type === 'LED_RGB' || type === 'LED_NEOPIXEL') {
+      pinDefs.push(`// LED: ${node.name}`);
+    }
+    if (type === 'SERVO_MOTOR' || type === 'MOTOR_SERVO') {
+      pinDefs.push(`// Servo: ${node.name}`);
+    }
+    if (type.startsWith('SENSOR_') || type.startsWith('DISPLAY_') || type.startsWith('LCD')) {
+      pinDefs.push(`// ${type.replace(/_/g, ' ')}: ${node.name}`);
+    }
+  });
+
+  // Determine board-specific includes
+  const board = boardType || 'ARDUINO_UNO';
+  const isEsp = board.startsWith('ESP');
+
+  const includes = [
+    '#include <Arduino.h>',
+    ...(isEsp ? ['#include <WiFi.h>'] : []),
+    ...(nodes.some(n => n.type.includes('SERVO')) ? ['#include <Servo.h>'] : []),
+    ...(nodes.some(n => n.type.includes('LCD') || n.type.includes('OLED')) ? ['#include <Wire.h>'] : []),
+    ...(nodes.some(n => n.type.includes('LCD_I2C') || n.type === 'DISPLAY_LCD_I2C') ? ['#include <LiquidCrystal_I2C.h>'] : []),
+    ...(nodes.some(n => n.type.includes('OLED') || n.type === 'DISPLAY_OLED') ? ['#include <Adafruit_SSD1306.h>'] : []),
+    ...(nodes.some(n => n.type === 'SENSOR_DHT11' || n.type === 'SENSOR_DHT22' || n.type === 'TEMP_SENSOR') ? ['#include <DHT.h>'] : []),
+    ...(nodes.some(n => n.type === 'LED_NEOPIXEL') ? ['#include <Adafruit_NeoPixel.h>'] : []),
+  ];
+
+  const header = [
+    '// ═══════════════════════════════════════════════════════════',
+    `// VoltForge — Auto-generated Full Sketch`,
+    `// Board: ${board.replace(/_/g, ' ')}`,
+    `// Components: ${nodes.map(n => n.name).join(', ') || 'None'}`,
+    '// ═══════════════════════════════════════════════════════════',
+    '',
+    ...includes,
+    '',
+    '// ── Pin Definitions ─────────────────────────────────────────',
+    ...(pinDefs.length > 0 ? pinDefs : ['// No components on canvas']),
+    '',
+    '// ── User Code ───────────────────────────────────────────────',
+    '',
+  ].join('\n');
+
+  return header + userCode;
+}
+
+export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
   const { currentProject, activeCodeFile, setActiveCodeFile, updateCodeFileContent } = useProjectStore();
   const { debugSnapshot, setBreakpoints } = useSimulationStore();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showFullCode, setShowFullCode] = useState(false);
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
   const decorationIds = useRef<string[]>([]);
 
   const codeFiles = currentProject?.codeFiles || [];
+
+  // Generate full code view when toggled
+  const fullCode = useMemo(() => {
+    if (!activeCodeFile || !showFullCode) return null;
+    return generateFullCode(activeCodeFile.content, currentProject?.boardType);
+  }, [activeCodeFile?.content, showFullCode, currentProject?.boardType]);
+
+  const displayedContent = showFullCode && fullCode ? fullCode : activeCodeFile?.content || '';
 
   const handleEditorMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
@@ -55,6 +124,13 @@ export default function CodeEditor() {
     decorationIds.current = editor.deltaDecorations(decorationIds.current, decorations);
   }, [debugSnapshot.breakpoints, debugSnapshot.currentLine]);
 
+  // Format code using Monaco's built-in formatter
+  const handleFormatCode = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.getAction('editor.action.formatDocument')?.run();
+  };
+
   if (!activeCodeFile) {
     return (
       <div className="flex items-center justify-center h-full bg-surface-950 text-surface-500">
@@ -83,7 +159,7 @@ export default function CodeEditor() {
       <div className="flex items-center border-b border-white/5 bg-surface-900/60 overflow-x-auto">
         <div className="flex items-center flex-1 min-w-0">
           {codeFiles.map(file => (
-            <button key={file.id} onClick={() => setActiveCodeFile(file)}
+            <button key={file.id} onClick={() => { setActiveCodeFile(file); setShowFullCode(false); }}
               className={`flex items-center gap-1.5 px-3 py-2 text-[11px] font-medium border-r border-white/5 whitespace-nowrap transition-colors ${
                 activeCodeFile?.id === file.id
                   ? 'bg-surface-950 text-volt-400 border-b-2 border-b-volt-500'
@@ -103,6 +179,30 @@ export default function CodeEditor() {
             <Bug className="w-3 h-3" />
             {debugSnapshot.breakpoints.length}
           </span>
+
+          {/* Format Code Button */}
+          <button
+            onClick={handleFormatCode}
+            className="p-1 rounded hover:bg-white/5 text-surface-400 hover:text-white transition-colors"
+            title="Format Code (Auto-indent)"
+          >
+            <AlignLeft className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Toggle Full Code / User Code Button */}
+          <button
+            onClick={() => setShowFullCode(!showFullCode)}
+            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-all ${
+              showFullCode
+                ? 'bg-forge-500/20 text-forge-400 border border-forge-500/30'
+                : 'hover:bg-white/5 text-surface-400 hover:text-white'
+            }`}
+            title={showFullCode ? 'Show user code only' : 'Show full generated code (includes, pin defs, libraries)'}
+          >
+            {showFullCode ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+            {showFullCode ? 'User' : 'Full'}
+          </button>
+
           <button onClick={() => setIsFullscreen(!isFullscreen)}
             className="p-1 rounded hover:bg-white/5 text-surface-400 hover:text-white transition-colors"
             title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
@@ -112,16 +212,29 @@ export default function CodeEditor() {
         </div>
       </div>
 
+      {/* Full Code Banner */}
+      {showFullCode && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-forge-500/10 border-b border-forge-500/20 text-[10px]">
+          <Eye className="w-3 h-3 text-forge-400 flex-shrink-0" />
+          <span className="text-forge-300">
+            <strong className="text-forge-400">Full Code View</strong> — Read-only preview with auto-generated #includes, pin definitions, and library headers based on your canvas components.
+          </span>
+        </div>
+      )}
+
       {/* Editor */}
       <div className="flex-1 min-h-0">
         <Editor
           height="100%"
           language={lang}
-          value={activeCodeFile.content}
+          value={displayedContent}
           theme="vs-dark"
           onMount={handleEditorMount}
           onChange={(value) => {
-            if (value !== undefined) updateCodeFileContent(activeCodeFile.id, value);
+            // Only allow editing in user code mode
+            if (!showFullCode && value !== undefined) {
+              updateCodeFileContent(activeCodeFile.id, value);
+            }
           }}
           options={{
             fontSize: 13,
@@ -142,6 +255,7 @@ export default function CodeEditor() {
             cursorSmoothCaretAnimation: 'on',
             cursorBlinking: 'smooth',
             formatOnPaste: true,
+            readOnly: readOnly || showFullCode, // Read-only in full code view or non-owner mode
           }}
         />
       </div>

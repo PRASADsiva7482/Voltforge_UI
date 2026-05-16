@@ -75,7 +75,7 @@ export default function Sidebar() {
               to={item.path}
               className={`flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group
                 ${isActive
-                  ? 'bg-volt-500/10 text-volt-400 border border-volt-500/20 shadow-[0_0_10px_rgba(34,197,94,0.1)]'
+                  ? 'bg-volt-500/10 text-volt-400 border border-volt-500/20 shadow-[0_0_14px_rgba(34,197,94,0.12)]'
                   : 'text-surface-300 hover:bg-white/5 hover:text-white border border-transparent'
                 }`}
             >

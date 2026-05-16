@@ -13,6 +13,7 @@ interface Props {
   collaborators?: Record<string, any>;
   onComponentInteraction?: (nodeId: string, event: 'press' | 'release') => void;
   onCursorMove?: (x: number, y: number) => void;
+  readOnly?: boolean;
 }
 
 const MAT_GRID_MINOR = 20;
@@ -202,8 +203,8 @@ const WiringPreview = ({ fromPos, mousePos }: { fromPos: { x: number; y: number 
 );
 
 // ── Pin component — large magnetic snap zones ──
-const PinDot = ({ pin, nodeId, isWiring, wiringFromNodeId, startWiring, finishWiring }: {
-  pin: PinPosition; nodeId: string; isWiring: boolean; wiringFromNodeId: string | null;
+const PinDot = ({ pin, nodeId, node, isWiring, wiringFromNodeId, startWiring, finishWiring }: {
+  pin: PinPosition; nodeId: string; node: CanvasNode; isWiring: boolean; wiringFromNodeId: string | null;
   startWiring: (n: string, p: string) => void;
   finishWiring: (n: string, p: string) => void;
 }) => {
@@ -279,28 +280,111 @@ const PinDot = ({ pin, nodeId, isWiring, wiringFromNodeId, startWiring, finishWi
           if (c) c.style.cursor = 'default';
         }}
       />
-      {/* Pin label — always visible during wiring */}
-      <Text text={pin.name} x={pin.x + 9} y={pin.y - 5} fontSize={8}
-        fill={hovered ? 'rgba(255,255,255,1)' : isWiring ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.48)'}
-        fontFamily="JetBrains Mono" fontStyle={hovered ? '700' : '400'}
-        shadowColor="black" shadowBlur={4} listening={false}
-      />
+      {/* Pin label — edge-aware orientation to prevent overlap */}
+      {(() => {
+        const isLeft = pin.x <= 5;
+        const isRight = pin.x >= node.width - 5;
+        const isTop = pin.y <= 5;
+        const isBottom = pin.y >= node.height - 5;
+
+        let labelX: number, labelY: number, rotation: number;
+        let labelWidth: number | undefined;
+        let labelAlign: string | undefined;
+
+        if (isLeft) {
+          // Left-edge pins: horizontal label pushed to the right of the pin
+          rotation = 0;
+          labelX = pin.x + 10;
+          labelY = pin.y - 4;
+          labelAlign = 'left';
+        } else if (isRight) {
+          // Right-edge pins: horizontal label to the left, right-aligned
+          rotation = 0;
+          labelX = pin.x - 50;
+          labelY = pin.y - 4;
+          labelWidth = 42;
+          labelAlign = 'right';
+        } else if (isTop) {
+          // Top-edge pins: vertical label below the pin
+          rotation = -90;
+          labelX = pin.x - 3;
+          labelY = pin.y + 10;
+        } else if (isBottom) {
+          // Bottom-edge pins: vertical label above the pin, text pointing upward
+          rotation = -90;
+          labelX = pin.x - 3;
+          labelY = pin.y - 10;
+          labelWidth = 42;
+          labelAlign = 'right';
+        } else {
+          // Interior / fallback: use top-half heuristic
+          const isTopHalf = pin.y < node.height / 2;
+          rotation = isTopHalf ? -90 : -90;
+          labelX = pin.x - 3;
+          labelY = isTopHalf ? pin.y + 10 : pin.y - 10;
+          labelWidth = isTopHalf ? undefined : 42;
+          labelAlign = isTopHalf ? undefined : 'right';
+        }
+
+        return (
+          <Text
+            text={pin.name}
+            x={labelX}
+            y={labelY}
+            fontSize={8}
+            rotation={rotation}
+            width={labelWidth}
+            align={labelAlign}
+            fill={hovered ? 'rgba(255,255,255,1)' : isWiring ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.48)'}
+            fontFamily="JetBrains Mono"
+            fontStyle={hovered ? '700' : '400'}
+            shadowColor="black"
+            shadowBlur={4}
+            listening={false}
+          />
+        );
+      })()}
     </Group>
   );
 };
 
 // ── Component Node ──
-const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringFromNodeId, startWiring, finishWiring, onInteraction }: {
+const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringFromNodeId, startWiring, finishWiring, onInteraction, readOnly }: {
   node: CanvasNode; isSelected: boolean; onSelect: () => void;
   onChange: (a: Partial<CanvasNode>) => void;
   isWiring: boolean; wiringFromNodeId: string | null;
   startWiring: (n: string, p: string) => void;
   finishWiring: (n: string, p: string) => void;
   onInteraction?: (nodeId: string, event: 'press' | 'release') => void;
+  readOnly?: boolean;
 }) => {
   const shapeRef = useRef<any>(null);
   const trRef = useRef<any>(null);
-  const svgData = (node.properties?.svgData as string | undefined) || componentSvgs[node.type];
+  let svgData = (node.properties?.svgData as string | undefined) || componentSvgs[node.type];
+
+  // Resolve the effective LED color from multiple sources:
+  // ledColor (user override) → color (from DB seed) → name-based inference → default red
+  const getLedColor = (): string => {
+    if (node.properties?.ledColor) return node.properties.ledColor as string;
+    if (node.properties?.color && typeof node.properties.color === 'string') return node.properties.color as string;
+    // Infer from component name
+    const name = (node.name || '').toLowerCase();
+    if (name.includes('green')) return '#22c55e';
+    if (name.includes('blue')) return '#3b82f6';
+    if (name.includes('yellow')) return '#eab308';
+    if (name.includes('white')) return '#f8fafc';
+    if (name.includes('orange')) return '#f97316';
+    if (name.includes('rgb') || name.includes('neopixel')) return '#a855f7';
+    return '#ef4444'; // default red
+  };
+  const ledColor = node.type.includes('LED') ? getLedColor() : '#ef4444';
+
+  // Dynamically recolor LED SVG to match the resolved ledColor
+  if (svgData && node.type.includes('LED')) {
+    const rawColor = ledColor.replace('#', '');
+    const encodedColor = `%23${rawColor}`;
+    svgData = svgData.replace(/%23ef4444/gi, encodedColor).replace(/%23991b1b/gi, '%23334155');
+  }
   const image = useImage(svgData || '');
 
   useEffect(() => {
@@ -323,7 +407,7 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
         width={node.width} height={node.height}
         rotation={node.rotation || 0}
         offsetX={0} offsetY={0}
-        draggable={!node.properties?.locked}
+        draggable={!node.properties?.locked && !readOnly}
         onClick={(e) => { e.cancelBubble = true; onSelect(); }}
         onTap={(e) => { e.cancelBubble = true; onSelect(); }}
         onMouseDown={() => { if (isButton && onInteraction) onInteraction(node.id, 'press'); }}
@@ -371,21 +455,48 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
           onChange({ x: n.x(), y: n.y(), width: nw, height: nh, pins: newPins, rotation: n.rotation() });
         }}
       >
-        {/* Active glow */}
-        {isActive && (
+        {/* Active glow — skipped for LEDs which have their own bloom */}
+        {isActive && !node.type.includes('LED') && (
           <Rect x={-4} y={-4} width={node.width + 8} height={node.height + 8}
             cornerRadius={8} fill="rgba(34,197,94,0.15)"
             shadowColor="#22c55e" shadowBlur={16} listening={false}
           />
         )}
 
-        {/* Dynamic color for LEDs */}
+        {/* Multi-layered LED bloom effect */}
         {isActive && node.type.includes('LED') && (
-          <Circle
-            x={node.width / 2} y={node.height / 2 - 10} radius={node.width / 3}
-            fill={(node.properties?.ledColor as string) || '#ef4444'}
-            opacity={0.8} shadowColor={(node.properties?.ledColor as string) || '#ef4444'} shadowBlur={15}
-          />
+          <>
+            {/* Outer haze — wide ambient glow */}
+            <Circle
+              x={node.width / 2} y={node.height / 2 - 10} radius={node.width * 0.9}
+              fill={ledColor}
+              opacity={0.1}
+              shadowColor={ledColor}
+              shadowBlur={40}
+              shadowOpacity={0.4}
+              listening={false}
+            />
+            {/* Mid glow — concentrated bloom */}
+            <Circle
+              x={node.width / 2} y={node.height / 2 - 10} radius={node.width / 2.2}
+              fill={ledColor}
+              opacity={0.35}
+              shadowColor={ledColor}
+              shadowBlur={24}
+              shadowOpacity={0.7}
+              listening={false}
+            />
+            {/* Bright core — high-intensity center */}
+            <Circle
+              x={node.width / 2} y={node.height / 2 - 10} radius={node.width / 5}
+              fill="white"
+              opacity={0.85}
+              shadowColor={ledColor}
+              shadowBlur={12}
+              shadowOpacity={0.9}
+              listening={false}
+            />
+          </>
         )}
 
         {isBlown && node.type.includes('LED') && (
@@ -444,6 +555,112 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
           />
         )}
 
+        {/* LCD / I2C Display — live text overlay */}
+        {(node.type === 'DISPLAY_LCD_I2C' || node.type === 'LCD_16X2') && (() => {
+          const line1 = (node.properties?.lcdLine1 as string) || '';
+          const line2 = (node.properties?.lcdLine2 as string) || '';
+          const hasText = line1.trim() || line2.trim();
+          const backlight = node.properties?.lcdBacklight !== false;
+          // Screen area coordinates (match the SVG green rect area)
+          const isI2C = node.type === 'DISPLAY_LCD_I2C';
+          const screenX = isI2C ? 6 : 12;
+          const screenY = isI2C ? 6 : 10;
+          const screenW = isI2C ? 108 : 146;
+          const screenH = isI2C ? 36 : 34;
+          // Scale font to fit the screen
+          const fontSize = Math.max(7, Math.min(11, screenW / 18));
+          const lineH = screenH / 2;
+
+          return (
+            <>
+              {/* Screen background overlay — changes with backlight */}
+              <Rect
+                x={screenX} y={screenY}
+                width={screenW} height={screenH}
+                cornerRadius={2}
+                fill={backlight ? '#64d475' : '#2a4d2e'}
+                opacity={hasText ? 0.95 : 0.7}
+                listening={false}
+              />
+              {/* Line 1 */}
+              <Text
+                x={screenX + 3}
+                y={screenY + (lineH - fontSize) / 2}
+                width={screenW - 6}
+                text={line1 || (hasText ? '' : 'LCD 16x2')}
+                fontSize={fontSize}
+                fontFamily="'JetBrains Mono', 'Courier New', monospace"
+                fontStyle="700"
+                fill={backlight ? '#004d00' : '#1a331a'}
+                listening={false}
+              />
+              {/* Line 2 */}
+              <Text
+                x={screenX + 3}
+                y={screenY + lineH + (lineH - fontSize) / 2}
+                width={screenW - 6}
+                text={line2 || ''}
+                fontSize={fontSize}
+                fontFamily="'JetBrains Mono', 'Courier New', monospace"
+                fontStyle="700"
+                fill={backlight ? '#004d00' : '#1a331a'}
+                listening={false}
+              />
+            </>
+          );
+        })()}
+
+        {/* OLED Display — live text overlay */}
+        {(node.type === 'DISPLAY_OLED' || node.type === 'OLED_DISPLAY') && (() => {
+          const line1 = (node.properties?.lcdLine1 as string) || '';
+          const line2 = (node.properties?.lcdLine2 as string) || '';
+          const hasText = line1.trim() || line2.trim();
+          const screenX = 6;
+          const screenY = 6;
+          const screenW = 68;
+          const screenH = 38;
+          const fontSize = Math.max(7, Math.min(9, screenW / 12));
+          const lineH = screenH / 2;
+
+          return (
+            <>
+              {/* Dark OLED screen */}
+              <Rect
+                x={screenX} y={screenY}
+                width={screenW} height={screenH}
+                cornerRadius={2}
+                fill="#000000"
+                opacity={0.95}
+                listening={false}
+              />
+              {/* Line 1 */}
+              <Text
+                x={screenX + 3}
+                y={screenY + (lineH - fontSize) / 2}
+                width={screenW - 6}
+                text={line1 || (hasText ? '' : 'OLED 128x64')}
+                fontSize={fontSize}
+                fontFamily="'JetBrains Mono', 'Courier New', monospace"
+                fontStyle="700"
+                fill="#0ea5e9"
+                listening={false}
+              />
+              {/* Line 2 */}
+              <Text
+                x={screenX + 3}
+                y={screenY + lineH + (lineH - fontSize) / 2}
+                width={screenW - 6}
+                text={line2 || ''}
+                fontSize={fontSize}
+                fontFamily="'JetBrains Mono', 'Courier New', monospace"
+                fontStyle="700"
+                fill="#0ea5e9"
+                listening={false}
+              />
+            </>
+          );
+        })()}
+
         {isServo && (
           <Group x={node.width - 15} y={node.height / 2} rotation={Number(node.properties?.servoAngle || 0) - 90} listening={false}>
             <Rect x={-4} y={-22} width={8} height={44} cornerRadius={4} fill="#f8fafc" stroke="#94a3b8" strokeWidth={1} />
@@ -453,7 +670,7 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
 
         {/* Pins */}
         {node.pins?.map(pin => (
-          <PinDot key={pin.id} pin={pin} nodeId={node.id}
+          <PinDot key={pin.id} pin={pin} nodeId={node.id} node={node}
             isWiring={isWiring} wiringFromNodeId={wiringFromNodeId}
             startWiring={startWiring} finishWiring={finishWiring}
           />
@@ -465,7 +682,7 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
         )}
       </Group>
 
-      {isSelected && !node.properties?.locked && (
+      {isSelected && !node.properties?.locked && !readOnly && (
         <Transformer ref={trRef} flipEnabled={false} rotateEnabled={true}
           rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
           boundBoxFunc={(_, nb) => (nb.width < 20 || nb.height < 20) ? _ : nb}
@@ -614,7 +831,7 @@ const PcbTraceLayer = ({ nodes, wires }: { nodes: CanvasNode[]; wires: Wire[] })
   </Layer>
 );
 
-export default function CircuitCanvas({ width, height, viewMode = 'breadboard', collaborators = {}, onComponentInteraction, onCursorMove }: Props) {
+export default function CircuitCanvas({ width, height, viewMode = 'breadboard', collaborators = {}, onComponentInteraction, onCursorMove, readOnly }: Props) {
   const {
     nodes, wires, selectedNodeId, selectedWireId, viewport,
     updateNode, selectNode, selectWire, isWiring, wiringFrom,
@@ -648,7 +865,7 @@ export default function CircuitCanvas({ width, height, viewMode = 'breadboard', 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { selectNode(null); selectWire(null); cancelWiring(); }
-      if ((e.key === 'Delete' || e.key === 'Backspace') && !e.ctrlKey) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && !e.ctrlKey && !readOnly) {
         const state = useCanvasStore.getState();
         if (state.selectedNodeId && !state.nodes.find(n => n.id === state.selectedNodeId)?.properties?.locked) {
           state.removeNode(state.selectedNodeId);
@@ -750,8 +967,10 @@ export default function CircuitCanvas({ width, height, viewMode = 'breadboard', 
               onChange={(a) => updateNode(node.id, a)}
               isWiring={isWiring}
               wiringFromNodeId={wiringFrom?.nodeId || null}
-              startWiring={startWiring} finishWiring={finishWiring}
+              startWiring={readOnly ? () => {} : startWiring}
+              finishWiring={readOnly ? () => {} : finishWiring}
               onInteraction={onComponentInteraction}
+              readOnly={readOnly}
             />
           ))}
         </Layer>
@@ -789,7 +1008,7 @@ export default function CircuitCanvas({ width, height, viewMode = 'breadboard', 
       </Stage>
 
       {/* Wire toolbar overlay (HTML, not canvas) */}
-      <WireToolbar />
+      {!readOnly && <WireToolbar />}
 
       <button
         onClick={handleExportImage}

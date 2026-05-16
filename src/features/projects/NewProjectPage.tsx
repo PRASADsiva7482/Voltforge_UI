@@ -77,7 +77,7 @@ export default function NewProjectPage() {
         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
           <h2 className="text-lg font-semibold text-white mb-1">Choose Your Board</h2>
           <p className="text-surface-400 text-sm mb-6">Select the microcontroller for your project</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {boards.map((board) => {
               const Icon = board.icon;
               const selected = selectedBoard === board.type;
@@ -110,7 +110,7 @@ export default function NewProjectPage() {
             <button
               onClick={() => setStep(2)}
               disabled={!selectedBoard}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-volt-500 to-volt-600 text-white font-medium hover:from-volt-400 hover:to-volt-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(34,197,94,0.3)]"
+              className="vf-btn vf-btn-primary shadow-[0_0_18px_rgba(34,197,94,0.25)] disabled:opacity-30 disabled:cursor-not-allowed"
             >
               Continue <ChevronRight className="w-4 h-4" />
             </button>
@@ -177,7 +177,7 @@ export default function NewProjectPage() {
             <button
               onClick={handleCreate}
               disabled={!name.trim() || createMutation.isPending}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-volt-500 to-volt-600 text-white font-medium hover:from-volt-400 hover:to-volt-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(34,197,94,0.3)]"
+              className="vf-btn vf-btn-primary shadow-[0_0_18px_rgba(34,197,94,0.25)] disabled:opacity-30 disabled:cursor-not-allowed"
             >
               {createMutation.isPending ? 'Creating...' : isAi ? 'Create & Generate with AI' : 'Create Project'}
               <ChevronRight className="w-4 h-4" />

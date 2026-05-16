@@ -15,7 +15,7 @@ const propertySchemas: Record<string, { label: string; key: string; type: 'numbe
     { label: 'Voltage Rating', key: 'voltageRating', type: 'select', options: ['10V', '16V', '25V', '50V', '100V'] },
   ],
   LED_STANDARD: [
-    { label: 'Color', key: 'ledColor', type: 'color' },
+    { label: 'Color', key: 'color', type: 'color' },
     { label: 'Forward Voltage', key: 'forwardVoltage', type: 'number', unit: 'V', min: 1.5, max: 3.5, step: 0.1 },
     { label: 'Max Current', key: 'maxCurrent', type: 'number', unit: 'mA', min: 1, max: 30, step: 1 },
   ],

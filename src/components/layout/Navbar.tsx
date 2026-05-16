@@ -43,7 +43,7 @@ export default function Navbar() {
   ];
 
   return (
-    <nav className="glass sticky top-0 z-50 border-b border-white/5 px-4 lg:px-8 py-3 flex items-center justify-between">
+    <nav className="glass sticky top-0 z-50 border-b border-white/5 px-5 lg:px-8 py-3 flex items-center justify-between">
       {/* Left side: Logo & Search */}
       <div className="flex items-center flex-1">
 
@@ -60,7 +60,7 @@ export default function Navbar() {
       </div>
 
       {/* Right side: Actions */}
-      <div className="flex items-center gap-2 md:gap-4">
+      <div className="flex items-center gap-3 md:gap-5">
         {/* Language Switcher */}
         <div className="relative">
           <button

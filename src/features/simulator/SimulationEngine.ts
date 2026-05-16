@@ -48,6 +48,16 @@ export class SimulationEngine {
   // For toggling state with delay patterns (e.g., blink)
   private pinToggleState: Record<string, boolean> = {};
 
+  // ── LCD Display state ──
+  private lcdRows = 2;
+  private lcdCols = 16;
+  private lcdBuffer: string[][] = [];
+  private lcdCursorRow = 0;
+  private lcdCursorCol = 0;
+  private lcdBacklight = true;
+  private lcdInitialized = false;
+  private lcdNodes: CanvasNode[] = [];  // display nodes on canvas
+
   constructor(callbacks: SimulationCallbacks) {
     this.callbacks = callbacks;
   }
@@ -64,6 +74,18 @@ export class SimulationEngine {
     this.serialLineBuffer = '';
     this.serialThrottle.clear();
     this.currentLine = null;
+
+    // Reset LCD state
+    this.lcdBuffer = Array.from({ length: this.lcdRows }, () => Array(this.lcdCols).fill(' '));
+    this.lcdCursorRow = 0;
+    this.lcdCursorCol = 0;
+    this.lcdBacklight = true;
+    this.lcdInitialized = false;
+    // Find display nodes on the canvas
+    this.lcdNodes = nodes.filter(n =>
+      n.type === 'DISPLAY_LCD_I2C' || n.type === 'LCD_16X2' ||
+      n.type === 'DISPLAY_OLED' || n.type === 'OLED_DISPLAY'
+    );
 
     try {
       if (hex?.trim()) {
@@ -115,9 +137,10 @@ export class SimulationEngine {
 
   private parseCode(code: string) {
     // Extract global variables
-    const varMatches = code.matchAll(/(?:int|const\s+int|byte|uint8_t|long|unsigned\s+long)\s+(\w+)\s*=\s*(\d+);/g);
+    const varMatches = code.matchAll(/(?:int|const\s+int|byte|uint8_t|long|unsigned\s+long|float|double)\s+(\w+)\s*=\s*([^;]+);/g);
     for (const match of varMatches) {
-      this.globals[match[1]] = parseInt(match[2]);
+      const val = parseFloat(match[2]);
+      this.globals[match[1]] = isNaN(val) ? 0 : val;
     }
 
     // Extract #define constants
@@ -208,6 +231,27 @@ export class SimulationEngine {
         continue;
       }
 
+      // dht.readTemperature() → simulated temperature ~25°C with slight variation
+      const dhtTempAssign = stmt.match(/(?:float\s+)?(\w+)\s*=\s*dht\.readTemperature\s*\(/i);
+      if (dhtTempAssign) {
+        const temp = 24.5 + Math.sin(this.tick / 3000) * 2 + (Math.random() * 0.5 - 0.25);
+        this.globals[dhtTempAssign[1]] = Math.round(temp * 10) / 10;
+        this.emitDebugSnapshot(false);
+        continue;
+      }
+
+      // dht.readHumidity() → simulated humidity ~60%
+      const dhtHumAssign = stmt.match(/(?:float\s+)?(\w+)\s*=\s*dht\.readHumidity\s*\(/i);
+      if (dhtHumAssign) {
+        const hum = 58 + Math.cos(this.tick / 5000) * 5 + (Math.random() * 1 - 0.5);
+        this.globals[dhtHumAssign[1]] = Math.round(hum * 10) / 10;
+        this.emitDebugSnapshot(false);
+        continue;
+      }
+
+      // dht.begin() — silently consume
+      if (/dht\.begin\s*\(/i.test(stmt)) continue;
+
       // Variable assignment: varName = expression (needs to happen after digitalRead check)
       const assign = stmt.match(/(\w+)\s*=\s*([^;]+)/);
       if (assign && this.globals[assign[1]] !== undefined && !assign[2].includes('digitalRead')) {
@@ -255,8 +299,109 @@ export class SimulationEngine {
         continue;
       }
 
+      // ── LCD commands ──
+      if (this.handleLcdStatement(stmt, nodes)) continue;
+
+      // I2C / Wire.h commands — silently consume so they don't cause errors
+      if (/Wire\.|lcd\.|dht\./i.test(stmt)) continue;
+
       // (Variable assignment moved up to handle digitalRead)
     }
+  }
+
+  /**
+   * Parse and execute LCD-related statements.
+   * Handles: lcd.init(), lcd.begin(), lcd.backlight(), lcd.noBacklight(),
+   *          lcd.clear(), lcd.setCursor(col, row), lcd.print("text")
+   */
+  private handleLcdStatement(stmt: string, nodes: CanvasNode[]): boolean {
+    const s = stmt.trim();
+
+    // lcd.init() / lcd.begin()
+    if (/lcd\.(init|begin)\s*\(/i.test(s)) {
+      this.lcdInitialized = true;
+      this.lcdBuffer = Array.from({ length: this.lcdRows }, () => Array(this.lcdCols).fill(' '));
+      this.lcdCursorRow = 0;
+      this.lcdCursorCol = 0;
+      this.pushLcdToCanvas(nodes);
+      return true;
+    }
+
+    // lcd.backlight()
+    if (/lcd\.backlight\s*\(/i.test(s)) {
+      this.lcdBacklight = true;
+      this.pushLcdToCanvas(nodes);
+      return true;
+    }
+
+    // lcd.noBacklight()
+    if (/lcd\.noBacklight\s*\(/i.test(s)) {
+      this.lcdBacklight = false;
+      this.pushLcdToCanvas(nodes);
+      return true;
+    }
+
+    // lcd.clear()
+    if (/lcd\.clear\s*\(/i.test(s)) {
+      this.lcdBuffer = Array.from({ length: this.lcdRows }, () => Array(this.lcdCols).fill(' '));
+      this.lcdCursorRow = 0;
+      this.lcdCursorCol = 0;
+      this.pushLcdToCanvas(nodes);
+      return true;
+    }
+
+    // lcd.setCursor(col, row)
+    const cursorMatch = s.match(/lcd\.setCursor\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)/i);
+    if (cursorMatch) {
+      this.lcdCursorCol = Math.max(0, Math.min(this.lcdCols - 1, parseInt(this.resolveValue(cursorMatch[1])) || 0));
+      this.lcdCursorRow = Math.max(0, Math.min(this.lcdRows - 1, parseInt(this.resolveValue(cursorMatch[2])) || 0));
+      return true;
+    }
+
+    // lcd.print("text") / lcd.print(variable)
+    const printMatch = s.match(/lcd\.print\s*\(\s*(.*?)\s*\)$/i);
+    if (printMatch) {
+      const text = this.resolveSerialArgument(printMatch[1]);
+      this.lcdWriteText(text);
+      this.pushLcdToCanvas(nodes);
+      return true;
+    }
+
+    return false;
+  }
+
+  /** Write text into the LCD buffer at the current cursor position. */
+  private lcdWriteText(text: string) {
+    for (const ch of text) {
+      if (this.lcdCursorCol >= this.lcdCols) {
+        // Wrap to next row
+        this.lcdCursorCol = 0;
+        this.lcdCursorRow = (this.lcdCursorRow + 1) % this.lcdRows;
+      }
+      this.lcdBuffer[this.lcdCursorRow][this.lcdCursorCol] = ch;
+      this.lcdCursorCol++;
+    }
+  }
+
+  /** Push the current LCD buffer text to canvas display nodes. */
+  private pushLcdToCanvas(_nodes: CanvasNode[]) {
+    const line1 = this.lcdBuffer[0]?.join('') || '';
+    const line2 = this.lcdBuffer[1]?.join('') || '';
+
+    // Update each LCD node on the canvas with the display text
+    this.lcdNodes.forEach(lcdNode => {
+      // Use a special pin state callback to trigger display update
+      // The LogicRegistry will handle updating the node properties
+      this.callbacks.onPinStateChange(lcdNode.id, '__lcd_display__', 'HIGH', 0);
+    });
+
+    // Store text in a global accessible to the canvas renderer
+    (globalThis as any).__voltforgeLcdState = (globalThis as any).__voltforgeLcdState || {};
+    this.lcdNodes.forEach(lcdNode => {
+      (globalThis as any).__voltforgeLcdState[lcdNode.id] = {
+        line1, line2, backlight: this.lcdBacklight
+      };
+    });
   }
 
   private evaluateExpression(expr: string): number {

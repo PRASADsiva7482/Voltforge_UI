@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Eye, GitFork, Clock, Cpu, Filter, TrendingUp, Star } from 'lucide-react';
+import { Eye, GitFork, Clock, Cpu, Filter, TrendingUp, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { projectApi } from '../../api/services';
@@ -10,7 +10,7 @@ import type { ProjectSummary } from '../../types';
 export default function ExplorePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery] = useState('');
   const [page, setPage] = useState(0);
   const [selectedBoard, setSelectedBoard] = useState<string>('ALL');
 
@@ -58,43 +58,31 @@ export default function ExplorePage() {
           </div>
           <h1 className="text-3xl font-bold text-white">{t('Explore')}</h1>
         </div>
-        <p className="text-surface-400 text-lg ml-13">{t('Discover amazing circuits built by the community')}</p>
+        <p className="text-surface-400 text-lg pl-[52px]">{t('Discover amazing circuits built by the community')}</p>
       </motion.div>
 
-      {/* Search & Filters */}
+      {/* Board Filters */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="glass rounded-2xl p-6 mb-8"
+        className="mb-8"
       >
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
-              placeholder={t('Search circuits, components, or tags...')}
-              className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-volt-500/50 transition-all"
-            />
-          </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            <Filter className="w-4 h-4 text-surface-400 flex-shrink-0" />
-            {boardTypes.map((board) => (
-              <button
-                key={board}
-                onClick={() => setSelectedBoard(board)}
-                className={`px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
-                  selectedBoard === board
-                    ? 'bg-volt-500/20 text-volt-400 border border-volt-500/30'
-                    : 'bg-white/5 text-surface-400 hover:text-white border border-white/10'
-                }`}
-              >
-                {board === 'ALL' ? 'All Boards' : board.replace(/_/g, ' ')}
-              </button>
-            ))}
-          </div>
+        <div className="flex items-center gap-3 overflow-x-auto pb-1">
+          <Filter className="w-4 h-4 text-surface-400 flex-shrink-0" />
+          {boardTypes.map((board) => (
+            <button
+              key={board}
+              onClick={() => setSelectedBoard(board)}
+              className={`px-4 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                selectedBoard === board
+                  ? 'bg-volt-500/20 text-volt-400 border border-volt-500/30'
+                  : 'bg-white/5 text-surface-400 hover:text-white border border-white/10 hover:border-white/20'
+              }`}
+            >
+              {board === 'ALL' ? 'All Boards' : board.replace(/_/g, ' ')}
+            </button>
+          ))}
         </div>
       </motion.div>
 
@@ -146,7 +134,7 @@ export default function ExplorePage() {
 
                 {/* Info */}
                 <h3 className="text-base font-semibold text-white mb-1 truncate">{project.name}</h3>
-                <p className="text-xs text-surface-400 mb-3 line-clamp-2">{project.description || 'No description'}</p>
+                <p className="text-xs text-surface-400 mb-3 line-clamp-2 min-h-[2.5rem]">{project.description || 'No description'}</p>
 
                 {/* Owner */}
                 <div className="flex items-center gap-2 mb-3">
@@ -165,7 +153,7 @@ export default function ExplorePage() {
 
                 {/* Tags */}
                 {project.tags && (
-                  <div className="flex flex-wrap gap-1 mt-3">
+                  <div className="flex flex-wrap gap-2 mt-3">
                     {project.tags.split(',').slice(0, 3).map((tag) => (
                       <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-medium bg-surface-800 text-surface-300 border border-surface-700">
                         {tag.trim()}

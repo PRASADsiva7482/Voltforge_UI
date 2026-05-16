@@ -1,6 +1,29 @@
 import { create } from 'zustand';
-import type { CanvasNode, Wire, ElectronicComponent, WireBendPoint } from '../types';
+import type { CanvasNode, Wire, ElectronicComponent, WireBendPoint, PinPosition } from '../types';
 import { rerouteAutoWires, routeWireBetweenNodes } from '../utils/wireRouting';
+
+/**
+ * Resolve a pin reference that doesn't match any pin.id on the node.
+ * Tries: name match, trailing-index match, partial-ID match.
+ */
+function resolvePin(pins: PinPosition[], refId: string): PinPosition | null {
+  const lower = refId.toLowerCase();
+  // By name
+  const byName = pins.find(p => p.name.toLowerCase() === lower);
+  if (byName) return byName;
+  // By trailing index (e.g., 'esp32_pin_3' → index 3)
+  const idxMatch = refId.match(/(\d+)$/);
+  if (idxMatch) {
+    const idx = parseInt(idxMatch[1], 10);
+    if (idx >= 0 && idx < pins.length) return pins[idx];
+  }
+  // By partial string inclusion
+  const byPartial = pins.find(p =>
+    p.id.toLowerCase().includes(lower) || lower.includes(p.id.toLowerCase())
+  );
+  if (byPartial) return byPartial;
+  return null;
+}
 
 type RoutingMode = Wire['routingMode'];
 
@@ -211,8 +234,27 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   loadCanvas: (nodes, wires) => {
+    // ── Pin-ID reconciliation: patch wire pinIds to match node pin IDs ──
+    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+    const reconciledWires = wires.map(w => {
+      const patched = { ...w };
+      // Fix fromPinId
+      const fromNode = nodeMap.get(w.fromNodeId);
+      if (fromNode && fromNode.pins?.length && !fromNode.pins.some(p => p.id === w.fromPinId)) {
+        const resolved = resolvePin(fromNode.pins, w.fromPinId);
+        if (resolved) patched.fromPinId = resolved.id;
+      }
+      // Fix toPinId
+      const toNode = nodeMap.get(w.toNodeId);
+      if (toNode && toNode.pins?.length && !toNode.pins.some(p => p.id === w.toPinId)) {
+        const resolved = resolvePin(toNode.pins, w.toPinId);
+        if (resolved) patched.toPinId = resolved.id;
+      }
+      return patched;
+    });
+
     // Migrate wire format and upgrade straight wires to auto-routing
-    const migratedWires = wires.map(w => {
+    const migratedWires = reconciledWires.map(w => {
       const mode = (['straight', 'orthogonal', 'curved', 'auto'].includes(w.routingMode) ? w.routingMode : 'auto') as RoutingMode;
       // Upgrade straight wires with no user bend points to auto-route around components
       const shouldUpgrade = mode === 'straight' && (!w.bendPoints || w.bendPoints.length === 0);

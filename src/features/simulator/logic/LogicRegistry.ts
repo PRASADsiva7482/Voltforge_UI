@@ -110,6 +110,33 @@ export class RelayLogic implements IComponentLogic {
 }
 
 /**
+ * Logic for LCD / OLED Displays
+ * Reads the simulated LCD text buffer and pushes it to node properties.
+ */
+export class LcdDisplayLogic implements IComponentLogic {
+  onPinStateChange(componentId: string, pinId: string, _state: PinState): void {
+    if (pinId !== '__lcd_display__') return;
+
+    const { updateNode, nodes } = useCanvasStore.getState();
+    const node = nodes.find(n => n.id === componentId);
+    if (!node) return;
+
+    // Read from the global LCD state set by SimulationEngine
+    const lcdState = (globalThis as any).__voltforgeLcdState?.[componentId];
+    if (!lcdState) return;
+
+    updateNode(componentId, {
+      properties: {
+        ...node.properties,
+        lcdLine1: lcdState.line1 || '',
+        lcdLine2: lcdState.line2 || '',
+        lcdBacklight: lcdState.backlight ?? true,
+      },
+    });
+  }
+}
+
+/**
  * Global Registry
  */
 export class LogicRegistry {
@@ -121,6 +148,10 @@ export class LogicRegistry {
     'BUZZER': new BuzzerLogic(),
     'RELAY_SPDT': new RelayLogic(),
     'MULTIMETER': new MultimeterLogic(),
+    'DISPLAY_LCD_I2C': new LcdDisplayLogic(),
+    'LCD_16X2': new LcdDisplayLogic(),
+    'DISPLAY_OLED': new LcdDisplayLogic(),
+    'OLED_DISPLAY': new LcdDisplayLogic(),
   };
 
   public static dispatch(componentType: string, componentId: string, pinId: string, state: PinState, value?: number) {
