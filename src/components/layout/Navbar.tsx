@@ -94,18 +94,24 @@ export default function Navbar() {
 
   const languages = [
     { code: 'en', label: 'English' },
-    { code: 'es', label: 'Español' },
-    { code: 'fr', label: 'Français' },
+    { code: 'hi', label: 'हिन्दी (Hindi)' },
+    { code: 'te', label: 'తెలుగు (Telugu)' },
+    { code: 'ta', label: 'தமிழ் (Tamil)' },
+    { code: 'kn', label: 'ಕನ್ನಡ (Kannada)' },
+    { code: 'ml', label: 'മലയാളം (Malayalam)' },
+    { code: 'mr', label: 'मराठी (Marathi)' },
   ];
 
   const isAdmin = user?.role === 'ADMIN';
 
+  const displayName = user?.displayName || user?.username || keycloak.tokenParsed?.name || keycloak.tokenParsed?.preferred_username || user?.email || '';
+
   const mobileNavItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-    { icon: FolderOpen, label: 'My Projects', path: '/projects' },
-    { icon: Cpu, label: 'Explore', path: '/explore' },
-    { icon: Settings, label: 'Settings', path: '/settings' },
-    ...(isAdmin ? [{ icon: Shield, label: 'Admin', path: '/admin' }] : []),
+    { icon: LayoutDashboard, label: t('Dashboard'), path: '/dashboard' },
+    { icon: FolderOpen, label: t('My Projects'), path: '/projects' },
+    { icon: Cpu, label: t('Explore'), path: '/explore' },
+    { icon: Settings, label: t('Settings'), path: '/settings' },
+    ...(isAdmin ? [{ icon: Shield, label: t('Admin'), path: '/admin' }] : []),
   ];
 
   // ── Dropdown animation variants ──
@@ -142,16 +148,16 @@ export default function Navbar() {
         </div>
 
         {/* Right side: Actions */}
-        <div className="flex items-center gap-3 md:gap-5">
+        <div className="flex items-center gap-3">
           {/* Language Switcher */}
           <div className="relative" ref={langRef}>
             <button
               id="lang-switcher"
               onClick={() => setIsLangOpen(!isLangOpen)}
-              className="p-2 rounded-xl text-surface-400 hover:text-white hover:bg-white/5 transition-colors"
+              className={`p-2.5 rounded-xl border transition-all bloom-hover ${isLangOpen ? 'bg-surface-700 border-surface-600 text-white' : 'bg-surface-800/50 border-surface-700/50 text-surface-300 hover:text-white hover:bg-surface-700 hover:border-surface-600'}`}
               title="Language"
             >
-              <Globe className="w-5 h-5" />
+              <Globe className="w-4 h-4" />
             </button>
 
             <AnimatePresence>
@@ -161,15 +167,15 @@ export default function Navbar() {
                   initial="hidden"
                   animate="visible"
                   exit="exit"
-                  className="absolute right-0 mt-2 w-40 glass border border-white/10 rounded-xl shadow-xl overflow-hidden"
+                  className="absolute right-0 mt-3 w-40 bg-surface-900 border border-surface-700 rounded-xl shadow-2xl overflow-hidden z-50"
                 >
                   {languages.map((lng) => (
                     <button
                       key={lng.code}
                       onClick={() => changeLanguage(lng.code)}
                       className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${i18n.language === lng.code
-                          ? 'bg-volt-500/20 text-volt-400'
-                          : 'text-surface-300 hover:bg-white/5 hover:text-white'
+                          ? 'bg-volt-500/20 text-volt-400 border-l-2 border-volt-500'
+                          : 'text-surface-300 hover:bg-surface-800 hover:text-white border-l-2 border-transparent'
                         }`}
                     >
                       {lng.label}
@@ -184,10 +190,10 @@ export default function Navbar() {
           <button
             id="theme-toggle"
             onClick={toggleTheme}
-            className="p-2 rounded-xl text-surface-400 hover:text-white hover:bg-white/5 transition-colors"
+            className="p-2.5 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-300 hover:text-white hover:bg-surface-700 hover:border-surface-600 transition-all bloom-hover"
             title="Toggle Theme"
           >
-            {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
 
           {/* Notifications Dropdown */}
@@ -195,12 +201,12 @@ export default function Navbar() {
             <button
               id="notifications-bell"
               onClick={toggleNotifications}
-              className={`p-2 rounded-xl transition-colors relative ${isNotifOpen ? 'bg-white/10 text-white' : 'text-surface-400 hover:text-white hover:bg-white/5'}`}
+              className={`p-2.5 rounded-xl border transition-all bloom-hover relative ${isNotifOpen ? 'bg-surface-700 border-surface-600 text-white' : 'bg-surface-800/50 border-surface-700/50 text-surface-300 hover:text-white hover:bg-surface-700 hover:border-surface-600'}`}
               title="Notifications"
             >
-              <Bell className="w-5 h-5" />
+              <Bell className="w-4 h-4" />
               {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-forge-500 rounded-full animate-pulse" />
+                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-forge-500 rounded-full border-2 border-surface-900" />
               )}
             </button>
 
@@ -211,17 +217,17 @@ export default function Navbar() {
                   initial="hidden"
                   animate="visible"
                   exit="exit"
-                  className="absolute right-0 mt-2 w-80 glass border border-white/10 rounded-xl shadow-2xl overflow-hidden"
+                  className="absolute right-0 mt-3 w-80 bg-surface-900 border border-surface-700 rounded-xl shadow-2xl overflow-hidden z-50"
                 >
                   {/* Header */}
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-                    <h3 className="text-sm font-semibold text-white">Notifications</h3>
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-surface-800">
+                    <h3 className="text-sm font-semibold text-white">{t('Notifications')}</h3>
                     {notifications.length > 0 && (
                       <button
                         onClick={clearNotifications}
                         className="text-[10px] text-surface-400 hover:text-volt-400 transition-colors font-medium"
                       >
-                        Clear all
+                        {t('Clear all')}
                       </button>
                     )}
                   </div>
@@ -229,16 +235,16 @@ export default function Navbar() {
                   {/* Notification List */}
                   <div className="max-h-72 overflow-y-auto">
                     {notifications.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-10 px-4">
+                       <div className="flex flex-col items-center justify-center py-10 px-4">
                         <BellOff className="w-8 h-8 text-surface-600 mb-3" />
-                        <p className="text-sm text-surface-400 font-medium">No new notifications</p>
-                        <p className="text-xs text-surface-500 mt-1">You're all caught up!</p>
+                        <p className="text-sm text-surface-400 font-medium">{t('No new notifications')}</p>
+                        <p className="text-xs text-surface-500 mt-1">{t("You're all caught up!")}</p>
                       </div>
                     ) : (
                       notifications.map((notif) => (
                         <div
                           key={notif.id}
-                          className="px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-b-0 cursor-pointer"
+                          className="px-4 py-3 hover:bg-surface-800 transition-colors border-b border-surface-800 last:border-b-0 cursor-pointer"
                         >
                           <div className="flex items-start gap-3">
                             <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${notif.read ? 'bg-surface-600' : 'bg-volt-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]'}`} />
@@ -256,18 +262,19 @@ export default function Navbar() {
             </AnimatePresence>
           </div>
 
-          <div className="h-6 w-px bg-white/10 mx-1 hidden md:block"></div>
+          <div className="h-6 w-px bg-surface-800 mx-2 hidden md:block"></div>
 
           {/* Profile Dropdown */}
           <div className="relative hidden md:block" ref={profileRef}>
             <button
               id="profile-dropdown"
               onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className="flex items-center gap-2 p-1 rounded-xl hover:bg-white/5 transition-colors"
+              className={`flex items-center gap-2 p-1.5 pr-4 pl-1.5 rounded-xl border transition-all bloom-hover ${isProfileOpen ? 'bg-surface-700 border-surface-600' : 'bg-surface-800/50 border-surface-700/50 hover:bg-surface-700 hover:border-surface-600'}`}
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-volt-500 to-forge-500 flex items-center justify-center text-xs font-bold text-white shadow-lg">
-                {user?.displayName?.charAt(0) || user?.username?.charAt(0) || 'U'}
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-volt-500 to-forge-500 flex items-center justify-center text-xs font-bold text-white shadow-lg">
+                {displayName.charAt(0).toUpperCase()}
               </div>
+              <span className="text-sm font-medium text-surface-200">{displayName}</span>
             </button>
 
             <AnimatePresence>
@@ -277,20 +284,20 @@ export default function Navbar() {
                   initial="hidden"
                   animate="visible"
                   exit="exit"
-                  className="absolute right-0 mt-2 w-56 glass border border-white/10 rounded-xl shadow-xl overflow-hidden"
+                  className="absolute right-0 mt-3 w-56 bg-surface-900 border border-surface-700 rounded-xl shadow-2xl overflow-hidden z-50"
                 >
-                  <div className="px-4 py-3 border-b border-white/5">
-                    <p className="text-sm font-medium text-white">{user?.displayName || user?.username}</p>
-                    <p className="text-xs text-surface-400 truncate">{user?.email}</p>
+                  <div className="px-4 py-3 border-b border-surface-800">
+                    <p className="text-sm font-medium text-white">{displayName}</p>
+                    <p className="text-xs text-surface-400 truncate">{user?.email || keycloak.tokenParsed?.email}</p>
                   </div>
-                  <div className="py-1 border-b border-white/5">
-                    <button onClick={() => navigate('/settings')} className="w-full text-left px-4 py-2 text-sm text-surface-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-2">
+                  <div className="py-1 border-b border-surface-800">
+                    <button onClick={() => navigate('/settings')} className="w-full text-left px-4 py-2 text-sm text-surface-300 hover:bg-surface-800 hover:text-white transition-colors flex items-center gap-2">
                       <User className="w-4 h-4" /> {t('Settings')}
                     </button>
                   </div>
                   <div className="py-1">
                     <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors">
-                      Logout
+                      {t('Logout')}
                     </button>
                   </div>
                 </motion.div>
@@ -334,11 +341,11 @@ export default function Navbar() {
               <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-volt-500 to-forge-500 flex items-center justify-center text-sm font-bold text-white shadow-lg">
-                    {user?.displayName?.charAt(0) || user?.username?.charAt(0) || 'U'}
+                    {displayName.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-white truncate">{user?.displayName || user?.username}</p>
-                    <p className="text-[10px] text-surface-400 truncate">{user?.email}</p>
+                    <p className="text-sm font-semibold text-white truncate">{displayName}</p>
+                    <p className="text-[10px] text-surface-400 truncate">{user?.email || keycloak.tokenParsed?.email}</p>
                   </div>
                 </div>
                 <button
@@ -396,14 +403,14 @@ export default function Navbar() {
                   className="flex items-center gap-4 w-full px-4 py-3 rounded-xl text-sm font-medium text-surface-300 hover:bg-white/5 hover:text-white transition-colors"
                 >
                   {theme === 'dark' ? <Sun className="w-5 h-5 text-surface-500" /> : <Moon className="w-5 h-5 text-surface-500" />}
-                  {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                  {theme === 'dark' ? t('Light Mode') : t('Dark Mode')}
                 </button>
                 <button
                   onClick={handleLogout}
                   className="flex items-center gap-4 w-full px-4 py-3 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
                 >
                   <LogOut className="w-5 h-5" />
-                  Logout
+                  {t('Logout')}
                 </button>
               </div>
             </motion.div>

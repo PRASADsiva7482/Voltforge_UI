@@ -6,6 +6,7 @@ import { projectApi } from '../../api/services';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
 import type { ProjectSummary } from '../../types';
+import keycloak from '../../utils/keycloak';
 
 export default function DashboardPage() {
   const { t } = useTranslation();
@@ -40,7 +41,7 @@ export default function DashboardPage() {
         className="mb-12"
       >
         <h1 className="text-4xl font-bold text-white mb-3">
-          {t('Welcome back')}, <span className="bg-gradient-to-r from-volt-400 to-forge-400 bg-clip-text text-transparent">{user?.displayName || user?.username}</span>
+          {t('Welcome back')}, <span className="bg-gradient-to-r from-volt-400 to-forge-400 bg-clip-text text-transparent">{user?.displayName || user?.username || keycloak.tokenParsed?.name || keycloak.tokenParsed?.preferred_username || user?.email}</span>
         </h1>
         <p className="text-surface-400 text-lg">{t('Build, simulate, and share your electronics projects')}</p>
       </motion.div>
@@ -60,7 +61,7 @@ export default function DashboardPage() {
             <Plus className="w-8 h-8 text-volt-400" />
           </div>
           <h3 className="text-xl font-semibold text-white mb-2">{t('New Project')}</h3>
-          <p className="text-sm text-surface-400">Start a new circuit from scratch</p>
+          <p className="text-sm text-surface-400">{t('Start a new circuit from scratch')}</p>
         </button>
 
         <button
@@ -71,7 +72,7 @@ export default function DashboardPage() {
             <Search className="w-8 h-8 text-forge-400" />
           </div>
           <h3 className="text-xl font-semibold text-white mb-2">{t('Explore')}</h3>
-          <p className="text-sm text-surface-400">Browse community projects</p>
+          <p className="text-sm text-surface-400">{t('Browse community projects')}</p>
         </button>
       </motion.div>
 
@@ -84,7 +85,7 @@ export default function DashboardPage() {
           className="mb-16"
         >
           <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-semibold text-white">Starter Templates</h2>
+            <h2 className="text-2xl font-semibold text-white">{t('Starter Templates')}</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {templates.map((template: ProjectSummary) => (
@@ -106,7 +107,7 @@ export default function DashboardPage() {
             onClick={() => navigate('/projects')}
             className="text-sm text-volt-400 hover:text-volt-300 transition-colors font-medium"
           >
-            View all →
+            {t('View all')} →
           </button>
         </div>
 
@@ -124,7 +125,7 @@ export default function DashboardPage() {
           <div className="glass rounded-2xl p-10 flex flex-col items-center justify-center border border-dashed border-white/10">
             <Cpu className="w-12 h-12 text-surface-600 mb-4" />
             <h3 className="text-lg font-medium text-white mb-2">{t('No projects yet')}</h3>
-            <p className="text-surface-400 mb-6 text-center max-w-sm">Create your first circuit to get started and see it appear here.</p>
+            <p className="text-surface-400 mb-6 text-center max-w-sm">{t('Create your first circuit to get started and see it appear here.')}</p>
             <button
               onClick={() => navigate('/projects/new')}
               className="vf-btn vf-btn-primary shadow-[0_0_18px_rgba(34,197,94,0.25)]"
@@ -145,6 +146,7 @@ export default function DashboardPage() {
 }
 
 function ProjectCard({ project, onClick }: { project: ProjectSummary; onClick: () => void }) {
+  const { t } = useTranslation();
   const boardColors: Record<string, string> = {
     ARDUINO_UNO: 'from-blue-500 to-cyan-500',
     ARDUINO_MEGA: 'from-indigo-500 to-blue-500',
@@ -168,7 +170,7 @@ function ProjectCard({ project, onClick }: { project: ProjectSummary; onClick: (
 
       {/* Info */}
       <h3 className="text-base font-semibold text-white mb-1 truncate">{project.name}</h3>
-      <p className="text-xs text-surface-400 mb-3 line-clamp-2 min-h-[2.5rem]">{project.description || 'No description'}</p>
+      <p className="text-xs text-surface-400 mb-3 line-clamp-2 min-h-[2.5rem]">{project.description || t('No description')}</p>
 
       {/* Meta */}
       <div className="flex items-center gap-4 text-xs text-surface-500">
@@ -191,7 +193,7 @@ function ProjectCard({ project, onClick }: { project: ProjectSummary; onClick: (
         </span>
         {project.isPublic && (
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-volt-500/10 text-volt-400 border border-volt-500/20 ml-1">
-            Public
+            {t('Public')}
           </span>
         )}
       </div>

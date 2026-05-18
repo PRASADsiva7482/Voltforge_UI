@@ -7,8 +7,10 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import keycloak from '../../utils/keycloak';
+import { useTranslation } from 'react-i18next';
 
 export default function Sidebar() {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -17,14 +19,14 @@ export default function Sidebar() {
   const isAdmin = user?.role === 'ADMIN';
 
   const navItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-    { icon: FolderOpen, label: 'My Projects', path: '/projects' },
-    { icon: Cpu, label: 'Explore', path: '/explore' },
-    { icon: Settings, label: 'Settings', path: '/settings' },
+    { icon: LayoutDashboard, label: t('Dashboard'), path: '/dashboard' },
+    { icon: FolderOpen, label: t('My Projects'), path: '/projects' },
+    { icon: Cpu, label: t('Explore'), path: '/explore' },
+    { icon: Settings, label: t('Settings'), path: '/settings' },
   ];
 
   if (isAdmin) {
-    navItems.push({ icon: Shield, label: 'Admin', path: '/admin' });
+    navItems.push({ icon: Shield, label: t('Admin'), path: '/admin' });
   }
 
   const handleLogout = () => {
@@ -53,7 +55,7 @@ export default function Sidebar() {
               <h1 className="text-lg font-bold bg-gradient-to-r from-volt-400 to-forge-400 bg-clip-text text-transparent">
                 VoltForge
               </h1>
-              <p className="text-[10px] text-surface-400 -mt-0.5">Circuit Simulator</p>
+              <p className="text-[10px] text-surface-400 -mt-0.5">{t('Circuit Simulator')}</p>
             </motion.div>
           )}
         </AnimatePresence>
