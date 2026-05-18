@@ -137,6 +137,91 @@ export class LcdDisplayLogic implements IComponentLogic {
 }
 
 /**
+ * Logic for ESC Module — interprets PWM signal and drives connected BLDC motor
+ * PWM mapping: 1000µs → 0% throttle, 2000µs → 100% throttle
+ * The PWM value (0-255) from analogWrite is mapped linearly to RPM.
+ */
+export class ESCLogic implements IComponentLogic {
+  onPinStateChange(componentId: string, pinId: string, state: PinState, value?: number): void {
+    const { updateNode, nodes, wires } = useCanvasStore.getState();
+    const node = nodes.find(n => n.id === componentId);
+    if (!node) return;
+
+    const pin = node.pins?.find(p => p.id === pinId);
+    const pinLabel = `${pinId} ${pin?.name || ''}`.toLowerCase();
+    if (!pinLabel.includes('sig') && !pinLabel.includes('signal')) return;
+
+    // Map PWM 0-255 to throttle percentage (0-100)
+    // In real ESC: 1000µs = 0%, 1500µs = 50%, 2000µs = 100%
+    const pwm = state === 'PWM' ? Math.max(0, Math.min(255, value ?? 0)) : state === 'HIGH' ? 255 : 0;
+    const throttlePercent = Math.round((pwm / 255) * 100);
+    const rpm = Math.round((pwm / 255) * 12000); // Max ~12000 RPM for a 2204 motor
+
+    updateNode(componentId, {
+      properties: {
+        ...node.properties,
+        escThrottle: throttlePercent,
+        escRpm: rpm,
+        isActive: pwm > 0,
+      },
+    });
+
+    // Propagate RPM to connected BLDC motors via phase pins
+    const phasePins = node.pins?.filter(p => p.id.startsWith('phase_')) || [];
+    for (const phasePin of phasePins) {
+      // Find wires connected to this phase pin
+      const connectedWires = wires.filter(w =>
+        (w.fromNodeId === componentId && w.fromPinId === phasePin.id) ||
+        (w.toNodeId === componentId && w.toPinId === phasePin.id)
+      );
+      for (const wire of connectedWires) {
+        const targetNodeId = wire.fromNodeId === componentId ? wire.toNodeId : wire.fromNodeId;
+        const targetPinId = wire.fromNodeId === componentId ? wire.toPinId : wire.fromPinId;
+        const targetNode = nodes.find(n => n.id === targetNodeId);
+        if (targetNode?.type === 'MOTOR_BLDC') {
+          // Use a special state to carry RPM value to the motor logic
+          LogicRegistry.dispatch('MOTOR_BLDC', targetNodeId, targetPinId, pwm > 0 ? 'HIGH' : 'LOW', rpm);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Logic for BLDC Motor — receives RPM from ESC and animates rotation
+ */
+export class BLDCMotorLogic implements IComponentLogic {
+  onPinStateChange(componentId: string, _pinId: string, state: PinState, value?: number): void {
+    const { updateNode, nodes } = useCanvasStore.getState();
+    const node = nodes.find(n => n.id === componentId);
+    if (!node) return;
+
+    // Animation tick — update rotation angle
+    if (_pinId === '__bldc_anim__') {
+      updateNode(componentId, {
+        properties: {
+          ...node.properties,
+          bldcRotation: value ?? 0,
+        },
+      });
+      return;
+    }
+
+    const rpm = state === 'HIGH' ? Math.max(0, value ?? 0) : 0;
+    const isSpinning = rpm > 0;
+
+    // Store RPM for animation; the CircuitCanvas will use bldcRpm to animate rotation
+    updateNode(componentId, {
+      properties: {
+        ...node.properties,
+        bldcRpm: rpm,
+        isSpinning,
+      },
+    });
+  }
+}
+
+/**
  * Global Registry
  */
 export class LogicRegistry {
@@ -152,6 +237,8 @@ export class LogicRegistry {
     'LCD_16X2': new LcdDisplayLogic(),
     'DISPLAY_OLED': new LcdDisplayLogic(),
     'OLED_DISPLAY': new LcdDisplayLogic(),
+    'ESC_MODULE': new ESCLogic(),
+    'MOTOR_BLDC': new BLDCMotorLogic(),
   };
 
   public static dispatch(componentType: string, componentId: string, pinId: string, state: PinState, value?: number) {

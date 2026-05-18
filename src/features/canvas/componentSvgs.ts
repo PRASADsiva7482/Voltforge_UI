@@ -308,6 +308,86 @@ export const componentSvgs: Record<string, string> = {
     '<text x="60" y="29" font-size="12" fill="%23e5e7eb" text-anchor="middle" font-family="Arial" font-weight="bold">74HC595</text>' +
     '<path d="M7 11h8M7 17h8M7 23h8M7 29h8M7 35h8M105 11h8M105 17h8M105 23h8M105 29h8M105 35h8" stroke="%23cbd5e1" stroke-width="3"/>'
   ),
+
+  // ── Drone / ESC ──
+  ESC_MODULE: svg('0 0 120 60',
+    // Heat-shrink wrapped ESC body
+    '<defs><linearGradient id="esc_g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23334155"/><stop offset="100%25" stop-color="%231e293b"/></linearGradient></defs>' +
+    '<rect width="120" height="60" rx="6" fill="url(%23esc_g)" stroke="%23475569" stroke-width="1.5"/>' +
+    // Inner PCB glow line
+    '<rect x="6" y="6" width="108" height="48" rx="3" fill="none" stroke="%2322c55e" stroke-width="0.5" opacity="0.3"/>' +
+    // MOSFET heat-pads
+    '<rect x="30" y="10" width="12" height="10" rx="1" fill="%234b5563"/>' +
+    '<rect x="48" y="10" width="12" height="10" rx="1" fill="%234b5563"/>' +
+    '<rect x="66" y="10" width="12" height="10" rx="1" fill="%234b5563"/>' +
+    // Capacitor cluster
+    '<circle cx="40" cy="38" r="5" fill="%231e293b" stroke="%23475569" stroke-width="1"/>' +
+    '<circle cx="56" cy="38" r="5" fill="%231e293b" stroke="%23475569" stroke-width="1"/>' +
+    '<circle cx="72" cy="38" r="5" fill="%231e293b" stroke="%23475569" stroke-width="1"/>' +
+    // Input wires (left)
+    '<rect x="0" y="12" width="10" height="4" rx="1" fill="%23f97316"/>' +  // Signal
+    '<rect x="0" y="27" width="10" height="4" rx="1" fill="%23ef4444"/>' +  // VCC
+    '<rect x="0" y="42" width="10" height="4" rx="1" fill="%23555"/>' +    // GND
+    // Phase output wires (right)
+    '<rect x="110" y="12" width="10" height="4" rx="1" fill="%23facc15"/>' +  // Phase A
+    '<rect x="110" y="27" width="10" height="4" rx="1" fill="%2322c55e"/>' +  // Phase B
+    '<rect x="110" y="42" width="10" height="4" rx="1" fill="%233b82f6"/>' +  // Phase C
+    // Label
+    '<text x="60" y="56" font-size="7" fill="%2394a3b8" text-anchor="middle" font-family="Arial" font-weight="bold">ESC 20A</text>'
+  ),
+
+  MOTOR_BLDC: svg('0 0 80 80',
+    '<defs>' +
+      '<radialGradient id="bldc_bell"><stop offset="0%25" stop-color="%234b5563"/><stop offset="80%25" stop-color="%231f2937"/><stop offset="100%25" stop-color="%23111827"/></radialGradient>' +
+    '</defs>' +
+    // Stator body — outer ring
+    '<circle cx="40" cy="36" r="32" fill="%231f2937" stroke="%23374151" stroke-width="2"/>' +
+    // Stator coil teeth (12-slot pattern)
+    '<path d="M40 8 L44 18 L36 18 Z" fill="%23b45309" opacity="0.7"/>' +  // top
+    '<path d="M64 14 L60 24 L54 19 Z" fill="%23b45309" opacity="0.7"/>' +
+    '<path d="M72 36 L62 40 L62 32 Z" fill="%23b45309" opacity="0.7"/>' +
+    '<path d="M64 58 L54 53 L60 48 Z" fill="%23b45309" opacity="0.7"/>' +
+    '<path d="M40 64 L36 54 L44 54 Z" fill="%23b45309" opacity="0.7"/>' +
+    '<path d="M16 58 L20 48 L26 53 Z" fill="%23b45309" opacity="0.7"/>' +
+    '<path d="M8 36 L18 32 L18 40 Z" fill="%23b45309" opacity="0.7"/>' +
+    '<path d="M16 14 L26 19 L20 24 Z" fill="%23b45309" opacity="0.7"/>' +
+    // Bell housing — spinning element (will be animated with CSS/Konva rotation)
+    '<circle cx="40" cy="36" r="20" fill="url(%23bldc_bell)" class="bldc-bell"/>' +
+    // Rotor magnets (shown as alternating arcs on the bell)
+    '<path d="M40 18 a18 18 0 0 1 15.6 9" stroke="%23ef4444" stroke-width="3" fill="none" opacity="0.6"/>' +
+    '<path d="M55.6 27 a18 18 0 0 1 0 18" stroke="%233b82f6" stroke-width="3" fill="none" opacity="0.6"/>' +
+    '<path d="M55.6 45 a18 18 0 0 1 -15.6 9" stroke="%23ef4444" stroke-width="3" fill="none" opacity="0.6"/>' +
+    '<path d="M40 54 a18 18 0 0 1 -15.6 -9" stroke="%233b82f6" stroke-width="3" fill="none" opacity="0.6"/>' +
+    '<path d="M24.4 45 a18 18 0 0 1 0 -18" stroke="%23ef4444" stroke-width="3" fill="none" opacity="0.6"/>' +
+    '<path d="M24.4 27 a18 18 0 0 1 15.6 -9" stroke="%233b82f6" stroke-width="3" fill="none" opacity="0.6"/>' +
+    // Center bearing
+    '<circle cx="40" cy="36" r="5" fill="%23c0c0c0"/>' +
+    '<circle cx="40" cy="36" r="2" fill="%234b5563"/>' +
+    // Phase wire leads (bottom)
+    '<rect x="12" y="70" width="4" height="10" rx="1" fill="%23facc15"/>' +
+    '<rect x="38" y="70" width="4" height="10" rx="1" fill="%2322c55e"/>' +
+    '<rect x="62" y="70" width="4" height="10" rx="1" fill="%233b82f6"/>' +
+    // Model label
+    '<text x="40" y="75" font-size="5" fill="%236b7280" text-anchor="middle" font-family="Arial">2204</text>'
+  ),
+
+  RC_RECEIVER: svg('0 0 80 60',
+    '<rect width="80" height="60" rx="4" fill="%23262626"/>' +
+    '<rect x="0" y="0" width="80" height="20" rx="4" fill="%23ef4444"/>' +
+    '<text x="40" y="14" font-size="10" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">FlySky FS-iA6B</text>' +
+    '<rect x="4" y="25" width="72" height="25" fill="%23171717"/>' +
+    // Pins block
+    '<rect x="18" y="50" width="6" height="10" fill="%23555"/>' +    // GND
+    '<rect x="38" y="50" width="6" height="10" fill="%23ef4444"/>' +  // VCC
+    '<rect x="58" y="50" width="6" height="10" fill="%23f97316"/>' +  // PPM
+    // Labels for pins
+    '<text x="21" y="44" font-size="6" fill="%23a3a3a3" text-anchor="middle" font-family="Arial">G</text>' +
+    '<text x="41" y="44" font-size="6" fill="%23ef4444" text-anchor="middle" font-family="Arial">V</text>' +
+    '<text x="61" y="44" font-size="6" fill="%23f97316" text-anchor="middle" font-family="Arial">S</text>' +
+    // Antennas
+    '<path d="M10 20 Q5 0 -10 -10" stroke="black" stroke-width="1.5" fill="none"/>' +
+    '<path d="M70 20 Q75 0 90 -10" stroke="black" stroke-width="1.5" fill="none"/>'
+  ),
 };
 
 // Default dimensions for each component type (width x height)
@@ -373,6 +453,11 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
   // Communication
   BLUETOOTH_MODULE: { w: 60, h: 50 },
   WIFI_MODULE: { w: 60, h: 50 },
+
+  // Drone / ESC
+  ESC_MODULE: { w: 120, h: 60 },
+  MOTOR_BLDC: { w: 80, h: 80 },
+  RC_RECEIVER: { w: 80, h: 60 },
 
   // Other
   BREADBOARD: { w: 200, h: 80 },

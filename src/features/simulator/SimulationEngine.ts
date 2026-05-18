@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { CanvasNode, Wire } from '../../types';
+import { useCanvasStore } from '../../store/canvasStore';
 import { CPU, avrInstruction, AVRIOPort, AVRUSART, AVRTimer, portBConfig, portCConfig, portDConfig, timer0Config, timer1Config, timer2Config, usart0Config, PinState as AvrPinState } from 'avr8js';
 
 export type PinState = 'HIGH' | 'LOW' | 'INPUT' | 'OUTPUT' | 'PWM';
@@ -58,6 +59,10 @@ export class SimulationEngine {
   private lcdInitialized = false;
   private lcdNodes: CanvasNode[] = [];  // display nodes on canvas
 
+  // ── ESC / BLDC Motor state ──
+  private escNodes: CanvasNode[] = [];   // ESC modules on canvas
+  private bldcNodes: CanvasNode[] = [];  // BLDC motors on canvas
+
   constructor(callbacks: SimulationCallbacks) {
     this.callbacks = callbacks;
   }
@@ -86,6 +91,9 @@ export class SimulationEngine {
       n.type === 'DISPLAY_LCD_I2C' || n.type === 'LCD_16X2' ||
       n.type === 'DISPLAY_OLED' || n.type === 'OLED_DISPLAY'
     );
+    // Find ESC and BLDC motor nodes
+    this.escNodes = nodes.filter(n => n.type === 'ESC_MODULE');
+    this.bldcNodes = nodes.filter(n => n.type === 'MOTOR_BLDC');
 
     try {
       if (hex?.trim()) {
@@ -100,7 +108,7 @@ export class SimulationEngine {
 
       this.parseCode(code);
 
-      this.callbacks.onSerialOutput('> Hardware emulator worker not enabled yet; using code-compatibility mode');
+      this.callbacks.onSerialOutput('> Compiled firmware not available; falling back to code-compatibility interpreter');
       await new Promise(resolve => setTimeout(resolve, 300));
       this.callbacks.onSerialOutput('> Compatibility CPU Started');
       this.callbacks.onSerialOutput('────────────────────────────────');
@@ -125,6 +133,7 @@ export class SimulationEngine {
 
         this.executeBlock(this.loopStatements, nodes, wires, false);
         this.updateDiagnosticProbes(nodes, wires);
+        this.updateBldcMotorAnimation();
         this.emitDebugSnapshot(false);
         this.tick += 100;
       }, 100);
@@ -220,7 +229,7 @@ export class SimulationEngine {
         this.propagatePinState(pin, 'PWM', nodes, wires, value);
         continue;
       }
-      
+
       // digitalRead(pin)
       const drAssign = stmt.match(/(\w+)\s*=\s*digitalRead\s*\(\s*(\w+)\s*\)/);
       if (drAssign) {
@@ -302,8 +311,11 @@ export class SimulationEngine {
       // ── LCD commands ──
       if (this.handleLcdStatement(stmt, nodes)) continue;
 
+      // ── ESC / Servo writeMicroseconds / write ──
+      if (this.handleEscStatement(stmt, nodes, wires)) continue;
+
       // I2C / Wire.h commands — silently consume so they don't cause errors
-      if (/Wire\.|lcd\.|dht\./i.test(stmt)) continue;
+      if (/Wire\.|lcd\.|dht\.|servo\.|esc\.|myservo\./i.test(stmt)) continue;
 
       // (Variable assignment moved up to handle digitalRead)
     }
@@ -508,6 +520,86 @@ export class SimulationEngine {
     });
   }
 
+  /**
+   * Handle ESC-related statements:
+   *   esc.writeMicroseconds(value)  — maps 1000-2000µs to 0-255 PWM
+   *   esc.write(value)              — maps 0-180 servo-style to 0-255 PWM
+   *   myservo.writeMicroseconds(value)
+   *   servo.attach(pin) / esc.attach(pin)
+   */
+  private handleEscStatement(stmt: string, _nodes: CanvasNode[], _wires: Wire[]): boolean {
+    const s = stmt.trim();
+
+    // Consume attach patterns: esc.attach(pin) / myservo.attach(pin)
+    if (/(?:esc|myservo|servo)\w*\.attach\s*\(/i.test(s)) return true;
+
+    // writeMicroseconds: 1000µs = 0%, 2000µs = 100%
+    const wmsMatch = s.match(/(?:esc|myservo|servo)\w*\.writeMicroseconds\s*\(\s*(\w+)\s*\)/i);
+    if (wmsMatch) {
+      const usValue = Math.max(1000, Math.min(2000, parseInt(this.resolveValue(wmsMatch[1])) || 1000));
+      const pwmValue = Math.round(((usValue - 1000) / 1000) * 255);
+      this.propagateEscSignal(pwmValue);
+      return true;
+    }
+
+    // write: 0-180 servo-style mapping
+    const wMatch = s.match(/(?:esc|myservo|servo)\w*\.write\s*\(\s*(\w+)\s*\)/i);
+    if (wMatch) {
+      const angle = Math.max(0, Math.min(180, parseInt(this.resolveValue(wMatch[1])) || 0));
+      const pwmValue = Math.round((angle / 180) * 255);
+      this.propagateEscSignal(pwmValue);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Propagate a PWM signal to all ESC_MODULE nodes on the canvas.
+   * The ESCLogic handler in LogicRegistry will then forward RPM to BLDC motors.
+   */
+  private propagateEscSignal(pwmValue: number) {
+    this.escNodes.forEach(escNode => {
+      const sigPin = escNode.pins?.find(p => p.id === 'sig');
+      if (sigPin) {
+        this.callbacks.onPinStateChange(escNode.id, sigPin.id, 'PWM', pwmValue);
+      }
+    });
+  }
+
+  /**
+   * Animate BLDC motors: increment rotation based on stored RPM.
+   * Called every tick (~100ms). Rotation speed is proportional to RPM.
+   */
+  private updateBldcMotorAnimation() {
+    // Get fresh nodes from the store to read the latest RPM set by ESCLogic
+    const freshNodes = useCanvasStore.getState().nodes;
+    
+    this.bldcNodes.forEach(motor => {
+      const freshMotor = freshNodes.find(n => n.id === motor.id);
+      if (!freshMotor) return;
+
+      const rpm = Number(freshMotor.properties?.bldcRpm) || 0;
+      if (rpm <= 0) return;
+
+      // Visual rotation speed: prevent wagon-wheel effect (syncing with frame rate).
+      // We map the full 0-12000 RPM range to a nice visual 0-47 degrees per tick.
+      const degreesPerTick = (rpm / 12000) * 47;
+      const currentRotation = Number(freshMotor.properties?.bldcRotation) || 0;
+      const newRotation = (currentRotation + degreesPerTick) % 360;
+
+      // Store rotation state for canvas rendering via globalThis
+      (globalThis as any).__voltforgeBldcState = (globalThis as any).__voltforgeBldcState || {};
+      (globalThis as any).__voltforgeBldcState[motor.id] = {
+        rotation: newRotation,
+        rpm,
+      };
+
+      // Trigger re-render with updated rotation
+      this.callbacks.onPinStateChange(motor.id, '__bldc_anim__', 'HIGH', newRotation);
+    });
+  }
+
   private voltageAtPin(nodeId: string, pinId: string, nodes: CanvasNode[], wires: Wire[]): number {
     const connectedPins = this.getConnectedPins(nodeId, pinId, wires);
 
@@ -629,6 +721,7 @@ export class SimulationEngine {
         avrInstruction(this.avrCpu);
         this.avrCpu.tick();
       }
+      this.updateBldcMotorAnimation();
       this.emitDebugSnapshot(false);
     }, 16);
   }

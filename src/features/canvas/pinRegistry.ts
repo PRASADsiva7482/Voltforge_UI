@@ -341,6 +341,30 @@ const RELAY_SINGLE_PINS: PinPosition[] = [
   pin('no', 'NO', 70, 35, 'bidirectional'),
 ];
 
+// ESC_MODULE: SVG viewBox 120×60, input left (Signal/VCC/GND), output right (Phase A/B/C)
+const ESC_PINS: PinPosition[] = [
+  pin('sig', 'Signal', 0, 15, 'input'),
+  pin('vcc', 'VCC', 0, 30, 'power'),
+  pin('gnd', 'GND', 0, 45, 'ground'),
+  pin('phase_a', 'Phase A', 120, 15, 'output'),
+  pin('phase_b', 'Phase B', 120, 30, 'output'),
+  pin('phase_c', 'Phase C', 120, 45, 'output'),
+];
+
+// MOTOR_BLDC: SVG viewBox 80×80, 3 phase input pins at bottom
+const MOTOR_BLDC_PINS: PinPosition[] = [
+  pin('phase_a', 'Phase A', 15, 80, 'input'),
+  pin('phase_b', 'Phase B', 40, 80, 'input'),
+  pin('phase_c', 'Phase C', 65, 80, 'input'),
+];
+
+// RC_RECEIVER: SVG viewBox 80×60, 3 output pins
+const RC_RECEIVER_PINS: PinPosition[] = [
+  pin('gnd', 'GND', 20, 60, 'ground'),
+  pin('vcc', 'VCC', 40, 60, 'power'),
+  pin('ppm', 'PPM Signal', 60, 60, 'output'),
+];
+
 // ── Registry ──
 export const boardPinRegistry: Record<string, PinPosition[]> = {
   ARDUINO_UNO: ARDUINO_UNO_PINS,
@@ -401,6 +425,11 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
   // Communication
   BLUETOOTH_MODULE: BT_MODULE_PINS,
   WIFI_MODULE: WIFI_MODULE_PINS,
+
+  // Drone / ESC
+  ESC_MODULE: ESC_PINS,
+  MOTOR_BLDC: MOTOR_BLDC_PINS,
+  RC_RECEIVER: RC_RECEIVER_PINS,
 
   // Other
   BREADBOARD: BREADBOARD_PINS,

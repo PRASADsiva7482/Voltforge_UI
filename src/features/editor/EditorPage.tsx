@@ -1,18 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Save, ArrowLeft, Play, Square, Settings, Layout, Wand2, Terminal, Sparkles, Undo, Redo, Gauge, Activity, Package, ShieldAlert, Download, Share2, Layers, GitFork } from 'lucide-react';
+import { Save, ArrowLeft, Play, Square, Settings, Layout, Terminal, Undo, Redo, Gauge, Activity, Package, Download, Share2, Layers, GitFork } from 'lucide-react';
 import CircuitCanvas from '../canvas/CircuitCanvas';
 import ComponentPanel from '../components/ComponentPanel';
 import CodeEditor from '../editor/CodeEditor';
 import PropertyEditor from '../editor/PropertyEditor';
-import AiChatPanel from '../ai/AiChatPanel';
 import ProjectSettingsModal from './ProjectSettingsModal';
 import MultimeterPanel from './MultimeterPanel';
 import OscilloscopePanel from './OscilloscopePanel';
 import BomPanel from './BomPanel';
-import AiValidatorPanel from './AiValidatorPanel';
-import { projectApi, aiApi, projectExportApi, simulationApi } from '../../api/services';
+import { projectApi, projectExportApi, simulationApi } from '../../api/services';
 import { useProjectStore } from '../../store/projectStore';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useSimulationStore } from '../../store/simulationStore';
@@ -57,13 +55,10 @@ export default function EditorPage() {
   const [activePanel, setActivePanel] = useState<ActivePanel>('split');
   const [canvasSize, setCanvasSize] = useState({ width: 600, height: 500 });
   const [isSimulating, setIsSimulating] = useState(false);
-  const [isAiRouting, setIsAiRouting] = useState(false);
-  const [showAiChat, setShowAiChat] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showMultimeter, setShowMultimeter] = useState(false);
   const [showOscilloscope, setShowOscilloscope] = useState(false);
   const [showBom, setShowBom] = useState(false);
-  const [showValidator, setShowValidator] = useState(false);
   const [splitRatio, setSplitRatio] = useState(50); // percentage for canvas width
   const [canvasViewMode, setCanvasViewMode] = useState<CanvasViewMode>('breadboard');
   const isDraggingSplit = useRef(false);
@@ -270,7 +265,9 @@ export default function EditorPage() {
       setIsSimulating(false);
       engineRef.current?.stop();
       writeSerial('> Simulation stopped');
-      nodes.forEach(n => updateNode(n.id, { properties: { ...n.properties, isLit: false, isSpinning: false, isBeeping: false } }));
+      nodes.forEach(n => updateNode(n.id, { properties: { ...n.properties, isLit: false, isSpinning: false, isBeeping: false, isActive: false, escThrottle: 0, escRpm: 0, bldcRpm: 0, bldcRotation: 0 } }));
+      // Clean up global BLDC animation state
+      if ((globalThis as any).__voltforgeBldcState) delete (globalThis as any).__voltforgeBldcState;
     }
   };
 
@@ -303,46 +300,7 @@ export default function EditorPage() {
     });
   }, [nodes, wires, isSimulating]);
 
-  const handleAiRouting = async () => {
-    if (nodes.length < 2) return alert('Add at least 2 components');
-    setIsAiRouting(true);
-    try {
-      const prompt = [
-        `Board: ${currentProject?.boardType || 'ARDUINO_UNO'}`,
-        'Components and pins:',
-        ...nodes.map(n => `- ${n.id}: ${n.name} (${n.type}) pins: ${n.pins.map(p => `${p.id}/${p.name}`).join(', ')}`),
-        'Return wiring suggestions using the exact component ids and pin ids where possible.',
-      ].join('\n');
-      const res = await aiApi.suggestWiring({ prompt, boardType: currentProject?.boardType, componentTypes: nodes.map(n => n.type) });
-      let applied = 0;
-      (res.data.data.wireSuggestions || []).forEach((s, i) => {
-        const from = resolveSuggestedNode(s.fromComponentId, nodes);
-        const to = resolveSuggestedNode(s.toComponentId, nodes);
-        const fromPin = from ? resolveSuggestedPin(s.fromPin, from) : null;
-        const toPin = to ? resolveSuggestedPin(s.toPin, to) : null;
-        if (!from || !to || !fromPin || !toPin || from.id === to.id) return;
-        const duplicate = wires.some(w =>
-          (w.fromNodeId === from.id && w.fromPinId === fromPin.id && w.toNodeId === to.id && w.toPinId === toPin.id) ||
-          (w.fromNodeId === to.id && w.fromPinId === toPin.id && w.toNodeId === from.id && w.toPinId === fromPin.id)
-        );
-        if (duplicate) return;
-        addWire({
-          id: `ai_${Date.now()}_${i}`,
-          fromNodeId: from.id,
-          fromPinId: fromPin.id,
-          toNodeId: to.id,
-          toPinId: toPin.id,
-          color: s.color || '#3b82f6',
-          bendPoints: [],
-          routingMode: 'auto',
-          label: s.description,
-        });
-        applied += 1;
-      });
-      if (applied === 0) alert('AI returned suggestions, but none matched the current component pins.');
-    } catch (e) { console.error(e); }
-    finally { setIsAiRouting(false); }
-  };
+
 
   const handleExportZip = async () => {
     if (!currentProject) return;
@@ -419,11 +377,8 @@ export default function EditorPage() {
 
         <div className="toolbar-divider" />
 
-        {/* ── Instrument & AI Tools ── */}
+        {/* ── Instrument Tools ── */}
         <div className="flex items-center gap-0.5">
-          <button onClick={handleAiRouting} disabled={!isOwner || isAiRouting || isSimulating} className={`p-2 rounded-lg transition-all ${isAiRouting ? 'text-purple-400 animate-pulse' : 'text-surface-400 hover:text-purple-400 hover:bg-white/5'} disabled:opacity-30`} title="AI Auto-Router"><Wand2 className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setShowAiChat(!showAiChat)} disabled={!isOwner} className={`p-2 rounded-lg transition-all ${showAiChat ? 'bg-purple-500/20 text-purple-400' : 'text-surface-400 hover:text-purple-400 hover:bg-white/5'} disabled:opacity-30`} title="AI Assistant"><Sparkles className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setShowValidator(!showValidator)} className={`p-2 rounded-lg transition-all ${showValidator ? 'bg-purple-500/20 text-purple-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="AI Validator"><ShieldAlert className="w-3.5 h-3.5" /></button>
           <button onClick={() => setShowMultimeter(!showMultimeter)} className={`p-2 rounded-lg transition-all ${showMultimeter ? 'bg-volt-500/20 text-volt-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Multimeter"><Gauge className="w-3.5 h-3.5" /></button>
           <button onClick={() => setShowOscilloscope(!showOscilloscope)} className={`p-2 rounded-lg transition-all ${showOscilloscope ? 'bg-volt-500/20 text-volt-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Oscilloscope"><Activity className="w-3.5 h-3.5" /></button>
           <button onClick={() => setShowBom(!showBom)} className={`p-2 rounded-lg transition-all ${showBom ? 'bg-forge-500/20 text-forge-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Bill of Materials"><Package className="w-3.5 h-3.5" /></button>
@@ -462,7 +417,7 @@ export default function EditorPage() {
               style={{ width: activePanel === 'split' ? `${splitRatio}%` : '100%' }}
             >
               {isSimulating && <div className="absolute top-3 right-3 z-10 glass px-2.5 py-1 rounded-full flex items-center gap-1.5 border border-volt-500/30"><span className="w-1.5 h-1.5 rounded-full bg-volt-500 animate-pulse" /><span className="text-[10px] font-medium text-volt-400">Simulating</span></div>}
-              {isAiRouting && <div className="absolute top-3 right-3 z-10 glass px-2.5 py-1 rounded-full flex items-center gap-1.5 border border-purple-500/30"><Wand2 className="w-3 h-3 text-purple-400 animate-spin" /><span className="text-[10px] font-medium text-purple-400">AI Routing...</span></div>}
+
               <div ref={canvasContainerCallbackRef} className="flex-1 relative min-h-0 min-w-0 p-0 m-0 border-0">
                 <CircuitCanvas
                   width={canvasSize.width}
@@ -502,8 +457,7 @@ export default function EditorPage() {
         )}
 
         {/* Floating Panels */}
-        <AiChatPanel isOpen={showAiChat} onClose={() => setShowAiChat(false)} onApplyCode={(c) => { if (activeCodeFile) updateCodeFileContent(activeCodeFile.id, c); }} projectContext={currentProject ? `Board: ${currentProject.boardType}, Components: ${nodes.map(n => n.type).join(', ')}` : undefined} />
-        <AiValidatorPanel isOpen={showValidator} onClose={() => setShowValidator(false)} />
+
         <MultimeterPanel isOpen={showMultimeter} onClose={() => setShowMultimeter(false)} voltage={isSimulating ? 5 : 0} current={isSimulating ? 20 : 0} />
         <OscilloscopePanel isOpen={showOscilloscope} onClose={() => setShowOscilloscope(false)} />
         <BomPanel isOpen={showBom} onClose={() => setShowBom(false)} />

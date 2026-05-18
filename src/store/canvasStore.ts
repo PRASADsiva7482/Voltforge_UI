@@ -45,7 +45,27 @@ interface CanvasState {
 
   // Actions
   addNode: (node: CanvasNode) => void;
+
+  /**
+   * updateNode — used during DRAG (geometry changes are transient).
+   *
+   * Performance contract:
+   *  - If geometry keys (x, y, width, height, rotation, pins) changed, ONLY
+   *    reroute wires that are directly connected to this node.  This is O(W_node)
+   *    instead of O(W_total) and keeps 60 fps smooth on large schematics.
+   *  - Full rerouteAutoWires() is intentionally deferred to updateNodeDragEnd().
+   */
   updateNode: (id: string, updates: Partial<CanvasNode>) => void;
+
+  /**
+   * updateNodeDragEnd — call this from onDragEnd / onTransformEnd only.
+   *
+   * Pushes to history and runs the full global rerouteAutoWires so every
+   * wire (including those routed around the moved component) is recalculated
+   * exactly once per user gesture.
+   */
+  updateNodeDragEnd: (id: string, updates: Partial<CanvasNode>) => void;
+
   removeNode: (id: string) => void;
   selectNode: (id: string | null) => void;
   addWire: (wire: Wire) => void;
@@ -75,6 +95,15 @@ const WIRE_COLORS = ['#22c55e', '#ef4444', '#3b82f6', '#f59e0b', '#a855f7', '#ec
 
 let wireCounter = 0;
 
+/** Re-route only the wires that touch a specific node — O(W_node) not O(W_total). */
+function rerouteConnectedWires(nodeId: string, nodes: CanvasNode[], wires: Wire[]): Wire[] {
+  return wires.map(w => {
+    const touches = w.fromNodeId === nodeId || w.toNodeId === nodeId;
+    if (!touches || w.routingMode !== 'auto') return w;
+    return { ...w, bendPoints: routeWireBetweenNodes(w, nodes) };
+  });
+}
+
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: [],
   wires: [],
@@ -94,15 +123,32 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set((state) => ({ nodes: [...state.nodes, node] }));
   },
 
+  // ── Fast drag-time update: only reroute wires connected to this node ──────
   updateNode: (id, updates) =>
     set((state) => {
       const nodes = state.nodes.map((n) => (n.id === id ? { ...n, ...updates } : n));
-      const geometryChanged = ['x', 'y', 'width', 'height', 'rotation', 'pins'].some((key) => key in updates);
+      const geometryChanged = ['x', 'y', 'width', 'height', 'rotation', 'pins'].some(
+        (key) => key in updates
+      );
       return {
         nodes,
-        wires: geometryChanged ? rerouteAutoWires(nodes, state.wires) : state.wires,
+        wires: geometryChanged
+          ? rerouteConnectedWires(id, nodes, state.wires)
+          : state.wires,
       };
     }),
+
+  // ── DragEnd commit: push history + full global reroute ───────────────────
+  updateNodeDragEnd: (id, updates) => {
+    get().pushHistory();
+    set((state) => {
+      const nodes = state.nodes.map((n) => (n.id === id ? { ...n, ...updates } : n));
+      return {
+        nodes,
+        wires: rerouteAutoWires(nodes, state.wires),
+      };
+    });
+  },
 
   removeNode: (id) => {
     get().pushHistory();

@@ -50,7 +50,7 @@ export default function DashboardPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16"
+        className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16"
       >
         <button
           onClick={() => navigate('/projects/new')}
@@ -72,18 +72,6 @@ export default function DashboardPage() {
           </div>
           <h3 className="text-xl font-semibold text-white mb-2">{t('Explore')}</h3>
           <p className="text-sm text-surface-400">Browse community projects</p>
-        </button>
-
-        <button
-          onClick={() => navigate('/projects/new?ai=true')}
-          className="glass glass-hover p-8 rounded-2xl text-center flex flex-col items-center justify-center group cursor-pointer transition-all duration-300"
-          style={{ boxShadow: '0 0 20px rgba(139, 92, 246, 0.1)' }}
-        >
-          <div className="w-16 h-16 rounded-2xl bg-purple-500/10 flex items-center justify-center mb-5 group-hover:bg-purple-500/20 transition-colors">
-            <Cpu className="w-8 h-8 text-purple-400" />
-          </div>
-          <h3 className="text-xl font-semibold text-white mb-2">{t('AI Generate')}</h3>
-          <p className="text-sm text-surface-400">Let AI build your circuit</p>
         </button>
       </motion.div>
 

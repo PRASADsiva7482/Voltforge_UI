@@ -349,9 +349,10 @@ const PinDot = ({ pin, nodeId, node, isWiring, wiringFromNodeId, startWiring, fi
 };
 
 // ── Component Node ──
-const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringFromNodeId, startWiring, finishWiring, onInteraction, readOnly }: {
+const ComponentNode = ({ node, isSelected, onSelect, onChange, onDragEnd, isWiring, wiringFromNodeId, startWiring, finishWiring, onInteraction, readOnly }: {
   node: CanvasNode; isSelected: boolean; onSelect: () => void;
   onChange: (a: Partial<CanvasNode>) => void;
+  onDragEnd: (a: Partial<CanvasNode>) => void;
   isWiring: boolean; wiringFromNodeId: string | null;
   startWiring: (n: string, p: string) => void;
   finishWiring: (n: string, p: string) => void;
@@ -360,6 +361,8 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
 }) => {
   const shapeRef = useRef<any>(null);
   const trRef = useRef<any>(null);
+  // ── Cached snap anchors: computed once on DragStart, reused every onDragMove frame ──
+  const snapAnchorsRef = useRef<{ x: number; y: number }[]>([]);
   let svgData = (node.properties?.svgData as string | undefined) || componentSvgs[node.type];
 
   // Resolve the effective LED color from multiple sources:
@@ -395,7 +398,7 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
   }, [isSelected]);
 
   const isBlown = Boolean(node.properties?.isBlown);
-  const isActive = !isBlown && (node.properties?.isLit || node.properties?.isSpinning || node.properties?.isBeeping);
+  const isActive = !isBlown && (node.properties?.isLit || node.properties?.isSpinning || node.properties?.isBeeping || node.properties?.isActive);
   const isButton = node.type === 'PUSH_BUTTON' || node.type === 'BUTTON';
   const isServo = node.type === 'SERVO_MOTOR' || node.type === 'MOTOR_SERVO';
 
@@ -415,18 +418,22 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
         onMouseLeave={() => { if (isButton && onInteraction) onInteraction(node.id, 'release'); }}
         onTouchStart={() => { if (isButton && onInteraction) onInteraction(node.id, 'press'); }}
         onTouchEnd={() => { if (isButton && onInteraction) onInteraction(node.id, 'release'); }}
-        onDragMove={(e) => {
+        onDragStart={() => {
+          // ── Cache snap anchors ONCE at the start of the drag gesture ──────────
+          // This avoids O(N*pins) allocation on every 16 ms onDragMove tick.
           const state = useCanvasStore.getState();
-          // Snap to other components' positions, centers, AND pin positions
-          const anchors = state.nodes
+          snapAnchorsRef.current = state.nodes
             .filter(item => item.id !== node.id)
             .flatMap(item => [
               { x: item.x, y: item.y },
               { x: item.x + item.width, y: item.y + item.height },
               { x: item.x + item.width / 2, y: item.y + item.height / 2 },
-              // Include pin absolute positions for pin-to-pin alignment
               ...item.pins.map(p => getPinAbsPos(item, p.id)).filter(Boolean) as { x: number; y: number }[],
             ]);
+        }}
+        onDragMove={(e) => {
+          // ── Use cached anchors — zero allocation per frame ───────────────────
+          const anchors = snapAnchorsRef.current;
           const snapped = snapToRoutingGuides({ x: e.target.x(), y: e.target.y() }, anchors, 8);
           // Grid-snap fallback (20px grid)
           const sx = anchors.some(a => Math.abs(a.x - snapped.x) <= 8) ? snapped.x : Math.round(snapped.x / MAT_GRID_MINOR) * MAT_GRID_MINOR;
@@ -438,7 +445,9 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
           }
         }}
         onDragEnd={(e) => {
-          onChange({ x: e.target.x(), y: e.target.y() });
+          // ── Full global wire reroute runs exactly ONCE per drag gesture ──────
+          onDragEnd({ x: e.target.x(), y: e.target.y() });
+          snapAnchorsRef.current = [];
         }}
         onTransformEnd={() => {
           const n = shapeRef.current;
@@ -452,7 +461,8 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
             x: p.x * (nw / node.width),
             y: p.y * (nh / node.height)
           }));
-          onChange({ x: n.x(), y: n.y(), width: nw, height: nh, pins: newPins, rotation: n.rotation() });
+          // Transform end is equivalent to drag end — full reroute
+          onDragEnd({ x: n.x(), y: n.y(), width: nw, height: nh, pins: newPins, rotation: n.rotation() });
         }}
       >
         {/* Active glow — skipped for LEDs which have their own bloom */}
@@ -463,7 +473,9 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
           />
         )}
 
-        {/* Multi-layered LED bloom effect */}
+        {/* Multi-layered LED bloom effect — perfectDrawEnabled=false + shadowForStrokeEnabled=false
+             eliminates the extra canvas clear+redraw pass Konva does for stroked shadows.
+             These circles are purely fill-based so there is no visual difference. */}
         {isActive && node.type.includes('LED') && (
           <>
             {/* Outer haze — wide ambient glow */}
@@ -474,6 +486,8 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
               shadowColor={ledColor}
               shadowBlur={40}
               shadowOpacity={0.4}
+              perfectDrawEnabled={false}
+              shadowForStrokeEnabled={false}
               listening={false}
             />
             {/* Mid glow — concentrated bloom */}
@@ -484,6 +498,8 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
               shadowColor={ledColor}
               shadowBlur={24}
               shadowOpacity={0.7}
+              perfectDrawEnabled={false}
+              shadowForStrokeEnabled={false}
               listening={false}
             />
             {/* Bright core — high-intensity center */}
@@ -494,6 +510,8 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
               shadowColor={ledColor}
               shadowBlur={12}
               shadowOpacity={0.9}
+              perfectDrawEnabled={false}
+              shadowForStrokeEnabled={false}
               listening={false}
             />
           </>
@@ -520,10 +538,13 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
           </>
         )}
 
-        {/* Component image or fallback */}
+        {/* Component image or fallback — perfectDrawEnabled=false avoids a redundant
+             canvas clear on every Konva draw cycle for static images. */}
         {image ? (
           <KonvaImage image={image} width={node.width} height={node.height}
             shadowColor="rgba(0,0,0,0.4)" shadowBlur={6} shadowOffsetY={2}
+            perfectDrawEnabled={false}
+            shadowForStrokeEnabled={false}
           />
         ) : (
           <>
@@ -668,6 +689,112 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
           </Group>
         )}
 
+        {/* BLDC Motor — animated rotating propeller cross */}
+        {node.type === 'MOTOR_BLDC' && (() => {
+          const rpm = Number(node.properties?.bldcRpm) || 0;
+          const rotation = Number(node.properties?.bldcRotation) || 0;
+          const isMotorSpinning = rpm > 0;
+
+          return (
+            <>
+              {/* Spinning propeller overlay */}
+              <Group
+                x={node.width / 2}
+                y={36}   // Center of the bell in the 80×80 SVG
+                rotation={rotation}
+                listening={false}
+              >
+                {/* Four propeller blades */}
+                <Rect x={-3} y={-22} width={6} height={18} cornerRadius={3}
+                  fill={isMotorSpinning ? '#f8fafc' : '#6b7280'} opacity={isMotorSpinning ? 0.9 : 0.3}
+                />
+                <Rect x={-3} y={4} width={6} height={18} cornerRadius={3}
+                  fill={isMotorSpinning ? '#f8fafc' : '#6b7280'} opacity={isMotorSpinning ? 0.9 : 0.3}
+                />
+                <Rect x={-22} y={-3} width={18} height={6} cornerRadius={3}
+                  fill={isMotorSpinning ? '#f8fafc' : '#6b7280'} opacity={isMotorSpinning ? 0.9 : 0.3}
+                />
+                <Rect x={4} y={-3} width={18} height={6} cornerRadius={3}
+                  fill={isMotorSpinning ? '#f8fafc' : '#6b7280'} opacity={isMotorSpinning ? 0.9 : 0.3}
+                />
+                {/* Center hub */}
+                <Circle x={0} y={0} radius={4} fill="#334155" stroke="#94a3b8" strokeWidth={1} />
+              </Group>
+              {/* RPM readout */}
+              {isMotorSpinning && (
+                <Text
+                  text={`${rpm} RPM`}
+                  x={0}
+                  y={node.height - 6}
+                  width={node.width}
+                  align="center"
+                  fontSize={7}
+                  fontFamily="JetBrains Mono"
+                  fontStyle="700"
+                  fill="#22c55e"
+                  shadowColor="#22c55e"
+                  shadowBlur={6}
+                  listening={false}
+                />
+              )}
+              {/* Spin blur ring glow when active */}
+              {isMotorSpinning && (
+                <Circle
+                  x={node.width / 2} y={36} radius={24}
+                  fill="transparent"
+                  stroke="#22c55e"
+                  strokeWidth={1.5}
+                  opacity={Math.min(0.6, rpm / 12000)}
+                  shadowColor="#22c55e"
+                  shadowBlur={12}
+                  shadowOpacity={0.4}
+                  listening={false}
+                />
+              )}
+            </>
+          );
+        })()}
+
+        {/* ESC Module — throttle percentage overlay */}
+        {node.type === 'ESC_MODULE' && (() => {
+          const throttle = Number(node.properties?.escThrottle) || 0;
+          const rpm = Number(node.properties?.escRpm) || 0;
+          const isEscActive = throttle > 0;
+
+          return (
+            <>
+              {isEscActive && (
+                <>
+                  {/* Throttle bar background */}
+                  <Rect x={14} y={24} width={92} height={6} cornerRadius={3} fill="#0f172a" opacity={0.7} listening={false} />
+                  {/* Throttle bar fill */}
+                  <Rect
+                    x={14} y={24}
+                    width={Math.round((throttle / 100) * 92)} height={6}
+                    cornerRadius={3}
+                    fill={throttle > 80 ? '#ef4444' : throttle > 50 ? '#f59e0b' : '#22c55e'}
+                    shadowColor={throttle > 80 ? '#ef4444' : '#22c55e'}
+                    shadowBlur={6}
+                    listening={false}
+                  />
+                  {/* Throttle text */}
+                  <Text
+                    text={`${throttle}% • ${rpm} RPM`}
+                    x={14} y={32}
+                    width={92}
+                    align="center"
+                    fontSize={7}
+                    fontFamily="JetBrains Mono"
+                    fontStyle="700"
+                    fill="#e5e7eb"
+                    listening={false}
+                  />
+                </>
+              )}
+            </>
+          );
+        })()}
+
         {/* Pins */}
         {node.pins?.map(pin => (
           <PinDot key={pin.id} pin={pin} nodeId={node.id} node={node}
@@ -675,6 +802,7 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, isWiring, wiringF
             startWiring={startWiring} finishWiring={finishWiring}
           />
         ))}
+
 
         {/* Lock indicator */}
         {node.properties?.locked && (
@@ -965,6 +1093,7 @@ export default function CircuitCanvas({ width, height, viewMode = 'breadboard', 
               isSelected={node.id === selectedNodeId}
               onSelect={() => selectNode(node.id)}
               onChange={(a) => updateNode(node.id, a)}
+              onDragEnd={(a) => useCanvasStore.getState().updateNodeDragEnd(node.id, a)}
               isWiring={isWiring}
               wiringFromNodeId={wiringFrom?.nodeId || null}
               startWiring={readOnly ? () => {} : startWiring}
