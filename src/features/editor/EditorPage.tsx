@@ -342,26 +342,26 @@ export default function EditorPage() {
     writeSerial(`> Live Session link copied: ${url}`);
   };
 
-  if (isLoading) return <div className="flex items-center justify-center h-screen bg-surface-950"><div className="w-8 h-8 border-2 border-volt-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (isLoading) return <div className="flex items-center justify-center h-screen bg-surface-50 dark:bg-surface-950"><div className="w-8 h-8 border-2 border-volt-500 border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
-    <div className="flex flex-col h-screen bg-surface-950 relative">
+    <div className="flex flex-col h-screen bg-surface-50 text-surface-900 relative dark:bg-surface-950 dark:text-surface-100">
       <ProjectSettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
       {/* Toolbar */}
-      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-white/5 glass z-10">
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-surface-200/70 glass z-10 dark:border-white/5">
         {/* ── Navigation & Project Info ── */}
-        <button onClick={() => navigate('/dashboard')} className="p-2 rounded-lg hover:bg-white/5 text-surface-400 hover:text-white transition-all" title="Back to Dashboard"><ArrowLeft className="w-4 h-4" /></button>
+        <button onClick={() => navigate('/dashboard')} className="p-2 rounded-lg text-surface-500 hover:bg-surface-100 hover:text-surface-950 transition-all dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white" title="Back to Dashboard"><ArrowLeft className="w-4 h-4" /></button>
         <div className="flex-1 min-w-0 ml-1">
-          <h2 className="text-xs font-semibold text-white truncate">{currentProject?.name || 'Untitled'}</h2>
+          <h2 className="text-xs font-semibold text-surface-950 truncate dark:text-white">{currentProject?.name || 'Untitled'}</h2>
           <p className="text-[9px] text-surface-500">{currentProject?.boardType?.replace(/_/g, ' ')}</p>
         </div>
         {isConnected && <span className="w-2 h-2 rounded-full bg-volt-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />}
 
         {/* ── View Mode Switcher ── */}
-        <div className="flex items-center gap-0.5 bg-surface-900/80 rounded-lg p-0.5">
+        <div className="flex items-center gap-0.5 bg-surface-100 rounded-lg p-0.5 dark:bg-surface-900/80">
           {(['canvas', 'split', 'code'] as ActivePanel[]).map(p => (
-            <button key={p} onClick={() => setActivePanel(p)} className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${activePanel === p ? 'bg-volt-500/20 text-volt-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`}>
+            <button key={p} onClick={() => setActivePanel(p)} className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${activePanel === p ? 'bg-volt-500/20 text-volt-500 dark:text-volt-400' : 'text-surface-500 hover:text-surface-950 hover:bg-white dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`}>
               {p === 'canvas' ? 'Canvas' : p === 'split' ? 'Split' : 'Code'}
             </button>
           ))}
@@ -371,21 +371,21 @@ export default function EditorPage() {
 
         {/* ── Canvas Operations (Undo / Redo) ── */}
         <div className="flex items-center gap-0.5">
-          <button onClick={undo} disabled={!isOwner || historyIndex < 0} className="p-2 rounded-lg text-surface-400 hover:text-white hover:bg-white/5 disabled:opacity-30 transition-all" title="Undo (Ctrl+Z)"><Undo className="w-3.5 h-3.5" /></button>
-          <button onClick={redo} disabled={!isOwner || historyIndex >= history.length - 1} className="p-2 rounded-lg text-surface-400 hover:text-white hover:bg-white/5 disabled:opacity-30 transition-all" title="Redo (Ctrl+Y)"><Redo className="w-3.5 h-3.5" /></button>
+          <button onClick={undo} disabled={!isOwner || historyIndex < 0} className="p-2 rounded-lg text-surface-500 hover:text-surface-950 hover:bg-surface-100 disabled:opacity-30 transition-all dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5" title="Undo (Ctrl+Z)"><Undo className="w-3.5 h-3.5" /></button>
+          <button onClick={redo} disabled={!isOwner || historyIndex >= history.length - 1} className="p-2 rounded-lg text-surface-500 hover:text-surface-950 hover:bg-surface-100 disabled:opacity-30 transition-all dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5" title="Redo (Ctrl+Y)"><Redo className="w-3.5 h-3.5" /></button>
         </div>
 
         <div className="toolbar-divider" />
 
         {/* ── Instrument Tools ── */}
         <div className="flex items-center gap-0.5">
-          <button onClick={() => setShowMultimeter(!showMultimeter)} className={`p-2 rounded-lg transition-all ${showMultimeter ? 'bg-volt-500/20 text-volt-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Multimeter"><Gauge className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setShowOscilloscope(!showOscilloscope)} className={`p-2 rounded-lg transition-all ${showOscilloscope ? 'bg-volt-500/20 text-volt-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Oscilloscope"><Activity className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setShowBom(!showBom)} className={`p-2 rounded-lg transition-all ${showBom ? 'bg-forge-500/20 text-forge-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Bill of Materials"><Package className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setCanvasViewMode(canvasViewMode === 'breadboard' ? 'pcb' : 'breadboard')} className={`p-2 rounded-lg transition-all ${canvasViewMode === 'pcb' ? 'bg-forge-500/20 text-forge-400' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Breadboard / PCB View"><Layers className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setSerialPanelOpen(!serialPanelOpen)} className={`p-2 rounded-lg transition-all ${serialPanelOpen ? 'bg-surface-800 text-white' : 'text-surface-400 hover:text-white hover:bg-white/5'}`} title="Serial Monitor"><Terminal className="w-3.5 h-3.5" /></button>
-          <button onClick={handleShareLiveSession} className="p-2 rounded-lg transition-all text-surface-400 hover:text-white hover:bg-white/5" title="Copy Live Session Link"><Share2 className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setShowSettings(true)} disabled={!isOwner} className="p-2 rounded-lg hover:bg-white/5 text-surface-400 hover:text-white transition-all disabled:opacity-30" title="Settings"><Settings className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setShowMultimeter(!showMultimeter)} className={`p-2 rounded-lg transition-all ${showMultimeter ? 'bg-volt-500/20 text-volt-500 dark:text-volt-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title="Multimeter"><Gauge className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setShowOscilloscope(!showOscilloscope)} className={`p-2 rounded-lg transition-all ${showOscilloscope ? 'bg-volt-500/20 text-volt-500 dark:text-volt-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title="Oscilloscope"><Activity className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setShowBom(!showBom)} className={`p-2 rounded-lg transition-all ${showBom ? 'bg-forge-500/20 text-forge-500 dark:text-forge-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title="Bill of Materials"><Package className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setCanvasViewMode(canvasViewMode === 'breadboard' ? 'pcb' : 'breadboard')} className={`p-2 rounded-lg transition-all ${canvasViewMode === 'pcb' ? 'bg-forge-500/20 text-forge-500 dark:text-forge-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title="Breadboard / PCB View"><Layers className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setSerialPanelOpen(!serialPanelOpen)} className={`p-2 rounded-lg transition-all ${serialPanelOpen ? 'bg-surface-100 text-surface-950 dark:bg-surface-800 dark:text-white' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title="Serial Monitor"><Terminal className="w-3.5 h-3.5" /></button>
+          <button onClick={handleShareLiveSession} className="p-2 rounded-lg transition-all text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5" title="Copy Live Session Link"><Share2 className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setShowSettings(true)} disabled={!isOwner} className="p-2 rounded-lg text-surface-500 hover:bg-surface-100 hover:text-surface-950 transition-all disabled:opacity-30 dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white" title="Settings"><Settings className="w-3.5 h-3.5" /></button>
         </div>
 
         <div className="toolbar-divider" />
@@ -397,10 +397,10 @@ export default function EditorPage() {
           ) : (
             <button onClick={toggleSimulation} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-volt-500/10 text-volt-400 hover:bg-volt-500/20 border border-volt-500/20 transition-all"><Play className="w-3 h-3 fill-current" /> Run</button>
           )}
-          <button onClick={handleExportZip} disabled={!currentProject} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700 transition-all border border-white/5"><Download className="w-3 h-3" /> Export</button>
-          <button onClick={handleExportGerber} disabled={!currentProject} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700 transition-all border border-white/5"><Layout className="w-3 h-3" /> Gerber</button>
+          <button onClick={handleExportZip} disabled={!currentProject} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-white text-surface-600 hover:text-surface-950 hover:bg-surface-100 transition-all border border-surface-200 dark:bg-surface-800 dark:text-surface-400 dark:hover:text-white dark:hover:bg-surface-700 dark:border-white/5"><Download className="w-3 h-3" /> Export</button>
+          <button onClick={handleExportGerber} disabled={!currentProject} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-white text-surface-600 hover:text-surface-950 hover:bg-surface-100 transition-all border border-surface-200 dark:bg-surface-800 dark:text-surface-400 dark:hover:text-white dark:hover:bg-surface-700 dark:border-white/5"><Layout className="w-3 h-3" /> Gerber</button>
           {isOwner ? (
-            <button onClick={handleSave} disabled={!isDirty && !isSaving} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${isSaving ? 'bg-volt-500/30 text-volt-300 animate-pulse' : isDirty ? 'bg-volt-500 text-white hover:bg-volt-400 shadow-[0_0_16px_rgba(34,197,94,0.25)]' : 'bg-surface-800 text-surface-500'}`}><Save className={`w-3 h-3 ${isSaving ? 'animate-spin' : ''}`} /> {isSaving ? 'Saving…' : 'Save'}</button>
+            <button onClick={handleSave} disabled={!isDirty && !isSaving} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${isSaving ? 'bg-volt-500/30 text-volt-500 animate-pulse dark:text-volt-300' : isDirty ? 'bg-volt-500 text-white hover:bg-volt-400 shadow-[0_0_16px_rgba(34,197,94,0.25)]' : 'bg-surface-100 text-surface-500 dark:bg-surface-800'}`}><Save className={`w-3 h-3 ${isSaving ? 'animate-spin' : ''}`} /> {isSaving ? 'Saving…' : 'Save'}</button>
           ) : (
             <button onClick={handleFork} disabled={forkMutation.isPending} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${forkMutation.isPending ? 'bg-purple-500/30 text-purple-300 animate-pulse' : 'bg-purple-500 text-white hover:bg-purple-400 shadow-[0_0_16px_rgba(168,85,247,0.25)]'}`}><GitFork className={`w-3 h-3 ${forkMutation.isPending ? 'animate-spin' : ''}`} /> {forkMutation.isPending ? 'Forking…' : 'Fork to Edit'}</button>
           )}
@@ -413,7 +413,7 @@ export default function EditorPage() {
         <div className="flex flex-1">
           {(activePanel === 'canvas' || activePanel === 'split') && (
             <div
-              className="bg-[#0a0a14] relative flex flex-col"
+              className="bg-surface-100 relative flex flex-col dark:bg-[#0a0a14]"
               style={{ width: activePanel === 'split' ? `${splitRatio}%` : '100%' }}
             >
               {isSimulating && <div className="absolute top-3 right-3 z-10 glass px-2.5 py-1 rounded-full flex items-center gap-1.5 border border-volt-500/30"><span className="w-1.5 h-1.5 rounded-full bg-volt-500 animate-pulse" /><span className="text-[10px] font-medium text-volt-400">Simulating</span></div>}
@@ -434,7 +434,7 @@ export default function EditorPage() {
 
           {activePanel === 'split' && (
             <div
-              className="w-1.5 bg-surface-900 border-x border-white/5 cursor-col-resize hover:bg-volt-500/50 active:bg-volt-500 flex-shrink-0 z-10 transition-colors"
+              className="w-1.5 bg-surface-200 border-x border-surface-300/60 cursor-col-resize hover:bg-volt-500/50 active:bg-volt-500 flex-shrink-0 z-10 transition-colors dark:bg-surface-900 dark:border-white/5"
               onMouseDown={handleSplitDragStart}
             />
           )}
@@ -451,7 +451,7 @@ export default function EditorPage() {
 
         {/* Right Panel for Property Editor */}
         {isOwner && (selectedNodeId || useCanvasStore.getState().selectedWireId) && (activePanel === 'canvas' || activePanel === 'split') && (
-          <div className="absolute right-0 top-0 h-full border-l border-white/5 shadow-[-10px_0_20px_rgba(0,0,0,0.5)] z-20 bg-surface-950/50 backdrop-blur-md">
+          <div className="absolute right-0 top-0 h-full border-l border-surface-200 shadow-[-10px_0_20px_rgba(15,23,42,0.12)] z-20 bg-white/70 backdrop-blur-md dark:border-white/5 dark:bg-surface-950/50 dark:shadow-[-10px_0_20px_rgba(0,0,0,0.5)]">
             <PropertyEditor />
           </div>
         )}

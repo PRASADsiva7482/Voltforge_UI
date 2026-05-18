@@ -2,6 +2,7 @@ import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import { Stage, Layer, Rect, Group, Text, Circle, Line, Image as KonvaImage, Transformer } from 'react-konva';
 import { Download, Layers } from 'lucide-react';
 import { useCanvasStore, WIRE_COLORS } from '../../store/canvasStore';
+import { useThemeStore } from '../../store/themeStore';
 import type { CanvasNode, Wire, PinPosition, WireBendPoint } from '../../types';
 import { componentSvgs } from './componentSvgs';
 import { getPinAbsPos, distToSegment, getWireRenderPoints, getWiringPreviewPoints, snapToRoutingGuides } from '../../utils/wireRouting';
@@ -35,8 +36,9 @@ const useImage = (url: string) => {
 
 // ── Helper: get absolute pin position ──
 // ── Wire rendering with multi-segment support ──
-const WireShape = ({ wire, nodes, wires, isSelected, onSelect, onWireDragStart, activeNewBendPoint }: {
+const WireShape = ({ wire, nodes, wires, isSelected, isDark, onSelect, onWireDragStart, activeNewBendPoint }: {
   wire: Wire; nodes: CanvasNode[]; wires: Wire[]; isSelected: boolean;
+  isDark: boolean;
   onSelect: () => void;
   onWireDragStart: (wireId: string, index: number, x: number, y: number) => void;
   activeNewBendPoint: { wireId: string, index: number, x: number, y: number } | null;
@@ -87,7 +89,7 @@ const WireShape = ({ wire, nodes, wires, isSelected, onSelect, onWireDragStart, 
       {/* Dark outline for wire separation — prevents merging of adjacent wires */}
       <Line
         points={allPoints}
-        stroke="#06060f"
+        stroke={isDark ? '#06060f' : '#ffffff'}
         strokeWidth={isSelected ? 7 : 5.5}
         tension={wire.routingMode === 'curved' ? 0.4 : 0}
         lineCap="round"
@@ -97,7 +99,7 @@ const WireShape = ({ wire, nodes, wires, isSelected, onSelect, onWireDragStart, 
       {/* Main wire line */}
       <Line
         points={allPoints}
-        stroke={isSelected ? '#ffffff' : wire.color}
+        stroke={isSelected ? (isDark ? '#ffffff' : '#0f172a') : wire.color}
         strokeWidth={isSelected ? 3 : 2.5}
         tension={wire.routingMode === 'curved' ? 0.4 : 0}
         lineCap="round"
@@ -138,7 +140,7 @@ const WireShape = ({ wire, nodes, wires, isSelected, onSelect, onWireDragStart, 
           text={wire.label}
           fontSize={9}
           fontFamily="Inter"
-          fill="rgba(255,255,255,0.6)"
+          fill={isDark ? 'rgba(255,255,255,0.6)' : 'rgba(15,23,42,0.72)'}
           padding={2}
         />
       )}
@@ -203,8 +205,9 @@ const WiringPreview = ({ fromPos, mousePos }: { fromPos: { x: number; y: number 
 );
 
 // ── Pin component — large magnetic snap zones ──
-const PinDot = ({ pin, nodeId, node, isWiring, wiringFromNodeId, startWiring, finishWiring }: {
+const PinDot = ({ pin, nodeId, node, isWiring, wiringFromNodeId, isDark, startWiring, finishWiring }: {
   pin: PinPosition; nodeId: string; node: CanvasNode; isWiring: boolean; wiringFromNodeId: string | null;
+  isDark: boolean;
   startWiring: (n: string, p: string) => void;
   finishWiring: (n: string, p: string) => void;
 }) => {
@@ -255,7 +258,7 @@ const PinDot = ({ pin, nodeId, node, isWiring, wiringFromNodeId, startWiring, fi
       <Circle
         x={pin.x} y={pin.y} radius={hovered ? 8 : 6}
         fill={hovered ? (isValidTarget ? '#22c55e' : '#60a5fa') : pinColor}
-        stroke={hovered ? (isValidTarget ? '#22c55e' : '#60a5fa') : 'rgba(255,255,255,0.25)'}
+        stroke={hovered ? (isValidTarget ? '#22c55e' : '#60a5fa') : (isDark ? 'rgba(255,255,255,0.25)' : 'rgba(15,23,42,0.28)')}
         strokeWidth={1.5}
         shadowColor={hovered ? glowColor : 'transparent'}
         shadowBlur={hovered ? 8 : 0}
@@ -326,6 +329,8 @@ const PinDot = ({ pin, nodeId, node, isWiring, wiringFromNodeId, startWiring, fi
           labelAlign = isTopHalf ? undefined : 'right';
         }
 
+        if (node.type === 'BREADBOARD' && !hovered) return null;
+
         return (
           <Text
             text={pin.name}
@@ -335,7 +340,7 @@ const PinDot = ({ pin, nodeId, node, isWiring, wiringFromNodeId, startWiring, fi
             rotation={rotation}
             width={labelWidth}
             align={labelAlign}
-            fill={hovered ? 'rgba(255,255,255,1)' : isWiring ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.48)'}
+            fill={hovered ? (isDark ? 'rgba(255,255,255,1)' : 'rgba(15,23,42,0.95)') : isWiring ? (isDark ? 'rgba(255,255,255,0.85)' : 'rgba(15,23,42,0.82)') : (isDark ? 'rgba(255,255,255,0.48)' : 'rgba(15,23,42,0.58)')}
             fontFamily="JetBrains Mono"
             fontStyle={hovered ? '700' : '400'}
             shadowColor="black"
@@ -349,8 +354,9 @@ const PinDot = ({ pin, nodeId, node, isWiring, wiringFromNodeId, startWiring, fi
 };
 
 // ── Component Node ──
-const ComponentNode = ({ node, isSelected, onSelect, onChange, onDragEnd, isWiring, wiringFromNodeId, startWiring, finishWiring, onInteraction, readOnly }: {
+const ComponentNode = ({ node, isSelected, isDark, onSelect, onChange, onDragEnd, isWiring, wiringFromNodeId, startWiring, finishWiring, onInteraction, readOnly }: {
   node: CanvasNode; isSelected: boolean; onSelect: () => void;
+  isDark: boolean;
   onChange: (a: Partial<CanvasNode>) => void;
   onDragEnd: (a: Partial<CanvasNode>) => void;
   isWiring: boolean; wiringFromNodeId: string | null;
@@ -799,6 +805,7 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, onDragEnd, isWiri
         {node.pins?.map(pin => (
           <PinDot key={pin.id} pin={pin} nodeId={node.id} node={node}
             isWiring={isWiring} wiringFromNodeId={wiringFromNodeId}
+            isDark={isDark}
             startWiring={startWiring} finishWiring={finishWiring}
           />
         ))}
@@ -821,7 +828,7 @@ const ComponentNode = ({ node, isSelected, onSelect, onChange, onDragEnd, isWiri
 };
 
 // ── Grid Layer (memoized) — professional engineering grid ──
-const CanvasMat = ({ width, height, viewport }: { width: number; height: number; viewport: { x: number; y: number; scale: number } }) => {
+const CanvasMat = ({ width, height, viewport, isDark }: { width: number; height: number; viewport: { x: number; y: number; scale: number }; isDark: boolean }) => {
   const guides = useMemo(() => {
     const result: React.ReactNode[] = [];
     const scale = viewport.scale || 1;
@@ -836,14 +843,14 @@ const CanvasMat = ({ width, height, viewport }: { width: number; height: number;
       if (x % MAT_GRID_MAJOR === 0) continue;
       result.push(
         <Line key={`gm_x_${x}`} points={[x, minY, x, maxY]}
-          stroke="rgba(255,255,255,0.025)" strokeWidth={0.5 / scale} listening={false} />
+          stroke={isDark ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.055)'} strokeWidth={0.5 / scale} listening={false} />
       );
     }
     for (let y = minY; y <= maxY; y += MAT_GRID_MINOR) {
       if (y % MAT_GRID_MAJOR === 0) continue;
       result.push(
         <Line key={`gm_y_${y}`} points={[minX, y, maxX, y]}
-          stroke="rgba(255,255,255,0.025)" strokeWidth={0.5 / scale} listening={false} />
+          stroke={isDark ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.055)'} strokeWidth={0.5 / scale} listening={false} />
       );
     }
 
@@ -853,20 +860,20 @@ const CanvasMat = ({ width, height, viewport }: { width: number; height: number;
     for (let x = majorMinX; x <= maxX; x += MAT_GRID_MAJOR) {
       result.push(
         <Line key={`gM_x_${x}`} points={[x, minY, x, maxY]}
-          stroke={x === 0 ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.055)'}
+          stroke={x === 0 ? 'rgba(34,197,94,0.24)' : (isDark ? 'rgba(255,255,255,0.055)' : 'rgba(15,23,42,0.11)')}
           strokeWidth={(x === 0 ? 1.4 : 0.8) / scale} listening={false} />
       );
     }
     for (let y = majorMinY; y <= maxY; y += MAT_GRID_MAJOR) {
       result.push(
         <Line key={`gM_y_${y}`} points={[minX, y, maxX, y]}
-          stroke={y === 0 ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.055)'}
+          stroke={y === 0 ? 'rgba(34,197,94,0.24)' : (isDark ? 'rgba(255,255,255,0.055)' : 'rgba(15,23,42,0.11)')}
           strokeWidth={(y === 0 ? 1.4 : 0.8) / scale} listening={false} />
       );
     }
 
     return result;
-  }, [width, height, viewport.x, viewport.y, viewport.scale]);
+  }, [width, height, viewport.x, viewport.y, viewport.scale, isDark]);
 
   return (
     <>
@@ -875,7 +882,7 @@ const CanvasMat = ({ width, height, viewport }: { width: number; height: number;
         y={-viewport.y / viewport.scale}
         width={width / viewport.scale}
         height={height / viewport.scale}
-        fill="#06060f"
+        fill={isDark ? '#06060f' : '#f8fafc'}
         listening={false}
       />
       {guides}
@@ -890,17 +897,17 @@ const WireToolbar = () => {
   if (!isWiring) return null;
 
   return (
-    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 glass rounded-xl px-3 py-2 flex items-center gap-3 border border-white/10">
-      <span className="text-[10px] text-surface-400 font-medium">Wire Color:</span>
+    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 glass rounded-xl px-3 py-2 flex items-center gap-3 border border-surface-200 dark:border-white/10">
+      <span className="text-[10px] text-surface-600 font-medium dark:text-surface-400">Wire Color:</span>
       <div className="flex gap-1">
         {WIRE_COLORS.map(c => (
           <button key={c} onClick={() => setWiringColor(c)}
-            className={`w-5 h-5 rounded-full border-2 transition-transform ${wiringColor === c ? 'border-white scale-125' : 'border-transparent'}`}
+            className={`w-5 h-5 rounded-full border-2 transition-transform ${wiringColor === c ? 'border-surface-950 scale-125 dark:border-white' : 'border-transparent'}`}
             style={{ backgroundColor: c }}
           />
         ))}
       </div>
-      <div className="h-4 w-px bg-white/10" />
+      <div className="h-4 w-px bg-surface-200 dark:bg-white/10" />
       <button
         onClick={() => {
           const next = wiringMode === 'straight'
@@ -912,7 +919,7 @@ const WireToolbar = () => {
                 : 'straight';
           setWiringMode(next as any);
         }}
-        className="text-[10px] px-2 py-1 rounded bg-white/5 text-surface-300 hover:text-white hover:bg-white/10">
+        className="text-[10px] px-2 py-1 rounded bg-surface-100 text-surface-700 hover:text-surface-950 hover:bg-white dark:bg-white/5 dark:text-surface-300 dark:hover:text-white dark:hover:bg-white/10">
         {wiringMode === 'straight' ? 'Straight' : wiringMode === 'orthogonal' ? 'Orthogonal' : wiringMode === 'auto' ? 'Smart-route' : 'Curved'}
       </button>
       <span className="text-[9px] text-surface-500 ml-1">Click a pin to connect • ESC to cancel</span>
@@ -921,7 +928,7 @@ const WireToolbar = () => {
 };
 
 // ── Main Canvas ──
-const PcbTraceLayer = ({ nodes, wires }: { nodes: CanvasNode[]; wires: Wire[] }) => (
+const PcbTraceLayer = ({ nodes, wires, isDark }: { nodes: CanvasNode[]; wires: Wire[]; isDark: boolean }) => (
   <Layer listening={false}>
     {wires.map((wire, index) => {
       const points = getWireRenderPoints({ ...wire, routingMode: 'auto' }, nodes, [], wires);
@@ -950,7 +957,7 @@ const PcbTraceLayer = ({ nodes, wires }: { nodes: CanvasNode[]; wires: Wire[] })
           x={pos.x}
           y={pos.y}
           radius={5}
-          fill="#0f172a"
+          fill={isDark ? '#0f172a' : '#f8fafc'}
           stroke={pin.type === 'ground' ? '#94a3b8' : '#facc15'}
           strokeWidth={2}
         />
@@ -960,6 +967,7 @@ const PcbTraceLayer = ({ nodes, wires }: { nodes: CanvasNode[]; wires: Wire[] })
 );
 
 export default function CircuitCanvas({ width, height, viewMode = 'breadboard', collaborators = {}, onComponentInteraction, onCursorMove, readOnly }: Props) {
+  const isDark = useThemeStore((state) => state.theme === 'dark');
   const {
     nodes, wires, selectedNodeId, selectedWireId, viewport,
     updateNode, selectNode, selectWire, isWiring, wiringFrom,
@@ -1080,10 +1088,10 @@ export default function CircuitCanvas({ width, height, viewMode = 'breadboard', 
       >
         {/* Grid layer (below everything) */}
         <Layer ref={gridLayerRef} listening={false}>
-          <CanvasMat width={width} height={height} viewport={viewport} />
+          <CanvasMat width={width} height={height} viewport={viewport} isDark={isDark} />
         </Layer>
 
-        {viewMode === 'pcb' && <PcbTraceLayer nodes={nodes} wires={wires} />}
+        {viewMode === 'pcb' && <PcbTraceLayer nodes={nodes} wires={wires} isDark={isDark} />}
 
         {/* Component layer (below wires) */}
         <Layer opacity={viewMode === 'pcb' ? 0.35 : 1}>
@@ -1091,6 +1099,7 @@ export default function CircuitCanvas({ width, height, viewMode = 'breadboard', 
             <ComponentNode
               key={node.id} node={node}
               isSelected={node.id === selectedNodeId}
+              isDark={isDark}
               onSelect={() => selectNode(node.id)}
               onChange={(a) => updateNode(node.id, a)}
               onDragEnd={(a) => useCanvasStore.getState().updateNodeDragEnd(node.id, a)}
@@ -1109,6 +1118,7 @@ export default function CircuitCanvas({ width, height, viewMode = 'breadboard', 
           {wires.map(w => (
             <WireShape key={w.id} wire={w} nodes={nodes} wires={wires}
               isSelected={w.id === selectedWireId}
+              isDark={isDark}
               onSelect={() => selectWire(w.id)}
               onWireDragStart={handleWireDragStart}
               activeNewBendPoint={activeNewBendPoint}
@@ -1128,7 +1138,7 @@ export default function CircuitCanvas({ width, height, viewMode = 'breadboard', 
                 x={8}
                 y={-14}
                 fontSize={10}
-                fill="#e5e7eb"
+                fill={isDark ? '#e5e7eb' : '#0f172a'}
                 fontFamily="Inter"
               />
             </Group>
@@ -1141,7 +1151,7 @@ export default function CircuitCanvas({ width, height, viewMode = 'breadboard', 
 
       <button
         onClick={handleExportImage}
-        className="absolute top-3 left-3 z-20 glass px-2.5 py-1.5 rounded-lg text-[10px] text-surface-300 hover:text-white border border-white/10 flex items-center gap-1.5"
+        className="absolute top-3 left-3 z-20 glass px-2.5 py-1.5 rounded-lg text-[10px] text-surface-600 hover:text-surface-950 border border-surface-200 flex items-center gap-1.5 dark:text-surface-300 dark:hover:text-white dark:border-white/10"
         title="Export circuit PNG"
       >
         <Download className="w-3.5 h-3.5" />
@@ -1149,7 +1159,7 @@ export default function CircuitCanvas({ width, height, viewMode = 'breadboard', 
       </button>
 
       {viewMode === 'pcb' && (
-        <div className="absolute top-3 left-20 z-20 glass px-2.5 py-1.5 rounded-lg text-[10px] text-surface-300 border border-white/10 flex items-center gap-1.5">
+        <div className="absolute top-3 left-20 z-20 glass px-2.5 py-1.5 rounded-lg text-[10px] text-surface-600 border border-surface-200 flex items-center gap-1.5 dark:text-surface-300 dark:border-white/10">
           <Layers className="w-3.5 h-3.5 text-forge-400" />
           2-layer PCB traces
         </div>

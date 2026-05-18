@@ -14,6 +14,35 @@ const propertySchemas: Record<string, { label: string; key: string; type: 'numbe
     { label: 'Capacitance', key: 'capacitance', type: 'number', unit: 'µF', min: 0.001, max: 100000, step: 0.001 },
     { label: 'Voltage Rating', key: 'voltageRating', type: 'select', options: ['10V', '16V', '25V', '50V', '100V'] },
   ],
+  CERAMIC_CAPACITOR: [
+    { label: 'Capacitance', key: 'capacitance', type: 'number', unit: 'nF', min: 1, max: 1000, step: 1 },
+    { label: 'Voltage Rating', key: 'voltageRating', type: 'select', options: ['16V', '25V', '50V', '100V'] },
+  ],
+  ELECTROLYTIC_CAPACITOR: [
+    { label: 'Capacitance', key: 'capacitance', type: 'number', unit: 'uF', min: 0.47, max: 10000, step: 0.47 },
+    { label: 'Voltage Rating', key: 'voltageRating', type: 'select', options: ['6.3V', '10V', '16V', '25V', '50V'] },
+    { label: 'Polarity', key: 'polarity', type: 'select', options: ['Polarized'] },
+  ],
+  DIODE: [
+    { label: 'Forward Voltage', key: 'forwardVoltage', type: 'number', unit: 'V', min: 0.1, max: 1.2, step: 0.05 },
+    { label: 'Max Current', key: 'maxCurrent', type: 'number', unit: 'mA', min: 10, max: 1000, step: 10 },
+    { label: 'Part Number', key: 'partNumber', type: 'text' },
+  ],
+  NPN_TRANSISTOR: [
+    { label: 'Gain hFE', key: 'gain', type: 'number', min: 20, max: 800, step: 1 },
+    { label: 'Collector Current', key: 'collectorCurrent', type: 'number', unit: 'mA', min: 10, max: 1000, step: 10 },
+    { label: 'Part Number', key: 'partNumber', type: 'text' },
+  ],
+  PNP_TRANSISTOR: [
+    { label: 'Gain hFE', key: 'gain', type: 'number', min: 20, max: 800, step: 1 },
+    { label: 'Collector Current', key: 'collectorCurrent', type: 'number', unit: 'mA', min: 10, max: 1000, step: 10 },
+    { label: 'Part Number', key: 'partNumber', type: 'text' },
+  ],
+  VOLTAGE_REGULATOR_7805: [
+    { label: 'Output Voltage', key: 'outputVoltage', type: 'number', unit: 'V', min: 5, max: 5, step: 0.1 },
+    { label: 'Max Current', key: 'maxCurrent', type: 'number', unit: 'A', min: 0.1, max: 1.5, step: 0.1 },
+    { label: 'Dropout Voltage', key: 'dropoutVoltage', type: 'number', unit: 'V', min: 1.5, max: 2.5, step: 0.1 },
+  ],
   LED_STANDARD: [
     { label: 'Color', key: 'color', type: 'color' },
     { label: 'Forward Voltage', key: 'forwardVoltage', type: 'number', unit: 'V', min: 1.5, max: 3.5, step: 0.1 },
@@ -45,6 +74,10 @@ const propertySchemas: Record<string, { label: string; key: string; type: 'numbe
     { label: 'Type', key: 'buttonType', type: 'select', options: ['Momentary', 'Latching'] },
     { label: 'State', key: 'state', type: 'select', options: ['NO (Normally Open)', 'NC (Normally Closed)'] },
   ],
+  BUTTON: [
+    { label: 'Type', key: 'buttonType', type: 'select', options: ['Momentary', 'Latching'] },
+    { label: 'State', key: 'state', type: 'select', options: ['NO (Normally Open)', 'NC (Normally Closed)'] },
+  ],
   TEMP_SENSOR: [
     { label: 'Sensor Type', key: 'sensorType', type: 'select', options: ['DHT11', 'DHT22', 'LM35', 'DS18B20'] },
     { label: 'Temperature', key: 'temperature', type: 'number', unit: '°C', min: -40, max: 80, step: 0.5 },
@@ -54,9 +87,36 @@ const propertySchemas: Record<string, { label: string; key: string; type: 'numbe
     { label: 'Max Range', key: 'maxRange', type: 'number', unit: 'cm', min: 2, max: 400, step: 1 },
     { label: 'Distance', key: 'distance', type: 'number', unit: 'cm', min: 2, max: 400, step: 1 },
   ],
+  SENSOR_ULTRASONIC: [
+    { label: 'Max Range', key: 'maxRange', type: 'number', unit: 'cm', min: 2, max: 400, step: 1 },
+    { label: 'Distance', key: 'distance', type: 'number', unit: 'cm', min: 2, max: 400, step: 1 },
+  ],
+  SENSOR_DHT11: [
+    { label: 'Temperature', key: 'temperature', type: 'number', unit: 'C', min: 0, max: 50, step: 0.5 },
+    { label: 'Humidity', key: 'humidity', type: 'number', unit: '%', min: 20, max: 90, step: 1 },
+  ],
+  SENSOR_PIR: [
+    { label: 'Detection Range', key: 'range', type: 'number', unit: 'm', min: 1, max: 7, step: 0.5 },
+    { label: 'Retrigger Delay', key: 'delay', type: 'number', unit: 's', min: 0.3, max: 300, step: 0.1 },
+  ],
+  SENSOR_LDR: [
+    { label: 'Dark Resistance', key: 'resistanceDark', type: 'number', unit: 'ohm', min: 10000, max: 2000000, step: 1000 },
+    { label: 'Light Resistance', key: 'resistanceLight', type: 'number', unit: 'ohm', min: 100, max: 50000, step: 100 },
+  ],
   LCD_16X2: [
     { label: 'Backlight', key: 'backlight', type: 'select', options: ['On', 'Off'] },
     { label: 'Interface', key: 'interface', type: 'select', options: ['I2C', 'Parallel'] },
+    { label: 'Text Line 1', key: 'line1', type: 'text' },
+    { label: 'Text Line 2', key: 'line2', type: 'text' },
+  ],
+  DISPLAY_LCD_I2C: [
+    { label: 'Backlight', key: 'backlight', type: 'select', options: ['On', 'Off'] },
+    { label: 'I2C Address', key: 'address', type: 'select', options: ['0x27', '0x3F'] },
+    { label: 'Text Line 1', key: 'line1', type: 'text' },
+    { label: 'Text Line 2', key: 'line2', type: 'text' },
+  ],
+  DISPLAY_OLED: [
+    { label: 'I2C Address', key: 'address', type: 'select', options: ['0x3C', '0x3D'] },
     { label: 'Text Line 1', key: 'line1', type: 'text' },
     { label: 'Text Line 2', key: 'line2', type: 'text' },
   ],
@@ -80,25 +140,25 @@ function WirePropertiesPanel() {
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: 300, opacity: 0 }}
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="w-64 glass flex flex-col h-full bg-surface-950/80"
+        className="w-64 glass flex flex-col h-full bg-white/80 dark:bg-surface-950/80"
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-surface-900/50">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-surface-200/70 bg-surface-50/70 dark:border-white/5 dark:bg-surface-900/50">
           <div className="flex items-center gap-2">
             <Palette className="w-4 h-4 text-volt-400" />
-            <h3 className="text-sm font-semibold text-white">Wire</h3>
+            <h3 className="text-sm font-semibold text-surface-950 dark:text-white">Wire</h3>
           </div>
-          <button onClick={() => selectWire(null)} className="p-1 rounded-lg hover:bg-white/5 text-surface-400 hover:text-white">
+          <button onClick={() => selectWire(null)} className="p-1 rounded-lg text-surface-500 hover:bg-surface-100 hover:text-surface-950 dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white">
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Color picker */}
           <div>
-            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Color</h4>
+            <h4 className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-2 dark:text-surface-400">Color</h4>
             <div className="flex flex-wrap gap-2">
               {WIRE_COLORS.map(c => (
                 <button key={c} onClick={() => updateWire(selectedWire.id, { color: c })}
-                  className={`w-7 h-7 rounded-lg border-2 transition-all ${selectedWire.color === c ? 'border-white scale-110' : 'border-transparent hover:scale-105'}`}
+                  className={`w-7 h-7 rounded-lg border-2 transition-all ${selectedWire.color === c ? 'border-surface-950 scale-110 dark:border-white' : 'border-transparent hover:scale-105'}`}
                   style={{ backgroundColor: c }}
                 />
               ))}
@@ -107,29 +167,29 @@ function WirePropertiesPanel() {
 
           {/* Routing mode */}
           <div>
-            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Routing</h4>
+            <h4 className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-2 dark:text-surface-400">Routing</h4>
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => updateWire(selectedWire.id, { routingMode: 'straight' })}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-[10px] font-medium border ${selectedWire.routingMode === 'straight' ? 'bg-volt-500/20 text-volt-400 border-volt-500/30' : 'bg-white/5 text-surface-400 border-white/10'}`}
+                className={`flex-1 px-3 py-1.5 rounded-lg text-[10px] font-medium border ${selectedWire.routingMode === 'straight' ? 'bg-volt-500/20 text-volt-500 border-volt-500/30 dark:text-volt-400' : 'bg-surface-100 text-surface-600 border-surface-200 dark:bg-white/5 dark:text-surface-400 dark:border-white/10'}`}
               >
                 Straight
               </button>
               <button
                 onClick={() => updateWire(selectedWire.id, { routingMode: 'orthogonal' })}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-[10px] font-medium border ${selectedWire.routingMode === 'orthogonal' ? 'bg-volt-500/20 text-volt-400 border-volt-500/30' : 'bg-white/5 text-surface-400 border-white/10'}`}
+                className={`flex-1 px-3 py-1.5 rounded-lg text-[10px] font-medium border ${selectedWire.routingMode === 'orthogonal' ? 'bg-volt-500/20 text-volt-500 border-volt-500/30 dark:text-volt-400' : 'bg-surface-100 text-surface-600 border-surface-200 dark:bg-white/5 dark:text-surface-400 dark:border-white/10'}`}
               >
                 Orthogonal
               </button>
               <button
                 onClick={() => updateWire(selectedWire.id, { routingMode: 'curved' })}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-[10px] font-medium border ${selectedWire.routingMode === 'curved' ? 'bg-volt-500/20 text-volt-400 border-volt-500/30' : 'bg-white/5 text-surface-400 border-white/10'}`}
+                className={`flex-1 px-3 py-1.5 rounded-lg text-[10px] font-medium border ${selectedWire.routingMode === 'curved' ? 'bg-volt-500/20 text-volt-500 border-volt-500/30 dark:text-volt-400' : 'bg-surface-100 text-surface-600 border-surface-200 dark:bg-white/5 dark:text-surface-400 dark:border-white/10'}`}
               >
                 Curved
               </button>
               <button
                 onClick={() => updateWire(selectedWire.id, { routingMode: 'auto' })}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-[10px] font-medium border ${selectedWire.routingMode === 'auto' ? 'bg-volt-500/20 text-volt-400 border-volt-500/30' : 'bg-white/5 text-surface-400 border-white/10'}`}
+                className={`flex-1 px-3 py-1.5 rounded-lg text-[10px] font-medium border ${selectedWire.routingMode === 'auto' ? 'bg-volt-500/20 text-volt-500 border-volt-500/30 dark:text-volt-400' : 'bg-surface-100 text-surface-600 border-surface-200 dark:bg-white/5 dark:text-surface-400 dark:border-white/10'}`}
               >
                 Smart
               </button>
@@ -142,20 +202,20 @@ function WirePropertiesPanel() {
             <input type="text" value={selectedWire.label || ''}
               onChange={(e) => updateWire(selectedWire.id, { label: e.target.value })}
               placeholder="e.g. SCL, SDA, VCC..."
-              className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-volt-500/50"
+              className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
             />
           </div>
 
           {/* Bend points info */}
           <div>
-            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-1">Bend Points</h4>
+            <h4 className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-1 dark:text-surface-400">Bend Points</h4>
             <p className="text-[10px] text-surface-500">
               {selectedWire.bendPoints.length} points • Double-click wire to add • Double-click point to remove
             </p>
           </div>
         </div>
 
-        <div className="p-3 border-t border-white/5">
+        <div className="p-3 border-t border-surface-200/70 dark:border-white/5">
           <button
             onClick={() => { removeWire(selectedWire.id); }}
             className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs text-red-400 bg-red-500/5 hover:bg-red-500/10 transition-colors"
@@ -204,19 +264,19 @@ export default function PropertyEditor() {
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: 300, opacity: 0 }}
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="w-72 glass flex flex-col h-full bg-surface-950/80"
+        className="w-72 glass flex flex-col h-full bg-white/80 dark:bg-surface-950/80"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-surface-900/50">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-surface-200/70 bg-surface-50/70 dark:border-white/5 dark:bg-surface-900/50">
           <div className="flex items-center gap-2">
             <Sliders className="w-4 h-4 text-volt-400" />
-            <h3 className="text-sm font-semibold text-white truncate">{selectedNode.name}</h3>
+            <h3 className="text-sm font-semibold text-surface-950 truncate dark:text-white">{selectedNode.name}</h3>
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={toggleLock} className="p-1 rounded-lg hover:bg-white/5 text-surface-400 hover:text-white" title={properties.locked ? 'Unlock' : 'Lock'}>
+            <button onClick={toggleLock} className="p-1 rounded-lg text-surface-500 hover:bg-surface-100 hover:text-surface-950 dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white" title={properties.locked ? 'Unlock' : 'Lock'}>
               {properties.locked ? <Lock className="w-3.5 h-3.5 text-amber-400" /> : <Unlock className="w-3.5 h-3.5" />}
             </button>
-            <button onClick={() => useCanvasStore.getState().selectNode(null)} className="p-1 rounded-lg hover:bg-white/5 text-surface-400 hover:text-white">
+            <button onClick={() => useCanvasStore.getState().selectNode(null)} className="p-1 rounded-lg text-surface-500 hover:bg-surface-100 hover:text-surface-950 dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -225,27 +285,27 @@ export default function PropertyEditor() {
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Type Badge */}
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-medium bg-surface-800 text-surface-300 border border-surface-700">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-medium bg-surface-100 text-surface-700 border border-surface-200 dark:bg-surface-800 dark:text-surface-300 dark:border-surface-700">
               {selectedNode.type.replace(/_/g, ' ')}
             </span>
           </div>
 
           {/* Position */}
           <div>
-            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Position</h4>
+            <h4 className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-2 dark:text-surface-400">Position</h4>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[10px] text-surface-500 mb-1 block">X</label>
                 <input type="number" value={Math.round(selectedNode.x)}
                   onChange={(e) => updateNode(selectedNode.id, { x: Number(e.target.value) })}
-                  className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-volt-500/50"
+                  className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
                 />
               </div>
               <div>
                 <label className="text-[10px] text-surface-500 mb-1 block">Y</label>
                 <input type="number" value={Math.round(selectedNode.y)}
                   onChange={(e) => updateNode(selectedNode.id, { y: Number(e.target.value) })}
-                  className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-volt-500/50"
+                  className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
                 />
               </div>
             </div>
@@ -253,14 +313,14 @@ export default function PropertyEditor() {
 
           {/* Rotation with quick buttons */}
           <div>
-            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Transform</h4>
+            <h4 className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-2 dark:text-surface-400">Transform</h4>
             <div className="flex items-center gap-1 mb-2">
               {[0, 90, 180, 270].map(a => (
                 <button key={a} onClick={() => updateNode(selectedNode.id, { rotation: a })}
                   className={`flex-1 px-2 py-1.5 rounded-lg text-[10px] font-medium border transition-colors ${
                     (selectedNode.rotation || 0) === a
                       ? 'bg-volt-500/20 text-volt-400 border-volt-500/30'
-                      : 'bg-white/5 text-surface-400 border-white/10 hover:text-white'
+                      : 'bg-surface-100 text-surface-600 border-surface-200 hover:text-surface-950 dark:bg-white/5 dark:text-surface-400 dark:border-white/10 dark:hover:text-white'
                   }`}
                 >
                   {a}°
@@ -280,20 +340,20 @@ export default function PropertyEditor() {
 
           {/* Size */}
           <div>
-            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Size</h4>
+            <h4 className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-2 dark:text-surface-400">Size</h4>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[10px] text-surface-500 mb-1 block">Width</label>
                 <input type="number" value={Math.round(selectedNode.width)} min={20}
                   onChange={(e) => updateNode(selectedNode.id, { width: Math.max(20, Number(e.target.value)) })}
-                  className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-volt-500/50"
+                  className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
                 />
               </div>
               <div>
                 <label className="text-[10px] text-surface-500 mb-1 block">Height</label>
                 <input type="number" value={Math.round(selectedNode.height)} min={20}
                   onChange={(e) => updateNode(selectedNode.id, { height: Math.max(20, Number(e.target.value)) })}
-                  className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-volt-500/50"
+                  className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
                 />
               </div>
             </div>
@@ -302,7 +362,7 @@ export default function PropertyEditor() {
           {/* Component Properties */}
           {schema.length > 0 && (
             <div>
-              <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Properties</h4>
+              <h4 className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-3 dark:text-surface-400">Properties</h4>
               <div className="space-y-3">
                 {schema.map((prop) => (
                   <div key={prop.key}>
@@ -315,7 +375,7 @@ export default function PropertyEditor() {
                         value={(properties[prop.key] as number) ?? prop.min ?? 0}
                         min={prop.min} max={prop.max} step={prop.step}
                         onChange={(e) => handlePropertyChange(prop.key, Number(e.target.value))}
-                        className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-volt-500/50"
+                        className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
                       />
                     )}
                     {prop.type === 'text' && (
@@ -323,14 +383,14 @@ export default function PropertyEditor() {
                         type="text"
                         value={(properties[prop.key] as string) || ''}
                         onChange={(e) => handlePropertyChange(prop.key, e.target.value)}
-                        className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-volt-500/50"
+                        className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
                       />
                     )}
                     {prop.type === 'select' && (
                       <select
                         value={(properties[prop.key] as string) || prop.options?.[0] || ''}
                         onChange={(e) => handlePropertyChange(prop.key, e.target.value)}
-                        className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-volt-500/50"
+                        className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
                       >
                         {prop.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                       </select>
@@ -340,9 +400,9 @@ export default function PropertyEditor() {
                         <input type="color"
                           value={(properties[prop.key] as string) || '#ff0000'}
                           onChange={(e) => handlePropertyChange(prop.key, e.target.value)}
-                          className="w-8 h-8 rounded-lg border border-white/10 cursor-pointer"
+                          className="w-8 h-8 rounded-lg border border-surface-200 cursor-pointer dark:border-white/10"
                         />
-                        <span className="text-xs text-surface-400">{(properties[prop.key] as string) || '#ff0000'}</span>
+                        <span className="text-xs text-surface-500 dark:text-surface-400">{(properties[prop.key] as string) || '#ff0000'}</span>
                       </div>
                     )}
                   </div>
@@ -356,20 +416,20 @@ export default function PropertyEditor() {
             <label className="text-[10px] text-surface-500 mb-1 block">Display Name</label>
             <input type="text" value={selectedNode.name}
               onChange={(e) => updateNode(selectedNode.id, { name: e.target.value })}
-              className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-volt-500/50"
+              className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
             />
           </div>
 
           {/* Pins */}
           {selectedNode.pins && selectedNode.pins.length > 0 && (
             <div>
-              <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Pins ({selectedNode.pins.length})</h4>
+              <h4 className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-2 dark:text-surface-400">Pins ({selectedNode.pins.length})</h4>
               <div className="space-y-0.5 max-h-40 overflow-y-auto">
                 {selectedNode.pins.map((pin) => {
-                  const typeColor = pin.type === 'power' ? 'text-red-400' : pin.type === 'ground' ? 'text-surface-500' : pin.type === 'output' ? 'text-blue-400' : pin.type === 'input' ? 'text-amber-400' : 'text-surface-300';
+                  const typeColor = pin.type === 'power' ? 'text-red-500 dark:text-red-400' : pin.type === 'ground' ? 'text-surface-500' : pin.type === 'output' ? 'text-blue-500 dark:text-blue-400' : pin.type === 'input' ? 'text-amber-500 dark:text-amber-400' : 'text-surface-600 dark:text-surface-300';
                   return (
                     <div key={pin.id} className="flex items-center justify-between px-2 py-1 rounded bg-white/[0.02] text-[10px]">
-                      <span className="text-surface-200 font-mono">{pin.name}</span>
+                      <span className="text-surface-800 font-mono dark:text-surface-200">{pin.name}</span>
                       <span className={typeColor}>{pin.type}</span>
                     </div>
                   );
@@ -380,16 +440,16 @@ export default function PropertyEditor() {
         </div>
 
         {/* Actions */}
-        <div className="p-3 border-t border-white/5 flex gap-2">
+        <div className="p-3 border-t border-surface-200/70 flex gap-2 dark:border-white/5">
           <button
             onClick={() => handleRotate(90)}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs text-surface-300 bg-white/5 hover:bg-white/10 transition-colors"
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs text-surface-700 bg-surface-100 hover:bg-surface-200 transition-colors dark:text-surface-300 dark:bg-white/5 dark:hover:bg-white/10"
           >
             <RotateCw className="w-3 h-3" /> +90°
           </button>
           <button
             onClick={() => handleRotate(-90)}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs text-surface-300 bg-white/5 hover:bg-white/10 transition-colors"
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs text-surface-700 bg-surface-100 hover:bg-surface-200 transition-colors dark:text-surface-300 dark:bg-white/5 dark:hover:bg-white/10"
           >
             <RotateCw className="w-3 h-3 -scale-x-100" /> −90°
           </button>

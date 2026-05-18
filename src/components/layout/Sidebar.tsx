@@ -37,10 +37,10 @@ export default function Sidebar() {
     <motion.aside
       animate={{ width: collapsed ? 72 : 260 }}
       transition={{ duration: 0.2, ease: 'easeInOut' }}
-      className="glass flex flex-col border-r border-white/5 h-screen sticky top-0 z-40"
+      className="glass flex flex-col border-r border-surface-200/70 h-screen sticky top-0 z-40 dark:border-white/5"
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 p-4 border-b border-white/5">
+      <div className="flex items-center gap-3 p-4 border-b border-surface-200/70 dark:border-white/5">
         <div className="flex items-center justify-center flex-shrink-0">
           <img src="/v-logo.svg" alt="VoltForge Logo" className="w-8 h-8" />
         </div>
@@ -55,13 +55,13 @@ export default function Sidebar() {
               <h1 className="text-lg font-bold bg-gradient-to-r from-volt-400 to-forge-400 bg-clip-text text-transparent">
                 VoltForge
               </h1>
-              <p className="text-[10px] text-surface-400 -mt-0.5">{t('Circuit Simulator')}</p>
+              <p className="text-[10px] text-surface-500 dark:text-surface-400 -mt-0.5">{t('Circuit Simulator')}</p>
             </motion.div>
           )}
         </AnimatePresence>
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="ml-auto p-1.5 rounded-lg hover:bg-white/5 text-surface-400 hover:text-white transition-colors"
+          className="ml-auto p-1.5 rounded-lg text-surface-500 transition-colors hover:bg-surface-100 hover:text-surface-950 dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white"
         >
           {collapsed ? <Menu className="w-4 h-4" /> : <X className="w-4 h-4" />}
         </button>
@@ -78,10 +78,10 @@ export default function Sidebar() {
               className={`flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group
                 ${isActive
                   ? 'bg-volt-500/10 text-volt-400 border border-volt-500/20 shadow-[0_0_14px_rgba(34,197,94,0.12)]'
-                  : 'text-surface-300 hover:bg-white/5 hover:text-white border border-transparent'
+                  : 'text-surface-600 hover:bg-surface-100 hover:text-surface-950 border border-transparent dark:text-surface-300 dark:hover:bg-white/5 dark:hover:text-white'
                 }`}
             >
-              <item.icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-volt-400' : 'text-surface-500 group-hover:text-volt-400'}`} />
+              <item.icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-volt-500 dark:text-volt-400' : 'text-surface-500 group-hover:text-volt-500 dark:group-hover:text-volt-400'}`} />
               <AnimatePresence>
                 {!collapsed && (
                   <motion.span

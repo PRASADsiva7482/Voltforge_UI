@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Cpu, Zap, Thermometer, Monitor, Power, Settings2, Search, Radio, BatteryCharging, Plus } from 'lucide-react';
+import { Cpu, Zap, Thermometer, Monitor, Power, Settings2, Search, Radio, BatteryCharging, Plus, ChevronDown } from 'lucide-react';
 import { componentApi } from '../../api/services';
 import { useCanvasStore } from '../../store/canvasStore';
 import { componentDimensions } from '../canvas/componentSvgs';
@@ -30,9 +30,11 @@ export default function ComponentPanel() {
 
   useEffect(() => { if (data) setComponentLibrary(data); }, [data, setComponentLibrary]);
 
-  const filtered = (data || []).filter(c =>
-    !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.type.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = [...(data || [])]
+    .sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name))
+    .filter(c =>
+      !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.type.toLowerCase().includes(search.toLowerCase())
+    );
 
   const grouped = filtered.reduce((acc: Record<string, ElectronicComponent[]>, c) => {
     const cat = c.category;
@@ -75,12 +77,12 @@ export default function ComponentPanel() {
   };
 
   return (
-    <div className="w-56 glass border-r border-white/5 h-full overflow-y-auto flex flex-col">
+    <div className="w-56 glass border-r border-surface-200/70 h-full overflow-y-auto flex flex-col dark:border-white/5">
       <CustomComponentStudio isOpen={studioOpen} onClose={() => setStudioOpen(false)} />
-      <div className="p-3 border-b border-white/5">
+      <div className="p-3 border-b border-surface-200/70 dark:border-white/5">
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-white">Components</h3>
-          <button onClick={() => setStudioOpen(true)} className="rounded-md p-1 text-surface-400 hover:bg-white/5 hover:text-white" title="Create custom component">
+          <h3 className="text-xs font-semibold text-surface-950 dark:text-white">Components</h3>
+          <button onClick={() => setStudioOpen(true)} className="rounded-md p-1 text-surface-500 hover:bg-surface-100 hover:text-surface-950 dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white" title="Create custom component">
             <Plus className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -88,7 +90,7 @@ export default function ComponentPanel() {
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-surface-500" />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search..."
-            className="w-full pl-7 pr-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[11px] text-white placeholder:text-surface-500 focus:outline-none focus:ring-1 focus:ring-volt-500/50"
+            className="w-full pl-7 pr-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-[11px] text-surface-950 placeholder:text-surface-500 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
           />
         </div>
       </div>
@@ -101,23 +103,23 @@ export default function ComponentPanel() {
             <div key={category} className="mb-1">
               <button
                 onClick={() => toggleCategory(category)}
-                className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold text-surface-400 uppercase tracking-wider hover:text-surface-200 transition-colors"
+                className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold text-surface-500 uppercase tracking-wider hover:text-surface-900 transition-colors dark:text-surface-400 dark:hover:text-surface-200"
               >
                 <Icon className="w-3 h-3" />
                 <span className="flex-1 text-left">{category}</span>
-                <span className="text-[8px] bg-surface-800 px-1 py-0.5 rounded text-surface-500">{components.length}</span>
-                <span className={`transition-transform ${isCollapsed ? '-rotate-90' : ''}`}>▾</span>
+                <span className="text-[8px] bg-surface-100 px-1 py-0.5 rounded text-surface-500 dark:bg-surface-800">{components.length}</span>
+                <ChevronDown className={`h-3 w-3 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
               </button>
               {!isCollapsed && components.map((comp) => (
                 <motion.button key={comp.id} whileHover={{ x: 3 }}
                   onClick={() => addToCanvas(comp)}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 text-left rounded-lg hover:bg-white/5 transition-colors group"
+                  className="w-full flex items-center gap-2 px-2 py-1.5 text-left rounded-lg hover:bg-surface-100 transition-colors group dark:hover:bg-white/5"
                 >
-                  <div className="w-6 h-6 rounded bg-surface-800 flex items-center justify-center flex-shrink-0 group-hover:bg-volt-500/10">
-                    <Cpu className="w-3 h-3 text-surface-400 group-hover:text-volt-400" />
+                  <div className="w-6 h-6 rounded bg-surface-100 flex items-center justify-center flex-shrink-0 group-hover:bg-volt-500/10 dark:bg-surface-800">
+                    <Cpu className="w-3 h-3 text-surface-500 group-hover:text-volt-500 dark:text-surface-400 dark:group-hover:text-volt-400" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-medium text-surface-200 truncate">{comp.name}</p>
+                    <p className="text-[11px] font-medium text-surface-800 truncate dark:text-surface-200">{comp.name}</p>
                     <p className="text-[9px] text-surface-500">{comp.type.replace(/_/g, ' ')}</p>
                   </div>
                   {comp.isPremium && (

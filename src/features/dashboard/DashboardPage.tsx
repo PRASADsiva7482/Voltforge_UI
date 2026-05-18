@@ -40,10 +40,10 @@ export default function DashboardPage() {
         animate={{ opacity: 1, y: 0 }}
         className="mb-12"
       >
-        <h1 className="text-4xl font-bold text-white mb-3">
+        <h1 className="text-4xl font-bold text-surface-950 mb-3 dark:text-white">
           {t('Welcome back')}, <span className="bg-gradient-to-r from-volt-400 to-forge-400 bg-clip-text text-transparent">{user?.displayName || user?.username || keycloak.tokenParsed?.name || keycloak.tokenParsed?.preferred_username || user?.email}</span>
         </h1>
-        <p className="text-surface-400 text-lg">{t('Build, simulate, and share your electronics projects')}</p>
+        <p className="text-surface-600 text-lg dark:text-surface-400">{t('Build, simulate, and share your electronics projects')}</p>
       </motion.div>
 
       {/* Quick Actions */}
@@ -60,8 +60,8 @@ export default function DashboardPage() {
           <div className="w-16 h-16 rounded-2xl bg-volt-500/10 flex items-center justify-center mb-5 group-hover:bg-volt-500/20 transition-colors">
             <Plus className="w-8 h-8 text-volt-400" />
           </div>
-          <h3 className="text-xl font-semibold text-white mb-2">{t('New Project')}</h3>
-          <p className="text-sm text-surface-400">{t('Start a new circuit from scratch')}</p>
+          <h3 className="text-xl font-semibold text-surface-950 mb-2 dark:text-white">{t('New Project')}</h3>
+          <p className="text-sm text-surface-600 dark:text-surface-400">{t('Start a new circuit from scratch')}</p>
         </button>
 
         <button
@@ -71,8 +71,8 @@ export default function DashboardPage() {
           <div className="w-16 h-16 rounded-2xl bg-forge-500/10 flex items-center justify-center mb-5 group-hover:bg-forge-500/20 transition-colors">
             <Search className="w-8 h-8 text-forge-400" />
           </div>
-          <h3 className="text-xl font-semibold text-white mb-2">{t('Explore')}</h3>
-          <p className="text-sm text-surface-400">{t('Browse community projects')}</p>
+          <h3 className="text-xl font-semibold text-surface-950 mb-2 dark:text-white">{t('Explore')}</h3>
+          <p className="text-sm text-surface-600 dark:text-surface-400">{t('Browse community projects')}</p>
         </button>
       </motion.div>
 
@@ -85,7 +85,7 @@ export default function DashboardPage() {
           className="mb-16"
         >
           <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-semibold text-white">{t('Starter Templates')}</h2>
+            <h2 className="text-2xl font-semibold text-surface-950 dark:text-white">{t('Starter Templates')}</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {templates.map((template: ProjectSummary) => (
@@ -102,7 +102,7 @@ export default function DashboardPage() {
         transition={{ delay: 0.2 }}
       >
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-semibold text-white">{t('Recent Projects')}</h2>
+          <h2 className="text-2xl font-semibold text-surface-950 dark:text-white">{t('Recent Projects')}</h2>
           <button
             onClick={() => navigate('/projects')}
             className="text-sm text-volt-400 hover:text-volt-300 transition-colors font-medium"
@@ -115,17 +115,17 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map((i) => (
               <div key={i} className="glass rounded-2xl p-6 animate-pulse">
-                <div className="h-40 bg-surface-800 rounded-xl mb-5" />
-                <div className="h-5 bg-surface-800 rounded w-3/4 mb-3" />
-                <div className="h-4 bg-surface-800 rounded w-1/2" />
+                <div className="h-40 bg-surface-200 rounded-xl mb-5 dark:bg-surface-800" />
+                <div className="h-5 bg-surface-200 rounded w-3/4 mb-3 dark:bg-surface-800" />
+                <div className="h-4 bg-surface-200 rounded w-1/2 dark:bg-surface-800" />
               </div>
             ))}
           </div>
         ) : projects.length === 0 ? (
-          <div className="glass rounded-2xl p-10 flex flex-col items-center justify-center border border-dashed border-white/10">
+          <div className="glass rounded-2xl p-10 flex flex-col items-center justify-center border border-dashed border-surface-300/70 dark:border-white/10">
             <Cpu className="w-12 h-12 text-surface-600 mb-4" />
-            <h3 className="text-lg font-medium text-white mb-2">{t('No projects yet')}</h3>
-            <p className="text-surface-400 mb-6 text-center max-w-sm">{t('Create your first circuit to get started and see it appear here.')}</p>
+            <h3 className="text-lg font-medium text-surface-950 mb-2 dark:text-white">{t('No projects yet')}</h3>
+            <p className="text-surface-600 mb-6 text-center max-w-sm dark:text-surface-400">{t('Create your first circuit to get started and see it appear here.')}</p>
             <button
               onClick={() => navigate('/projects/new')}
               className="vf-btn vf-btn-primary shadow-[0_0_18px_rgba(34,197,94,0.25)]"
@@ -169,11 +169,11 @@ function ProjectCard({ project, onClick }: { project: ProjectSummary; onClick: (
       </div>
 
       {/* Info */}
-      <h3 className="text-base font-semibold text-white mb-1 truncate">{project.name}</h3>
-      <p className="text-xs text-surface-400 mb-3 line-clamp-2 min-h-[2.5rem]">{project.description || t('No description')}</p>
+      <h3 className="text-base font-semibold text-surface-950 mb-1 truncate dark:text-white">{project.name}</h3>
+      <p className="text-xs text-surface-600 mb-3 line-clamp-2 min-h-[2.5rem] dark:text-surface-400">{project.description || t('No description')}</p>
 
       {/* Meta */}
-      <div className="flex items-center gap-4 text-xs text-surface-500">
+      <div className="flex items-center gap-4 text-xs text-surface-500 dark:text-surface-500">
         <span className="flex items-center gap-1">
           <Eye className="w-3.5 h-3.5" /> {project.viewCount}
         </span>
@@ -188,7 +188,7 @@ function ProjectCard({ project, onClick }: { project: ProjectSummary; onClick: (
 
       {/* Board Badge */}
       <div className="mt-3">
-        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-surface-800 text-surface-300 border border-surface-700">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-surface-100 text-surface-700 border border-surface-200 dark:bg-surface-800 dark:text-surface-300 dark:border-surface-700">
           {project.boardType.replace(/_/g, ' ')}
         </span>
         {project.isPublic && (

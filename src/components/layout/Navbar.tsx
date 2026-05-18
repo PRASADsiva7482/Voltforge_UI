@@ -114,6 +114,13 @@ export default function Navbar() {
     ...(isAdmin ? [{ icon: Shield, label: t('Admin'), path: '/admin' }] : []),
   ];
 
+  const iconButtonBase = 'p-2.5 rounded-xl border transition-all bloom-hover';
+  const iconButtonIdle = 'bg-white/70 border-surface-200 text-surface-600 hover:bg-surface-100 hover:text-surface-950 hover:border-surface-300 dark:bg-surface-800/50 dark:border-surface-700/50 dark:text-surface-300 dark:hover:text-white dark:hover:bg-surface-700 dark:hover:border-surface-600';
+  const iconButtonActive = 'bg-white border-volt-500/30 text-surface-950 dark:bg-surface-700 dark:border-surface-600 dark:text-white';
+  const dropdownPanel = 'absolute right-0 mt-3 bg-white border border-surface-200 rounded-xl shadow-2xl overflow-hidden z-50 dark:bg-surface-900 dark:border-surface-700';
+  const dropdownItem = 'text-surface-700 hover:bg-surface-100 hover:text-surface-950 border-l-2 border-transparent dark:text-surface-300 dark:hover:bg-surface-800 dark:hover:text-white';
+  const searchInputClass = 'w-full pl-10 pr-4 py-2 bg-white/80 border border-surface-200 rounded-xl text-sm text-surface-950 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-volt-500/50 focus:border-volt-500/40 transition-all dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-surface-400 dark:focus:border-volt-500/30';
+
   // ── Dropdown animation variants ──
   const dropdownVariants = {
     hidden: { opacity: 0, y: 8, scale: 0.95 },
@@ -129,7 +136,7 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="glass sticky top-0 z-50 border-b border-white/5 px-5 lg:px-8 py-3 flex items-center justify-between">
+      <nav className="glass sticky top-0 z-50 border-b border-surface-200/70 px-5 lg:px-8 py-3 flex items-center justify-between dark:border-white/5">
         {/* Left side: Search */}
         <div className="flex items-center flex-1">
           <form onSubmit={handleSearch} className="hidden md:flex relative max-w-md w-full ml-4">
@@ -142,7 +149,7 @@ export default function Navbar() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('Search projects...')}
-              className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-volt-500/50 focus:border-volt-500/30 transition-all"
+              className={searchInputClass}
             />
           </form>
         </div>
@@ -154,7 +161,7 @@ export default function Navbar() {
             <button
               id="lang-switcher"
               onClick={() => setIsLangOpen(!isLangOpen)}
-              className={`p-2.5 rounded-xl border transition-all bloom-hover ${isLangOpen ? 'bg-surface-700 border-surface-600 text-white' : 'bg-surface-800/50 border-surface-700/50 text-surface-300 hover:text-white hover:bg-surface-700 hover:border-surface-600'}`}
+              className={`${iconButtonBase} ${isLangOpen ? iconButtonActive : iconButtonIdle}`}
               title="Language"
             >
               <Globe className="w-4 h-4" />
@@ -167,7 +174,7 @@ export default function Navbar() {
                   initial="hidden"
                   animate="visible"
                   exit="exit"
-                  className="absolute right-0 mt-3 w-40 bg-surface-900 border border-surface-700 rounded-xl shadow-2xl overflow-hidden z-50"
+                  className={`${dropdownPanel} w-40`}
                 >
                   {languages.map((lng) => (
                     <button
@@ -175,7 +182,7 @@ export default function Navbar() {
                       onClick={() => changeLanguage(lng.code)}
                       className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${i18n.language === lng.code
                           ? 'bg-volt-500/20 text-volt-400 border-l-2 border-volt-500'
-                          : 'text-surface-300 hover:bg-surface-800 hover:text-white border-l-2 border-transparent'
+                          : dropdownItem
                         }`}
                     >
                       {lng.label}
@@ -190,7 +197,7 @@ export default function Navbar() {
           <button
             id="theme-toggle"
             onClick={toggleTheme}
-            className="p-2.5 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-300 hover:text-white hover:bg-surface-700 hover:border-surface-600 transition-all bloom-hover"
+            className={`${iconButtonBase} ${iconButtonIdle}`}
             title="Toggle Theme"
           >
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -201,7 +208,7 @@ export default function Navbar() {
             <button
               id="notifications-bell"
               onClick={toggleNotifications}
-              className={`p-2.5 rounded-xl border transition-all bloom-hover relative ${isNotifOpen ? 'bg-surface-700 border-surface-600 text-white' : 'bg-surface-800/50 border-surface-700/50 text-surface-300 hover:text-white hover:bg-surface-700 hover:border-surface-600'}`}
+              className={`${iconButtonBase} relative ${isNotifOpen ? iconButtonActive : iconButtonIdle}`}
               title="Notifications"
             >
               <Bell className="w-4 h-4" />
@@ -217,11 +224,11 @@ export default function Navbar() {
                   initial="hidden"
                   animate="visible"
                   exit="exit"
-                  className="absolute right-0 mt-3 w-80 bg-surface-900 border border-surface-700 rounded-xl shadow-2xl overflow-hidden z-50"
+                  className={`${dropdownPanel} w-80`}
                 >
                   {/* Header */}
                   <div className="flex items-center justify-between px-4 py-3 border-b border-surface-800">
-                    <h3 className="text-sm font-semibold text-white">{t('Notifications')}</h3>
+                    <h3 className="text-sm font-semibold text-surface-950 dark:text-white">{t('Notifications')}</h3>
                     {notifications.length > 0 && (
                       <button
                         onClick={clearNotifications}
@@ -244,12 +251,12 @@ export default function Navbar() {
                       notifications.map((notif) => (
                         <div
                           key={notif.id}
-                          className="px-4 py-3 hover:bg-surface-800 transition-colors border-b border-surface-800 last:border-b-0 cursor-pointer"
+                          className="px-4 py-3 hover:bg-surface-100 transition-colors border-b border-surface-200 last:border-b-0 cursor-pointer dark:hover:bg-surface-800 dark:border-surface-800"
                         >
                           <div className="flex items-start gap-3">
                             <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${notif.read ? 'bg-surface-600' : 'bg-volt-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]'}`} />
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs text-white font-medium leading-relaxed">{notif.title}</p>
+                              <p className="text-xs text-surface-950 font-medium leading-relaxed dark:text-white">{notif.title}</p>
                               <p className="text-[10px] text-surface-500 mt-0.5">{notif.time}</p>
                             </div>
                           </div>
@@ -262,19 +269,19 @@ export default function Navbar() {
             </AnimatePresence>
           </div>
 
-          <div className="h-6 w-px bg-surface-800 mx-2 hidden md:block"></div>
+          <div className="h-6 w-px bg-surface-200 mx-2 hidden md:block dark:bg-surface-800"></div>
 
           {/* Profile Dropdown */}
           <div className="relative hidden md:block" ref={profileRef}>
             <button
               id="profile-dropdown"
               onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className={`flex items-center gap-2 p-1.5 pr-4 pl-1.5 rounded-xl border transition-all bloom-hover ${isProfileOpen ? 'bg-surface-700 border-surface-600' : 'bg-surface-800/50 border-surface-700/50 hover:bg-surface-700 hover:border-surface-600'}`}
+              className={`flex items-center gap-2 p-1.5 pr-4 pl-1.5 rounded-xl border transition-all bloom-hover ${isProfileOpen ? 'bg-white border-volt-500/30 dark:bg-surface-700 dark:border-surface-600' : 'bg-white/70 border-surface-200 hover:bg-surface-100 hover:border-surface-300 dark:bg-surface-800/50 dark:border-surface-700/50 dark:hover:bg-surface-700 dark:hover:border-surface-600'}`}
             >
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-volt-500 to-forge-500 flex items-center justify-center text-xs font-bold text-white shadow-lg">
                 {displayName.charAt(0).toUpperCase()}
               </div>
-              <span className="text-sm font-medium text-surface-200">{displayName}</span>
+              <span className="text-sm font-medium text-surface-800 dark:text-surface-200">{displayName}</span>
             </button>
 
             <AnimatePresence>
@@ -284,14 +291,14 @@ export default function Navbar() {
                   initial="hidden"
                   animate="visible"
                   exit="exit"
-                  className="absolute right-0 mt-3 w-56 bg-surface-900 border border-surface-700 rounded-xl shadow-2xl overflow-hidden z-50"
+                  className={`${dropdownPanel} w-56`}
                 >
                   <div className="px-4 py-3 border-b border-surface-800">
-                    <p className="text-sm font-medium text-white">{displayName}</p>
+                    <p className="text-sm font-medium text-surface-950 dark:text-white">{displayName}</p>
                     <p className="text-xs text-surface-400 truncate">{user?.email || keycloak.tokenParsed?.email}</p>
                   </div>
                   <div className="py-1 border-b border-surface-800">
-                    <button onClick={() => navigate('/settings')} className="w-full text-left px-4 py-2 text-sm text-surface-300 hover:bg-surface-800 hover:text-white transition-colors flex items-center gap-2">
+                    <button onClick={() => navigate('/settings')} className="w-full text-left px-4 py-2 text-sm text-surface-700 hover:bg-surface-100 hover:text-surface-950 transition-colors flex items-center gap-2 dark:text-surface-300 dark:hover:bg-surface-800 dark:hover:text-white">
                       <User className="w-4 h-4" /> {t('Settings')}
                     </button>
                   </div>
@@ -308,7 +315,7 @@ export default function Navbar() {
           {/* Mobile menu toggle */}
           <button
             id="mobile-menu-toggle"
-            className="md:hidden p-2 rounded-xl text-surface-400 hover:text-white hover:bg-white/5 transition-colors"
+            className="md:hidden p-2 rounded-xl text-surface-500 hover:text-surface-950 hover:bg-surface-100 transition-colors dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5"
             onClick={() => setIsMobileMenuOpen(true)}
           >
             <Menu className="w-5 h-5" />
@@ -335,29 +342,29 @@ export default function Navbar() {
               initial="hidden"
               animate="visible"
               exit="exit"
-              className="fixed top-0 right-0 bottom-0 w-[300px] max-w-[85vw] glass border-l border-white/10 z-[70] flex flex-col overflow-y-auto"
+              className="fixed top-0 right-0 bottom-0 w-[300px] max-w-[85vw] glass border-l border-surface-200 z-[70] flex flex-col overflow-y-auto dark:border-white/10"
             >
               {/* Mobile Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-surface-200/70 dark:border-white/5">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-volt-500 to-forge-500 flex items-center justify-center text-sm font-bold text-white shadow-lg">
                     {displayName.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-white truncate">{displayName}</p>
+                    <p className="text-sm font-semibold text-surface-950 truncate dark:text-white">{displayName}</p>
                     <p className="text-[10px] text-surface-400 truncate">{user?.email || keycloak.tokenParsed?.email}</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2 rounded-xl text-surface-400 hover:text-white hover:bg-white/5 transition-colors"
+                  className="p-2 rounded-xl text-surface-500 hover:text-surface-950 hover:bg-surface-100 transition-colors dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Mobile Search */}
-              <div className="px-5 py-4 border-b border-white/5">
+              <div className="px-5 py-4 border-b border-surface-200/70 dark:border-white/5">
                 <form onSubmit={(e) => { handleSearch(e); setIsMobileMenuOpen(false); }}>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -368,7 +375,7 @@ export default function Navbar() {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder={t('Search projects...')}
-                      className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-volt-500/50 transition-all"
+                      className={`${searchInputClass} py-2.5`}
                     />
                   </div>
                 </form>
@@ -386,7 +393,7 @@ export default function Navbar() {
                       className={`flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200
                         ${isActive
                           ? 'bg-volt-500/10 text-volt-400 border border-volt-500/20 shadow-[0_0_14px_rgba(34,197,94,0.12)]'
-                          : 'text-surface-300 hover:bg-white/5 hover:text-white border border-transparent'
+                          : 'text-surface-600 hover:bg-surface-100 hover:text-surface-950 border border-transparent dark:text-surface-300 dark:hover:bg-white/5 dark:hover:text-white'
                         }`}
                     >
                       <Icon className={`w-5 h-5 ${isActive ? 'text-volt-400' : 'text-surface-500'}`} />
@@ -397,10 +404,10 @@ export default function Navbar() {
               </nav>
 
               {/* Mobile Footer Actions */}
-              <div className="p-4 border-t border-white/5 space-y-2">
+              <div className="p-4 border-t border-surface-200/70 space-y-2 dark:border-white/5">
                 <button
                   onClick={toggleTheme}
-                  className="flex items-center gap-4 w-full px-4 py-3 rounded-xl text-sm font-medium text-surface-300 hover:bg-white/5 hover:text-white transition-colors"
+                  className="flex items-center gap-4 w-full px-4 py-3 rounded-xl text-sm font-medium text-surface-600 hover:bg-surface-100 hover:text-surface-950 transition-colors dark:text-surface-300 dark:hover:bg-white/5 dark:hover:text-white"
                 >
                   {theme === 'dark' ? <Sun className="w-5 h-5 text-surface-500" /> : <Moon className="w-5 h-5 text-surface-500" />}
                   {theme === 'dark' ? t('Light Mode') : t('Dark Mode')}

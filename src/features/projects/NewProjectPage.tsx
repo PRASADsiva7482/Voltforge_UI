@@ -58,7 +58,7 @@ export default function NewProjectPage() {
     <div className="p-8 max-w-3xl mx-auto pt-8 pb-20">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-10">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-surface-400 hover:text-white transition-colors mb-6 text-sm">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-surface-600 hover:text-surface-950 transition-colors mb-6 text-sm dark:text-surface-400 dark:hover:text-white">
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
         <div className="flex items-center gap-3">
@@ -66,8 +66,8 @@ export default function NewProjectPage() {
             <Zap className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">{isAi ? t('AI Generate Project') : t('New Project')}</h1>
-            <p className="text-surface-400 text-sm">{isAi ? 'Let AI create a circuit for you' : 'Set up your new circuit project'}</p>
+            <h1 className="text-2xl font-bold text-surface-950 dark:text-white">{isAi ? t('AI Generate Project') : t('New Project')}</h1>
+            <p className="text-surface-600 text-sm dark:text-surface-400">{isAi ? 'Let AI create a circuit for you' : 'Set up your new circuit project'}</p>
           </div>
         </div>
       </motion.div>
@@ -75,8 +75,8 @@ export default function NewProjectPage() {
       {/* Step 1: Select Board */}
       {step === 1 && (
         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-          <h2 className="text-lg font-semibold text-white mb-1">Choose Your Board</h2>
-          <p className="text-surface-400 text-sm mb-6">Select the microcontroller for your project</p>
+          <h2 className="text-lg font-semibold text-surface-950 mb-1 dark:text-white">Choose Your Board</h2>
+          <p className="text-surface-600 text-sm mb-6 dark:text-surface-400">Select the microcontroller for your project</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {boards.map((board) => {
               const Icon = board.icon;
@@ -90,7 +90,7 @@ export default function NewProjectPage() {
                   className={`p-5 rounded-2xl text-left transition-all duration-300 border ${
                     selected
                       ? 'glass border-volt-500/40 shadow-[0_0_20px_rgba(34,197,94,0.15)]'
-                      : 'glass glass-hover border-white/5'
+                      : 'glass glass-hover border-surface-200 dark:border-white/5'
                   }`}
                 >
                   <div className="flex items-start gap-4">
@@ -98,8 +98,8 @@ export default function NewProjectPage() {
                       <Icon className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-semibold text-white">{board.name}</h3>
-                      <p className="text-xs text-surface-400 mt-1">{board.description}</p>
+                      <h3 className="text-sm font-semibold text-surface-950 dark:text-white">{board.name}</h3>
+                      <p className="text-xs text-surface-600 mt-1 dark:text-surface-400">{board.description}</p>
                     </div>
                   </div>
                 </motion.button>
@@ -121,57 +121,57 @@ export default function NewProjectPage() {
       {/* Step 2: Project Details */}
       {step === 2 && (
         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-          <h2 className="text-lg font-semibold text-white mb-1">Project Details</h2>
-          <p className="text-surface-400 text-sm mb-6">Give your project a name and description</p>
+          <h2 className="text-lg font-semibold text-surface-950 mb-1 dark:text-white">Project Details</h2>
+          <p className="text-surface-600 text-sm mb-6 dark:text-surface-400">Give your project a name and description</p>
 
           <div className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-surface-300 mb-2">Project Name *</label>
+              <label className="block text-sm font-medium text-surface-700 mb-2 dark:text-surface-300">Project Name *</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Smart Home Controller"
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-volt-500/50 transition-all"
+                className="w-full px-4 py-3 bg-white/80 border border-surface-200 rounded-xl text-sm text-surface-950 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-volt-500/50 transition-all dark:bg-white/5 dark:border-white/10 dark:text-white"
                 autoFocus
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-surface-300 mb-2">Description</label>
+              <label className="block text-sm font-medium text-surface-700 mb-2 dark:text-surface-300">Description</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe your circuit project..."
                 rows={3}
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-volt-500/50 transition-all resize-none"
+                className="w-full px-4 py-3 bg-white/80 border border-surface-200 rounded-xl text-sm text-surface-950 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-volt-500/50 transition-all resize-none dark:bg-white/5 dark:border-white/10 dark:text-white"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-surface-300 mb-2">Tags</label>
+              <label className="block text-sm font-medium text-surface-700 mb-2 dark:text-surface-300">Tags</label>
               <input
                 type="text"
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
                 placeholder="e.g., iot, sensor, led (comma-separated)"
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-volt-500/50 transition-all"
+                className="w-full px-4 py-3 bg-white/80 border border-surface-200 rounded-xl text-sm text-surface-950 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-volt-500/50 transition-all dark:bg-white/5 dark:border-white/10 dark:text-white"
               />
             </div>
 
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsPublic(!isPublic)}
-                className={`w-10 h-6 rounded-full transition-colors relative ${isPublic ? 'bg-volt-500' : 'bg-surface-700'}`}
+                className={`w-10 h-6 rounded-full transition-colors relative ${isPublic ? 'bg-volt-500' : 'bg-surface-300 dark:bg-surface-700'}`}
               >
                 <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all ${isPublic ? 'left-4.5' : 'left-0.5'}`} />
               </button>
-              <span className="text-sm text-surface-300">{isPublic ? 'Public — visible to everyone' : 'Private — only you can see this'}</span>
+              <span className="text-sm text-surface-700 dark:text-surface-300">{isPublic ? 'Public — visible to everyone' : 'Private — only you can see this'}</span>
             </div>
           </div>
 
           <div className="flex justify-between mt-8">
-            <button onClick={() => setStep(1)} className="px-6 py-2.5 rounded-xl text-surface-400 hover:text-white transition-colors text-sm">
+            <button onClick={() => setStep(1)} className="px-6 py-2.5 rounded-xl text-surface-600 hover:text-surface-950 transition-colors text-sm dark:text-surface-400 dark:hover:text-white">
               ← Back
             </button>
             <button

@@ -42,9 +42,9 @@ export default function AdminPage() {
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center">
             <Shield className="w-5 h-5 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white">{t('Admin Dashboard')}</h1>
+          <h1 className="text-3xl font-bold text-surface-950 dark:text-white">{t('Admin Dashboard')}</h1>
         </div>
-        <p className="text-surface-400 text-lg ml-13">Platform overview and management</p>
+        <p className="text-surface-600 text-lg ml-13 dark:text-surface-400">Platform overview and management</p>
       </motion.div>
 
       {/* Stats Grid */}
@@ -52,7 +52,7 @@ export default function AdminPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="glass rounded-2xl p-6 animate-pulse">
-              <div className="h-20 bg-surface-800 rounded-xl" />
+              <div className="h-20 bg-surface-200 rounded-xl dark:bg-surface-800" />
             </div>
           ))}
         </div>
@@ -66,13 +66,13 @@ export default function AdminPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.06 }}
-                className="glass rounded-2xl p-6 group hover:border-white/10 transition-all"
+                className="glass rounded-2xl p-6 group hover:border-volt-500/20 transition-all dark:hover:border-white/10"
                 style={{ boxShadow: `0 0 30px ${stat.glow}` }}
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm text-surface-400 mb-1">{stat.label}</p>
-                    <p className="text-3xl font-bold text-white">{stat.value.toLocaleString()}</p>
+                    <p className="text-sm text-surface-600 mb-1 dark:text-surface-400">{stat.label}</p>
+                    <p className="text-3xl font-bold text-surface-950 dark:text-white">{stat.value.toLocaleString()}</p>
                   </div>
                   <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity`}>
                     <Icon className="w-6 h-6 text-white" />
@@ -96,7 +96,7 @@ export default function AdminPage() {
           <div className="glass rounded-2xl p-6">
             <div className="flex items-center gap-3 mb-6">
               <CreditCard className="w-5 h-5 text-purple-400" />
-              <h2 className="text-lg font-semibold text-white">Subscription Plans</h2>
+              <h2 className="text-lg font-semibold text-surface-950 dark:text-white">Subscription Plans</h2>
             </div>
             <div className="space-y-4">
               {Object.entries(stats.subscriptionBreakdown || {}).map(([plan, count]) => {
@@ -108,10 +108,10 @@ export default function AdminPage() {
                 return (
                   <div key={plan}>
                     <div className="flex justify-between text-sm mb-1">
-                      <span className="text-surface-300">{plan}</span>
-                      <span className="text-surface-400">{count} ({percentage.toFixed(1)}%)</span>
+                      <span className="text-surface-700 dark:text-surface-300">{plan}</span>
+                      <span className="text-surface-600 dark:text-surface-400">{count} ({percentage.toFixed(1)}%)</span>
                     </div>
-                    <div className="h-2 bg-surface-800 rounded-full overflow-hidden">
+                    <div className="h-2 bg-surface-200 rounded-full overflow-hidden dark:bg-surface-800">
                       <div className={`h-full ${planColors[plan] || 'bg-blue-500'} rounded-full transition-all duration-500`} style={{ width: `${percentage}%` }} />
                     </div>
                   </div>
@@ -124,7 +124,7 @@ export default function AdminPage() {
           <div className="glass rounded-2xl p-6">
             <div className="flex items-center gap-3 mb-6">
               <Users className="w-5 h-5 text-blue-400" />
-              <h2 className="text-lg font-semibold text-white">User Roles</h2>
+              <h2 className="text-lg font-semibold text-surface-950 dark:text-white">User Roles</h2>
             </div>
             <div className="space-y-4">
               {Object.entries(stats.roleBreakdown || {}).map(([role, count]) => {
@@ -136,10 +136,10 @@ export default function AdminPage() {
                 return (
                   <div key={role}>
                     <div className="flex justify-between text-sm mb-1">
-                      <span className="text-surface-300">{role}</span>
-                      <span className="text-surface-400">{count} ({percentage.toFixed(1)}%)</span>
+                      <span className="text-surface-700 dark:text-surface-300">{role}</span>
+                      <span className="text-surface-600 dark:text-surface-400">{count} ({percentage.toFixed(1)}%)</span>
                     </div>
-                    <div className="h-2 bg-surface-800 rounded-full overflow-hidden">
+                    <div className="h-2 bg-surface-200 rounded-full overflow-hidden dark:bg-surface-800">
                       <div className={`h-full ${roleColors[role] || 'bg-gray-500'} rounded-full transition-all duration-500`} style={{ width: `${percentage}%` }} />
                     </div>
                   </div>

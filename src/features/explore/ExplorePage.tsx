@@ -56,9 +56,9 @@ export default function ExplorePage() {
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-forge-500 to-forge-600 flex items-center justify-center">
             <TrendingUp className="w-5 h-5 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white">{t('Explore')}</h1>
+          <h1 className="text-3xl font-bold text-surface-950 dark:text-white">{t('Explore')}</h1>
         </div>
-        <p className="text-surface-400 text-lg pl-[52px]">{t('Discover amazing circuits built by the community')}</p>
+        <p className="text-surface-600 text-lg pl-[52px] dark:text-surface-400">{t('Discover amazing circuits built by the community')}</p>
       </motion.div>
 
       {/* Board Filters */}
@@ -76,8 +76,8 @@ export default function ExplorePage() {
               onClick={() => setSelectedBoard(board)}
               className={`px-4 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
                 selectedBoard === board
-                  ? 'bg-volt-500/20 text-volt-400 border border-volt-500/30'
-                  : 'bg-white/5 text-surface-400 hover:text-white border border-white/10 hover:border-white/20'
+                  ? 'bg-volt-500/20 text-volt-500 border border-volt-500/30 dark:text-volt-400'
+                  : 'bg-white/80 text-surface-600 hover:text-surface-950 border border-surface-200 hover:border-surface-300 dark:bg-white/5 dark:text-surface-400 dark:hover:text-white dark:border-white/10 dark:hover:border-white/20'
               }`}
             >
               {board === 'ALL' ? 'All Boards' : board.replace(/_/g, ' ')}
@@ -91,9 +91,9 @@ export default function ExplorePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="glass rounded-2xl p-6 animate-pulse">
-              <div className="h-40 bg-surface-800 rounded-xl mb-5" />
-              <div className="h-5 bg-surface-800 rounded w-3/4 mb-3" />
-              <div className="h-4 bg-surface-800 rounded w-1/2" />
+              <div className="h-40 bg-surface-200 rounded-xl mb-5 dark:bg-surface-800" />
+              <div className="h-5 bg-surface-200 rounded w-3/4 mb-3 dark:bg-surface-800" />
+              <div className="h-4 bg-surface-200 rounded w-1/2 dark:bg-surface-800" />
             </div>
           ))}
         </div>
@@ -101,11 +101,11 @@ export default function ExplorePage() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="glass rounded-2xl p-16 flex flex-col items-center justify-center border border-dashed border-white/10"
+          className="glass rounded-2xl p-16 flex flex-col items-center justify-center border border-dashed border-surface-300/70 dark:border-white/10"
         >
           <Search className="w-12 h-12 text-surface-600 mb-4" />
-          <h3 className="text-lg font-medium text-white mb-2">{t('No projects found')}</h3>
-          <p className="text-surface-400 text-center max-w-sm">
+          <h3 className="text-lg font-medium text-surface-950 mb-2 dark:text-white">{t('No projects found')}</h3>
+          <p className="text-surface-600 text-center max-w-sm dark:text-surface-400">
             {searchQuery ? `No results for "${searchQuery}". Try different search terms.` : 'Be the first to share a public project!'}
           </p>
         </motion.div>
@@ -133,15 +133,15 @@ export default function ExplorePage() {
                 </div>
 
                 {/* Info */}
-                <h3 className="text-base font-semibold text-white mb-1 truncate">{project.name}</h3>
-                <p className="text-xs text-surface-400 mb-3 line-clamp-2 min-h-[2.5rem]">{project.description || 'No description'}</p>
+                <h3 className="text-base font-semibold text-surface-950 mb-1 truncate dark:text-white">{project.name}</h3>
+                <p className="text-xs text-surface-600 mb-3 line-clamp-2 min-h-[2.5rem] dark:text-surface-400">{project.description || 'No description'}</p>
 
                 {/* Owner */}
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-5 h-5 rounded-full bg-gradient-to-br from-volt-500 to-forge-500 flex items-center justify-center text-[8px] font-bold text-white">
                     {project.owner?.displayName?.charAt(0) || '?'}
                   </div>
-                  <span className="text-xs text-surface-400">{project.owner?.displayName || project.owner?.username}</span>
+                  <span className="text-xs text-surface-600 dark:text-surface-400">{project.owner?.displayName || project.owner?.username}</span>
                 </div>
 
                 {/* Meta */}
@@ -155,7 +155,7 @@ export default function ExplorePage() {
                 {project.tags && (
                   <div className="flex flex-wrap gap-2 mt-3">
                     {project.tags.split(',').slice(0, 3).map((tag) => (
-                      <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-medium bg-surface-800 text-surface-300 border border-surface-700">
+                      <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-medium bg-surface-100 text-surface-700 border border-surface-200 dark:bg-surface-800 dark:text-surface-300 dark:border-surface-700">
                         {tag.trim()}
                       </span>
                     ))}
@@ -171,17 +171,17 @@ export default function ExplorePage() {
               <button
                 onClick={() => setPage(p => Math.max(0, p - 1))}
                 disabled={page === 0}
-                className="px-4 py-2 rounded-lg text-sm font-medium glass glass-hover text-surface-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-lg text-sm font-medium glass glass-hover text-surface-700 disabled:opacity-30 disabled:cursor-not-allowed dark:text-surface-300"
               >
                 Previous
               </button>
-              <span className="text-sm text-surface-400">
+              <span className="text-sm text-surface-600 dark:text-surface-400">
                 Page {page + 1} of {totalPages}
               </span>
               <button
                 onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                 disabled={page >= totalPages - 1}
-                className="px-4 py-2 rounded-lg text-sm font-medium glass glass-hover text-surface-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-lg text-sm font-medium glass glass-hover text-surface-700 disabled:opacity-30 disabled:cursor-not-allowed dark:text-surface-300"
               >
                 Next
               </button>

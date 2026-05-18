@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ═══════════════════════════════════════════════════════════════════════════
    VoltForge — Design System
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -55,40 +57,32 @@
 }
 
 /* ── Light Mode Variables ──────────────────────────────────────────────────── */
-:root.light {
-  --color-surface-950: #f8fafc;
-  --color-surface-900: #f1f5f9;
-  --color-surface-800: #e2e8f0;
-  --color-surface-700: #cbd5e1;
-  --color-surface-600: #94a3b8;
-  --color-surface-500: #64748b;
-  --color-surface-400: #475569;
-  --color-surface-300: #334155;
-  --color-surface-200: #1e293b;
-  --color-surface-100: #0f172a;
-  --color-surface-50: #020617;
+:root {
+  color-scheme: light;
+  --vf-bg: #f8fafc;
+  --vf-text: #0f172a;
+  --vf-glass-bg: rgba(255, 255, 255, 0.78);
+  --vf-glass-border: rgba(15, 23, 42, 0.1);
+  --vf-glass-hover-bg: rgba(255, 255, 255, 0.92);
+  --vf-glass-hover-border: rgba(34, 197, 94, 0.28);
+  --vf-toolbar-divider: rgba(15, 23, 42, 0.12);
+  --vf-control-bg: rgba(255, 255, 255, 0.72);
+  --vf-control-hover-bg: rgba(241, 245, 249, 0.95);
+  --vf-muted-border: rgba(15, 23, 42, 0.1);
 }
 
-:root.light .text-white {
-  color: #0f172a;
-}
-:root.light .bg-white\/5 {
-  background-color: rgba(0, 0, 0, 0.05);
-}
-:root.light .bg-white\/10 {
-  background-color: rgba(0, 0, 0, 0.1);
-}
-:root.light .border-white\/5 {
-  border-color: rgba(0, 0, 0, 0.05);
-}
-:root.light .border-white\/10 {
-  border-color: rgba(0, 0, 0, 0.1);
-}
-:root.light .hover\:bg-white\/5:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-}
-:root.light .hover\:text-white:hover {
-  color: #020617;
+:root.dark {
+  color-scheme: dark;
+  --vf-bg: var(--color-surface-950);
+  --vf-text: var(--color-surface-100);
+  --vf-glass-bg: rgba(17, 17, 24, 0.72);
+  --vf-glass-border: rgba(255, 255, 255, 0.06);
+  --vf-glass-hover-bg: rgba(26, 26, 36, 0.84);
+  --vf-glass-hover-border: rgba(255, 255, 255, 0.1);
+  --vf-toolbar-divider: rgba(255, 255, 255, 0.08);
+  --vf-control-bg: rgba(255, 255, 255, 0.04);
+  --vf-control-hover-bg: rgba(255, 255, 255, 0.08);
+  --vf-muted-border: rgba(255, 255, 255, 0.08);
 }
 
 /* ── Base Styles ───────────────────────────────────────────────────────────── */
@@ -108,8 +102,8 @@ html {
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--color-surface-950);
-  color: var(--color-surface-100);
+  background-color: var(--vf-bg);
+  color: var(--vf-text);
   min-height: 100vh;
   overflow-x: hidden;
 }
@@ -141,15 +135,16 @@ body {
 
 /* ── Glass Morphism ────────────────────────────────────────────────────────── */
 .glass {
-  background: rgba(17, 17, 24, 0.7);
+  background: var(--vf-glass-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--vf-glass-border);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
 }
 
 .glass-hover:hover {
-  background: rgba(26, 26, 36, 0.8);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--vf-glass-hover-bg);
+  border-color: var(--vf-glass-hover-border);
 }
 
 /* ── Glow Effects ──────────────────────────────────────────────────────────── */
@@ -207,21 +202,27 @@ body {
 }
 
 .vf-btn-ghost {
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--color-surface-300);
-  border-color: rgba(255, 255, 255, 0.06);
+  background: var(--vf-control-bg);
+  color: var(--color-surface-600);
+  border-color: var(--vf-muted-border);
 }
 .vf-btn-ghost:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--vf-control-hover-bg);
+  color: var(--color-surface-950);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.08);
+}
+.dark .vf-btn-ghost {
+  color: var(--color-surface-300);
+}
+.dark .vf-btn-ghost:hover:not(:disabled) {
   color: white;
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.04);
 }
 
 /* ── Toolbar Divider ──────────────────────────────────────────────────────── */
 .toolbar-divider {
   width: 1px;
   height: 1.25rem;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--vf-toolbar-divider);
   flex-shrink: 0;
   margin: 0 0.375rem;
 }
@@ -288,7 +289,7 @@ body {
 
 /* ── Typography Enhancements ──────────────────────────────────────────────── */
 h1, h2, h3, h4, h5, h6 {
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .text-gradient-volt {

@@ -1,4 +1,4 @@
-// ═══════════════════════════════════════════════════════════════════════════
+﻿// ═══════════════════════════════════════════════════════════════════════════
 // VoltForge — Board Pin Registry
 // Defines exact pin layouts for each board/component type with
 // precise positions matching SVG geometry.
@@ -101,6 +101,39 @@ const CAPACITOR_PINS: PinPosition[] = [
 ];
 
 // LED_STANDARD: SVG viewBox 40×80, leads end at y≈74-80
+const CERAMIC_CAPACITOR_PINS: PinPosition[] = [
+  pin('p1', 'Pin 1', 16, 60, 'bidirectional'),
+  pin('p2', 'Pin 2', 28, 60, 'bidirectional'),
+];
+
+const ELECTROLYTIC_CAPACITOR_PINS: PinPosition[] = [
+  pin('pos', '+', 16, 70, 'power'),
+  pin('neg', '-', 30, 70, 'ground'),
+];
+
+const DIODE_PINS: PinPosition[] = [
+  pin('anode', 'A', 0, 14, 'input'),
+  pin('cathode', 'K', 72, 14, 'output'),
+];
+
+const NPN_TRANSISTOR_PINS: PinPosition[] = [
+  pin('collector', 'C', 14, 70, 'output'),
+  pin('base', 'B', 28, 70, 'input'),
+  pin('emitter', 'E', 42, 70, 'ground'),
+];
+
+const PNP_TRANSISTOR_PINS: PinPosition[] = [
+  pin('emitter', 'E', 14, 70, 'power'),
+  pin('base', 'B', 28, 70, 'input'),
+  pin('collector', 'C', 42, 70, 'output'),
+];
+
+const VOLTAGE_REGULATOR_PINS: PinPosition[] = [
+  pin('vin', 'VIN', 16, 72, 'power'),
+  pin('gnd', 'GND', 32, 72, 'ground'),
+  pin('vout', '5V', 48, 72, 'power'),
+];
+
 const LED_PINS: PinPosition[] = [
   pin('anode', 'Anode (+)', 16, 80, 'input'),
   pin('cathode', 'Cathode (−)', 25, 80, 'input'),
@@ -317,13 +350,34 @@ const IMU_PINS: PinPosition[] = [
   pin('sda', 'SDA', 50, 60, 'bidirectional'),
 ];
 
-// BREADBOARD: SVG viewBox 200×80 — power rails + rows
-const BREADBOARD_PINS: PinPosition[] = [
-  pin('vcc_top', '+', 10, 8, 'power'),
-  pin('gnd_top', '−', 10, 18, 'ground'),
-  pin('vcc_bot', '+', 10, 62, 'power'),
-  pin('gnd_bot', '−', 10, 72, 'ground'),
-];
+// BREADBOARD: SVG viewBox 220x120 - power rails + terminal strips
+const BREADBOARD_PINS: PinPosition[] = (() => {
+  const pins: PinPosition[] = [];
+  const columns = 30;
+  const xFor = (col: number) => 15 + col * 6.55;
+
+  for (let col = 0; col < columns; col++) {
+    const x = xFor(col);
+    pins.push(pin(`vcc_top_${col + 1}`, '+', x, 10, 'power'));
+    pins.push(pin(`gnd_top_${col + 1}`, '-', x, 22, 'ground'));
+    pins.push(pin(`vcc_bottom_${col + 1}`, '+', x, 98, 'power'));
+    pins.push(pin(`gnd_bottom_${col + 1}`, '-', x, 110, 'ground'));
+  }
+
+  ['A', 'B', 'C', 'D', 'E'].forEach((row, rowIndex) => {
+    for (let col = 0; col < columns; col++) {
+      pins.push(pin(`${row.toLowerCase()}${col + 1}`, `${row}${col + 1}`, xFor(col), 40 + rowIndex * 6, 'bidirectional'));
+    }
+  });
+
+  ['F', 'G', 'H', 'I', 'J'].forEach((row, rowIndex) => {
+    for (let col = 0; col < columns; col++) {
+      pins.push(pin(`${row.toLowerCase()}${col + 1}`, `${row}${col + 1}`, xFor(col), 78 + rowIndex * 6, 'bidirectional'));
+    }
+  });
+
+  return pins;
+})();
 
 // MOTOR_STEPPER: SVG viewBox 70×70
 const STEPPER_V2_PINS: PinPosition[] = [
@@ -376,10 +430,18 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
 
   // Passives
   RESISTOR: RESISTOR_PINS,
-  CAPACITOR: CAPACITOR_PINS,
+  CAPACITOR: CERAMIC_CAPACITOR_PINS,
+  CERAMIC_CAPACITOR: CERAMIC_CAPACITOR_PINS,
+  ELECTROLYTIC_CAPACITOR: ELECTROLYTIC_CAPACITOR_PINS,
+  DIODE: DIODE_PINS,
+  NPN_TRANSISTOR: NPN_TRANSISTOR_PINS,
+  PNP_TRANSISTOR: PNP_TRANSISTOR_PINS,
   MULTIMETER: MULTIMETER_PINS,
   IC_555_TIMER: IC_555_PINS,
   IC_74HC595: IC_74HC595_PINS,
+
+  // Power
+  VOLTAGE_REGULATOR_7805: VOLTAGE_REGULATOR_PINS,
 
   // LEDs
   LED_STANDARD: LED_PINS,

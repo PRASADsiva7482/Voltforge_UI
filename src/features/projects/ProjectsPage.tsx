@@ -57,8 +57,8 @@ export default function ProjectsPage() {
         className="flex flex-col md:flex-row md:items-center md:justify-between mb-10 gap-4"
       >
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">{t('My Projects')}</h1>
-          <p className="text-surface-400">{projects.length} {t('projects total')}</p>
+          <h1 className="text-3xl font-bold text-surface-950 mb-2 dark:text-white">{t('My Projects')}</h1>
+          <p className="text-surface-600 dark:text-surface-400">{projects.length} {t('projects total')}</p>
         </div>
         <button
           onClick={() => navigate('/projects/new')}
@@ -83,7 +83,7 @@ export default function ProjectsPage() {
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
             placeholder={t('Filter projects...')}
-            className="w-full pl-11 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-volt-500/50 transition-all"
+            className="w-full pl-11 pr-4 py-2.5 bg-white/80 border border-surface-200 rounded-xl text-sm text-surface-950 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-volt-500/50 transition-all dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-surface-400"
           />
         </div>
       </motion.div>
@@ -93,19 +93,19 @@ export default function ProjectsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (
             <div key={i} className="glass rounded-2xl p-6 animate-pulse">
-              <div className="h-36 bg-surface-800 rounded-xl mb-5" />
-              <div className="h-5 bg-surface-800 rounded w-3/4 mb-3" />
-              <div className="h-4 bg-surface-800 rounded w-1/2" />
+              <div className="h-36 bg-surface-200 rounded-xl mb-5 dark:bg-surface-800" />
+              <div className="h-5 bg-surface-200 rounded w-3/4 mb-3 dark:bg-surface-800" />
+              <div className="h-4 bg-surface-200 rounded w-1/2 dark:bg-surface-800" />
             </div>
           ))}
         </div>
       ) : filteredProjects.length === 0 ? (
-        <div className="glass rounded-2xl p-16 flex flex-col items-center justify-center border border-dashed border-white/10">
+        <div className="glass rounded-2xl p-16 flex flex-col items-center justify-center border border-dashed border-surface-300/70 dark:border-white/10">
           <Cpu className="w-12 h-12 text-surface-600 mb-4" />
-          <h3 className="text-lg font-medium text-white mb-2">
+          <h3 className="text-lg font-medium text-surface-950 mb-2 dark:text-white">
             {searchFilter ? t('No matching projects') : t('No projects yet')}
           </h3>
-          <p className="text-surface-400 mb-6 text-center max-w-sm">
+          <p className="text-surface-600 mb-6 text-center max-w-sm dark:text-surface-400">
             {searchFilter ? 'Try a different filter.' : 'Create your first circuit to get started.'}
           </p>
           {!searchFilter && (
@@ -132,7 +132,7 @@ export default function ProjectsPage() {
               <div className="absolute top-4 right-4 z-10">
                 <button
                   onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === project.id ? null : project.id); }}
-                  className="p-1.5 rounded-lg bg-surface-800/80 text-surface-400 hover:text-white hover:bg-surface-700 opacity-0 group-hover:opacity-100 transition-all"
+                  className="p-1.5 rounded-lg bg-white/80 text-surface-500 hover:text-surface-950 hover:bg-surface-100 opacity-0 group-hover:opacity-100 transition-all dark:bg-surface-800/80 dark:text-surface-400 dark:hover:text-white dark:hover:bg-surface-700"
                 >
                   <MoreVertical className="w-4 h-4" />
                 </button>
@@ -142,7 +142,7 @@ export default function ProjectsPage() {
                       initial={{ opacity: 0, y: -5, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -5, scale: 0.95 }}
-                      className="absolute right-0 mt-1 w-36 glass border border-white/10 rounded-xl shadow-xl overflow-hidden"
+                      className="absolute right-0 mt-1 w-36 glass border border-surface-200 rounded-xl shadow-xl overflow-hidden dark:border-white/10"
                     >
                       <button
                         onClick={(e) => { e.stopPropagation(); if (confirm('Delete this project?')) deleteMutation.mutate(project.id); }}
@@ -162,8 +162,8 @@ export default function ProjectsPage() {
                 </div>
 
                 {/* Info */}
-                <h3 className="text-base font-semibold text-white mb-1 truncate">{project.name}</h3>
-                <p className="text-xs text-surface-400 mb-3 line-clamp-2 min-h-[2.5rem]">{project.description || 'No description'}</p>
+                <h3 className="text-base font-semibold text-surface-950 mb-1 truncate dark:text-white">{project.name}</h3>
+                <p className="text-xs text-surface-600 mb-3 line-clamp-2 min-h-[2.5rem] dark:text-surface-400">{project.description || 'No description'}</p>
 
                 {/* Meta */}
                 <div className="flex items-center gap-4 text-xs text-surface-500">
@@ -174,10 +174,10 @@ export default function ProjectsPage() {
 
                 {/* Badges */}
                 <div className="mt-3 flex items-center gap-1">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-surface-800 text-surface-300 border border-surface-700">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-surface-100 text-surface-700 border border-surface-200 dark:bg-surface-800 dark:text-surface-300 dark:border-surface-700">
                     {project.boardType.replace(/_/g, ' ')}
                   </span>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium ${project.isPublic ? 'bg-volt-500/10 text-volt-400 border border-volt-500/20' : 'bg-surface-800 text-surface-400 border border-surface-700'}`}>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium ${project.isPublic ? 'bg-volt-500/10 text-volt-500 border border-volt-500/20 dark:text-volt-400' : 'bg-surface-100 text-surface-600 border border-surface-200 dark:bg-surface-800 dark:text-surface-400 dark:border-surface-700'}`}>
                     {project.isPublic ? <><Globe className="w-2.5 h-2.5" /> Public</> : <><Lock className="w-2.5 h-2.5" /> Private</>}
                   </span>
                 </div>
@@ -191,12 +191,12 @@ export default function ProjectsPage() {
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2 mt-10">
           <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-            className="px-4 py-2 rounded-lg text-sm font-medium glass glass-hover text-surface-300 disabled:opacity-30 disabled:cursor-not-allowed">
+            className="px-4 py-2 rounded-lg text-sm font-medium glass glass-hover text-surface-700 disabled:opacity-30 disabled:cursor-not-allowed dark:text-surface-300">
             Previous
           </button>
-          <span className="text-sm text-surface-400">Page {page + 1} of {totalPages}</span>
+          <span className="text-sm text-surface-600 dark:text-surface-400">Page {page + 1} of {totalPages}</span>
           <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
-            className="px-4 py-2 rounded-lg text-sm font-medium glass glass-hover text-surface-300 disabled:opacity-30 disabled:cursor-not-allowed">
+            className="px-4 py-2 rounded-lg text-sm font-medium glass glass-hover text-surface-700 disabled:opacity-30 disabled:cursor-not-allowed dark:text-surface-300">
             Next
           </button>
         </div>

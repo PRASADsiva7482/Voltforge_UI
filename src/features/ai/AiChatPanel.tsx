@@ -68,27 +68,27 @@ export default function AiChatPanel({ isOpen, onClose, onApplyCode, projectConte
         const codeMatch = part.match(/```(?:\w+)?\s*\n?([\s\S]*?)```/);
         const code = codeMatch ? codeMatch[1].trim() : part.replace(/```/g, '').trim();
         return (
-          <div key={i} className="my-2 rounded-lg bg-surface-900 border border-white/5 overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-1.5 bg-surface-800/80 border-b border-white/5">
-              <span className="text-[10px] text-surface-400 uppercase font-mono">Code</span>
+          <div key={i} className="my-2 rounded-lg bg-surface-50 border border-surface-200 overflow-hidden dark:bg-surface-900 dark:border-white/5">
+            <div className="flex items-center justify-between px-3 py-1.5 bg-white border-b border-surface-200 dark:bg-surface-800/80 dark:border-white/5">
+              <span className="text-[10px] text-surface-500 uppercase font-mono dark:text-surface-400">Code</span>
               <div className="flex items-center gap-1">
                 {onApplyCode && (
                   <button
                     onClick={() => onApplyCode(code)}
-                    className="flex items-center gap-1 text-[10px] text-volt-400 hover:text-volt-300 px-2 py-0.5 rounded"
+                    className="flex items-center gap-1 text-[10px] text-volt-600 hover:text-volt-500 px-2 py-0.5 rounded dark:text-volt-400 dark:hover:text-volt-300"
                   >
                     <Code2 className="w-3 h-3" /> Apply
                   </button>
                 )}
                 <button
                   onClick={() => copyToClipboard(code, msgIdx * 100 + i)}
-                  className="flex items-center gap-1 text-[10px] text-surface-400 hover:text-white px-2 py-0.5 rounded"
+                  className="flex items-center gap-1 text-[10px] text-surface-500 hover:text-surface-950 px-2 py-0.5 rounded dark:text-surface-400 dark:hover:text-white"
                 >
                   {copiedIdx === msgIdx * 100 + i ? <Check className="w-3 h-3 text-volt-400" /> : <Copy className="w-3 h-3" />}
                 </button>
               </div>
             </div>
-            <pre className="p-3 text-xs text-green-400 font-mono overflow-x-auto whitespace-pre-wrap">{code}</pre>
+            <pre className="p-3 text-xs text-emerald-700 font-mono overflow-x-auto whitespace-pre-wrap dark:text-green-400">{code}</pre>
           </div>
         );
       }
@@ -104,20 +104,20 @@ export default function AiChatPanel({ isOpen, onClose, onApplyCode, projectConte
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: 400, opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="absolute top-0 right-0 bottom-0 w-[380px] glass border-l border-white/10 z-30 flex flex-col"
+          className="absolute top-0 right-0 bottom-0 w-[380px] glass border-l border-surface-200 z-30 flex flex-col dark:border-white/10"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-surface-900/50">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-surface-200/70 bg-surface-50/70 dark:border-white/5 dark:bg-surface-900/50">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-white" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-white">VoltForge AI</h3>
-                <p className="text-[10px] text-surface-400">Powered by Gemma</p>
+                <h3 className="text-sm font-semibold text-surface-950 dark:text-white">VoltForge AI</h3>
+                <p className="text-[10px] text-surface-500 dark:text-surface-400">Powered by Gemma</p>
               </div>
             </div>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 text-surface-400 hover:text-white transition-colors">
+            <button onClick={onClose} className="p-1.5 rounded-lg text-surface-500 hover:bg-surface-100 hover:text-surface-950 transition-colors dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -129,8 +129,8 @@ export default function AiChatPanel({ isOpen, onClose, onApplyCode, projectConte
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center mb-4">
                   <Bot className="w-8 h-8 text-purple-400" />
                 </div>
-                <h3 className="text-sm font-semibold text-white mb-2">VoltForge AI Assistant</h3>
-                <p className="text-xs text-surface-400 mb-6">Ask me about circuits, components, Arduino code, or debugging</p>
+                <h3 className="text-sm font-semibold text-surface-950 mb-2 dark:text-white">VoltForge AI Assistant</h3>
+                <p className="text-xs text-surface-600 mb-6 dark:text-surface-400">Ask me about circuits, components, Arduino code, or debugging</p>
                 <div className="space-y-2 w-full">
                   {[
                     'How do I connect an LED to Arduino?',
@@ -140,7 +140,7 @@ export default function AiChatPanel({ isOpen, onClose, onApplyCode, projectConte
                     <button
                       key={suggestion}
                       onClick={() => { setInput(suggestion); }}
-                      className="w-full text-left px-3 py-2 rounded-lg bg-white/[0.03] border border-white/5 text-xs text-surface-300 hover:bg-white/5 hover:text-white transition-colors"
+                      className="w-full text-left px-3 py-2 rounded-lg bg-white border border-surface-200 text-xs text-surface-700 hover:bg-surface-50 hover:text-surface-950 transition-colors dark:bg-white/[0.03] dark:border-white/5 dark:text-surface-300 dark:hover:bg-white/5 dark:hover:text-white"
                     >
                       {suggestion}
                     </button>
@@ -163,8 +163,8 @@ export default function AiChatPanel({ isOpen, onClose, onApplyCode, projectConte
                 </div>
                 <div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed ${
                   msg.role === 'user'
-                    ? 'bg-volt-500/10 text-surface-200 border border-volt-500/20'
-                    : 'bg-white/[0.03] text-surface-300 border border-white/5'
+                    ? 'bg-volt-500/10 text-surface-800 border border-volt-500/20 dark:text-surface-200'
+                    : 'bg-white text-surface-700 border border-surface-200 dark:bg-white/[0.03] dark:text-surface-300 dark:border-white/5'
                 }`}>
                   {renderMessage(msg.content, idx)}
                 </div>
@@ -176,7 +176,7 @@ export default function AiChatPanel({ isOpen, onClose, onApplyCode, projectConte
                 <div className="w-6 h-6 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
                   <Bot className="w-3 h-3 text-purple-400" />
                 </div>
-                <div className="bg-white/[0.03] border border-white/5 rounded-xl px-3 py-2">
+                <div className="bg-white border border-surface-200 rounded-xl px-3 py-2 dark:bg-white/[0.03] dark:border-white/5">
                   <div className="flex gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '0ms' }} />
                     <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -188,7 +188,7 @@ export default function AiChatPanel({ isOpen, onClose, onApplyCode, projectConte
           </div>
 
           {/* Input */}
-          <div className="p-3 border-t border-white/5 bg-surface-900/50">
+          <div className="p-3 border-t border-surface-200/70 bg-surface-50/70 dark:border-white/5 dark:bg-surface-900/50">
             <div className="flex items-end gap-2">
               <textarea
                 value={input}
@@ -196,7 +196,7 @@ export default function AiChatPanel({ isOpen, onClose, onApplyCode, projectConte
                 onKeyDown={handleKeyDown}
                 placeholder="Ask VoltForge AI..."
                 rows={1}
-                className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-xs text-white placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none max-h-24"
+                className="flex-1 px-3 py-2 bg-white border border-surface-200 rounded-xl text-xs text-surface-950 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none max-h-24 dark:bg-white/5 dark:border-white/10 dark:text-white"
                 style={{ minHeight: '36px' }}
               />
               <button

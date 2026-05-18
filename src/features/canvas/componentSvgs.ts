@@ -239,54 +239,126 @@ export const componentSvgs: Record<string, string> = {
 
   // ── Passives ──
   RESISTOR: svg('0 0 90 24',
-    '<rect x="0" y="10" width="18" height="4" fill="%23a0a0a0"/>' +
-    '<rect x="72" y="10" width="18" height="4" fill="%23a0a0a0"/>' +
-    '<rect x="18" y="2" width="54" height="20" rx="4" fill="%23d4a574"/>' +
-    '<rect x="26" y="2" width="5" height="20" fill="%23a16207"/>' +
-    '<rect x="36" y="2" width="5" height="20" fill="%23000"/>' +
-    '<rect x="46" y="2" width="5" height="20" fill="%23dc2626"/>' +
-    '<rect x="58" y="2" width="3" height="20" fill="%23b8860b"/>'
+    '<defs><linearGradient id="res_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f4d39d"/><stop offset="100%25" stop-color="%23c58a48"/></linearGradient></defs>' +
+    '<rect x="0" y="10.2" width="19" height="3.6" rx="1.8" fill="%2394a3b8"/>' +
+    '<rect x="71" y="10.2" width="19" height="3.6" rx="1.8" fill="%2394a3b8"/>' +
+    '<rect x="18" y="2" width="54" height="20" rx="6" fill="url(%23res_body)" stroke="%2392452e" stroke-width="1"/>' +
+    '<rect x="26" y="3" width="5" height="18" rx="1" fill="%237c2d12"/>' +
+    '<rect x="37" y="3" width="5" height="18" rx="1" fill="%23111827"/>' +
+    '<rect x="48" y="3" width="5" height="18" rx="1" fill="%23dc2626"/>' +
+    '<rect x="60" y="3" width="3" height="18" rx="1" fill="%23d97706"/>'
   ),
-  CAPACITOR: svg('0 0 40 50',
-    '<rect x="17" y="0" width="6" height="16" fill="%23a0a0a0"/>' +
-    '<rect x="17" y="34" width="6" height="16" fill="%23a0a0a0"/>' +
-    '<rect x="6" y="16" width="28" height="6" fill="%230369a1"/>' +
-    '<rect x="6" y="28" width="28" height="6" fill="%230369a1"/>'
+  CERAMIC_CAPACITOR: svg('0 0 44 60',
+    '<defs><linearGradient id="cer_cap" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23fde68a"/><stop offset="100%25" stop-color="%23d97706"/></linearGradient></defs>' +
+    '<rect x="15" y="38" width="3" height="22" rx="1.5" fill="%2394a3b8"/>' +
+    '<rect x="27" y="38" width="3" height="22" rx="1.5" fill="%2394a3b8"/>' +
+    '<path d="M11 7 Q22 -1 33 7 Q39 16 37 31 Q34 43 22 44 Q10 43 7 31 Q5 16 11 7Z" fill="url(%23cer_cap)" stroke="%2392452e" stroke-width="1.2"/>' +
+    '<path d="M14 16h16M13 23h18M14 30h16" stroke="%23fef3c7" stroke-width="1.4" opacity="0.7"/>' +
+    '<text x="22" y="37" font-size="7" fill="%237c2d12" text-anchor="middle" font-family="Arial" font-weight="bold">104</text>'
+  ),
+  CAPACITOR: svg('0 0 44 60',
+    '<defs><linearGradient id="cap_alias" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23fde68a"/><stop offset="100%25" stop-color="%23d97706"/></linearGradient></defs>' +
+    '<rect x="15" y="38" width="3" height="22" rx="1.5" fill="%2394a3b8"/>' +
+    '<rect x="27" y="38" width="3" height="22" rx="1.5" fill="%2394a3b8"/>' +
+    '<path d="M11 7 Q22 -1 33 7 Q39 16 37 31 Q34 43 22 44 Q10 43 7 31 Q5 16 11 7Z" fill="url(%23cap_alias)" stroke="%2392452e" stroke-width="1.2"/>' +
+    '<text x="22" y="37" font-size="7" fill="%237c2d12" text-anchor="middle" font-family="Arial" font-weight="bold">104</text>'
+  ),
+  ELECTROLYTIC_CAPACITOR: svg('0 0 46 70',
+    '<defs><linearGradient id="elyt" x1="0" y1="0" x2="1" y2="1"><stop offset="0%25" stop-color="%23334155"/><stop offset="55%25" stop-color="%231e293b"/><stop offset="100%25" stop-color="%230f172a"/></linearGradient></defs>' +
+    '<rect x="14" y="49" width="3.5" height="21" rx="1.5" fill="%2394a3b8"/>' +
+    '<rect x="28.5" y="49" width="3.5" height="21" rx="1.5" fill="%2394a3b8"/>' +
+    '<rect x="8" y="5" width="30" height="48" rx="8" fill="url(%23elyt)" stroke="%23475569" stroke-width="1.4"/>' +
+    '<rect x="28" y="8" width="6" height="42" rx="2" fill="%23e5e7eb" opacity="0.86"/>' +
+    '<path d="M30 15h3M30 24h3M30 33h3M30 42h3" stroke="%230f172a" stroke-width="1"/>' +
+    '<text x="17" y="26" font-size="7" fill="%23cbd5e1" text-anchor="middle" font-family="Arial" font-weight="bold">10uF</text>' +
+    '<text x="16" y="40" font-size="8" fill="%23f8fafc" text-anchor="middle" font-family="Arial" font-weight="bold">+</text>'
+  ),
+  DIODE: svg('0 0 72 28',
+    '<rect x="0" y="12" width="20" height="4" rx="2" fill="%2394a3b8"/>' +
+    '<rect x="52" y="12" width="20" height="4" rx="2" fill="%2394a3b8"/>' +
+    '<rect x="20" y="6" width="32" height="16" rx="4" fill="%23111827" stroke="%23475569" stroke-width="1.2"/>' +
+    '<path d="M30 8v12" stroke="%23e5e7eb" stroke-width="2"/>' +
+    '<rect x="43" y="6" width="3" height="16" fill="%23e5e7eb"/>' +
+    '<text x="36" y="18" font-size="6" fill="%2394a3b8" text-anchor="middle" font-family="Arial">1N4148</text>'
+  ),
+  NPN_TRANSISTOR: svg('0 0 56 70',
+    '<rect x="12" y="6" width="32" height="42" rx="15" fill="%23111827" stroke="%23475569" stroke-width="1.3"/>' +
+    '<path d="M18 48v22M28 48v22M38 48v22" stroke="%2394a3b8" stroke-width="3" stroke-linecap="round"/>' +
+    '<path d="M20 28h16M28 18v22M29 38l8 7" stroke="%23cbd5e1" stroke-width="1.6" stroke-linecap="round"/>' +
+    '<path d="M37 45l-1-6l-5 3Z" fill="%23cbd5e1"/>' +
+    '<text x="28" y="15" font-size="7" fill="%23e5e7eb" text-anchor="middle" font-family="Arial" font-weight="bold">NPN</text>'
+  ),
+  PNP_TRANSISTOR: svg('0 0 56 70',
+    '<rect x="12" y="6" width="32" height="42" rx="15" fill="%23111827" stroke="%23475569" stroke-width="1.3"/>' +
+    '<path d="M18 48v22M28 48v22M38 48v22" stroke="%2394a3b8" stroke-width="3" stroke-linecap="round"/>' +
+    '<path d="M20 28h16M28 18v22M36 39l-8-7" stroke="%23cbd5e1" stroke-width="1.6" stroke-linecap="round"/>' +
+    '<path d="M28 32l6 1l-3 5Z" fill="%23cbd5e1"/>' +
+    '<text x="28" y="15" font-size="7" fill="%23e5e7eb" text-anchor="middle" font-family="Arial" font-weight="bold">PNP</text>'
+  ),
+  VOLTAGE_REGULATOR_7805: svg('0 0 64 72',
+    '<defs><linearGradient id="reg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23475569"/><stop offset="100%25" stop-color="%23111827"/></linearGradient></defs>' +
+    '<rect x="18" y="3" width="28" height="14" rx="3" fill="%2394a3b8" stroke="%2364748b" stroke-width="1"/>' +
+    '<circle cx="32" cy="10" r="3" fill="%23e5e7eb"/>' +
+    '<rect x="10" y="14" width="44" height="38" rx="5" fill="url(%23reg)" stroke="%23475569" stroke-width="1.4"/>' +
+    '<text x="32" y="31" font-size="9" fill="%23f8fafc" text-anchor="middle" font-family="Arial" font-weight="bold">7805</text>' +
+    '<text x="32" y="43" font-size="6" fill="%23cbd5e1" text-anchor="middle" font-family="Arial">5V REG</text>' +
+    '<path d="M16 52v20M32 52v20M48 52v20" stroke="%2394a3b8" stroke-width="4" stroke-linecap="round"/>'
   ),
   POTENTIOMETER: svg('0 0 50 50',
-    '<circle cx="25" cy="25" r="20" fill="%230369a1"/>' +
-    '<circle cx="25" cy="25" r="14" fill="%231e40af"/>' +
-    '<line x1="25" y1="25" x2="25" y2="8" stroke="white" stroke-width="2"/>' +
-    '<circle cx="25" cy="25" r="4" fill="%23c0c0c0"/>' +
-    '<rect x="6" y="44" width="4" height="6" fill="%23a0a0a0"/>' +
-    '<rect x="22" y="44" width="4" height="6" fill="%23a0a0a0"/>' +
-    '<rect x="40" y="44" width="4" height="6" fill="%23a0a0a0"/>'
+    '<defs><radialGradient id="pot"><stop offset="0%25" stop-color="%23e0f2fe"/><stop offset="70%25" stop-color="%230ea5e9"/><stop offset="100%25" stop-color="%230c4a6e"/></radialGradient></defs>' +
+    '<circle cx="25" cy="25" r="20" fill="url(%23pot)" stroke="%230f172a" stroke-width="1"/>' +
+    '<circle cx="25" cy="25" r="13" fill="%231e293b" opacity="0.82"/>' +
+    '<line x1="25" y1="25" x2="25" y2="8" stroke="%23f8fafc" stroke-width="2.2" stroke-linecap="round"/>' +
+    '<circle cx="25" cy="25" r="4" fill="%23cbd5e1"/>' +
+    '<rect x="6" y="44" width="4" height="6" fill="%2394a3b8"/>' +
+    '<rect x="22" y="44" width="4" height="6" fill="%2394a3b8"/>' +
+    '<rect x="40" y="44" width="4" height="6" fill="%2394a3b8"/>'
+  ),
+  PUSH_BUTTON: svg('0 0 40 40',
+    '<rect x="4" y="8" width="32" height="24" rx="5" fill="%23e5e7eb" stroke="%2394a3b8" stroke-width="1.2"/>' +
+    '<circle cx="20" cy="20" r="9" fill="%23ef4444" stroke="%23991b1b" stroke-width="1.2"/>' +
+    '<circle cx="20" cy="18" r="4" fill="%23fecaca" opacity="0.6"/>' +
+    '<rect x="0" y="9" width="5" height="5" fill="%2394a3b8"/>' +
+    '<rect x="35" y="9" width="5" height="5" fill="%2394a3b8"/>' +
+    '<rect x="0" y="26" width="5" height="5" fill="%2394a3b8"/>' +
+    '<rect x="35" y="26" width="5" height="5" fill="%2394a3b8"/>'
   ),
   BUTTON: svg('0 0 40 40',
-    '<rect width="40" height="40" rx="4" fill="%23374151"/>' +
-    '<circle cx="20" cy="20" r="10" fill="%23ef4444"/>' +
-    '<circle cx="20" cy="20" r="8" fill="%23dc2626"/>' +
-    '<rect x="0" y="8" width="4" height="6" fill="%23a0a0a0"/>' +
-    '<rect x="36" y="8" width="4" height="6" fill="%23a0a0a0"/>' +
-    '<rect x="0" y="26" width="4" height="6" fill="%23a0a0a0"/>' +
-    '<rect x="36" y="26" width="4" height="6" fill="%23a0a0a0"/>'
+    '<rect x="4" y="8" width="32" height="24" rx="5" fill="%23e5e7eb" stroke="%2394a3b8" stroke-width="1.2"/>' +
+    '<circle cx="20" cy="20" r="9" fill="%23ef4444" stroke="%23991b1b" stroke-width="1.2"/>' +
+    '<circle cx="20" cy="18" r="4" fill="%23fecaca" opacity="0.6"/>' +
+    '<rect x="0" y="9" width="5" height="5" fill="%2394a3b8"/>' +
+    '<rect x="35" y="9" width="5" height="5" fill="%2394a3b8"/>' +
+    '<rect x="0" y="26" width="5" height="5" fill="%2394a3b8"/>' +
+    '<rect x="35" y="26" width="5" height="5" fill="%2394a3b8"/>'
   ),
-  BREADBOARD: svg('0 0 200 80',
-    '<rect width="200" height="80" rx="4" fill="%23f5f0e0"/>' +
-    '<rect x="4" y="4" width="192" height="8" fill="%23dc2626" opacity="0.3"/>' +
-    '<rect x="4" y="14" width="192" height="8" fill="%230369a1" opacity="0.3"/>' +
-    '<rect x="4" y="58" width="192" height="8" fill="%23dc2626" opacity="0.3"/>' +
-    '<rect x="4" y="68" width="192" height="8" fill="%230369a1" opacity="0.3"/>' +
-    '<rect x="4" y="28" width="192" height="24" fill="%23e2e0d4"/>' +
-    '<line x1="4" y1="40" x2="196" y2="40" stroke="%23d0cec0" stroke-width="2"/>'
+  BREADBOARD: svg('0 0 220 120',
+    '<rect x="2" y="2" width="216" height="116" rx="6" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="2"/>' +
+    '<rect x="8" y="7" width="204" height="8" rx="2" fill="%23fee2e2"/>' +
+    '<rect x="8" y="19" width="204" height="8" rx="2" fill="%23dbeafe"/>' +
+    '<rect x="8" y="93" width="204" height="8" rx="2" fill="%23fee2e2"/>' +
+    '<rect x="8" y="105" width="204" height="8" rx="2" fill="%23dbeafe"/>' +
+    '<rect x="8" y="34" width="204" height="30" rx="3" fill="%23eef2f7"/>' +
+    '<rect x="8" y="72" width="204" height="30" rx="3" fill="%23eef2f7"/>' +
+    '<rect x="8" y="65" width="204" height="5" rx="2" fill="%23cbd5e1" opacity="0.8"/>' +
+    '<path d="M14 11h192M14 23h192M14 97h192M14 109h192" stroke="%23ffffff" stroke-width="1" opacity="0.7"/>' +
+    '<g fill="%2394a3b8" opacity="0.78">' +
+    Array.from({ length: 30 }, (_, i) => {
+      const x = 15 + i * 6.55;
+      return `<circle cx="${x.toFixed(2)}" cy="10" r="1.3"/><circle cx="${x.toFixed(2)}" cy="22" r="1.3"/><circle cx="${x.toFixed(2)}" cy="40" r="1.3"/><circle cx="${x.toFixed(2)}" cy="46" r="1.3"/><circle cx="${x.toFixed(2)}" cy="52" r="1.3"/><circle cx="${x.toFixed(2)}" cy="58" r="1.3"/><circle cx="${x.toFixed(2)}" cy="64" r="1.3"/><circle cx="${x.toFixed(2)}" cy="78" r="1.3"/><circle cx="${x.toFixed(2)}" cy="84" r="1.3"/><circle cx="${x.toFixed(2)}" cy="90" r="1.3"/><circle cx="${x.toFixed(2)}" cy="96" r="1.3"/><circle cx="${x.toFixed(2)}" cy="102" r="1.3"/><circle cx="${x.toFixed(2)}" cy="98" r="1.3"/><circle cx="${x.toFixed(2)}" cy="110" r="1.3"/>`;
+    }).join('') +
+    '</g>' +
+    '<text x="110" y="69" font-size="7" fill="%2364748b" text-anchor="middle" font-family="Arial" font-weight="bold">HALF-SIZE BREADBOARD</text>'
   ),
   BUZZER: svg('0 0 50 50',
-    '<circle cx="25" cy="25" r="22" fill="%231f2937"/>' +
-    '<circle cx="25" cy="25" r="16" fill="%23111827"/>' +
-    '<circle cx="25" cy="25" r="6" fill="%23374151"/>' +
-    '<text x="25" y="8" font-size="5" fill="%239ca3af" text-anchor="middle" font-family="Arial">+</text>' +
-    '<rect x="18" y="46" width="4" height="4" fill="%23a0a0a0"/>' +
-    '<rect x="28" y="46" width="4" height="4" fill="%23a0a0a0"/>'
+    '<defs><radialGradient id="buzz"><stop offset="0%25" stop-color="%23475569"/><stop offset="78%25" stop-color="%231e293b"/><stop offset="100%25" stop-color="%230f172a"/></radialGradient></defs>' +
+    '<circle cx="25" cy="25" r="22" fill="url(%23buzz)" stroke="%23475569" stroke-width="1.4"/>' +
+    '<circle cx="25" cy="25" r="15" fill="%230f172a" stroke="%23334155" stroke-width="1"/>' +
+    '<circle cx="25" cy="25" r="5" fill="%23334155"/>' +
+    '<text x="25" y="10" font-size="8" fill="%23e5e7eb" text-anchor="middle" font-family="Arial" font-weight="bold">+</text>' +
+    '<path d="M34 16q8 9 0 18M39 12q12 13 0 26" stroke="%2394a3b8" stroke-width="1.3" fill="none" opacity="0.65"/>' +
+    '<rect x="18" y="46" width="4" height="4" fill="%2394a3b8"/>' +
+    '<rect x="28" y="46" width="4" height="4" fill="%2394a3b8"/>'
   ),
   MULTIMETER: svg('0 0 90 70',
     '<rect x="4" y="2" width="82" height="66" rx="8" fill="%23f59e0b" stroke="%23b45309" stroke-width="2"/>' +
@@ -403,7 +475,12 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
 
   // Passives (match SVG viewBox)
   RESISTOR: { w: 90, h: 24 },
-  CAPACITOR: { w: 40, h: 50 },
+  CAPACITOR: { w: 44, h: 60 },
+  CERAMIC_CAPACITOR: { w: 44, h: 60 },
+  ELECTROLYTIC_CAPACITOR: { w: 46, h: 70 },
+  DIODE: { w: 72, h: 28 },
+  NPN_TRANSISTOR: { w: 56, h: 70 },
+  PNP_TRANSISTOR: { w: 56, h: 70 },
   POTENTIOMETER: { w: 50, h: 50 },
   MULTIMETER: { w: 90, h: 70 },
   IC_555_TIMER: { w: 90, h: 50 },
@@ -460,5 +537,6 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
   RC_RECEIVER: { w: 80, h: 60 },
 
   // Other
-  BREADBOARD: { w: 200, h: 80 },
+  BREADBOARD: { w: 220, h: 120 },
+  VOLTAGE_REGULATOR_7805: { w: 64, h: 72 },
 };
