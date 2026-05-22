@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Mail, Shield, CreditCard, Save, Check } from 'lucide-react';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { userApi, subscriptionApi } from '../../api/services';
+import { User, Mail, Shield, Save, Check, Calendar } from 'lucide-react';
+import { useMutation } from '@tanstack/react-query';
+import { userApi } from '../../api/services';
 import { useAuthStore } from '../../store/authStore';
 import { useTranslation } from 'react-i18next';
 
@@ -14,14 +14,6 @@ export default function SettingsPage() {
   const [bio, setBio] = useState(user?.bio || '');
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || '');
   const [saved, setSaved] = useState(false);
-
-  const { data: subscriptionData } = useQuery({
-    queryKey: ['subscription'],
-    queryFn: async () => {
-      const res = await subscriptionApi.getCurrent();
-      return res.data.data;
-    },
-  });
 
   useEffect(() => {
     if (user) {
@@ -39,12 +31,6 @@ export default function SettingsPage() {
       setTimeout(() => setSaved(false), 2000);
     },
   });
-
-  const planColors: Record<string, string> = {
-    FREE: 'from-surface-600 to-surface-500',
-    PRO: 'from-volt-500 to-forge-500',
-    TEAM: 'from-purple-500 to-pink-500',
-  };
 
   return (
     <div className="p-8 max-w-4xl mx-auto pt-8 pb-20">
@@ -79,9 +65,6 @@ export default function SettingsPage() {
             <h3 className="text-lg font-semibold text-surface-950 dark:text-white">{displayName || user?.username}</h3>
             <p className="text-sm text-surface-600 dark:text-surface-400">{user?.email}</p>
             <div className="flex items-center gap-2 mt-1">
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-gradient-to-r ${planColors[user?.subscriptionType || 'FREE']} text-white`}>
-                {user?.subscriptionType || 'FREE'}
-              </span>
               <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-surface-100 text-surface-700 border border-surface-200 dark:bg-surface-800 dark:text-surface-300 dark:border-surface-700">
                 {user?.role}
               </span>
@@ -170,50 +153,11 @@ export default function SettingsPage() {
           </div>
           <div className="flex items-center justify-between py-3">
             <div className="flex items-center gap-3">
-              <CreditCard className="w-4 h-4 text-surface-400" />
+              <Calendar className="w-4 h-4 text-surface-400" />
               <span className="text-sm text-surface-700 dark:text-surface-300">Member since</span>
             </div>
             <span className="text-sm text-surface-950 dark:text-white">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</span>
           </div>
-        </div>
-      </motion.div>
-
-      {/* Subscription Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="glass rounded-2xl p-8"
-      >
-        <div className="flex items-center gap-3 mb-6">
-          <CreditCard className="w-5 h-5 text-purple-400" />
-          <h2 className="text-lg font-semibold text-surface-950 dark:text-white">{t('Subscription')}</h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {(['FREE', 'PRO', 'TEAM'] as const).map((plan) => {
-            const isActive = (user?.subscriptionType || 'FREE') === plan;
-            const features: Record<string, string[]> = {
-              FREE: ['5 projects', 'Basic components', 'Community access'],
-              PRO: ['Unlimited projects', 'All components', 'AI Assistant', 'Priority support'],
-              TEAM: ['Everything in PRO', 'Team collaboration', 'Private sharing', 'Admin dashboard'],
-            };
-            return (
-              <div key={plan} className={`p-7 rounded-xl border transition-all ${isActive ? 'border-volt-500/40 bg-volt-500/5 shadow-[0_0_15px_rgba(34,197,94,0.1)]' : 'border-surface-200 bg-white/50 dark:border-white/5 dark:bg-white/[0.02]'}`}>
-                <div className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-gradient-to-r ${planColors[plan]} text-white mb-3`}>
-                  {plan}
-                </div>
-                {isActive && <span className="ml-2 text-xs text-volt-400">Current</span>}
-                <ul className="space-y-2 mt-3">
-                  {features[plan].map((f) => (
-                    <li key={f} className="text-xs text-surface-600 flex items-center gap-2 dark:text-surface-400">
-                      <Check className="w-3 h-3 text-volt-500 flex-shrink-0" /> {f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
         </div>
       </motion.div>
     </div>

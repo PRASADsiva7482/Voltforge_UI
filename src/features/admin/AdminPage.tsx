@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Users, FolderOpen, CreditCard, TrendingUp, UserPlus, Activity, BarChart3, Shield } from 'lucide-react';
+import { Users, FolderOpen, TrendingUp, UserPlus, Activity, BarChart3, Shield } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '../../api/services';
 import { useTranslation } from 'react-i18next';
@@ -84,42 +84,14 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Subscription Breakdown */}
+      {/* Distribution Section */}
       {stats && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-6"
+          className="max-w-2xl mx-auto"
         >
-          {/* Subscription Distribution */}
-          <div className="glass rounded-2xl p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <CreditCard className="w-5 h-5 text-purple-400" />
-              <h2 className="text-lg font-semibold text-surface-950 dark:text-white">Subscription Plans</h2>
-            </div>
-            <div className="space-y-4">
-              {Object.entries(stats.subscriptionBreakdown || {}).map(([plan, count]) => {
-                const total = Object.values(stats.subscriptionBreakdown || {}).reduce((a, b) => a + b, 0);
-                const percentage = total > 0 ? (count / total) * 100 : 0;
-                const planColors: Record<string, string> = {
-                  FREE: 'bg-surface-500', PRO: 'bg-volt-500', TEAM: 'bg-purple-500',
-                };
-                return (
-                  <div key={plan}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-surface-700 dark:text-surface-300">{plan}</span>
-                      <span className="text-surface-600 dark:text-surface-400">{count} ({percentage.toFixed(1)}%)</span>
-                    </div>
-                    <div className="h-2 bg-surface-200 rounded-full overflow-hidden dark:bg-surface-800">
-                      <div className={`h-full ${planColors[plan] || 'bg-blue-500'} rounded-full transition-all duration-500`} style={{ width: `${percentage}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Role Distribution */}
           <div className="glass rounded-2xl p-6">
             <div className="flex items-center gap-3 mb-6">

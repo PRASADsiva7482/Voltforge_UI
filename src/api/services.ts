@@ -6,7 +6,6 @@ import type {
   Project,
   ProjectSummary,
   ElectronicComponent,
-  Subscription,
   DashboardStats,
   CreateProjectRequest,
   UpdateProjectRequest,
@@ -63,13 +62,6 @@ export const componentApi = {
   createCustom: (data: CustomComponentRequest) =>
     api.post<ApiResponse<ElectronicComponent>>('/components/custom', data),
   getCommunity: () => api.get<ApiResponse<ElectronicComponent[]>>('/components/community'),
-};
-
-// ── Subscription APIs ─────────────────────────────────────────────────────
-export const subscriptionApi = {
-  getCurrent: () => api.get<ApiResponse<Subscription>>('/subscriptions/current'),
-  upgrade: (planType: string, paymentRef?: string) =>
-    api.post<ApiResponse<Subscription>>('/subscriptions/upgrade', { planType, paymentRef }),
 };
 
 // ── AI APIs ───────────────────────────────────────────────────────────────

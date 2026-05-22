@@ -3,7 +3,6 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 export type UserRole = 'USER' | 'ADMIN';
-export type SubscriptionType = 'FREE' | 'PRO' | 'TEAM';
 export type AccountStatus = 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
 export type BoardType = 'ARDUINO_UNO' | 'ARDUINO_MEGA' | 'ARDUINO_NANO' | 'ESP32' | 'ESP32_S3' | 'ESP8266';
 export type ComponentCategory = 'BOARD' | 'LED' | 'SENSOR' | 'DISPLAY' | 'RELAY' | 'MOTOR' | 'PASSIVE' | 'COMMUNICATION' | 'POWER';
@@ -36,7 +35,6 @@ export interface User {
   avatarUrl?: string;
   bio?: string;
   role: UserRole;
-  subscriptionType: SubscriptionType;
   accountStatus: AccountStatus;
   createdAt: string;
   updatedAt: string;
@@ -113,16 +111,6 @@ export interface CustomComponentRequest {
   publishToCommunity?: boolean;
 }
 
-export interface Subscription {
-  id: string;
-  userId: string;
-  planType: SubscriptionType;
-  status: string;
-  startsAt?: string;
-  expiresAt?: string;
-  createdAt: string;
-}
-
 export interface DashboardStats {
   totalUsers: number;
   activeUsers: number;
@@ -130,7 +118,6 @@ export interface DashboardStats {
   totalProjects: number;
   publicProjects: number;
   newProjectsToday: number;
-  subscriptionBreakdown: Record<string, number>;
   roleBreakdown: Record<string, number>;
 }
 
