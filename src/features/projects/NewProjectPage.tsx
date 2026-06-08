@@ -5,9 +5,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { projectApi } from '../../api/services';
 import { useTranslation } from 'react-i18next';
+import { useToastStore } from '../../store/useToastStore';
+import { generateDefaultCode } from '../../utils/codeTemplates';
 import type { BoardType, CreateProjectRequest } from '../../types';
 
-const boards: { type: BoardType; name: string; description: string; icon: any; gradient: string }[] = [
+const MAX_NAME_LENGTH = 50;
+const MAX_DESCRIPTION_LENGTH = 500;
+
+const boards: { type: BoardType; name: string; description: string; icon: typeof Cpu; gradient: string }[] = [
   { type: 'ARDUINO_UNO', name: 'Arduino Uno', description: 'Classic 8-bit ATmega328P board — great for beginners', icon: Cpu, gradient: 'from-blue-500 to-cyan-500' },
   { type: 'ARDUINO_MEGA', name: 'Arduino Mega', description: '54 digital pins, 16 analog — for complex projects', icon: Cpu, gradient: 'from-indigo-500 to-blue-500' },
   { type: 'ARDUINO_NANO', name: 'Arduino Nano', description: 'Compact breadboard-friendly board', icon: Cpu, gradient: 'from-sky-500 to-blue-400' },
@@ -16,11 +21,22 @@ const boards: { type: BoardType; name: string; description: string; icon: any; g
   { type: 'ESP8266', name: 'ESP8266', description: 'Budget WiFi-enabled microcontroller', icon: Wifi, gradient: 'from-green-500 to-lime-500' },
 ];
 
+/** Parse comma-separated tags: trims whitespace and removes empty entries. */
+function parseTags(raw: string): string | undefined {
+  const parsed = raw
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .join(',');
+  return parsed || undefined;
+}
+
 export default function NewProjectPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isAi = searchParams.get('ai') === 'true';
+  const addToast = useToastStore((s) => s.addToast);
 
   const [step, setStep] = useState(1);
   const [selectedBoard, setSelectedBoard] = useState<BoardType | null>(null);
@@ -35,6 +51,13 @@ export default function NewProjectPage() {
       const project = res.data.data;
       navigate(`/editor/${project.id}${isAi ? '?ai=true' : ''}`);
     },
+    onError: (error: Error) => {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        error.message ||
+        'Failed to create project. Please try again.';
+      addToast(message, 'error');
+    },
   });
 
   const handleCreate = () => {
@@ -44,21 +67,32 @@ export default function NewProjectPage() {
       description: description.trim() || undefined,
       boardType: selectedBoard,
       isPublic,
-      tags: tags.trim() || undefined,
-      codeFiles: [{
-        filename: 'main.ino',
-        content: `// ${name}\n// Board: ${selectedBoard.replace(/_/g, ' ')}\n\nvoid setup() {\n  Serial.begin(9600);\n  Serial.println("VoltForge — ${name}");\n}\n\nvoid loop() {\n  // Your code here\n  delay(1000);\n}\n`,
-        language: 'cpp',
-        sortOrder: 0,
-      }],
+      tags: parseTags(tags),
+      codeFiles: [
+        {
+          filename: 'main.ino',
+          content: generateDefaultCode(selectedBoard, name.trim()),
+          language: 'cpp',
+          sortOrder: 0,
+        },
+      ],
     });
+  };
+
+  /** Navigate back safely — falls back to /projects if there is no browser history. */
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/projects');
+    }
   };
 
   return (
     <div className="p-8 max-w-3xl mx-auto pt-8 pb-20">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-10">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-surface-600 hover:text-surface-950 transition-colors mb-6 text-sm dark:text-surface-400 dark:hover:text-white">
+        <button onClick={handleBack} className="flex items-center gap-2 text-surface-600 hover:text-surface-950 transition-colors mb-6 text-sm dark:text-surface-400 dark:hover:text-white">
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
         <div className="flex items-center gap-3">
@@ -126,31 +160,39 @@ export default function NewProjectPage() {
 
           <div className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-surface-700 mb-2 dark:text-surface-300">Project Name *</label>
+              <label htmlFor="project-name" className="block text-sm font-medium text-surface-700 mb-2 dark:text-surface-300">Project Name *</label>
               <input
+                id="project-name"
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => setName(e.target.value.slice(0, MAX_NAME_LENGTH))}
+                maxLength={MAX_NAME_LENGTH}
                 placeholder="e.g., Smart Home Controller"
                 className="w-full px-4 py-3 bg-white/80 border border-surface-200 rounded-xl text-sm text-surface-950 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-volt-500/50 transition-all dark:bg-white/5 dark:border-white/10 dark:text-white"
+                aria-required="true"
                 autoFocus
               />
+              <p className="text-xs text-surface-400 mt-1 text-right">{name.length}/{MAX_NAME_LENGTH}</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-surface-700 mb-2 dark:text-surface-300">Description</label>
+              <label htmlFor="project-description" className="block text-sm font-medium text-surface-700 mb-2 dark:text-surface-300">Description</label>
               <textarea
+                id="project-description"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => setDescription(e.target.value.slice(0, MAX_DESCRIPTION_LENGTH))}
+                maxLength={MAX_DESCRIPTION_LENGTH}
                 placeholder="Describe your circuit project..."
                 rows={3}
                 className="w-full px-4 py-3 bg-white/80 border border-surface-200 rounded-xl text-sm text-surface-950 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-volt-500/50 transition-all resize-none dark:bg-white/5 dark:border-white/10 dark:text-white"
               />
+              <p className="text-xs text-surface-400 mt-1 text-right">{description.length}/{MAX_DESCRIPTION_LENGTH}</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-surface-700 mb-2 dark:text-surface-300">Tags</label>
+              <label htmlFor="project-tags" className="block text-sm font-medium text-surface-700 mb-2 dark:text-surface-300">Tags</label>
               <input
+                id="project-tags"
                 type="text"
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
@@ -162,6 +204,8 @@ export default function NewProjectPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsPublic(!isPublic)}
+                role="switch"
+                aria-checked={isPublic}
                 className={`w-10 h-6 rounded-full transition-colors relative ${isPublic ? 'bg-volt-500' : 'bg-surface-300 dark:bg-surface-700'}`}
               >
                 <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all ${isPublic ? 'left-4.5' : 'left-0.5'}`} />

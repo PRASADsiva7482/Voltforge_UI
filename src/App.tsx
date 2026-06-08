@@ -6,6 +6,7 @@ import { useAuthStore } from './store/authStore';
 import { useThemeStore } from './store/themeStore';
 import { authApi } from './api/services';
 import AppLayout from './components/layout/AppLayout';
+import ToastContainer from './components/layout/ToastContainer';
 import DashboardPage from './features/dashboard/DashboardPage';
 import EditorPage from './features/editor/EditorPage';
 import ExplorePage from './features/explore/ExplorePage';
@@ -85,6 +86,7 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <ToastContainer />
       <BrowserRouter>
         <AuthGate>
           <Routes>
