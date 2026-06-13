@@ -1,10 +1,15 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// VoltForge — Simulation Engine (Code-Driven Logic Interpreter)
+// VoltForge — Simulation Engine (Code-Driven Logic Interpreter + MNA Solver)
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { CanvasNode, Wire } from '../../types';
 import { useCanvasStore } from '../../store/canvasStore';
+import { useSimulationStore } from '../../store/simulationStore';
 import { CPU, avrInstruction, AVRIOPort, AVRUSART, AVRTimer, portBConfig, portCConfig, portDConfig, timer0Config, timer1Config, timer2Config, usart0Config, PinState as AvrPinState } from 'avr8js';
+import { buildMNACircuit } from './NetlistBuilder';
+import type { MNACircuit } from './NetlistBuilder';
+import type { WorkerInMessage, WorkerResultMessage, WorkerOscilloscopeMessage } from './SimulationWorker';
+import { LogicRegistry } from './logic/LogicRegistry';
 
 export type PinState = 'HIGH' | 'LOW' | 'INPUT' | 'OUTPUT' | 'PWM';
 
@@ -62,6 +67,13 @@ export class SimulationEngine {
   // ── ESC / BLDC Motor state ──
   private escNodes: CanvasNode[] = [];   // ESC modules on canvas
   private bldcNodes: CanvasNode[] = [];  // BLDC motors on canvas
+  private dcMotorNodes: CanvasNode[] = [];  // DC motors on canvas
+  private stepperNodes: CanvasNode[] = [];  // Stepper motors on canvas
+
+  // ── MNA Solver Integration ──
+  private solverWorker: Worker | null = null;
+  private mnaCircuit: MNACircuit | null = null;
+  private mcuPinVoltages: Record<string, number> = {};  // pin number → voltage
 
   constructor(callbacks: SimulationCallbacks) {
     this.callbacks = callbacks;
@@ -94,11 +106,17 @@ export class SimulationEngine {
     // Find ESC and BLDC motor nodes
     this.escNodes = nodes.filter(n => n.type === 'ESC_MODULE');
     this.bldcNodes = nodes.filter(n => n.type === 'MOTOR_BLDC');
+    this.dcMotorNodes = nodes.filter(n => n.type === 'MOTOR_DC');
+    this.stepperNodes = nodes.filter(n => n.type === 'MOTOR_STEPPER' || n.type === 'STEPPER_MOTOR');
+
+    // Reset MNA state
+    this.mcuPinVoltages = {};
 
     try {
       if (hex?.trim()) {
         this.callbacks.onSerialOutput('> Starting AVR8js ATmega328P emulator...');
         this.parseCode(code);
+        this.startMNASolver(nodes, wires);
         this.startAvr(hex, nodes, wires);
         return;
       }
@@ -110,8 +128,12 @@ export class SimulationEngine {
 
       this.callbacks.onSerialOutput('> Compiled firmware not available; falling back to code-compatibility interpreter');
       await new Promise(resolve => setTimeout(resolve, 300));
+      this.callbacks.onSerialOutput('> Physics-based MNA solver active');
       this.callbacks.onSerialOutput('> Compatibility CPU Started');
       this.callbacks.onSerialOutput('────────────────────────────────');
+
+      // Start MNA solver in WebWorker
+      this.startMNASolver(nodes, wires);
 
       // Execute setup()
       this.executeBlock(this.setupStatements, nodes, wires, true);
@@ -134,6 +156,7 @@ export class SimulationEngine {
         this.executeBlock(this.loopStatements, nodes, wires, false);
         this.updateDiagnosticProbes(nodes, wires);
         this.updateBldcMotorAnimation();
+        this.updateDcMotorAnimation();
         this.emitDebugSnapshot(false);
         this.tick += 100;
       }, 100);
@@ -212,6 +235,8 @@ export class SimulationEngine {
           this.pins[pin].state = state;
           this.pins[pin].value = state === 'HIGH' ? 255 : 0;
           this.propagatePinState(pin, state, nodes, wires, state === 'HIGH' ? 255 : 0);
+          // Update MNA solver with new pin voltage
+          this.updateMNAPinVoltage(pin, state === 'HIGH' ? 5 : 0);
           this.emitDebugSnapshot(false);
         }
         continue;
@@ -227,6 +252,8 @@ export class SimulationEngine {
         this.pins[pin].state = 'PWM';
         this.pins[pin].value = value;
         this.propagatePinState(pin, 'PWM', nodes, wires, value);
+        // Update MNA solver with PWM average voltage
+        this.updateMNAPinVoltage(pin, (value / 255) * 5);
         continue;
       }
 
@@ -600,6 +627,36 @@ export class SimulationEngine {
     });
   }
 
+  /**
+   * Animate DC motors: increment rotation if isSpinning is true.
+   * Called every tick (~100ms).
+   */
+  private updateDcMotorAnimation() {
+    const freshNodes = useCanvasStore.getState().nodes;
+
+    this.dcMotorNodes.forEach(motor => {
+      const freshMotor = freshNodes.find(n => n.id === motor.id);
+      if (!freshMotor) return;
+
+      const isSpinning = Boolean(freshMotor.properties?.isSpinning);
+      if (!isSpinning) return;
+
+      const currentTick = Number(freshMotor.properties?.motorTick) || 0;
+      const newTick = (currentTick + 30) % 360; // 30° per tick = smooth rotation
+
+      this.callbacks.onPinStateChange(motor.id, '__dc_anim__', 'HIGH', newTick);
+
+      // Update the store directly for the visual
+      const { updateNode } = useCanvasStore.getState();
+      updateNode(motor.id, {
+        properties: {
+          ...freshMotor.properties,
+          motorTick: newTick,
+        },
+      });
+    });
+  }
+
   private voltageAtPin(nodeId: string, pinId: string, nodes: CanvasNode[], wires: Wire[]): number {
     const connectedPins = this.getConnectedPins(nodeId, pinId, wires);
 
@@ -722,6 +779,7 @@ export class SimulationEngine {
         this.avrCpu.tick();
       }
       this.updateBldcMotorAnimation();
+      this.updateDcMotorAnimation();
       this.emitDebugSnapshot(false);
     }, 16);
   }
@@ -785,6 +843,221 @@ export class SimulationEngine {
     this.avrCpu = null;
     this.avrUsart = null;
     this.avrPorts = {};
+    this.stopMNASolver();
     this.emitDebugSnapshot(false);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // MNA Solver Integration
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Build the MNA circuit from the canvas and start the solver WebWorker.
+   */
+  private startMNASolver(nodes: CanvasNode[], wires: Wire[]) {
+    try {
+      // Build the circuit netlist
+      this.mnaCircuit = buildMNACircuit(nodes, wires, this.mcuPinVoltages);
+
+      if (this.mnaCircuit.elements.length === 0) {
+        // No solvable elements — skip solver
+        return;
+      }
+
+      // Create WebWorker
+      this.solverWorker = new Worker(
+        new URL('./SimulationWorker.ts', import.meta.url),
+        { type: 'module' }
+      );
+
+      // Handle messages from the worker
+      this.solverWorker.onmessage = (event: MessageEvent) => {
+        const msg = event.data;
+        if (msg.type === 'RESULT') {
+          this.handleSolverResult(msg as WorkerResultMessage, nodes);
+        } else if (msg.type === 'OSCILLOSCOPE') {
+          this.handleOscilloscopeData(msg as WorkerOscilloscopeMessage);
+        }
+      };
+
+      this.solverWorker.onerror = (err) => {
+        console.warn('[VoltForge MNA] Solver worker error:', err.message);
+      };
+
+      // Initialize the worker with circuit data
+      const initMsg: WorkerInMessage = {
+        type: 'INIT',
+        numNodes: this.mnaCircuit.numNodes,
+        elements: this.mnaCircuit.elements,
+        dt: 0.001, // 1ms time step
+      };
+      this.solverWorker.postMessage(initMsg);
+
+      // Start the solver loop
+      const startMsg: WorkerInMessage = { type: 'START' };
+      this.solverWorker.postMessage(startMsg);
+
+    } catch (err: any) {
+      console.warn('[VoltForge MNA] Failed to start solver:', err.message);
+    }
+  }
+
+  /**
+   * Stop and dispose the solver WebWorker.
+   */
+  private stopMNASolver() {
+    if (this.solverWorker) {
+      const stopMsg: WorkerInMessage = { type: 'STOP' };
+      this.solverWorker.postMessage(stopMsg);
+      this.solverWorker.terminate();
+      this.solverWorker = null;
+    }
+    this.mnaCircuit = null;
+    this.mcuPinVoltages = {};
+
+    // Clear solver state in store
+    useSimulationStore.getState().setCircuitState({}, {}, {}, true);
+    useSimulationStore.getState().clearOscilloscopeData();
+  }
+
+  /**
+   * Update a specific MCU pin voltage in the solver.
+   * Called whenever digitalWrite/analogWrite changes a pin.
+   */
+  private updateMNAPinVoltage(pin: string, voltage: number) {
+    this.mcuPinVoltages[pin] = voltage;
+
+    if (!this.solverWorker || !this.mnaCircuit) return;
+
+    // Find the MCU node on canvas
+    const nodes = useCanvasStore.getState().nodes;
+    const mcuNode = nodes.find(n =>
+      n.type.startsWith('ARDUINO') || n.type.startsWith('ESP') || n.type.startsWith('RASPBERRY')
+    );
+    if (!mcuNode) return;
+
+    // Build the element ID that matches NetlistBuilder naming
+    const elementId = `vs_mcu_${mcuNode.id}_d${pin}`;
+
+    const updateMsg: WorkerInMessage = {
+      type: 'UPDATE_PIN',
+      elementId,
+      voltage,
+    };
+    this.solverWorker.postMessage(updateMsg);
+  }
+
+  /**
+   * Handle solver results from the WebWorker.
+   * Maps MNA element IDs back to canvas components and dispatches visual updates.
+   */
+  private handleSolverResult(result: WorkerResultMessage, _nodes: CanvasNode[]) {
+    if (!this.mnaCircuit) return;
+
+    const { elementToComponent, pinToMNANode } = this.mnaCircuit;
+    const nodes = useCanvasStore.getState().nodes;
+
+    // Build component-level voltage and current maps
+    const componentVoltages: Record<string, number> = {};
+    const componentCurrents: Record<string, number> = {};
+    const componentPower: Record<string, number> = {};
+
+    // Map MNA node voltages to a string-keyed record for the store
+    const nodeVoltageMap: Record<string, number> = {};
+    for (let i = 0; i < result.nodeVoltages.length; i++) {
+      nodeVoltageMap[String(i)] = result.nodeVoltages[i];
+    }
+
+    // Map element results to canvas components
+    for (const [elemId, current] of Object.entries(result.branchCurrents)) {
+      const componentId = elementToComponent.get(elemId);
+      if (!componentId) continue;
+      componentCurrents[componentId] = (componentCurrents[componentId] || 0) + Math.abs(current);
+    }
+
+    for (const [elemId, power] of Object.entries(result.componentPower)) {
+      const componentId = elementToComponent.get(elemId);
+      if (!componentId) continue;
+      componentPower[componentId] = (componentPower[componentId] || 0) + power;
+    }
+
+    // Update store with solver state
+    useSimulationStore.getState().setCircuitState(
+      nodeVoltageMap,
+      componentCurrents,
+      componentPower,
+      result.converged
+    );
+
+    // Dispatch to specific instrument components
+    for (const node of nodes) {
+      // Multimeter: read voltage between probe nodes
+      if (node.type === 'MULTIMETER') {
+        const probeNode = pinToMNANode.get(`${node.id}:v_probe`) ?? 0;
+        const comNode = pinToMNANode.get(`${node.id}:com`) ?? 0;
+        const probeV = result.nodeVoltages[probeNode] ?? 0;
+        const comV = result.nodeVoltages[comNode] ?? 0;
+        const voltage = Math.abs(probeV - comV);
+        LogicRegistry.dispatch('MULTIMETER', node.id, 'v_probe', voltage > 0.01 ? 'HIGH' : 'LOW', voltage);
+      }
+
+      // Ammeter: read branch current
+      if (node.type === 'AMMETER') {
+        const elemId = `am_${node.id}`;
+        const current = result.branchCurrents[elemId] ?? 0;
+        LogicRegistry.dispatch('AMMETER', node.id, 'in', Math.abs(current) > 0.0001 ? 'HIGH' : 'LOW', current);
+      }
+
+      // Oscilloscope: handled separately via OSCILLOSCOPE messages
+
+      // LED: check if enough current flows (> 1mA) to light up
+      if (node.type.includes('LED') && !node.type.includes('NEOPIXEL')) {
+        const elemId = `led_${node.id}`;
+        const current = result.branchCurrents[elemId] ?? 0;
+        const isLit = Math.abs(current) > 0.001; // > 1mA
+
+        // Check for burnout: typical LED max is 20mA
+        const maxCurrent = Number(node.properties?.maxCurrent) || 20;
+        const currentMa = Math.abs(current) * 1000;
+        if (currentMa > maxCurrent * 2) {
+          // Blown!
+          useCanvasStore.getState().updateNode(node.id, {
+            properties: {
+              ...node.properties,
+              isBlown: true,
+              isLit: false,
+              faultMessage: `Current ${currentMa.toFixed(1)} mA exceeds max ${maxCurrent} mA`,
+            },
+          });
+        } else if (!node.properties?.isBlown) {
+          useCanvasStore.getState().updateNode(node.id, {
+            properties: {
+              ...node.properties,
+              isLit,
+            },
+          });
+        }
+      }
+
+      // Buzzer: check current
+      if (node.type === 'BUZZER') {
+        const elemId = `bz_${node.id}`;
+        const current = result.branchCurrents[elemId] ?? 0;
+        const isBeeping = Math.abs(current) > 0.001;
+        useCanvasStore.getState().updateNode(node.id, {
+          properties: { ...node.properties, isBeeping },
+        });
+      }
+    }
+  }
+
+  /**
+   * Handle oscilloscope data from the WebWorker.
+   */
+  private handleOscilloscopeData(msg: WorkerOscilloscopeMessage) {
+    const store = useSimulationStore.getState();
+    for (const [nodeIdx, voltage] of Object.entries(msg.samples)) {
+      store.appendOscilloscopeData(nodeIdx, voltage);
+    }
   }
 }

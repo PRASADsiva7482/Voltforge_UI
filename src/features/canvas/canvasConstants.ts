@@ -114,3 +114,10 @@ export const PCB_TRACE_BOTTOM = '#38bdf8';
 // ── Collaborator cursor ──────────────────────────────────────────────────
 export const COLLABORATOR_CURSOR_RADIUS = 5;
 export const COLLABORATOR_DEFAULT_COLOR = '#38bdf8';
+
+// ── Instrument / Meter constants ────────────────────────────────────────
+export const AMMETER_TEXT_COLOR = '#38bdf8';
+export const OSCILLOSCOPE_SCREEN_BG = '#0a0f1e';
+export const OSCILLOSCOPE_GRID_COLOR = 'rgba(34,197,94,0.2)';
+export const OSCILLOSCOPE_TRACE_COLOR = '#22c55e';
+export const OSCILLOSCOPE_SCREEN: ScreenDimensions = { x: 8, y: 8, width: 84, height: 50 };

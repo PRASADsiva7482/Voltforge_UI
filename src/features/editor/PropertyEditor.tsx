@@ -6,7 +6,7 @@ import type { Wire } from '../../types';
 // Property schemas for each component type
 const propertySchemas: Record<string, { label: string; key: string; type: 'number' | 'text' | 'select' | 'color'; options?: string[]; unit?: string; min?: number; max?: number; step?: number }[]> = {
   RESISTOR: [
-    { label: 'Resistance', key: 'resistance', type: 'number', unit: 'Ω', min: 1, max: 10000000, step: 1 },
+    { label: 'Resistance', key: 'resistance', type: 'number', unit: 'Ω', min: 0.1, max: 10000000, step: 0.1 },
     { label: 'Tolerance', key: 'tolerance', type: 'select', options: ['5%', '1%', '0.5%', '0.1%'] },
     { label: 'Power Rating', key: 'powerRating', type: 'select', options: ['0.125W', '0.25W', '0.5W', '1W', '2W'] },
   ],
@@ -15,7 +15,7 @@ const propertySchemas: Record<string, { label: string; key: string; type: 'numbe
     { label: 'Voltage Rating', key: 'voltageRating', type: 'select', options: ['10V', '16V', '25V', '50V', '100V'] },
   ],
   CERAMIC_CAPACITOR: [
-    { label: 'Capacitance', key: 'capacitance', type: 'number', unit: 'nF', min: 1, max: 1000, step: 1 },
+    { label: 'Capacitance', key: 'capacitance', type: 'number', unit: 'pF', min: 1, max: 1000000, step: 1 },
     { label: 'Voltage Rating', key: 'voltageRating', type: 'select', options: ['16V', '25V', '50V', '100V'] },
   ],
   ELECTROLYTIC_CAPACITOR: [
@@ -123,6 +123,38 @@ const propertySchemas: Record<string, { label: string; key: string; type: 'numbe
   RELAY_SPDT: [
     { label: 'Coil Voltage', key: 'coilVoltage', type: 'select', options: ['5V', '12V', '24V'] },
     { label: 'Max Load', key: 'maxLoad', type: 'select', options: ['5A', '10A', '20A', '30A'] },
+  ],
+  RELAY_SINGLE: [
+    { label: 'Coil Voltage', key: 'coilVoltage', type: 'select', options: ['5V', '12V'] },
+    { label: 'Max Load', key: 'maxLoad', type: 'select', options: ['5A', '10A'] },
+  ],
+  RELAY_2CH: [
+    { label: 'Coil Voltage', key: 'coilVoltage', type: 'select', options: ['5V', '12V'] },
+    { label: 'Max Load', key: 'maxLoad', type: 'select', options: ['5A', '10A', '20A'] },
+  ],
+  RELAY_4CH: [
+    { label: 'Coil Voltage', key: 'coilVoltage', type: 'select', options: ['5V', '12V'] },
+    { label: 'Max Load', key: 'maxLoad', type: 'select', options: ['5A', '10A', '20A'] },
+  ],
+  SWITCH_SPST: [
+    { label: 'Type', key: 'switchType', type: 'select', options: ['Toggle', 'Slide'] },
+    { label: 'State', key: 'state', type: 'select', options: ['Open', 'Closed'] },
+  ],
+  MOTOR_STEPPER: [
+    { label: 'Steps/Rev', key: 'stepsPerRev', type: 'select', options: ['200 (1.8°)', '400 (0.9°)'] },
+    { label: 'Voltage', key: 'voltage', type: 'select', options: ['5V', '12V', '24V'] },
+  ],
+  MOTOR_SERVO: [
+    { label: 'Angle', key: 'angle', type: 'number', unit: '°', min: 0, max: 180, step: 1 },
+    { label: 'Speed', key: 'speed', type: 'select', options: ['Slow', 'Normal', 'Fast'] },
+  ],
+  DISPLAY_7SEG: [
+    { label: 'Color', key: 'segColor', type: 'color' },
+    { label: 'Type', key: 'segType', type: 'select', options: ['Common Cathode', 'Common Anode'] },
+  ],
+  LED_NEOPIXEL: [
+    { label: 'Pixel Count', key: 'pixelCount', type: 'number', min: 1, max: 256, step: 1 },
+    { label: 'Brightness', key: 'brightness', type: 'number', unit: '%', min: 0, max: 100, step: 1 },
   ],
 };
 

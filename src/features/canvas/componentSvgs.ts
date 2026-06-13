@@ -192,6 +192,16 @@ export const componentSvgs: Record<string, string> = {
     '<circle cx="45" cy="18" r="6" fill="%23fbbf24" opacity="0.6"/>' +
     '<text x="35" y="44" font-size="7" fill="white" text-anchor="middle" font-family="Arial">RELAY</text>'
   ),
+  RELAY_2CH: svg('0 0 90 50',
+    '<rect width="90" height="50" rx="4" fill="%232563eb"/>' +
+    '<rect x="4" y="6" width="35" height="24" rx="2" fill="%231e40af"/>' +
+    '<rect x="51" y="6" width="35" height="24" rx="2" fill="%231e40af"/>' +
+    '<rect x="8" y="10" width="12" height="16" rx="1" fill="%23c0c0c0"/>' +
+    '<rect x="55" y="10" width="12" height="16" rx="1" fill="%23c0c0c0"/>' +
+    '<circle cx="28" cy="18" r="4" fill="%23fbbf24" opacity="0.5"/>' +
+    '<circle cx="75" cy="18" r="4" fill="%23fbbf24" opacity="0.5"/>' +
+    '<text x="45" y="44" font-size="7" fill="white" text-anchor="middle" font-family="Arial">2-CH RELAY</text>'
+  ),
   RELAY_4CH: svg('0 0 120 50',
     '<rect width="120" height="50" rx="4" fill="%232563eb"/>' +
     '<rect x="4" y="6" width="20" height="24" rx="2" fill="%231e40af"/>' +
@@ -460,6 +470,32 @@ export const componentSvgs: Record<string, string> = {
     '<path d="M10 20 Q5 0 -10 -10" stroke="black" stroke-width="1.5" fill="none"/>' +
     '<path d="M70 20 Q75 0 90 -10" stroke="black" stroke-width="1.5" fill="none"/>'
   ),
+
+  // ── Instruments / Meters ──
+  AMMETER: svg('0 0 90 70',
+    '<rect x="4" y="2" width="82" height="66" rx="8" fill="%2338bdf8" stroke="%230284c7" stroke-width="2"/>' +
+    '<rect x="14" y="14" width="62" height="28" rx="3" fill="%23111827" stroke="%23222" stroke-width="1"/>' +
+    '<circle cx="45" cy="55" r="8" fill="%23374151" stroke="%23111827" stroke-width="2"/>' +
+    '<text x="45" y="58" font-size="10" fill="%2338bdf8" text-anchor="middle" font-family="Arial" font-weight="bold">A</text>' +
+    '<circle cx="24" cy="64" r="3" fill="%23ef4444"/>' +
+    '<circle cx="66" cy="64" r="3" fill="%23111827"/>'
+  ),
+  OSCILLOSCOPE: svg('0 0 100 80',
+    '<rect width="100" height="80" rx="6" fill="%23111827" stroke="%23334155" stroke-width="2"/>' +
+    '<rect x="8" y="8" width="84" height="50" rx="3" fill="%230a0f1e" stroke="%23334155" stroke-width="1"/>' +
+    // Grid lines
+    '<path d="M8 33h84M50 8v50" stroke="%2322c55e" stroke-width="0.5" opacity="0.3"/>' +
+    '<path d="M29 8v50M71 8v50M8 20h84M8 45h84" stroke="%2322c55e" stroke-width="0.3" opacity="0.2"/>' +
+    // Sample waveform
+    '<path d="M12 33 L22 18 L24 18 L24 48 L26 48 L26 18 L36 18 L38 48 L40 48 L40 18 L50 18 L52 48 L54 48 L54 18 L64 18 L66 48 L68 48 L68 18 L78 18 L80 48 L82 48 L84 33" stroke="%2322c55e" stroke-width="1.5" fill="none"/>' +
+    // Controls
+    '<circle cx="20" cy="68" r="5" fill="%23374151" stroke="%23475569" stroke-width="1"/>' +
+    '<circle cx="40" cy="68" r="5" fill="%23374151" stroke="%23475569" stroke-width="1"/>' +
+    '<circle cx="60" cy="68" r="5" fill="%23374151" stroke="%23475569" stroke-width="1"/>' +
+    '<text x="20" y="72" font-size="5" fill="%2394a3b8" text-anchor="middle" font-family="Arial">T/D</text>' +
+    '<text x="40" y="72" font-size="5" fill="%2394a3b8" text-anchor="middle" font-family="Arial">V/D</text>' +
+    '<text x="80" y="68" font-size="6" fill="%2322c55e" text-anchor="middle" font-family="Arial" font-weight="bold">SCOPE</text>'
+  ),
 };
 
 // Default dimensions for each component type (width x height)
@@ -504,6 +540,7 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
   MOTOR_STEPPER: { w: 70, h: 70 },
   RELAY_SPDT: { w: 70, h: 50 },
   RELAY_SINGLE: { w: 70, h: 50 },
+  RELAY_2CH: { w: 90, h: 50 },
   RELAY_4CH: { w: 120, h: 50 },
 
   // Sensors (match SVG viewBox)
@@ -536,7 +573,12 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
   MOTOR_BLDC: { w: 80, h: 80 },
   RC_RECEIVER: { w: 80, h: 60 },
 
+  // Instruments
+  AMMETER: { w: 90, h: 70 },
+  OSCILLOSCOPE: { w: 100, h: 80 },
+
   // Other
   BREADBOARD: { w: 220, h: 120 },
   VOLTAGE_REGULATOR_7805: { w: 64, h: 72 },
+  SWITCH_SPST: { w: 60, h: 30 },
 };

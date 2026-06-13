@@ -263,3 +263,98 @@ function parseMilliAmps(value: unknown, fallback: number): number {
   const numeric = Number(value.replace(/[^0-9.]/g, ''));
   return Number.isFinite(numeric) ? numeric : fallback;
 }
+
+/**
+ * Enhanced safety analysis using MNA solver output.
+ * When the solver is running, it uses real computed currents and power
+ * for accurate burnout detection. Falls back to heuristic analysis otherwise.
+ */
+export function analyzeCircuitSafetyWithSolver(
+  nodes: CanvasNode[],
+  wires: Wire[],
+  solverCurrents: Record<string, number>,
+  solverPower: Record<string, number>,
+): CircuitSafetyResult {
+  const netlist = buildCircuitNetlist(nodes, wires);
+  const issues: CircuitSafetyIssue[] = [];
+  const nodeStates: Record<string, Record<string, unknown>> = {};
+
+  const hasSolverData = Object.keys(solverCurrents).length > 0;
+
+  if (!hasSolverData) {
+    // No solver data — fall back to heuristic analysis
+    return analyzeCircuitSafety(nodes, wires);
+  }
+
+  // Use real solver data for each component
+  for (const node of nodes) {
+    const current = solverCurrents[node.id] ?? 0;
+    const power = solverPower[node.id] ?? 0;
+    const currentMa = Math.abs(current) * 1000;
+
+    // LED overcurrent check
+    if (node.type.includes('LED') && !node.type.includes('NEOPIXEL')) {
+      const maxCurrent = parseMilliAmps(node.properties?.maxCurrent, 20);
+
+      if (currentMa > maxCurrent * 2) {
+        issues.push({
+          id: `${node.id}:solver-overcurrent`,
+          severity: 'CRITICAL',
+          componentId: node.id,
+          message: `${node.name} current is ${currentMa.toFixed(1)} mA (max ${maxCurrent} mA). Component will burn out.`,
+          suggestedFix: 'Add or increase the series resistor value.',
+          currentMa,
+        });
+        nodeStates[node.id] = {
+          isBlown: true,
+          isLit: false,
+          faultMessage: `Current ${currentMa.toFixed(1)} mA exceeds max ${maxCurrent} mA`,
+          currentMa,
+        };
+      } else if (currentMa > maxCurrent) {
+        issues.push({
+          id: `${node.id}:solver-overcurrent-warn`,
+          severity: 'WARNING',
+          componentId: node.id,
+          message: `${node.name} current is ${currentMa.toFixed(1)} mA, above its ${maxCurrent} mA limit.`,
+          suggestedFix: 'Increase the series resistor value.',
+          currentMa,
+        });
+      }
+    }
+
+    // Resistor power dissipation check
+    if (node.type === 'RESISTOR') {
+      const maxPower = Number(node.properties?.maxPower) || 0.25; // 1/4W default
+      if (power > maxPower) {
+        issues.push({
+          id: `${node.id}:solver-overheat`,
+          severity: power > maxPower * 2 ? 'CRITICAL' : 'WARNING',
+          componentId: node.id,
+          message: `${node.name} is dissipating ${(power * 1000).toFixed(0)} mW (rated for ${(maxPower * 1000).toFixed(0)} mW).`,
+          suggestedFix: 'Use a higher wattage resistor or reduce current.',
+        });
+      }
+    }
+
+    // Generic over-power check for any component with maxPower property
+    if (node.properties?.maxPowerWatts) {
+      const maxPower = Number(node.properties.maxPowerWatts);
+      if (power > maxPower) {
+        issues.push({
+          id: `${node.id}:solver-overpower`,
+          severity: 'CRITICAL',
+          componentId: node.id,
+          message: `${node.name} is exceeding its power rating (${(power * 1000).toFixed(0)} mW vs ${(maxPower * 1000).toFixed(0)} mW max).`,
+          suggestedFix: 'Reduce voltage or current to the component.',
+        });
+        nodeStates[node.id] = {
+          isBlown: true,
+          faultMessage: `Power ${(power * 1000).toFixed(0)} mW exceeds max ${(maxPower * 1000).toFixed(0)} mW`,
+        };
+      }
+    }
+  }
+
+  return { netlist, issues, nodeStates };
+}

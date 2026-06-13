@@ -1,4 +1,4 @@
-﻿// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 // VoltForge — Board Pin Registry
 // Defines exact pin layouts for each board/component type with
 // precise positions matching SVG geometry.
@@ -395,6 +395,24 @@ const RELAY_SINGLE_PINS: PinPosition[] = [
   pin('no', 'NO', 70, 35, 'bidirectional'),
 ];
 
+// RELAY_2CH: SVG viewBox 90×50
+const RELAY_2CH_PINS: PinPosition[] = [
+  pin('coil1', 'Coil1+', 0, 12, 'input'),
+  pin('coil2', 'Coil2+', 0, 38, 'input'),
+  pin('gnd', 'GND', 0, 25, 'ground'),
+  pin('com1', 'COM1', 90, 12, 'bidirectional'),
+  pin('no1', 'NO1', 90, 25, 'bidirectional'),
+  pin('com2', 'COM2', 90, 38, 'bidirectional'),
+  pin('no2', 'NO2', 90, 48, 'bidirectional'),
+];
+
+// SWITCH_SPST: SVG viewBox 60×30
+const SWITCH_SPST_PINS: PinPosition[] = [
+  pin('p1', 'Pin 1', 34, 15, 'bidirectional'),
+  pin('p2', 'Pin 2', 44, 15, 'bidirectional'),
+  pin('p3', 'Pin 3', 54, 15, 'bidirectional'),
+];
+
 // ESC_MODULE: SVG viewBox 120×60, input left (Signal/VCC/GND), output right (Phase A/B/C)
 const ESC_PINS: PinPosition[] = [
   pin('sig', 'Signal', 0, 15, 'input'),
@@ -417,6 +435,19 @@ const RC_RECEIVER_PINS: PinPosition[] = [
   pin('gnd', 'GND', 20, 60, 'ground'),
   pin('vcc', 'VCC', 40, 60, 'power'),
   pin('ppm', 'PPM Signal', 60, 60, 'output'),
+];
+
+// AMMETER: SVG viewBox 90×70, two terminal pins
+const AMMETER_PINS: PinPosition[] = [
+  pin('in', 'IN (+)', 24, 70, 'input'),
+  pin('out', 'OUT (−)', 66, 70, 'output'),
+];
+
+// OSCILLOSCOPE: SVG viewBox 100×80, 2 channels + GND
+const OSCILLOSCOPE_PINS: PinPosition[] = [
+  pin('ch1', 'CH1', 20, 80, 'input'),
+  pin('ch2', 'CH2', 50, 80, 'input'),
+  pin('gnd', 'GND', 80, 80, 'ground'),
 ];
 
 // ── Registry ──
@@ -451,6 +482,7 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
   // Input
   PUSH_BUTTON: BUTTON_PINS,
   BUTTON: BUTTON_PINS,
+  SWITCH_SPST: SWITCH_SPST_PINS,
   POTENTIOMETER: POTENTIOMETER_PINS,
 
   // Output
@@ -462,6 +494,7 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
   MOTOR_STEPPER: STEPPER_V2_PINS,
   RELAY_SPDT: RELAY_PINS,
   RELAY_SINGLE: RELAY_SINGLE_PINS,
+  RELAY_2CH: RELAY_2CH_PINS,
 
   // Sensors
   TEMP_SENSOR: DHT_PINS,
@@ -492,6 +525,10 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
   ESC_MODULE: ESC_PINS,
   MOTOR_BLDC: MOTOR_BLDC_PINS,
   RC_RECEIVER: RC_RECEIVER_PINS,
+
+  // Instruments
+  AMMETER: AMMETER_PINS,
+  OSCILLOSCOPE: OSCILLOSCOPE_PINS,
 
   // Other
   BREADBOARD: BREADBOARD_PINS,

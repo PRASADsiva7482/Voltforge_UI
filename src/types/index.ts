@@ -5,7 +5,13 @@
 export type UserRole = 'USER' | 'ADMIN';
 export type AccountStatus = 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
 export type BoardType = 'ARDUINO_UNO' | 'ARDUINO_MEGA' | 'ARDUINO_NANO' | 'ESP32' | 'ESP32_S3' | 'ESP8266';
-export type ComponentCategory = 'BOARD' | 'LED' | 'SENSOR' | 'DISPLAY' | 'RELAY' | 'MOTOR' | 'PASSIVE' | 'COMMUNICATION' | 'POWER';
+export type ComponentCategory = 'BOARD' | 'LED' | 'SENSOR' | 'DISPLAY' | 'RELAY' | 'MOTOR' | 'PASSIVE' | 'COMMUNICATION' | 'POWER' | 'INSTRUMENT';
+
+export interface CircuitSolverState {
+  nodeVoltages: Record<string, number>;
+  branchCurrents: Record<string, number>;
+  componentPower: Record<string, number>;
+}
 export type SharePermission = 'VIEW' | 'EDIT' | 'ADMIN';
 
 export interface ApiResponse<T> {

@@ -125,7 +125,14 @@ const ComponentNode = ({
       node.properties?.isBeeping ||
       node.properties?.isActive);
   const isButton = node.type === 'PUSH_BUTTON' || node.type === 'BUTTON';
+  const isSwitch = node.type === 'SWITCH_SPST';
   const isServo = node.type === 'SERVO_MOTOR' || node.type === 'MOTOR_SERVO';
+  const isDcMotor = node.type === 'MOTOR_DC';
+  const isStepper = node.type === 'MOTOR_STEPPER' || node.type === 'STEPPER_MOTOR';
+  const is7Seg = node.type === 'DISPLAY_7SEG';
+  const isBuzzer = node.type === 'BUZZER';
+  const isRelay = node.type === 'RELAY_SINGLE' || node.type === 'RELAY_2CH' || node.type === 'RELAY_4CH' || node.type === 'RELAY_SPDT';
+  const isPressed = Boolean(node.properties?.isPressed);
 
   return (
     <>
@@ -377,6 +384,40 @@ const ComponentNode = ({
           />
         )}
 
+        {/* Ammeter — current reading overlay */}
+        {node.type === 'AMMETER' && (
+          <Text
+            text={(node.properties?.displayValue as string) || '0.00 mA'}
+            x={14}
+            y={27}
+            width={node.width - 28}
+            align="center"
+            fontSize={Math.max(12, Math.min(20, node.width / 6))}
+            fontFamily="JetBrains Mono"
+            fontStyle="700"
+            fill="#38bdf8"
+            listening={false}
+          />
+        )}
+
+        {/* Oscilloscope — mini waveform preview and display text */}
+        {node.type === 'OSCILLOSCOPE' && (
+          <>
+            <Text
+              text={(node.properties?.displayValue as string) || 'SCOPE'}
+              x={14}
+              y={12}
+              width={node.width - 28}
+              align="center"
+              fontSize={Math.max(8, Math.min(12, node.width / 10))}
+              fontFamily="JetBrains Mono"
+              fontStyle="700"
+              fill="#22c55e"
+              listening={false}
+            />
+          </>
+        )}
+
         {/* LCD / I2C Display — live text overlay */}
         {(node.type === 'DISPLAY_LCD_I2C' || node.type === 'LCD_16X2') &&
           (() => {
@@ -577,6 +618,173 @@ const ComponentNode = ({
               </>
             );
           })()}
+
+        {/* DC Motor — animated rotating shaft */}
+        {isDcMotor && isActive && (() => {
+          const rpm = Number(node.properties?.rpm) || 3000;
+          const tick = Number(node.properties?.motorTick) || 0;
+          return (
+            <Group x={30} y={25} rotation={tick} listening={false}>
+              {/* Rotating cross-hair shaft indicator */}
+              <Rect x={-1.5} y={-10} width={3} height={20} cornerRadius={1.5}
+                fill="#f8fafc" opacity={0.8} />
+              <Rect x={-10} y={-1.5} width={20} height={3} cornerRadius={1.5}
+                fill="#f8fafc" opacity={0.8} />
+              <Circle x={0} y={0} radius={3} fill="#c0c0c0" />
+            </Group>
+          );
+        })()}
+
+        {/* Stepper Motor — rotation indicator */}
+        {isStepper && (() => {
+          const rotation = Number(node.properties?.stepperRotation) || 0;
+          const spinning = Boolean(node.properties?.isSpinning);
+          return (
+            <>
+              <Group x={35} y={35} rotation={rotation} listening={false}>
+                {/* Stepper position indicator line */}
+                <Rect x={-1.5} y={-18} width={3} height={18} cornerRadius={1}
+                  fill={spinning ? '#22c55e' : '#6b7280'} opacity={spinning ? 0.9 : 0.4} />
+                <Circle x={0} y={0} radius={4} fill="#c0c0c0" stroke="#6b7280" strokeWidth={1} />
+              </Group>
+              {spinning && (
+                <Circle x={35} y={35} radius={22} fill="transparent"
+                  stroke={ACTIVE_GLOW_COLOR} strokeWidth={1} opacity={0.4}
+                  shadowColor={ACTIVE_GLOW_COLOR} shadowBlur={8} listening={false} />
+              )}
+            </>
+          );
+        })()}
+
+        {/* 7-Segment Display — lit segments overlay */}
+        {is7Seg && (() => {
+          const segs = (node.properties?.segments || {}) as Record<string, boolean>;
+          const litColor = '#ef4444';
+          const dimColor = 'rgba(239,68,68,0.12)';
+          // Segment geometry (relative to 50×70 viewBox)
+          const segDefs: Record<string, { d: string }> = {
+            a: { d: 'M12 8 h26 l-4 4 h-18 Z' },
+            b: { d: 'M40 12 l4 4 v18 l-4 4 l-4-4 v-18 Z' },
+            c: { d: 'M40 40 l4 4 v18 l-4 4 l-4-4 v-18 Z' },
+            d: { d: 'M12 62 h26 l-4-4 h-18 Z' },
+            e: { d: 'M10 40 l-4 4 v18 l4 4 l4-4 v-18 Z' },
+            f: { d: 'M10 12 l-4 4 v18 l4 4 l4-4 v-18 Z' },
+            g: { d: 'M12 35 h26 l-4 4 h-18 Z' },
+          };
+          // We can't render SVG path in Konva directly, but we use Rects as approximation
+          // For a realistic 7-seg, overlay colored rectangles at segment positions
+          const segRects: { key: string; x: number; y: number; w: number; h: number; rot?: number }[] = [
+            { key: 'a', x: 14, y: 7, w: 22, h: 4 },       // top horizontal
+            { key: 'b', x: 36, y: 12, w: 4, h: 20 },      // top-right vertical
+            { key: 'c', x: 36, y: 40, w: 4, h: 20 },      // bottom-right vertical
+            { key: 'd', x: 14, y: 60, w: 22, h: 4 },      // bottom horizontal
+            { key: 'e', x: 8, y: 40, w: 4, h: 20 },       // bottom-left vertical
+            { key: 'f', x: 8, y: 12, w: 4, h: 20 },       // top-left vertical
+            { key: 'g', x: 14, y: 34, w: 22, h: 4 },      // middle horizontal
+          ];
+          return (
+            <>
+              {segRects.map(seg => {
+                const isLit = segs[seg.key];
+                return (
+                  <Rect
+                    key={`seg_${seg.key}`}
+                    x={seg.x} y={seg.y}
+                    width={seg.w} height={seg.h}
+                    cornerRadius={1}
+                    fill={isLit ? litColor : dimColor}
+                    shadowColor={isLit ? litColor : 'transparent'}
+                    shadowBlur={isLit ? 8 : 0}
+                    opacity={isLit ? 0.95 : 0.3}
+                    listening={false}
+                  />
+                );
+              })}
+            </>
+          );
+        })()}
+
+        {/* Push Button — visual press feedback (scale + color shift) */}
+        {isButton && isPressed && (
+          <>
+            <Circle
+              x={20} y={20} radius={9}
+              fill="#b91c1c" stroke="#7f1d1d" strokeWidth={1.2}
+              listening={false}
+            />
+            <Circle
+              x={20} y={20} radius={4}
+              fill="#fca5a5" opacity={0.3}
+              listening={false}
+            />
+          </>
+        )}
+
+        {/* Toggle Switch — on/off indicator */}
+        {isSwitch && (() => {
+          const isClosed = Boolean(node.properties?.isClosed);
+          return (
+            <>
+              <Rect
+                x={node.width / 2 - 6} y={node.height / 2 - 10}
+                width={12} height={20}
+                cornerRadius={6}
+                fill={isClosed ? '#22c55e' : '#374151'}
+                stroke={isClosed ? '#16a34a' : '#6b7280'}
+                strokeWidth={1}
+                shadowColor={isClosed ? '#22c55e' : 'transparent'}
+                shadowBlur={isClosed ? 6 : 0}
+                listening={false}
+              />
+              <Circle
+                x={node.width / 2} y={isClosed ? node.height / 2 - 4 : node.height / 2 + 4}
+                radius={4}
+                fill="#f8fafc" stroke="#94a3b8" strokeWidth={0.5}
+                listening={false}
+              />
+            </>
+          );
+        })()}
+
+        {/* Buzzer — active pulse rings */}
+        {isBuzzer && isActive && (
+          <>
+            <Circle x={25} y={25} radius={18} fill="transparent"
+              stroke="#94a3b8" strokeWidth={1} opacity={0.3}
+              shadowColor="#94a3b8" shadowBlur={4} listening={false} />
+            <Circle x={25} y={25} radius={24} fill="transparent"
+              stroke="#64748b" strokeWidth={0.7} opacity={0.2}
+              listening={false} />
+          </>
+        )}
+
+        {/* Relay — per-channel LED indicators */}
+        {isRelay && (() => {
+          const channelCount = node.type === 'RELAY_4CH' ? 4 : node.type === 'RELAY_2CH' ? 2 : 1;
+          const spacing = node.width / (channelCount + 1);
+          return (
+            <>
+              {Array.from({ length: channelCount }, (_, i) => {
+                const chKey = channelCount === 1 ? 'isSwitched' : `isSwitched_${i + 1}`;
+                const isSwitched = Boolean(node.properties?.[chKey]);
+                return (
+                  <Circle
+                    key={`relay_led_${i}`}
+                    x={spacing * (i + 1)}
+                    y={6}
+                    radius={3}
+                    fill={isSwitched ? '#22c55e' : '#374151'}
+                    stroke={isSwitched ? '#16a34a' : '#555'}
+                    strokeWidth={0.8}
+                    shadowColor={isSwitched ? '#22c55e' : 'transparent'}
+                    shadowBlur={isSwitched ? 6 : 0}
+                    listening={false}
+                  />
+                );
+              })}
+            </>
+          );
+        })()}
 
         {/* Pins */}
         {node.pins?.map((pin) => (
