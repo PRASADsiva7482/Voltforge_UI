@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { CanvasNode, Wire, ElectronicComponent, WireBendPoint, PinPosition } from '../types';
 import { rerouteAutoWires, routeWireBetweenNodes } from '../utils/wireRouting';
+import { getPinsForComponent } from '../features/canvas/pinRegistry';
 
 /**
  * Resolve a pin reference that doesn't match any pin.id on the node.
@@ -280,8 +281,19 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   loadCanvas: (nodes, wires) => {
+    // Populate missing or empty pin arrays for nodes
+    const populatedNodes = nodes.map(n => {
+      if (!n.pins || n.pins.length === 0) {
+        return {
+          ...n,
+          pins: getPinsForComponent(n.type, undefined, n.width, n.height)
+        };
+      }
+      return n;
+    });
+
     // ── Pin-ID reconciliation: patch wire pinIds to match node pin IDs ──
-    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+    const nodeMap = new Map(populatedNodes.map(n => [n.id, n]));
     const reconciledWires = wires.map(w => {
       const patched = { ...w };
       // Fix fromPinId
@@ -310,7 +322,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         routingMode: shouldUpgrade ? 'auto' as RoutingMode : mode,
       };
     });
-    set({ nodes, wires: rerouteAutoWires(nodes, migratedWires) });
+    set({ nodes: populatedNodes, wires: rerouteAutoWires(populatedNodes, migratedWires) });
   },
 
   // History Implementation

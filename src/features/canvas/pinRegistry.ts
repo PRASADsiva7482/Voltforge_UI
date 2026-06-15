@@ -406,6 +406,24 @@ const RELAY_2CH_PINS: PinPosition[] = [
   pin('no2', 'NO2', 90, 48, 'bidirectional'),
 ];
 
+// RELAY_4CH: SVG viewBox 120×50
+const RELAY_4CH_PINS: PinPosition[] = [
+  pin('coil1', 'IN1', 0, 10, 'input'),
+  pin('coil2', 'IN2', 0, 18, 'input'),
+  pin('gnd', 'GND', 0, 25, 'ground'),
+  pin('coil3', 'IN3', 0, 32, 'input'),
+  pin('coil4', 'IN4', 0, 40, 'input'),
+  pin('vcc', 'VCC', 0, 47, 'power'),
+  pin('com1', 'COM1', 120, 6, 'bidirectional'),
+  pin('no1', 'NO1', 120, 11, 'bidirectional'),
+  pin('com2', 'COM2', 120, 18, 'bidirectional'),
+  pin('no2', 'NO2', 120, 23, 'bidirectional'),
+  pin('com3', 'COM3', 120, 30, 'bidirectional'),
+  pin('no3', 'NO3', 120, 35, 'bidirectional'),
+  pin('com4', 'COM4', 120, 42, 'bidirectional'),
+  pin('no4', 'NO4', 120, 47, 'bidirectional'),
+];
+
 // SWITCH_SPST: SVG viewBox 60×30
 const SWITCH_SPST_PINS: PinPosition[] = [
   pin('p1', 'Pin 1', 34, 15, 'bidirectional'),
@@ -495,6 +513,7 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
   RELAY_SPDT: RELAY_PINS,
   RELAY_SINGLE: RELAY_SINGLE_PINS,
   RELAY_2CH: RELAY_2CH_PINS,
+  RELAY_4CH: RELAY_4CH_PINS,
 
   // Sensors
   TEMP_SENSOR: DHT_PINS,

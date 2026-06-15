@@ -1,5 +1,5 @@
 import { useRef, useEffect, useMemo, useState } from 'react';
-import { Group, Rect, Text, Circle, Image as KonvaImage, Transformer } from 'react-konva';
+import { Group, Rect, Text, Circle, Image as KonvaImage, Transformer, Line } from 'react-konva';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { useCanvasStore } from '../../../store/canvasStore';
@@ -49,6 +49,26 @@ const useImage = (url: string) => {
   return image;
 };
 
+const getBoardLedPositions = (type: string, width: number, height: number) => {
+  if (type.startsWith('ARDUINO_MEGA')) {
+    return {
+      pwr: { x: 30, y: 20 },
+      l: { x: 30, y: 35 }
+    };
+  }
+  if (type.startsWith('ESP32') || type.startsWith('ESP8266')) {
+    return {
+      pwr: { x: 20, y: 20 },
+      l: { x: 20, y: 35 }
+    };
+  }
+  // Default (Uno, Nano, etc.)
+  return {
+    pwr: { x: 35, y: 30 },
+    l: { x: 35, y: 45 }
+  };
+};
+
 interface ComponentNodeProps {
   node: CanvasNode;
   isSelected: boolean;
@@ -62,6 +82,7 @@ interface ComponentNodeProps {
   finishWiring: (nodeId: string, pinId: string) => void;
   onInteraction?: (nodeId: string, event: 'press' | 'release') => void;
   readOnly?: boolean;
+  isProbeMode?: boolean;
 }
 
 /** Main visual component rendered on the canvas. */
@@ -78,11 +99,76 @@ const ComponentNode = ({
   finishWiring,
   onInteraction,
   readOnly,
+  isProbeMode,
 }: ComponentNodeProps) => {
   const shapeRef = useRef<Konva.Group>(null);
   const trRef = useRef<Konva.Transformer>(null);
+  const dcMotorShaftRef = useRef<Konva.Group>(null);
+  const bldcPropellerRef = useRef<Konva.Group>(null);
   // Cached snap anchors: computed once on DragStart, reused every onDragMove frame
   const snapAnchorsRef = useRef<{ x: number; y: number }[]>([]);
+
+  const handleDialMouseDown = (e: KonvaEventObject<MouseEvent>) => {
+    if (readOnly) return;
+    e.cancelBubble = true; // Stop dragging the component node itself!
+
+    const stage = e.target.getStage();
+    if (!stage) return;
+
+    const handleMouseMove = () => {
+      const pos = stage.getRelativePointerPosition();
+      if (!pos) return;
+
+      const rad = (node.rotation || 0) * Math.PI / 180;
+      const canvasCenterX = node.x + 25 * Math.cos(rad) - 25 * Math.sin(rad);
+      const canvasCenterY = node.y + 25 * Math.sin(rad) + 25 * Math.cos(rad);
+
+      const dx = pos.x - canvasCenterX;
+      const dy = pos.y - canvasCenterY;
+
+      let angleDeg = Math.atan2(dy, dx) * (180 / Math.PI) - (node.rotation || 0);
+      let normAngle = (angleDeg + 360) % 360;
+      let pct = 50;
+
+      if (normAngle >= 135) {
+        pct = ((normAngle - 135) / 270) * 100;
+      } else if (normAngle <= 45) {
+        pct = ((normAngle + 225) / 270) * 100;
+      } else {
+        pct = normAngle <= 90 ? 100 : 0;
+      }
+
+      onChange({
+        properties: {
+          ...node.properties,
+          position: Math.round(pct),
+        },
+      });
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleWheel = (e: KonvaEventObject<WheelEvent>) => {
+    if (readOnly) return;
+    e.cancelBubble = true;
+    e.evt.preventDefault();
+    const delta = e.evt.deltaY > 0 ? -5 : 5;
+    const currentPos = Number(node.properties?.position !== undefined ? node.properties.position : 50);
+    const newPos = Math.max(0, Math.min(100, currentPos + delta));
+    onChange({
+      properties: {
+        ...node.properties,
+        position: newPos,
+      },
+    });
+  };
 
   let svgData = (node.properties?.svgData as string | undefined) || componentSvgs[node.type];
 
@@ -110,13 +196,6 @@ const ComponentNode = ({
 
   const image = useImage(processedSvgData || '');
 
-  useEffect(() => {
-    if (isSelected && trRef.current && shapeRef.current) {
-      trRef.current.nodes([shapeRef.current]);
-      trRef.current.getLayer()?.batchDraw();
-    }
-  }, [isSelected]);
-
   const isBlown = Boolean(node.properties?.isBlown);
   const isActive =
     !isBlown &&
@@ -126,6 +205,7 @@ const ComponentNode = ({
       node.properties?.isActive);
   const isButton = node.type === 'PUSH_BUTTON' || node.type === 'BUTTON';
   const isSwitch = node.type === 'SWITCH_SPST';
+  const isBoard = node.type.startsWith('ARDUINO') || node.type.startsWith('ESP') || node.type.startsWith('RASPBERRY');
   const isServo = node.type === 'SERVO_MOTOR' || node.type === 'MOTOR_SERVO';
   const isDcMotor = node.type === 'MOTOR_DC';
   const isStepper = node.type === 'MOTOR_STEPPER' || node.type === 'STEPPER_MOTOR';
@@ -133,6 +213,36 @@ const ComponentNode = ({
   const isBuzzer = node.type === 'BUZZER';
   const isRelay = node.type === 'RELAY_SINGLE' || node.type === 'RELAY_2CH' || node.type === 'RELAY_4CH' || node.type === 'RELAY_SPDT';
   const isPressed = Boolean(node.properties?.isPressed);
+
+  useEffect(() => {
+    if (isSelected && trRef.current && shapeRef.current) {
+      trRef.current.nodes([shapeRef.current]);
+      trRef.current.getLayer()?.batchDraw();
+    }
+  }, [isSelected]);
+
+  useEffect(() => {
+    if (!isActive) return;
+    let animId: number;
+    let angle = 0;
+    const tickAnim = () => {
+      if (isDcMotor && dcMotorShaftRef.current) {
+        const rpm = Number(node.properties?.rpm) || 3000;
+        const delta = (rpm / 60) * 360 * (16.7 / 1000);
+        angle = (angle + delta) % 360;
+        dcMotorShaftRef.current.rotation(angle);
+      }
+      if (node.type === 'MOTOR_BLDC' && bldcPropellerRef.current) {
+        const rpm = Number(node.properties?.bldcRpm) || 0;
+        const delta = (rpm / 60) * 360 * (16.7 / 1000);
+        angle = (angle + delta) % 360;
+        bldcPropellerRef.current.rotation(angle);
+      }
+      animId = requestAnimationFrame(tickAnim);
+    };
+    animId = requestAnimationFrame(tickAnim);
+    return () => cancelAnimationFrame(animId);
+  }, [isActive, isDcMotor, node.type, node.properties?.rpm, node.properties?.bldcRpm]);
 
   return (
     <>
@@ -149,10 +259,28 @@ const ComponentNode = ({
         onClick={(e: KonvaEventObject<MouseEvent>) => {
           e.cancelBubble = true;
           onSelect();
+          if (isSwitch && !readOnly) {
+            const currentClosed = Boolean(node.properties?.isClosed);
+            useCanvasStore.getState().updateNode(node.id, {
+              properties: {
+                ...node.properties,
+                isClosed: !currentClosed,
+              },
+            });
+          }
         }}
         onTap={(e: KonvaEventObject<TouchEvent>) => {
           e.cancelBubble = true;
           onSelect();
+          if (isSwitch && !readOnly) {
+            const currentClosed = Boolean(node.properties?.isClosed);
+            useCanvasStore.getState().updateNode(node.id, {
+              properties: {
+                ...node.properties,
+                isClosed: !currentClosed,
+              },
+            });
+          }
         }}
         onMouseDown={() => {
           if (isButton && onInteraction) onInteraction(node.id, 'press');
@@ -369,6 +497,68 @@ const ComponentNode = ({
           </>
         )}
 
+        {/* Potentiometer dial knob overlay */}
+        {node.type === 'POTENTIOMETER' && (() => {
+          const position = Number(node.properties?.position !== undefined ? node.properties.position : 50);
+          const displayAngle = 135 + (position / 100) * 270;
+          return (
+            <Group
+              x={25}
+              y={25}
+              onWheel={handleWheel}
+              onMouseDown={handleDialMouseDown}
+            >
+              {/* Dial Background Shadow */}
+              <Circle radius={16} fill="rgba(0,0,0,0.15)" y={1} />
+              {/* Dial Body - Silver Metallic Circle */}
+              <Circle
+                radius={15}
+                fillLinearGradientStartPoint={{ x: -10, y: -10 }}
+                fillLinearGradientEndPoint={{ x: 10, y: 10 }}
+                fillLinearGradientColorStops={[
+                  0, '#f1f5f9',
+                  0.5, '#cbd5e1',
+                  1, '#64748b'
+                ]}
+                stroke="#475569"
+                strokeWidth={1.5}
+              />
+              {/* Inner concentric ring */}
+              <Circle radius={11} stroke="#94a3b8" strokeWidth={0.5} dash={[2, 2]} />
+              {/* Pointer Tick Line */}
+              <Group rotation={displayAngle}>
+                <Line points={[0, 0, 13, 0]} stroke="#f97316" strokeWidth={2} lineCap="round" />
+                <Circle x={10} y={0} radius={2} fill="#ff9800" />
+              </Group>
+              {/* Center Screw Cap */}
+              <Circle
+                radius={4}
+                fillLinearGradientStartPoint={{ x: -2, y: -2 }}
+                fillLinearGradientEndPoint={{ x: 2, y: 2 }}
+                fillLinearGradientColorStops={[
+                  0, '#cbd5e1',
+                  1, '#475569'
+                ]}
+              />
+            </Group>
+          );
+        })()}
+
+        {node.type === 'POTENTIOMETER' && (
+          <Text
+            text={`${Math.round(Number(node.properties?.position !== undefined ? node.properties.position : 50))}%`}
+            x={0}
+            y={43}
+            width={50}
+            align="center"
+            fontSize={8}
+            fontFamily="JetBrains Mono"
+            fontStyle="700"
+            fill="#f97316"
+            listening={false}
+          />
+        )}
+
         {node.type === 'MULTIMETER' && (
           <Text
             text={(node.properties?.displayValue as string) || '0.00V'}
@@ -424,10 +614,16 @@ const ComponentNode = ({
             const line1 = (node.properties?.lcdLine1 as string) || '';
             const line2 = (node.properties?.lcdLine2 as string) || '';
             const hasText = line1.trim() || line2.trim();
-            const backlight = node.properties?.lcdBacklight !== false;
+            // Check if board is powered
+            const boardNode = useCanvasStore.getState().nodes.find(n => n.type.startsWith('ARDUINO') || n.type.startsWith('ESP') || n.type.startsWith('RASPBERRY'));
+            const isBoardPwr = boardNode ? Boolean(boardNode.properties?.boardPowered) : false;
+            const backlight = isBoardPwr && node.properties?.lcdBacklight !== false;
             const screen = node.type === 'DISPLAY_LCD_I2C' ? LCD_I2C_SCREEN : LCD_16X2_SCREEN;
             const fontSize = Math.max(7, Math.min(11, screen.width / 18));
             const lineH = screen.height / 2;
+
+            const bgFill = backlight ? LCD_BACKLIGHT_ON : '#1e293b';
+            const textFill = backlight ? LCD_TEXT_BACKLIGHT_ON : 'transparent';
 
             return (
               <>
@@ -437,32 +633,38 @@ const ComponentNode = ({
                   width={screen.width}
                   height={screen.height}
                   cornerRadius={2}
-                  fill={backlight ? LCD_BACKLIGHT_ON : LCD_BACKLIGHT_OFF}
-                  opacity={hasText ? 0.95 : 0.7}
+                  fill={bgFill}
+                  stroke={backlight ? '#22c55e' : '#475569'}
+                  strokeWidth={0.5}
+                  opacity={backlight ? 0.95 : 0.7}
                   listening={false}
                 />
-                <Text
-                  x={screen.x + 3}
-                  y={screen.y + (lineH - fontSize) / 2}
-                  width={screen.width - 6}
-                  text={line1 || (hasText ? '' : 'LCD 16x2')}
-                  fontSize={fontSize}
-                  fontFamily="'JetBrains Mono', 'Courier New', monospace"
-                  fontStyle="700"
-                  fill={backlight ? LCD_TEXT_BACKLIGHT_ON : LCD_TEXT_BACKLIGHT_OFF}
-                  listening={false}
-                />
-                <Text
-                  x={screen.x + 3}
-                  y={screen.y + lineH + (lineH - fontSize) / 2}
-                  width={screen.width - 6}
-                  text={line2 || ''}
-                  fontSize={fontSize}
-                  fontFamily="'JetBrains Mono', 'Courier New', monospace"
-                  fontStyle="700"
-                  fill={backlight ? LCD_TEXT_BACKLIGHT_ON : LCD_TEXT_BACKLIGHT_OFF}
-                  listening={false}
-                />
+                {backlight && (
+                  <>
+                    <Text
+                      x={screen.x + 3}
+                      y={screen.y + (lineH - fontSize) / 2}
+                      width={screen.width - 6}
+                      text={line1 || (hasText ? '' : 'LCD 16x2')}
+                      fontSize={fontSize}
+                      fontFamily="'JetBrains Mono', 'Courier New', monospace"
+                      fontStyle="700"
+                      fill={textFill}
+                      listening={false}
+                    />
+                    <Text
+                      x={screen.x + 3}
+                      y={screen.y + lineH + (lineH - fontSize) / 2}
+                      width={screen.width - 6}
+                      text={line2 || ''}
+                      fontSize={fontSize}
+                      fontFamily="'JetBrains Mono', 'Courier New', monospace"
+                      fontStyle="700"
+                      fill={textFill}
+                      listening={false}
+                    />
+                  </>
+                )}
               </>
             );
           })()}
@@ -473,8 +675,15 @@ const ComponentNode = ({
             const line1 = (node.properties?.lcdLine1 as string) || '';
             const line2 = (node.properties?.lcdLine2 as string) || '';
             const hasText = line1.trim() || line2.trim();
+            // Check if board is powered
+            const boardNode = useCanvasStore.getState().nodes.find(n => n.type.startsWith('ARDUINO') || n.type.startsWith('ESP') || n.type.startsWith('RASPBERRY'));
+            const isBoardPwr = boardNode ? Boolean(boardNode.properties?.boardPowered) : false;
+            const backlight = isBoardPwr && node.properties?.lcdBacklight !== false;
             const fontSize = Math.max(7, Math.min(9, OLED_SCREEN.width / 12));
             const lineH = OLED_SCREEN.height / 2;
+
+            const bgFill = backlight ? OLED_BG : '#1e293b';
+            const textFill = backlight ? OLED_TEXT_COLOR : 'transparent';
 
             return (
               <>
@@ -484,32 +693,36 @@ const ComponentNode = ({
                   width={OLED_SCREEN.width}
                   height={OLED_SCREEN.height}
                   cornerRadius={2}
-                  fill={OLED_BG}
-                  opacity={0.95}
+                  fill={bgFill}
+                  opacity={backlight ? 0.95 : 0.7}
                   listening={false}
                 />
-                <Text
-                  x={OLED_SCREEN.x + 3}
-                  y={OLED_SCREEN.y + (lineH - fontSize) / 2}
-                  width={OLED_SCREEN.width - 6}
-                  text={line1 || (hasText ? '' : 'OLED 128x64')}
-                  fontSize={fontSize}
-                  fontFamily="'JetBrains Mono', 'Courier New', monospace"
-                  fontStyle="700"
-                  fill={OLED_TEXT_COLOR}
-                  listening={false}
-                />
-                <Text
-                  x={OLED_SCREEN.x + 3}
-                  y={OLED_SCREEN.y + lineH + (lineH - fontSize) / 2}
-                  width={OLED_SCREEN.width - 6}
-                  text={line2 || ''}
-                  fontSize={fontSize}
-                  fontFamily="'JetBrains Mono', 'Courier New', monospace"
-                  fontStyle="700"
-                  fill={OLED_TEXT_COLOR}
-                  listening={false}
-                />
+                {backlight && (
+                  <>
+                    <Text
+                      x={OLED_SCREEN.x + 3}
+                      y={OLED_SCREEN.y + (lineH - fontSize) / 2}
+                      width={OLED_SCREEN.width - 6}
+                      text={line1 || (hasText ? '' : 'OLED 128x64')}
+                      fontSize={fontSize}
+                      fontFamily="'JetBrains Mono', 'Courier New', monospace"
+                      fontStyle="700"
+                      fill={textFill}
+                      listening={false}
+                    />
+                    <Text
+                      x={OLED_SCREEN.x + 3}
+                      y={OLED_SCREEN.y + lineH + (lineH - fontSize) / 2}
+                      width={OLED_SCREEN.width - 6}
+                      text={line2 || ''}
+                      fontSize={fontSize}
+                      fontFamily="'JetBrains Mono', 'Courier New', monospace"
+                      fontStyle="700"
+                      fill={textFill}
+                      listening={false}
+                    />
+                  </>
+                )}
               </>
             );
           })()}
@@ -545,6 +758,7 @@ const ComponentNode = ({
             return (
               <>
                 <Group
+                  ref={bldcPropellerRef}
                   x={node.width / 2}
                   y={MOTOR_BELL_CENTER_Y}
                   rotation={rotation}
@@ -619,18 +833,28 @@ const ComponentNode = ({
             );
           })()}
 
-        {/* DC Motor — animated rotating shaft */}
-        {isDcMotor && isActive && (() => {
-          const rpm = Number(node.properties?.rpm) || 3000;
+        {/* DC Motor — animated rotating propeller */}
+        {isDcMotor && (() => {
           const tick = Number(node.properties?.motorTick) || 0;
           return (
-            <Group x={30} y={25} rotation={tick} listening={false}>
-              {/* Rotating cross-hair shaft indicator */}
-              <Rect x={-1.5} y={-10} width={3} height={20} cornerRadius={1.5}
-                fill="#f8fafc" opacity={0.8} />
-              <Rect x={-10} y={-1.5} width={20} height={3} cornerRadius={1.5}
-                fill="#f8fafc" opacity={0.8} />
-              <Circle x={0} y={0} radius={3} fill="#c0c0c0" />
+            <Group ref={dcMotorShaftRef} x={30} y={25} rotation={tick} listening={false}>
+              {/* Blade 1 */}
+              <Group rotation={0}>
+                <Rect x={-4} y={-25} width={8} height={25} cornerRadius={3} fill="#ef4444" opacity={isActive ? 1 : 0.4} />
+                <Circle x={0} y={-18} radius={2} fill="#ffffff" opacity={isActive ? 0.9 : 0.5} />
+              </Group>
+              {/* Blade 2 */}
+              <Group rotation={120}>
+                <Rect x={-4} y={-25} width={8} height={25} cornerRadius={3} fill="#ef4444" opacity={isActive ? 1 : 0.4} />
+                <Circle x={0} y={-18} radius={2} fill="#ffffff" opacity={isActive ? 0.9 : 0.5} />
+              </Group>
+              {/* Blade 3 */}
+              <Group rotation={240}>
+                <Rect x={-4} y={-25} width={8} height={25} cornerRadius={3} fill="#ef4444" opacity={isActive ? 1 : 0.4} />
+                <Circle x={0} y={-18} radius={2} fill="#ffffff" opacity={isActive ? 0.9 : 0.5} />
+              </Group>
+              {/* Center hub */}
+              <Circle x={0} y={0} radius={5} fill="#1e293b" stroke="#f8fafc" strokeWidth={1} />
             </Group>
           );
         })()}
@@ -786,6 +1010,65 @@ const ComponentNode = ({
           );
         })()}
 
+        {/* Board LED indicators */}
+        {isBoard && (() => {
+          const isPwrOn = Boolean(node.properties?.boardPowered);
+          const isLOn = isPwrOn && Boolean(node.properties?.builtInLedLit);
+          const leds = getBoardLedPositions(node.type, node.width, node.height);
+          
+          return (
+            <>
+              {/* Power LED */}
+              <Circle
+                x={leds.pwr.x}
+                y={leds.pwr.y}
+                radius={4}
+                fill={isPwrOn ? '#22c55e' : '#ef4444'}
+                stroke={isPwrOn ? '#86efac' : '#991b1b'}
+                strokeWidth={1}
+                shadowColor={isPwrOn ? '#22c55e' : '#ef4444'}
+                shadowBlur={isPwrOn ? 10 : 0}
+                opacity={1}
+                listening={false}
+              />
+              <Text
+                text={isPwrOn ? 'ON' : 'OFF'}
+                x={leds.pwr.x + 8}
+                y={leds.pwr.y - 4}
+                fontSize={8}
+                fontFamily="Inter"
+                fontStyle="700"
+                fill={isPwrOn ? '#86efac' : '#ef4444'}
+                listening={false}
+              />
+
+              {/* Built-in Pin 13/L LED */}
+              <Circle
+                x={leds.l.x}
+                y={leds.l.y}
+                radius={4}
+                fill={isLOn ? '#eab308' : '#374151'}
+                stroke={isLOn ? '#fde047' : '#4b5563'}
+                strokeWidth={1}
+                shadowColor="#eab308"
+                shadowBlur={isLOn ? 10 : 0}
+                opacity={isLOn ? 1 : 0.6}
+                listening={false}
+              />
+              <Text
+                text="L"
+                x={leds.l.x + 8}
+                y={leds.l.y - 4}
+                fontSize={8}
+                fontFamily="Inter"
+                fontStyle="700"
+                fill={isLOn ? '#fde047' : '#4b5563'}
+                listening={false}
+              />
+            </>
+          );
+        })()}
+
         {/* Pins */}
         {node.pins?.map((pin) => (
           <PinDot
@@ -798,6 +1081,7 @@ const ComponentNode = ({
             isDark={isDark}
             startWiring={startWiring}
             finishWiring={finishWiring}
+            isProbeMode={isProbeMode}
           />
         ))}
 

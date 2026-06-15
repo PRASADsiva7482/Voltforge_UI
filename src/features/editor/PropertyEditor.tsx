@@ -100,8 +100,17 @@ const propertySchemas: Record<string, { label: string; key: string; type: 'numbe
     { label: 'Retrigger Delay', key: 'delay', type: 'number', unit: 's', min: 0.3, max: 300, step: 0.1 },
   ],
   SENSOR_LDR: [
+    { label: 'Light Level', key: 'lightLevel', type: 'number', unit: '%', min: 0, max: 100, step: 1 },
     { label: 'Dark Resistance', key: 'resistanceDark', type: 'number', unit: 'ohm', min: 10000, max: 2000000, step: 1000 },
     { label: 'Light Resistance', key: 'resistanceLight', type: 'number', unit: 'ohm', min: 100, max: 50000, step: 100 },
+  ],
+  SENSOR_IMU: [
+    { label: 'Accel X', key: 'accelerationX', type: 'number', unit: 'g', min: -16, max: 16, step: 0.1 },
+    { label: 'Accel Y', key: 'accelerationY', type: 'number', unit: 'g', min: -16, max: 16, step: 0.1 },
+    { label: 'Accel Z', key: 'accelerationZ', type: 'number', unit: 'g', min: -16, max: 16, step: 0.1 },
+    { label: 'Gyro X', key: 'gyroX', type: 'number', unit: '°/s', min: -2000, max: 2000, step: 1 },
+    { label: 'Gyro Y', key: 'gyroY', type: 'number', unit: '°/s', min: -2000, max: 2000, step: 1 },
+    { label: 'Gyro Z', key: 'gyroZ', type: 'number', unit: '°/s', min: -2000, max: 2000, step: 1 },
   ],
   LCD_16X2: [
     { label: 'Backlight', key: 'backlight', type: 'select', options: ['On', 'Off'] },
@@ -155,6 +164,24 @@ const propertySchemas: Record<string, { label: string; key: string; type: 'numbe
   LED_NEOPIXEL: [
     { label: 'Pixel Count', key: 'pixelCount', type: 'number', min: 1, max: 256, step: 1 },
     { label: 'Brightness', key: 'brightness', type: 'number', unit: '%', min: 0, max: 100, step: 1 },
+  ],
+  ARDUINO_UNO: [
+    { label: 'USB Connected', key: 'usbConnected', type: 'select', options: ['Yes', 'No'] },
+  ],
+  ARDUINO_NANO: [
+    { label: 'USB Connected', key: 'usbConnected', type: 'select', options: ['Yes', 'No'] },
+  ],
+  ARDUINO_MEGA: [
+    { label: 'USB Connected', key: 'usbConnected', type: 'select', options: ['Yes', 'No'] },
+  ],
+  ESP32: [
+    { label: 'USB Connected', key: 'usbConnected', type: 'select', options: ['Yes', 'No'] },
+  ],
+  ESP32_S3: [
+    { label: 'USB Connected', key: 'usbConnected', type: 'select', options: ['Yes', 'No'] },
+  ],
+  ESP8266: [
+    { label: 'USB Connected', key: 'usbConnected', type: 'select', options: ['Yes', 'No'] },
   ],
 };
 

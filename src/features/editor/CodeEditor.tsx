@@ -74,6 +74,25 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
   const monacoRef = useRef<any>(null);
   const decorationIds = useRef<string[]>([]);
 
+  const lastShowFullCode = useRef(showFullCode);
+  const lastFileId = useRef(activeCodeFile?.id);
+  const ignoreChange = useRef(false);
+
+  if (lastShowFullCode.current !== showFullCode || lastFileId.current !== activeCodeFile?.id) {
+    lastShowFullCode.current = showFullCode;
+    lastFileId.current = activeCodeFile?.id;
+    ignoreChange.current = true;
+  }
+
+  useEffect(() => {
+    if (ignoreChange.current) {
+      const timer = setTimeout(() => {
+        ignoreChange.current = false;
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [showFullCode, activeCodeFile?.id]);
+
   const codeFiles = currentProject?.codeFiles || [];
 
   // Generate full code view when toggled
@@ -231,10 +250,15 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
           theme="vs-dark"
           onMount={handleEditorMount}
           onChange={(value) => {
-            // Only allow editing in user code mode
-            if (!showFullCode && value !== undefined) {
-              updateCodeFileContent(activeCodeFile.id, value);
+            if (showFullCode || ignoreChange.current) return;
+            if (value === undefined) return;
+
+            // Prevent saving full code view contents if it contains auto-generated headers
+            if (value.includes('VoltForge — Auto-generated Full Sketch') || value.includes('Auto-generated Full Sketch')) {
+              return;
             }
+
+            updateCodeFileContent(activeCodeFile.id, value);
           }}
           options={{
             fontSize: 13,

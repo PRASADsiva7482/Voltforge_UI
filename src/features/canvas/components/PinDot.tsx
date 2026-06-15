@@ -1,5 +1,5 @@
 import { memo, useState } from 'react';
-import { Group, Circle, Line, Text } from 'react-konva';
+import { Group, Circle, Line, Text, Rect } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { CanvasNode, PinPosition } from '../canvasTypes';
 import {
@@ -27,6 +27,7 @@ interface PinDotProps {
   isDark: boolean;
   startWiring: (nodeId: string, pinId: string) => void;
   finishWiring: (nodeId: string, pinId: string) => void;
+  isProbeMode?: boolean;
 }
 
 /** Resolves the fill and glow colors for a pin based on its electrical type. */
@@ -104,6 +105,7 @@ const PinDot = memo(function PinDot({
   isDark,
   startWiring,
   finishWiring,
+  isProbeMode,
 }: PinDotProps) {
   const [hovered, setHovered] = useState(false);
   const isValidTarget = isWiring && wiringFromNodeId !== nodeId;
@@ -225,6 +227,44 @@ const PinDot = memo(function PinDot({
           listening={false}
         />
       )}
+
+      {isProbeMode && hovered && (() => {
+        const voltage = (globalThis as any).__voltforgePinVoltages?.[`${nodeId}:${pin.id}`];
+        if (voltage === undefined) return null;
+        return (
+          <Group x={pin.x + 12} y={pin.y - 12} listening={false}>
+            <Rect
+              width={75}
+              height={30}
+              cornerRadius={6}
+              fill="#0c0a1c"
+              stroke="#c084fc"
+              strokeWidth={1.5}
+              shadowColor="#c084fc"
+              shadowBlur={10}
+              shadowOpacity={0.6}
+            />
+            <Text
+              text={pin.name}
+              x={6}
+              y={4}
+              fontSize={8}
+              fontFamily="JetBrains Mono"
+              fontStyle="700"
+              fill="#a855f7"
+            />
+            <Text
+              text={`${voltage.toFixed(3)} V`}
+              x={6}
+              y={15}
+              fontSize={10}
+              fontFamily="JetBrains Mono"
+              fontStyle="700"
+              fill="#34d399"
+            />
+          </Group>
+        );
+      })()}
     </Group>
   );
 });

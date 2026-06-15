@@ -1,4 +1,5 @@
-import { Circle, Line, Text } from 'react-konva';
+import { useState } from 'react';
+import { Circle, Line, Text, Group, Rect } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { getPinAbsPos, distToSegment, getWireRenderPoints } from '../../../utils/wireRouting';
 import type { CanvasNode, Wire, ActiveBendPoint } from '../canvasTypes';
@@ -24,6 +25,7 @@ interface WireShapeProps {
   onSelect: () => void;
   onWireDragStart: (wireId: string, index: number, x: number, y: number) => void;
   activeNewBendPoint: ActiveBendPoint | null;
+  isProbeMode?: boolean;
 }
 
 /** Renders a single wire with outline, bend point handles, and label. */
@@ -36,7 +38,9 @@ const WireShape = ({
   onSelect,
   onWireDragStart,
   activeNewBendPoint,
+  isProbeMode,
 }: WireShapeProps) => {
+  const [hovered, setHovered] = useState(false);
   const from = nodes.find((n) => n.id === wire.fromNodeId);
   const to = nodes.find((n) => n.id === wire.toNodeId);
   if (!from || !to) return null;
@@ -117,10 +121,12 @@ const WireShape = ({
         onMouseEnter={(e: KonvaEventObject<MouseEvent>) => {
           const c = e.target.getStage()?.container();
           if (c) c.style.cursor = isSelected ? 'pointer' : 'default';
+          setHovered(true);
         }}
         onMouseLeave={(e: KonvaEventObject<MouseEvent>) => {
           const c = e.target.getStage()?.container();
           if (c) c.style.cursor = 'default';
+          setHovered(false);
         }}
       />
 
@@ -155,6 +161,52 @@ const WireShape = ({
           padding={2}
         />
       )}
+
+      {isProbeMode && hovered && (() => {
+        const voltage =
+          (globalThis as any).__voltforgePinVoltages?.[`${wire.fromNodeId}:${wire.fromPinId}`] ??
+          (globalThis as any).__voltforgePinVoltages?.[`${wire.toNodeId}:${wire.toPinId}`];
+        if (voltage === undefined) return null;
+        const getWireMidpoint = (pts: number[]): { x: number; y: number } => {
+          if (pts.length < 4) return { x: 0, y: 0 };
+          const numPoints = pts.length / 2;
+          const midIdx = Math.floor(numPoints / 2);
+          if (numPoints % 2 === 1) {
+            return { x: pts[2 * midIdx], y: pts[2 * midIdx + 1] };
+          } else {
+            const x1 = pts[2 * (midIdx - 1)];
+            const y1 = pts[2 * (midIdx - 1) + 1];
+            const x2 = pts[2 * midIdx];
+            const y2 = pts[2 * midIdx + 1];
+            return { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
+          }
+        };
+        const mid = getWireMidpoint(allPoints);
+        return (
+          <Group x={mid.x - 32} y={mid.y - 10} listening={false}>
+            <Rect
+              width={65}
+              height={20}
+              cornerRadius={4}
+              fill="#0c0a1c"
+              stroke="#c084fc"
+              strokeWidth={1.2}
+              shadowColor="#c084fc"
+              shadowBlur={8}
+              shadowOpacity={0.6}
+            />
+            <Text
+              text={`${voltage.toFixed(3)} V`}
+              x={6}
+              y={5}
+              fontSize={9}
+              fontFamily="JetBrains Mono"
+              fontStyle="700"
+              fill="#34d399"
+            />
+          </Group>
+        );
+      })()}
     </>
   );
 };

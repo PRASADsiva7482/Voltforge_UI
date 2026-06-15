@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
 import type { ProjectSummary } from '../../types';
 import keycloak from '../../utils/keycloak';
+import { SMART_DEVICE_PRESET } from '../../store/projectStore';
 
 export default function DashboardPage() {
   const { t } = useTranslation();
@@ -30,7 +31,23 @@ export default function DashboardPage() {
   });
 
   const projects = projectsData?.content || [];
-  const templates = templatesData?.content || [];
+  const templatesFromDb = templatesData?.content || [];
+  const templates = [...templatesFromDb];
+  if (!templates.some(t => t.id === 'preset-smart-device')) {
+    templates.unshift({
+      id: SMART_DEVICE_PRESET.id,
+      name: SMART_DEVICE_PRESET.name,
+      description: SMART_DEVICE_PRESET.description,
+      boardType: SMART_DEVICE_PRESET.boardType,
+      isPublic: SMART_DEVICE_PRESET.isPublic,
+      forkCount: SMART_DEVICE_PRESET.forkCount,
+      viewCount: SMART_DEVICE_PRESET.viewCount,
+      tags: SMART_DEVICE_PRESET.tags,
+      owner: SMART_DEVICE_PRESET.owner,
+      createdAt: SMART_DEVICE_PRESET.createdAt,
+      updatedAt: SMART_DEVICE_PRESET.updatedAt,
+    });
+  }
 
   return (
     <div className="p-8 max-w-7xl mx-auto pt-16 pb-20">
@@ -89,7 +106,7 @@ export default function DashboardPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {templates.map((template: ProjectSummary) => (
-              <ProjectCard key={template.id} project={template} onClick={() => navigate(`/explore?template=${template.id}`)} />
+              <ProjectCard key={template.id} project={template} onClick={() => navigate(`/editor/${template.id}`)} />
             ))}
           </div>
         </motion.div>

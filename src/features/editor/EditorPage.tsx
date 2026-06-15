@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Save, ArrowLeft, Play, Square, Settings, Layout, Terminal, Undo, Redo, Gauge, Activity, Package, Download, Share2, Layers, GitFork } from 'lucide-react';
+import { Save, ArrowLeft, Play, Square, Settings, Layout, Terminal, Undo, Redo, Gauge, Activity, Package, Download, Share2, Layers, GitFork, Zap } from 'lucide-react';
 import CircuitCanvas from '../canvas/CircuitCanvas';
 import ComponentPanel from '../components/ComponentPanel';
 import CodeEditor from '../editor/CodeEditor';
@@ -11,7 +11,7 @@ import MultimeterPanel from './MultimeterPanel';
 import OscilloscopePanel from './OscilloscopePanel';
 import BomPanel from './BomPanel';
 import { projectApi, projectExportApi, simulationApi } from '../../api/services';
-import { useProjectStore } from '../../store/projectStore';
+import { useProjectStore, SMART_DEVICE_PRESET } from '../../store/projectStore';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useSimulationStore } from '../../store/simulationStore';
 import { useAuthStore } from '../../store/authStore';
@@ -19,7 +19,7 @@ import { useCollaboration } from '../../hooks/useCollaboration';
 import { SimulationEngine } from '../simulator/SimulationEngine';
 import { LogicRegistry } from '../simulator/logic/LogicRegistry';
 import { analyzeCircuitSafety } from '../canvas/pinRegistry';
-import type { CanvasNode, PinPosition } from '../../types';
+import type { CanvasNode, PinPosition, CodeFile, Project } from '../../types';
 
 type ActivePanel = 'canvas' | 'code' | 'split';
 type CanvasViewMode = 'breadboard' | 'pcb';
@@ -49,6 +49,28 @@ function resolveSuggestedPin(ref: string, node: CanvasNode): PinPosition | null 
   ) || null;
 }
 
+function bundleCodeFiles(activeFile: CodeFile | null, files: CodeFile[]): string {
+  if (!activeFile) return '';
+  let content = activeFile.content;
+  const maxIterations = 10;
+
+  for (let iter = 0; iter < maxIterations; iter++) {
+    let replaced = false;
+    content = content.replace(/^#include\s+"([^"]+)"/gm, (match, filename) => {
+      const includedFile = files.find(f => f.filename.toLowerCase() === filename.toLowerCase());
+      if (includedFile) {
+        replaced = true;
+        return `\n// ── Begin Include: ${includedFile.filename} ──\n` +
+               includedFile.content +
+               `\n// ── End Include: ${includedFile.filename} ──\n`;
+      }
+      return match;
+    });
+    if (!replaced) break;
+  }
+  return content;
+}
+
 export default function EditorPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
@@ -59,6 +81,7 @@ export default function EditorPage() {
   const [showMultimeter, setShowMultimeter] = useState(false);
   const [showOscilloscope, setShowOscilloscope] = useState(false);
   const [showBom, setShowBom] = useState(false);
+  const [isProbeMode, setIsProbeMode] = useState(false);
   const [splitRatio, setSplitRatio] = useState(50); // percentage for canvas width
   const [canvasViewMode, setCanvasViewMode] = useState<CanvasViewMode>('breadboard');
   const isDraggingSplit = useRef(false);
@@ -104,14 +127,52 @@ export default function EditorPage() {
   const { user } = useAuthStore();
 
   // Ownership check — non-owners get a read-only view
-  const isOwner = !currentProject || currentProject.owner.id === user?.id;
+  const isOwner = !currentProject || currentProject.id === 'share' || currentProject.owner.id === user?.id;
 
   // Fork mutation — duplicates the project to the current user's account
   const forkMutation = useMutation({
     mutationFn: async () => {
       if (!currentProject) return;
-      const response = await projectApi.fork(currentProject.id);
-      return response.data.data;
+
+      if (currentProject.id === 'preset-smart-device') {
+        const response = await projectApi.create({
+          name: `${currentProject.name} (Forked)`,
+          description: currentProject.description,
+          boardType: currentProject.boardType,
+          canvasLayout: { nodes, wires } as any,
+          tags: currentProject.tags,
+          isPublic: false,
+          codeFiles: currentProject.codeFiles.map(f => ({
+            filename: f.filename,
+            content: f.content,
+            language: f.language,
+            sortOrder: f.sortOrder
+          })),
+        });
+        return response.data.data;
+      }
+
+      try {
+        const response = await projectApi.fork(currentProject.id);
+        return response.data.data;
+      } catch (err) {
+        console.warn('Fork endpoint failed, falling back to projectApi.create', err);
+        const response = await projectApi.create({
+          name: `${currentProject.name} (Copy)`,
+          description: currentProject.description,
+          boardType: currentProject.boardType,
+          canvasLayout: { nodes, wires } as any,
+          tags: currentProject.tags,
+          isPublic: false,
+          codeFiles: currentProject.codeFiles.map(f => ({
+            filename: f.filename,
+            content: f.content,
+            language: f.language,
+            sortOrder: f.sortOrder
+          })),
+        });
+        return response.data.data;
+      }
     },
     onSuccess: (forkedProject) => {
       if (forkedProject) {
@@ -124,7 +185,62 @@ export default function EditorPage() {
 
   const { data: projectData, isLoading } = useQuery({
     queryKey: ['project', projectId],
-    queryFn: async () => { const r = await projectApi.getById(projectId!); return r.data.data; },
+    queryFn: async () => {
+      if (projectId === 'preset-smart-device') {
+        return SMART_DEVICE_PRESET;
+      }
+      if (projectId === 'share') {
+        const params = new URLSearchParams(window.location.search);
+        const encoded = params.get('state');
+        if (encoded) {
+          try {
+            const decoded = decodeURIComponent(escape(atob(encoded)));
+            const shareState = JSON.parse(decoded);
+            const mockProject: Project = {
+              id: 'share',
+              name: shareState.name || 'Shared Project',
+              description: 'Shared via portable link',
+              boardType: shareState.boardType || 'ARDUINO_UNO',
+              isPublic: false,
+              forkCount: 0,
+              viewCount: 0,
+              owner: {
+                id: 'shared-user',
+                keycloakId: 'shared-user',
+                username: 'shared-user',
+                email: 'shared@voltforge.in',
+                displayName: 'Shared User',
+                role: 'USER',
+                accountStatus: 'ACTIVE',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
+              codeFiles: (shareState.codeFiles || []).map((f: any, idx: number) => ({
+                id: `shared-file-${idx}`,
+                filename: f.filename,
+                content: f.content,
+                language: f.language || 'cpp',
+                sortOrder: idx,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              })),
+              canvasLayout: {
+                viewport: shareState.canvasLayout?.viewport || { x: 0, y: 0, scale: 1 },
+                nodes: shareState.canvasLayout?.nodes || [],
+                wires: shareState.canvasLayout?.wires || [],
+              },
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            return mockProject;
+          } catch (err) {
+            console.error('Failed to parse shared project state', err);
+          }
+        }
+      }
+      const r = await projectApi.getById(projectId!);
+      return r.data.data;
+    },
     enabled: !!projectId,
   });
 
@@ -141,6 +257,23 @@ export default function EditorPage() {
     mutationFn: async () => {
       if (!currentProject || !projectId) return;
       setSaving(true);
+      if (projectId === 'share') {
+        const response = await projectApi.create({
+          name: currentProject.name,
+          description: currentProject.description,
+          boardType: currentProject.boardType,
+          canvasLayout: { nodes, wires } as any,
+          codeFiles: currentProject.codeFiles.map(f => ({
+            filename: f.filename,
+            content: f.content,
+            language: f.language,
+          })),
+        });
+        const created = response.data.data;
+        setCurrentProject(created);
+        navigate(`/editor/${created.id}`);
+        return;
+      }
       await projectApi.update(projectId, {
         name: currentProject.name, description: currentProject.description,
         canvasLayout: { nodes, wires } as any,
@@ -244,9 +377,10 @@ export default function EditorPage() {
         safety.issues.forEach(issue => writeSerial(`[${issue.severity}] ${issue.message} ${issue.suggestedFix}`));
       }
 
+      const bundledCode = bundleCodeFiles(activeCodeFile, currentProject?.codeFiles || []);
       try {
         const compile = await simulationApi.compileFirmware({
-          source: activeCodeFile?.content || '',
+          source: bundledCode,
           boardType: currentProject?.boardType,
           sketchName: currentProject?.name || 'VoltForgeSketch',
         });
@@ -260,7 +394,7 @@ export default function EditorPage() {
         writeSerial(`> Firmware compiler unavailable: ${err?.message || 'request failed'}`);
       }
 
-      await engineRef.current?.start(activeCodeFile?.content || '', nodes, wires, compiledHex);
+      await engineRef.current?.start(bundledCode, nodes, wires, compiledHex);
     } else {
       setIsSimulating(false);
       engineRef.current?.stop();
@@ -276,7 +410,16 @@ export default function EditorPage() {
     const node = nodes.find(n => n.id === nodeId);
     if (!node) return;
 
-    // Simulate sending high/low for buttons
+    // 1. Visually depress/release the button in the Canvas store
+    const isPressed = event === 'press';
+    updateNode(nodeId, {
+      properties: {
+        ...node.properties,
+        isPressed
+      }
+    });
+
+    // 2. Simulate sending high/low for buttons connected to MCU
     const nodePinIds = node.pins?.map(p => p.id) || [];
     const connectedWires = wires.filter(w =>
       (w.fromNodeId === nodeId && nodePinIds.includes(w.fromPinId)) ||
@@ -294,11 +437,11 @@ export default function EditorPage() {
         if (mcuPin) {
           // Extract pin number from name (e.g., "D2" -> "2", "2" -> "2")
           const pinNum = mcuPin.name.replace(/[^0-9]/g, '');
-          engineRef.current?.setExternalPinState(pinNum, event === 'press' ? 'HIGH' : 'LOW');
+          engineRef.current?.setExternalPinState(pinNum, isPressed ? 'HIGH' : 'LOW');
         }
       }
     });
-  }, [nodes, wires, isSimulating]);
+  }, [nodes, wires, isSimulating, updateNode]);
 
 
 
@@ -337,9 +480,36 @@ export default function EditorPage() {
   };
 
   const handleShareLiveSession = async () => {
-    const url = `${window.location.origin}/editor/${projectId}?live=1`;
-    await navigator.clipboard?.writeText(url);
-    writeSerial(`> Live Session link copied: ${url}`);
+    if (!currentProject) return;
+    try {
+      const shareState = {
+        name: currentProject.name,
+        boardType: currentProject.boardType,
+        canvasLayout: {
+          nodes: nodes.map(n => ({
+            id: n.id, componentId: n.componentId, type: n.type, name: n.name,
+            x: n.x, y: n.y, width: n.width, height: n.height, rotation: n.rotation,
+            properties: n.properties, pins: n.pins
+          })),
+          wires: wires.map(w => ({
+            id: w.id, fromNodeId: w.fromNodeId, fromPinId: w.fromPinId,
+            toNodeId: w.toNodeId, toPinId: w.toPinId, color: w.color,
+            bendPoints: w.bendPoints, routingMode: w.routingMode
+          }))
+        },
+        codeFiles: currentProject.codeFiles.map(f => ({
+          filename: f.filename, content: f.content, language: f.language
+        })),
+      };
+      const jsonString = JSON.stringify(shareState);
+      const encoded = btoa(unescape(encodeURIComponent(jsonString)));
+      const url = `${window.location.origin}/editor/share?state=${encoded}`;
+      await navigator.clipboard?.writeText(url);
+      writeSerial(`> Portable Share Link copied: ${url}`);
+    } catch (err: any) {
+      console.error(err);
+      writeSerial(`> Failed to generate share link: ${err.message}`);
+    }
   };
 
   if (isLoading) return <div className="flex items-center justify-center h-screen bg-surface-50 dark:bg-surface-950"><div className="w-8 h-8 border-2 border-volt-500 border-t-transparent rounded-full animate-spin" /></div>;
@@ -381,10 +551,11 @@ export default function EditorPage() {
         <div className="flex items-center gap-0.5">
           <button onClick={() => setShowMultimeter(!showMultimeter)} className={`p-2 rounded-lg transition-all ${showMultimeter ? 'bg-volt-500/20 text-volt-500 dark:text-volt-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title="Multimeter"><Gauge className="w-3.5 h-3.5" /></button>
           <button onClick={() => setShowOscilloscope(!showOscilloscope)} className={`p-2 rounded-lg transition-all ${showOscilloscope ? 'bg-volt-500/20 text-volt-500 dark:text-volt-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title="Oscilloscope"><Activity className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setIsProbeMode(!isProbeMode)} className={`p-2 rounded-lg transition-all ${isProbeMode ? 'bg-purple-500/20 text-purple-500 dark:text-purple-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title="Diagnostic Probe Mode"><Zap className="w-3.5 h-3.5" /></button>
           <button onClick={() => setShowBom(!showBom)} className={`p-2 rounded-lg transition-all ${showBom ? 'bg-forge-500/20 text-forge-500 dark:text-forge-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title="Bill of Materials"><Package className="w-3.5 h-3.5" /></button>
           <button onClick={() => setCanvasViewMode(canvasViewMode === 'breadboard' ? 'pcb' : 'breadboard')} className={`p-2 rounded-lg transition-all ${canvasViewMode === 'pcb' ? 'bg-forge-500/20 text-forge-500 dark:text-forge-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title="Breadboard / PCB View"><Layers className="w-3.5 h-3.5" /></button>
           <button onClick={() => setSerialPanelOpen(!serialPanelOpen)} className={`p-2 rounded-lg transition-all ${serialPanelOpen ? 'bg-surface-100 text-surface-950 dark:bg-surface-800 dark:text-white' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title="Serial Monitor"><Terminal className="w-3.5 h-3.5" /></button>
-          <button onClick={handleShareLiveSession} className="p-2 rounded-lg transition-all text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5" title="Copy Live Session Link"><Share2 className="w-3.5 h-3.5" /></button>
+          <button onClick={handleShareLiveSession} className="p-2 rounded-lg transition-all text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5" title="Copy Share Link"><Share2 className="w-3.5 h-3.5" /></button>
           <button onClick={() => setShowSettings(true)} disabled={!isOwner} className="p-2 rounded-lg text-surface-500 hover:bg-surface-100 hover:text-surface-950 transition-all disabled:opacity-30 dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white" title="Settings"><Settings className="w-3.5 h-3.5" /></button>
         </div>
 
@@ -427,6 +598,7 @@ export default function EditorPage() {
                   onCursorMove={broadcastCursorMove}
                   onComponentInteraction={handleComponentInteraction}
                   readOnly={!isOwner}
+                  isProbeMode={isProbeMode}
                 />
               </div>
             </div>

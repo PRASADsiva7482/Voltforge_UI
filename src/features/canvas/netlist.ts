@@ -188,6 +188,7 @@ export function analyzeCircuitSafety(nodes: CanvasNode[], wires: Wire[]): Circui
     }
   }
 
+  checkI2cConflicts(netlist, issues);
   return { netlist, issues, nodeStates };
 }
 
@@ -356,5 +357,66 @@ export function analyzeCircuitSafetyWithSolver(
     }
   }
 
+  checkI2cConflicts(netlist, issues);
   return { netlist, issues, nodeStates };
+}
+
+function checkI2cConflicts(netlist: CircuitNetlist, issues: CircuitSafetyIssue[]) {
+  const busGroups: Record<string, { component: NetlistComponent; addr: number }[]> = {};
+
+  for (const component of netlist.components) {
+    const sdaPinId = Object.keys(component.pins).find(
+      (k) => k.toLowerCase() === 'sda' || k.toLowerCase().includes('sda')
+    );
+    const sclPinId = Object.keys(component.pins).find(
+      (k) => k.toLowerCase() === 'scl' || k.toLowerCase().includes('scl')
+    );
+
+    if (!sdaPinId || !sclPinId) continue;
+
+    const sdaNet = component.pins[sdaPinId];
+    const sclNet = component.pins[sclPinId];
+
+    if (!sdaNet || !sclNet) continue;
+
+    const busId = `${sdaNet}_${sclNet}`;
+
+    if (component.properties && component.properties.address !== undefined) {
+      const rawAddr = String(component.properties.address).trim().toLowerCase();
+      const addrNum = rawAddr.startsWith('0x') ? parseInt(rawAddr, 16) : parseInt(rawAddr, 10);
+
+      if (!isNaN(addrNum)) {
+        if (!busGroups[busId]) {
+          busGroups[busId] = [];
+        }
+        busGroups[busId].push({ component, addr: addrNum });
+      }
+    }
+  }
+
+  for (const [busId, devices] of Object.entries(busGroups)) {
+    const addrToDevices: Record<number, typeof devices> = {};
+    for (const dev of devices) {
+      if (!addrToDevices[dev.addr]) {
+        addrToDevices[dev.addr] = [];
+      }
+      addrToDevices[dev.addr].push(dev);
+    }
+
+    for (const [addr, devs] of Object.entries(addrToDevices)) {
+      if (devs.length > 1) {
+        const names = devs.map((d) => d.component.name).join(' and ');
+        const hexAddr = `0x${Number(addr).toString(16).toUpperCase()}`;
+        devs.forEach((dev) => {
+          issues.push({
+            id: `${dev.component.id}:i2c-address-conflict`,
+            severity: 'WARNING',
+            componentId: dev.component.id,
+            message: `I2C Address Conflict: Multiple devices (${names}) share the address ${hexAddr} on the same I2C bus.`,
+            suggestedFix: 'Configure a unique address for each I2C device in the properties panel.',
+          });
+        });
+      }
+    }
+  }
 }

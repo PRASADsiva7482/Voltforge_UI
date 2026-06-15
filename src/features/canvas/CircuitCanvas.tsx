@@ -36,6 +36,7 @@ interface Props {
   onComponentInteraction?: (nodeId: string, event: 'press' | 'release') => void;
   onCursorMove?: (x: number, y: number) => void;
   readOnly?: boolean;
+  isProbeMode?: boolean;
 }
 
 // ── Grid Layer (memoized) — professional engineering grid ──
@@ -216,6 +217,7 @@ export default function CircuitCanvas({
   onComponentInteraction,
   onCursorMove,
   readOnly,
+  isProbeMode,
 }: Props) {
   const isDark = useThemeStore((state) => state.theme === 'dark');
   const {
@@ -398,6 +400,7 @@ export default function CircuitCanvas({
                 finishWiring={readOnly ? () => {} : finishWiring}
                 onInteraction={onComponentInteraction}
                 readOnly={readOnly}
+                isProbeMode={isProbeMode}
               />
             ))}
           </Layer>
@@ -415,6 +418,7 @@ export default function CircuitCanvas({
                 onSelect={() => selectWire(w.id)}
                 onWireDragStart={handleWireDragStart}
                 activeNewBendPoint={activeNewBendPoint}
+                isProbeMode={isProbeMode}
               />
             ))}
             {isWiring && wiringFrom && (
