@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Save, ArrowLeft, Play, Square, Settings, Layout, Terminal, Undo, Redo, Gauge, Activity, Package, Download, Share2, Layers, GitFork, Zap } from 'lucide-react';
 import CircuitCanvas from '../canvas/CircuitCanvas';
 import ComponentPanel from '../components/ComponentPanel';
-import CodeEditor from '../editor/CodeEditor';
+const CodeEditor = lazy(() => import('../editor/CodeEditor'));
 import PropertyEditor from '../editor/PropertyEditor';
 import ProjectSettingsModal from './ProjectSettingsModal';
 import MultimeterPanel from './MultimeterPanel';
@@ -618,7 +618,9 @@ export default function EditorPage() {
               className="relative min-w-0"
               style={{ width: activePanel === 'split' ? `${100 - splitRatio}%` : '100%' }}
             >
-              <CodeEditor readOnly={!isOwner} />
+              <Suspense fallback={<div className="p-4 text-xs text-surface-400 font-mono">Loading Code Editor...</div>}>
+                <CodeEditor readOnly={!isOwner} />
+              </Suspense>
             </div>
           )}
         </div>

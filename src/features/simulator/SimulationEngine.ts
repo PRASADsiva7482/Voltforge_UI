@@ -331,9 +331,10 @@ export class SimulationEngine {
     // Subscribe to canvas store changes to dynamically update MNA solver values
     this.storeUnsubscribe = useCanvasStore.subscribe((state, prev) => {
       if (!this.isRunning || !this.solverWorker || !this.mnaCircuit) return;
+      if (state.nodes === prev.nodes) return;
 
       state.nodes.forEach(node => {
-        const prevNode = prev.nodes.find(n => n.id === node.id);
+        const prevNode = prev.nodesById?.get(node.id) || prev.nodes.find(n => n.id === node.id);
         if (!prevNode) return;
 
         const props = node.properties || {};
@@ -534,22 +535,27 @@ export class SimulationEngine {
       if (!this.isRunning) return;
       const nodes = useCanvasStore.getState().nodes;
       const elapsed = (Date.now() - this.sensorStartTime) / 1000; // seconds
+      const updatesList: Array<{ id: string; changes: Partial<CanvasNode> }> = [];
 
       for (const node of nodes) {
         const props = node.properties || {};
+        const nodeChanges: Record<string, any> = {};
+        let changed = false;
 
         // ── DHT Temperature + Humidity: oscillate around set value ──
         if (node.type === 'TEMP_SENSOR' || node.type === 'SENSOR_DHT11' || node.type === 'SENSOR_DHT22') {
           const baseTemp = Number(props.temperature ?? 25);
           const baseHum = Number(props.humidity ?? 60);
-          // Slow sine wave ±2°C over ~30s period
           const tempVariation = Math.sin(elapsed * 0.2) * 2 + Math.sin(elapsed * 0.7) * 0.5;
           const humVariation = Math.sin(elapsed * 0.15) * 5 + Math.cos(elapsed * 0.4) * 2;
           const newTemp = Math.round((baseTemp + tempVariation) * 10) / 10;
           const newHum = Math.max(0, Math.min(100, Math.round(baseHum + humVariation)));
 
-          LogicRegistry.dispatch(node.type, node.id, '__sensor_temp__', 'HIGH', newTemp);
-          LogicRegistry.dispatch(node.type, node.id, '__sensor_hum__', 'HIGH', newHum);
+          if (props.temperature !== newTemp || props.humidity !== newHum) {
+            nodeChanges.temperature = newTemp;
+            nodeChanges.humidity = newHum;
+            changed = true;
+          }
         }
 
         // ── Ultrasonic: distance slowly varies ±15cm ──
@@ -557,16 +563,19 @@ export class SimulationEngine {
           const baseDist = Number(props.distance ?? 100);
           const distVariation = Math.sin(elapsed * 0.3) * 15 + Math.cos(elapsed * 0.8) * 5;
           const newDist = Math.max(2, Math.min(400, Math.round(baseDist + distVariation)));
-          LogicRegistry.dispatch(node.type, node.id, '__sensor_dist__', 'HIGH', newDist);
+          if (props.distance !== newDist) {
+            nodeChanges.distance = newDist;
+            changed = true;
+          }
         }
 
-        // ── PIR: random motion triggers every 5-10 seconds ──
+        // ── PIR: motion triggers in bursts ──
         if (node.type === 'PIR_SENSOR' || node.type === 'SENSOR_PIR') {
-          // Trigger motion in bursts
           const isMotionPhase = Math.sin(elapsed * 0.5) > 0.6;
           const currentMotion = Boolean(props.motionDetected);
           if (isMotionPhase !== currentMotion) {
-            LogicRegistry.dispatch(node.type, node.id, '__sensor_motion__', isMotionPhase ? 'HIGH' : 'LOW');
+            nodeChanges.motionDetected = isMotionPhase;
+            changed = true;
           }
         }
 
@@ -575,7 +584,10 @@ export class SimulationEngine {
           const baseLight = Number(props.lightLevel ?? 50);
           const lightVariation = Math.sin(elapsed * 0.1) * 15 + Math.cos(elapsed * 0.3) * 8;
           const newLight = Math.max(0, Math.min(100, Math.round(baseLight + lightVariation)));
-          LogicRegistry.dispatch(node.type, node.id, '__sensor_light__', 'HIGH', newLight);
+          if (props.lightLevel !== newLight) {
+            nodeChanges.lightLevel = newLight;
+            changed = true;
+          }
         }
 
         // ── IMU: subtle accelerometer noise + gentle tilt ──
@@ -585,12 +597,13 @@ export class SimulationEngine {
           const noise = () => (Math.random() - 0.5) * 0.2;
           const tiltX = Math.sin(elapsed * 0.4) * 0.5 + noise();
           const tiltY = Math.cos(elapsed * 0.3) * 0.3 + noise();
-          LogicRegistry.dispatch(node.type, node.id, '__sensor_accel_x__', 'HIGH',
-            Math.round((baseAx + tiltX) * 100) / 100
-          );
-          LogicRegistry.dispatch(node.type, node.id, '__sensor_accel_y__', 'HIGH',
-            Math.round((baseAy + tiltY) * 100) / 100
-          );
+          const newAx = Math.round((baseAx + tiltX) * 100) / 100;
+          const newAy = Math.round((baseAy + tiltY) * 100) / 100;
+          if (props.accelerationX !== newAx || props.accelerationY !== newAy) {
+            nodeChanges.accelerationX = newAx;
+            nodeChanges.accelerationY = newAy;
+            changed = true;
+          }
         }
 
         // ── Soil Moisture: moisture slowly changes ──
@@ -598,10 +611,29 @@ export class SimulationEngine {
           const baseMoisture = Number(props.moistureLevel ?? 50);
           const moistureVariation = Math.sin(elapsed * 0.08) * 10 + Math.cos(elapsed * 0.2) * 5;
           const newMoisture = Math.max(0, Math.min(100, Math.round(baseMoisture + moistureVariation)));
-          LogicRegistry.dispatch(node.type, node.id, '__sensor_moisture__', 'HIGH', newMoisture);
+          if (props.moistureLevel !== newMoisture) {
+            nodeChanges.moistureLevel = newMoisture;
+            changed = true;
+          }
+        }
+
+        if (changed) {
+          updatesList.push({
+            id: node.id,
+            changes: {
+              properties: {
+                ...props,
+                ...nodeChanges,
+              },
+            },
+          });
         }
       }
-    }, 500); // Update every 500ms
+
+      if (updatesList.length > 0) {
+        useCanvasStore.getState().batchUpdateNodes(updatesList);
+      }
+    }, 1000); // Update every 1000ms
   }
 
   private stopSensorAutoCycling() {

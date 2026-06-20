@@ -1,5 +1,6 @@
 import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
-import { Stage, Layer, Rect, Group, Text, Circle, Line } from 'react-konva';
+import { useShallow } from 'zustand/react/shallow';
+import { Stage, Layer, Rect, Group, Text, Circle, Line, Shape } from 'react-konva';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { Download, Layers } from 'lucide-react';
@@ -52,66 +53,82 @@ const CanvasMat = ({
   viewport: { x: number; y: number; scale: number };
   isDark: boolean;
 }) => {
-  const guides = useMemo(() => {
-    const result: React.ReactNode[] = [];
-    const scale = viewport.scale || 1;
-    const pad = 200;
-    const minX = Math.floor((-viewport.x / scale - pad) / MAT_GRID_MINOR) * MAT_GRID_MINOR;
-    const minY = Math.floor((-viewport.y / scale - pad) / MAT_GRID_MINOR) * MAT_GRID_MINOR;
-    const maxX = -viewport.x / scale + width / scale + pad;
-    const maxY = -viewport.y / scale + height / scale + pad;
-
-    // Minor grid lines (fine 20px)
-    for (let x = minX; x <= maxX; x += MAT_GRID_MINOR) {
-      if (x % MAT_GRID_MAJOR === 0) continue;
-      result.push(
-        <Line key={`gm_x_${x}`} points={[x, minY, x, maxY]}
-          stroke={isDark ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.055)'}
-          strokeWidth={0.5 / scale} listening={false} />
-      );
-    }
-    for (let y = minY; y <= maxY; y += MAT_GRID_MINOR) {
-      if (y % MAT_GRID_MAJOR === 0) continue;
-      result.push(
-        <Line key={`gm_y_${y}`} points={[minX, y, maxX, y]}
-          stroke={isDark ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.055)'}
-          strokeWidth={0.5 / scale} listening={false} />
-      );
-    }
-
-    // Major grid lines (100px)
-    const majorMinX = Math.floor(minX / MAT_GRID_MAJOR) * MAT_GRID_MAJOR;
-    const majorMinY = Math.floor(minY / MAT_GRID_MAJOR) * MAT_GRID_MAJOR;
-    for (let x = majorMinX; x <= maxX; x += MAT_GRID_MAJOR) {
-      result.push(
-        <Line key={`gM_x_${x}`} points={[x, minY, x, maxY]}
-          stroke={x === 0 ? ORIGIN_AXIS_COLOR : (isDark ? 'rgba(255,255,255,0.055)' : 'rgba(15,23,42,0.11)')}
-          strokeWidth={(x === 0 ? 1.4 : 0.8) / scale} listening={false} />
-      );
-    }
-    for (let y = majorMinY; y <= maxY; y += MAT_GRID_MAJOR) {
-      result.push(
-        <Line key={`gM_y_${y}`} points={[minX, y, maxX, y]}
-          stroke={y === 0 ? ORIGIN_AXIS_COLOR : (isDark ? 'rgba(255,255,255,0.055)' : 'rgba(15,23,42,0.11)')}
-          strokeWidth={(y === 0 ? 1.4 : 0.8) / scale} listening={false} />
-      );
-    }
-
-    return result;
-  }, [width, height, viewport.x, viewport.y, viewport.scale, isDark]);
+  const scale = viewport.scale || 1;
+  const minorStroke = isDark ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.055)';
+  const majorStroke = isDark ? 'rgba(255,255,255,0.055)' : 'rgba(15,23,42,0.11)';
 
   return (
-    <>
+    <Group>
       <Rect
-        x={-viewport.x / viewport.scale}
-        y={-viewport.y / viewport.scale}
-        width={width / viewport.scale}
-        height={height / viewport.scale}
+        x={-viewport.x / scale}
+        y={-viewport.y / scale}
+        width={width / scale}
+        height={height / scale}
         fill={isDark ? CANVAS_BG_DARK : CANVAS_BG_LIGHT}
         listening={false}
       />
-      {guides}
-    </>
+      <Shape
+        listening={false}
+        sceneFunc={(context, shape) => {
+          const pad = 200;
+          const minX = Math.floor((-viewport.x / scale - pad) / MAT_GRID_MINOR) * MAT_GRID_MINOR;
+          const minY = Math.floor((-viewport.y / scale - pad) / MAT_GRID_MINOR) * MAT_GRID_MINOR;
+          const maxX = -viewport.x / scale + width / scale + pad;
+          const maxY = -viewport.y / scale + height / scale + pad;
+
+          // 1. Draw minor grid lines
+          context.beginPath();
+          for (let x = minX; x <= maxX; x += MAT_GRID_MINOR) {
+            if (x % MAT_GRID_MAJOR === 0) continue;
+            context.moveTo(x, minY);
+            context.lineTo(x, maxY);
+          }
+          for (let y = minY; y <= maxY; y += MAT_GRID_MINOR) {
+            if (y % MAT_GRID_MAJOR === 0) continue;
+            context.moveTo(minX, y);
+            context.lineTo(maxX, y);
+          }
+          context.strokeStyle = minorStroke;
+          context.lineWidth = 0.5 / scale;
+          context.stroke();
+
+          // 2. Draw major grid lines
+          context.beginPath();
+          const majorMinX = Math.floor(minX / MAT_GRID_MAJOR) * MAT_GRID_MAJOR;
+          const majorMinY = Math.floor(minY / MAT_GRID_MAJOR) * MAT_GRID_MAJOR;
+
+          for (let x = majorMinX; x <= maxX; x += MAT_GRID_MAJOR) {
+            context.moveTo(x, minY);
+            context.lineTo(x, maxY);
+          }
+          for (let y = majorMinY; y <= maxY; y += MAT_GRID_MAJOR) {
+            context.moveTo(minX, y);
+            context.lineTo(maxX, y);
+          }
+          context.strokeStyle = majorStroke;
+          context.lineWidth = 0.8 / scale;
+          context.stroke();
+
+          // 3. Draw origin axis if visible
+          if (minX <= 0 && maxX >= 0) {
+            context.beginPath();
+            context.moveTo(0, minY);
+            context.lineTo(0, maxY);
+            context.strokeStyle = ORIGIN_AXIS_COLOR;
+            context.lineWidth = 1.4 / scale;
+            context.stroke();
+          }
+          if (minY <= 0 && maxY >= 0) {
+            context.beginPath();
+            context.moveTo(minX, 0);
+            context.lineTo(maxX, 0);
+            context.strokeStyle = ORIGIN_AXIS_COLOR;
+            context.lineWidth = 1.4 / scale;
+            context.stroke();
+          }
+        }}
+      />
+    </Group>
   );
 };
 
@@ -162,52 +179,101 @@ const WireToolbar = () => {
 
 // ── PCB Trace Layer ──
 const PcbTraceLayer = ({
-  nodes,
   wires,
   isDark,
 }: {
-  nodes: CanvasNode[];
   wires: Wire[];
   isDark: boolean;
-}) => (
-  <Layer listening={false}>
-    {wires.map((wire, index) => {
-      const points = getWireRenderPoints({ ...wire, routingMode: 'auto' }, nodes, [], wires);
-      const isBottom = index % 2 === 1;
-      return (
-        <Line
-          key={`pcb_${wire.id}`}
-          points={points}
-          stroke={isBottom ? PCB_TRACE_BOTTOM : PCB_TRACE_TOP}
-          strokeWidth={5}
-          opacity={0.62}
-          lineCap="round"
-          lineJoin="round"
-          dash={isBottom ? [12, 6] : undefined}
-          shadowColor={isBottom ? PCB_TRACE_BOTTOM : PCB_TRACE_TOP}
-          shadowBlur={6}
-        />
-      );
-    })}
-    {nodes.flatMap((node) =>
-      node.pins.map((pin) => {
-        const pos = getPinAbsPos(node, pin.id);
-        if (!pos) return null;
+}) => {
+  const nodes = useCanvasStore((state) => state.nodes);
+  return (
+    <Layer listening={false}>
+      {wires.map((wire, index) => {
+        const points = getWireRenderPoints({ ...wire, routingMode: 'auto' }, nodes, [], wires);
+        const isBottom = index % 2 === 1;
         return (
-          <Circle
-            key={`pad_${node.id}_${pin.id}`}
-            x={pos.x}
-            y={pos.y}
-            radius={5}
-            fill={isDark ? '#0f172a' : '#f8fafc'}
-            stroke={pin.type === 'ground' ? '#94a3b8' : '#facc15'}
-            strokeWidth={2}
+          <Line
+            key={`pcb_${wire.id}`}
+            points={points}
+            stroke={isBottom ? PCB_TRACE_BOTTOM : PCB_TRACE_TOP}
+            strokeWidth={5}
+            opacity={0.62}
+            lineCap="round"
+            lineJoin="round"
+            dash={isBottom ? [12, 6] : undefined}
+            shadowColor={isBottom ? PCB_TRACE_BOTTOM : PCB_TRACE_TOP}
+            shadowBlur={6}
           />
         );
-      })
-    )}
-  </Layer>
-);
+      })}
+      {nodes.flatMap((node) =>
+        node.pins.map((pin) => {
+          const pos = getPinAbsPos(node, pin.id);
+          if (!pos) return null;
+          return (
+            <Circle
+              key={`pad_${node.id}_${pin.id}`}
+              x={pos.x}
+              y={pos.y}
+              radius={5}
+              fill={isDark ? '#0f172a' : '#f8fafc'}
+              stroke={pin.type === 'ground' ? '#94a3b8' : '#facc15'}
+              strokeWidth={2}
+            />
+          );
+        })
+      )}
+    </Layer>
+  );
+};
+
+// ── Component Node Wrapper (isolates state changes to a single component) ──
+const ComponentNodeWrapper = ({
+  id,
+  isDark,
+  onComponentInteraction,
+  readOnly,
+  isProbeMode,
+  isSimulating,
+}: {
+  id: string;
+  isDark: boolean;
+  onComponentInteraction?: (nodeId: string, event: 'press' | 'release') => void;
+  readOnly?: boolean;
+  isProbeMode?: boolean;
+  isSimulating?: boolean;
+}) => {
+  const node = useCanvasStore((state) => state.nodesById.get(id));
+  const isSelected = useCanvasStore((state) => state.selectedNodeId === id);
+  const isWiring = useCanvasStore((state) => state.isWiring);
+  const wiringFromNodeId = useCanvasStore((state) => state.wiringFrom?.nodeId || null);
+
+  const updateNode = useCanvasStore((state) => state.updateNode);
+  const selectNode = useCanvasStore((state) => state.selectNode);
+  const startWiring = useCanvasStore((state) => state.startWiring);
+  const finishWiring = useCanvasStore((state) => state.finishWiring);
+
+  if (!node) return null;
+
+  return (
+    <ComponentNode
+      node={node}
+      isSelected={isSelected}
+      isDark={isDark}
+      onSelect={() => selectNode(node.id)}
+      onChange={(a) => updateNode(node.id, a)}
+      onDragEnd={(a) => useCanvasStore.getState().updateNodeDragEnd(node.id, a)}
+      isWiring={isWiring}
+      wiringFromNodeId={wiringFromNodeId}
+      startWiring={readOnly ? () => {} : startWiring}
+      finishWiring={readOnly ? () => {} : finishWiring}
+      onInteraction={onComponentInteraction}
+      readOnly={readOnly}
+      isProbeMode={isProbeMode}
+      isSimulating={isSimulating}
+    />
+  );
+};
 
 // ── Main Canvas ──
 export default function CircuitCanvas({
@@ -222,23 +288,22 @@ export default function CircuitCanvas({
   isSimulating,
 }: Props) {
   const isDark = useThemeStore((state) => state.theme === 'dark');
-  const {
-    nodes,
-    wires,
-    selectedNodeId,
-    selectedWireId,
-    viewport,
-    updateNode,
-    selectNode,
-    selectWire,
-    isWiring,
-    wiringFrom,
-    startWiring,
-    finishWiring,
-    cancelWiring,
-    setViewport,
-    addBendPoint,
-  } = useCanvasStore();
+
+  const nodeIds = useCanvasStore(
+    useShallow((state) => state.nodes.map((n) => n.id))
+  );
+  const wires = useCanvasStore((state) => state.wires);
+  const selectedWireId = useCanvasStore((state) => state.selectedWireId);
+  const viewport = useCanvasStore((state) => state.viewport);
+  const selectNode = useCanvasStore((state) => state.selectNode);
+  const selectWire = useCanvasStore((state) => state.selectWire);
+  const isWiring = useCanvasStore((state) => state.isWiring);
+  const wiringFrom = useCanvasStore((state) => state.wiringFrom);
+  const startWiring = useCanvasStore((state) => state.startWiring);
+  const finishWiring = useCanvasStore((state) => state.finishWiring);
+  const cancelWiring = useCanvasStore((state) => state.cancelWiring);
+  const setViewport = useCanvasStore((state) => state.setViewport);
+  const addBendPoint = useCanvasStore((state) => state.addBendPoint);
 
   const stageRef = useRef<Konva.Stage>(null);
   const gridLayerRef = useRef<Konva.Layer>(null);
@@ -294,7 +359,7 @@ export default function CircuitCanvas({
   // Get wiring start position
   const getWiringFromPos = () => {
     if (!wiringFrom) return { x: 0, y: 0 };
-    const node = nodes.find((n) => n.id === wiringFrom.nodeId);
+    const node = useCanvasStore.getState().nodesById.get(wiringFrom.nodeId);
     if (!node) return { x: 0, y: 0 };
     return getPinAbsPos(node, wiringFrom.pinId) || { x: 0, y: 0 };
   };
@@ -355,7 +420,7 @@ export default function CircuitCanvas({
             if (isWiring) {
               setMousePos({ x, y });
             } else if (activeNewBendPoint) {
-              const anchors = nodes.flatMap((node) =>
+              const anchors = useCanvasStore.getState().nodes.flatMap((node) =>
                 node.pins
                   .map((pin) => getPinAbsPos(node, pin.id))
                   .filter(Boolean) as { x: number; y: number }[]
@@ -383,24 +448,16 @@ export default function CircuitCanvas({
             <CanvasMat width={width} height={height} viewport={viewport} isDark={isDark} />
           </Layer>
 
-          {viewMode === 'pcb' && <PcbTraceLayer nodes={nodes} wires={wires} isDark={isDark} />}
+          {viewMode === 'pcb' && <PcbTraceLayer wires={wires} isDark={isDark} />}
 
           {/* Component layer (below wires) */}
           <Layer opacity={viewMode === 'pcb' ? 0.35 : 1}>
-            {nodes.map((node) => (
-              <ComponentNode
-                key={node.id}
-                node={node}
-                isSelected={node.id === selectedNodeId}
+            {nodeIds.map((id) => (
+              <ComponentNodeWrapper
+                key={id}
+                id={id}
                 isDark={isDark}
-                onSelect={() => selectNode(node.id)}
-                onChange={(a) => updateNode(node.id, a)}
-                onDragEnd={(a) => useCanvasStore.getState().updateNodeDragEnd(node.id, a)}
-                isWiring={isWiring}
-                wiringFromNodeId={wiringFrom?.nodeId || null}
-                startWiring={readOnly ? () => {} : startWiring}
-                finishWiring={readOnly ? () => {} : finishWiring}
-                onInteraction={onComponentInteraction}
+                onComponentInteraction={onComponentInteraction}
                 readOnly={readOnly}
                 isProbeMode={isProbeMode}
                 isSimulating={isSimulating}
@@ -414,7 +471,6 @@ export default function CircuitCanvas({
               <WireShape
                 key={w.id}
                 wire={w}
-                nodes={nodes}
                 wires={wires}
                 isSelected={w.id === selectedWireId}
                 isDark={isDark}

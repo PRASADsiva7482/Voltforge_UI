@@ -28,8 +28,13 @@ function resolvePin(pins: PinPosition[], refId: string): PinPosition | null {
 
 type RoutingMode = Wire['routingMode'];
 
+/** Keys that indicate geometry (position/size) changed — requires wire rerouting. */
+const GEOMETRY_KEYS = new Set(['x', 'y', 'width', 'height', 'rotation', 'pins']);
+
 interface CanvasState {
   nodes: CanvasNode[];
+  /** O(1) lookup map — kept in sync with `nodes` array on every mutation. */
+  nodesById: Map<string, CanvasNode>;
   wires: Wire[];
   selectedNodeId: string | null;
   selectedWireId: string | null;
@@ -55,6 +60,8 @@ interface CanvasState {
    *    reroute wires that are directly connected to this node.  This is O(W_node)
    *    instead of O(W_total) and keeps 60 fps smooth on large schematics.
    *  - Full rerouteAutoWires() is intentionally deferred to updateNodeDragEnd().
+   *  - If ONLY non-geometry keys changed (e.g. properties), the wires array
+   *    reference is preserved entirely — no rerouting, no downstream re-renders.
    */
   updateNode: (id: string, updates: Partial<CanvasNode>) => void;
 
@@ -66,6 +73,13 @@ interface CanvasState {
    * exactly once per user gesture.
    */
   updateNodeDragEnd: (id: string, updates: Partial<CanvasNode>) => void;
+
+  /**
+   * batchUpdateNodes — batches multiple node property updates into a single
+   * store mutation.  Used by SimulationEngine to avoid N separate re-renders
+   * per simulation tick.
+   */
+  batchUpdateNodes: (updates: Array<{ id: string; changes: Partial<CanvasNode> }>) => void;
 
   removeNode: (id: string) => void;
   selectNode: (id: string | null) => void;
@@ -105,8 +119,16 @@ function rerouteConnectedWires(nodeId: string, nodes: CanvasNode[], wires: Wire[
   });
 }
 
+/** Helper: build nodesById map from array. */
+function buildNodesMap(nodes: CanvasNode[]): Map<string, CanvasNode> {
+  const map = new Map<string, CanvasNode>();
+  for (const n of nodes) map.set(n.id, n);
+  return map;
+}
+
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: [],
+  nodesById: new Map(),
   wires: [],
   selectedNodeId: null,
   selectedWireId: null,
@@ -121,18 +143,28 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   addNode: (node) => {
     get().pushHistory();
-    set((state) => ({ nodes: [...state.nodes, node] }));
+    set((state) => {
+      const nodes = [...state.nodes, node];
+      const nodesById = new Map(state.nodesById);
+      nodesById.set(node.id, node);
+      return { nodes, nodesById };
+    });
   },
 
   // ── Fast drag-time update: only reroute wires connected to this node ──────
   updateNode: (id, updates) =>
     set((state) => {
+      const geometryChanged = Object.keys(updates).some((k) => GEOMETRY_KEYS.has(k));
       const nodes = state.nodes.map((n) => (n.id === id ? { ...n, ...updates } : n));
-      const geometryChanged = ['x', 'y', 'width', 'height', 'rotation', 'pins'].some(
-        (key) => key in updates
-      );
+      const updatedNode = nodes.find((n) => n.id === id);
+      const nodesById = new Map(state.nodesById);
+      if (updatedNode) nodesById.set(id, updatedNode);
       return {
         nodes,
+        nodesById,
+        // PERF: When only properties changed (simulation updates), skip wire
+        // rerouting entirely and preserve the wires array reference.  This
+        // prevents thousands of downstream re-renders per simulation tick.
         wires: geometryChanged
           ? rerouteConnectedWires(id, nodes, state.wires)
           : state.wires,
@@ -146,18 +178,40 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       const nodes = state.nodes.map((n) => (n.id === id ? { ...n, ...updates } : n));
       return {
         nodes,
+        nodesById: buildNodesMap(nodes),
         wires: rerouteAutoWires(nodes, state.wires),
       };
     });
   },
 
+  // ── Batch update: merge N simulation updates into 1 store mutation ────────
+  batchUpdateNodes: (updates) =>
+    set((state) => {
+      const nodesById = new Map(state.nodesById);
+      const nodes = state.nodes.map((n) => {
+        const entry = updates.find((u) => u.id === n.id);
+        if (!entry) return n;
+        const merged = { ...n, ...entry.changes };
+        nodesById.set(n.id, merged);
+        return merged;
+      });
+      // Batch updates are property-only (simulation), so wires are preserved.
+      return { nodes, nodesById };
+    }),
+
   removeNode: (id) => {
     get().pushHistory();
-    set((state) => ({
-      nodes: state.nodes.filter((n) => n.id !== id),
-      wires: state.wires.filter((w) => w.fromNodeId !== id && w.toNodeId !== id),
-      selectedNodeId: state.selectedNodeId === id ? null : state.selectedNodeId,
-    }));
+    set((state) => {
+      const nodes = state.nodes.filter((n) => n.id !== id);
+      const nodesById = new Map(state.nodesById);
+      nodesById.delete(id);
+      return {
+        nodes,
+        nodesById,
+        wires: state.wires.filter((w) => w.fromNodeId !== id && w.toNodeId !== id),
+        selectedNodeId: state.selectedNodeId === id ? null : state.selectedNodeId,
+      };
+    });
   },
 
   selectNode: (id) => set({ selectedNodeId: id, selectedWireId: null }),
@@ -277,7 +331,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   clearCanvas: () => {
     get().pushHistory();
-    set({ nodes: [], wires: [], selectedNodeId: null, selectedWireId: null });
+    set({ nodes: [], nodesById: new Map(), wires: [], selectedNodeId: null, selectedWireId: null });
   },
 
   loadCanvas: (nodes, wires) => {
@@ -322,7 +376,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         routingMode: shouldUpgrade ? 'auto' as RoutingMode : mode,
       };
     });
-    set({ nodes: populatedNodes, wires: rerouteAutoWires(populatedNodes, migratedWires) });
+    const finalNodes = populatedNodes;
+    set({ nodes: finalNodes, nodesById: buildNodesMap(finalNodes), wires: rerouteAutoWires(finalNodes, migratedWires) });
   },
 
   // History Implementation
@@ -346,6 +401,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     const prevState = history[historyIndex];
     set({
       nodes: prevState.nodes,
+      nodesById: buildNodesMap(prevState.nodes),
       wires: prevState.wires,
       historyIndex: historyIndex - 1
     });
@@ -358,6 +414,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     const nextState = history[nextIndex];
     set({
       nodes: nextState.nodes,
+      nodesById: buildNodesMap(nextState.nodes),
       wires: nextState.wires,
       historyIndex: nextIndex
     });

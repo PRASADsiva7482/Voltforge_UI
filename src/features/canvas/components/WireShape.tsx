@@ -16,9 +16,10 @@ import {
   BEND_POINT_STROKE,
 } from '../canvasConstants';
 
+import { useCanvasStore } from '../../../store/canvasStore';
+
 interface WireShapeProps {
   wire: Wire;
-  nodes: CanvasNode[];
   wires: Wire[];
   isSelected: boolean;
   isDark: boolean;
@@ -31,7 +32,6 @@ interface WireShapeProps {
 /** Renders a single wire with outline, bend point handles, and label. */
 const WireShape = ({
   wire,
-  nodes,
   wires,
   isSelected,
   isDark,
@@ -41,9 +41,10 @@ const WireShape = ({
   isProbeMode,
 }: WireShapeProps) => {
   const [hovered, setHovered] = useState(false);
-  const from = nodes.find((n) => n.id === wire.fromNodeId);
-  const to = nodes.find((n) => n.id === wire.toNodeId);
+  const from = useCanvasStore((state) => state.nodesById.get(wire.fromNodeId));
+  const to = useCanvasStore((state) => state.nodesById.get(wire.toNodeId));
   if (!from || !to) return null;
+  const nodes = [from, to];
 
   const startPos = getPinAbsPos(from, wire.fromPinId);
   const endPos = getPinAbsPos(to, wire.toPinId);

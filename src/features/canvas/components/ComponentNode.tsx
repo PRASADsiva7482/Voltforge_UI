@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo, useState, useCallback } from 'react';
+import { useRef, useEffect, useMemo, useState, useCallback, memo } from 'react';
 import { Group, Rect, Text, Circle, Image as KonvaImage, Transformer, Line, Arc } from 'react-konva';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -68,16 +68,28 @@ import {
   BOARD_RX_COLOR,
 } from '../canvasConstants';
 
-// ── SVG Image loader hook ──
+// ── Global SVG image cache ── prevents re-parsing SVG data URIs on every render
+const svgImageCache = new Map<string, HTMLImageElement>();
+
 const useImage = (url: string) => {
-  const [image, setImage] = useState<HTMLImageElement | undefined>();
+  const [image, setImage] = useState<HTMLImageElement | undefined>(
+    () => svgImageCache.get(url) // initialize from cache synchronously
+  );
   useEffect(() => {
     if (!url) return;
+    const cached = svgImageCache.get(url);
+    if (cached) {
+      setImage(cached);
+      return;
+    }
     const img = new window.Image();
     img.src = url.trim().startsWith('<svg')
       ? `data:image/svg+xml;utf8,${encodeURIComponent(url)}`
       : url;
-    img.onload = () => setImage(img);
+    img.onload = () => {
+      svgImageCache.set(url, img);
+      setImage(img);
+    };
   }, [url]);
   return image;
 };
@@ -101,6 +113,224 @@ const getBoardLedPositions = (type: string, width: number, height: number) => {
     l: { x: 35, y: 45 }
   };
 };
+
+const BuzzerOverlay = memo(({ isSimulating, isBeeping, frequency, width, height }: {
+  isSimulating: boolean;
+  isBeeping: boolean;
+  frequency: number;
+  width: number;
+  height: number;
+}) => {
+  const [animTick, setAnimTick] = useState(0);
+
+  useEffect(() => {
+    if (!isSimulating || !isBeeping) return;
+    let frameId: number;
+    let startTime = performance.now();
+    const tick = () => {
+      setAnimTick(Math.floor((performance.now() - startTime) / 50));
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [isSimulating, isBeeping]);
+
+  const cx = width / 2;
+  const cy = height / 2;
+  const vibrateY = (isSimulating && isBeeping) ? Math.sin(animTick * 0.8) * 1.5 : 0;
+
+  return (
+    <Group listening={false}>
+      {/* Speaker cone body */}
+      <Circle
+        x={cx} y={cy + vibrateY}
+        radius={8}
+        fill={isBeeping ? '#475569' : '#334155'}
+        stroke={isBeeping ? '#94a3b8' : '#4b5563'}
+        strokeWidth={1}
+      />
+      <Circle
+        x={cx} y={cy + vibrateY}
+        radius={3}
+        fill={isBeeping ? '#cbd5e1' : '#64748b'}
+      />
+      {/* Animated expanding sound wave rings */}
+      {isSimulating && isBeeping && Array.from({ length: BUZZER_WAVE_RINGS }).map((_, i) => {
+        const phase = ((animTick * 3 + i * (BUZZER_WAVE_SPEED / BUZZER_WAVE_RINGS / 50)) % (BUZZER_WAVE_SPEED / 50)) / (BUZZER_WAVE_SPEED / 50);
+        const radius = 12 + phase * BUZZER_WAVE_MAX_RADIUS;
+        const opacity = Math.max(0, 0.5 * (1 - phase));
+        return (
+          <Circle
+            key={`bz_wave_${i}`}
+            x={cx} y={cy}
+            radius={radius}
+            fill="transparent"
+            stroke={BUZZER_WAVE_COLOR}
+            strokeWidth={1.2 * (1 - phase * 0.5)}
+            opacity={opacity}
+          />
+        );
+      })}
+      {/* Frequency display */}
+      {isSimulating && isBeeping && (
+        <Text
+          text={`♪ ${frequency}Hz`}
+          x={0} y={height + 2}
+          width={width} align="center"
+          fontSize={7} fontFamily="JetBrains Mono" fontStyle="700"
+          fill={ACTIVE_GLOW_COLOR}
+          shadowColor={ACTIVE_GLOW_COLOR} shadowBlur={4}
+        />
+      )}
+    </Group>
+  );
+});
+
+const UltrasonicOverlay = memo(({ isSimulating, distance, width, height }: {
+  isSimulating: boolean;
+  distance: number;
+  width: number;
+  height: number;
+}) => {
+  const [animTick, setAnimTick] = useState(0);
+
+  useEffect(() => {
+    if (!isSimulating) return;
+    let frameId: number;
+    let startTime = performance.now();
+    const tick = () => {
+      setAnimTick(Math.floor((performance.now() - startTime) / 50));
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [isSimulating]);
+
+  const wavePhase = (animTick % 20) / 20;
+
+  return (
+    <Group listening={false}>
+      {/* Animated wave arcs from transducers */}
+      {[0, 1, 2].map(i => {
+        const phase = (wavePhase + i * 0.33) % 1;
+        const arcR = 8 + phase * 18;
+        return (
+          <Circle key={`us_wave_${i}`}
+            x={width / 2} y={10}
+            radius={arcR}
+            fill="transparent" stroke={ULTRASONIC_WAVE_COLOR}
+            strokeWidth={1.2 * (1 - phase)}
+            opacity={0.5 * (1 - phase)}
+          />
+        );
+      })}
+      {/* Distance reading overlay */}
+      <Rect x={4} y={height - 18} width={width - 8} height={14}
+        cornerRadius={SENSOR_OVERLAY_RADIUS} fill={SENSOR_OVERLAY_BG} />
+      <Text text={`📏 ${distance.toFixed(0)} cm`}
+        x={6} y={height - 16} fontSize={SENSOR_OVERLAY_FONT_SIZE}
+        fontFamily={SENSOR_OVERLAY_FONT} fontStyle="700" fill={ULTRASONIC_WAVE_COLOR} />
+    </Group>
+  );
+});
+
+const PirOverlay = memo(({ isSimulating, motionDetected, width, height }: {
+  isSimulating: boolean;
+  motionDetected: boolean;
+  width: number;
+  height: number;
+}) => {
+  const [animTick, setAnimTick] = useState(0);
+
+  useEffect(() => {
+    if (!isSimulating) return;
+    let frameId: number;
+    let startTime = performance.now();
+    const tick = () => {
+      setAnimTick(Math.floor((performance.now() - startTime) / 50));
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [isSimulating]);
+
+  const sweepAngle = (animTick * 6) % 360;
+  const cx = width / 2;
+  const cy = height / 2 - 5;
+
+  return (
+    <Group listening={false}>
+      {/* Radar sweep line */}
+      <Group x={cx} y={cy} rotation={sweepAngle}>
+        <Line points={[0, 0, 0, -18]}
+          stroke={motionDetected ? PIR_ACTIVE_COLOR : PIR_IDLE_COLOR}
+          strokeWidth={1.5} opacity={0.6} />
+      </Group>
+      {/* Detection range circle */}
+      <Circle x={cx} y={cy} radius={18}
+        fill="transparent" stroke={motionDetected ? PIR_ACTIVE_COLOR : PIR_IDLE_COLOR}
+        strokeWidth={1} opacity={0.3} dash={[3, 3]} />
+      {/* Motion alert flash */}
+      {motionDetected && (
+        <>
+          <Circle x={cx} y={cy} radius={22}
+            fill={PIR_ACTIVE_COLOR} opacity={0.12 + Math.sin(animTick * 0.4) * 0.08}
+            shadowColor={PIR_ACTIVE_COLOR} shadowBlur={12} />
+          <Text text="🚨 MOTION"
+            x={0} y={height + 2} width={width} align="center"
+            fontSize={7} fontFamily={SENSOR_OVERLAY_FONT} fontStyle="700"
+            fill={PIR_ACTIVE_COLOR} />
+        </>
+      )}
+    </Group>
+  );
+});
+
+const DcMotorOverlay = memo(({ isActive, rpm, width, height }: {
+  isActive: boolean;
+  rpm: number;
+  width: number;
+  height: number;
+}) => {
+  const [animTick, setAnimTick] = useState(0);
+
+  useEffect(() => {
+    if (!isActive) return;
+    let frameId: number;
+    let startTime = performance.now();
+    const tick = () => {
+      setAnimTick(Math.floor((performance.now() - startTime) / 50));
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [isActive]);
+
+  const isHighRpm = rpm > MOTOR_BLUR_RPM_THRESHOLD;
+  const vibrateX = isActive ? Math.sin(animTick * 2.3) * MOTOR_VIBRATE_PX : 0;
+  const vibrateY = isActive ? Math.cos(animTick * 3.1) * MOTOR_VIBRATE_PX : 0;
+
+  return (
+    <Group listening={false}>
+      {/* Motion blur circle at high RPM */}
+      {isActive && isHighRpm && (
+        <Circle x={30 + vibrateX} y={25 + vibrateY} radius={26}
+          fill="rgba(239,68,68,0.08)"
+          stroke="rgba(239,68,68,0.15)"
+          strokeWidth={1}
+          shadowColor="#ef4444" shadowBlur={8}
+        />
+      )}
+      {/* RPM readout */}
+      <Rect x={2} y={height - 12} width={width - 4} height={10}
+        cornerRadius={2} fill={SENSOR_OVERLAY_BG} />
+      <Text text={`⚙ ${rpm} RPM`}
+        x={4} y={height - 11} fontSize={6}
+        fontFamily={SENSOR_OVERLAY_FONT} fontStyle="700"
+        fill={isHighRpm ? '#ef4444' : ACTIVE_GLOW_COLOR} />
+    </Group>
+  );
+});
 
 interface ComponentNodeProps {
   node: CanvasNode;
@@ -143,10 +373,12 @@ const ComponentNode = ({
   // Cached snap anchors: computed once on DragStart, reused every onDragMove frame
   const snapAnchorsRef = useRef<{ x: number; y: number }[]>([]);
 
-  // ── Animation tick state (used for buzzer waves, sensor pulses, motor vibration) ──
-  const [animTick, setAnimTick] = useState(0);
-  const [txBlink, setTxBlink] = useState(false);
-  const [rxBlink, setRxBlink] = useState(false);
+
+  // Refs for TX/RX blink — we toggle Konva node opacity directly via refs
+  const txLedRef = useRef<Konva.Circle>(null);
+  const rxLedRef = useRef<Konva.Circle>(null);
+  const txTextRef = useRef<Konva.Text>(null);
+  const rxTextRef = useRef<Konva.Text>(null);
   const prevBeepingRef = useRef(false);
   const prevPressedRef = useRef(false);
   const prevClosedRef = useRef<boolean | undefined>(undefined);
@@ -317,17 +549,23 @@ const ComponentNode = ({
     let animId: number;
     let angle = 0;
     const tickAnim = () => {
+      let needsDraw = false;
       if (isDcMotor && dcMotorShaftRef.current) {
         const rpm = Number(node.properties?.rpm) || 3000;
         const delta = (rpm / 60) * 360 * (16.7 / 1000);
         angle = (angle + delta) % 360;
         dcMotorShaftRef.current.rotation(angle);
+        needsDraw = true;
       }
       if (node.type === 'MOTOR_BLDC' && bldcPropellerRef.current) {
         const rpm = Number(node.properties?.bldcRpm) || 0;
         const delta = (rpm / 60) * 360 * (16.7 / 1000);
         angle = (angle + delta) % 360;
         bldcPropellerRef.current.rotation(angle);
+        needsDraw = true;
+      }
+      if (needsDraw) {
+        shapeRef.current?.getLayer()?.batchDraw();
       }
       animId = requestAnimationFrame(tickAnim);
     };
@@ -335,40 +573,37 @@ const ComponentNode = ({
     return () => cancelAnimationFrame(animId);
   }, [isActive, isDcMotor, node.type, node.properties?.rpm, node.properties?.bldcRpm]);
 
-  // ── Animation tick for buzzer waves, sensor pulses, motor vibration ──
-  useEffect(() => {
-    if (!isSimulating) return;
-    const needsAnim = isBuzzer || node.type.includes('SENSOR') || node.type === 'TEMP_SENSOR' ||
-      node.type === 'ULTRASONIC_SENSOR' || node.type === 'PIR_SENSOR' ||
-      node.type === 'SENSOR_ULTRASONIC' || node.type === 'SENSOR_PIR' ||
-      node.type === 'SENSOR_DHT11' || node.type === 'SENSOR_DHT22' ||
-      node.type === 'SENSOR_LDR' || node.type === 'LDR' ||
-      node.type === 'SENSOR_IMU' || node.type === 'SOIL_MOISTURE' ||
-      isDcMotor || node.type === 'MOTOR_BLDC' || isBoard;
-    if (!needsAnim) return;
-
-    let frameId: number;
-    let startTime = performance.now();
-    const tick = () => {
-      setAnimTick(Math.floor((performance.now() - startTime) / 50));
-      frameId = requestAnimationFrame(tick);
-    };
-    frameId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frameId);
-  }, [isSimulating, isBuzzer, isDcMotor, isBoard, node.type]);
-
-  // ── Board TX/RX blink simulation ──
+  // ── Board TX/RX blink simulation (ref-based, no React state) ──
   useEffect(() => {
     if (!isSimulating || !isBoard) return;
     const iv = setInterval(() => {
       if (Math.random() > 0.6) {
-        setTxBlink(true);
-        setTimeout(() => setTxBlink(false), 80);
+        txLedRef.current?.fill(BOARD_TX_COLOR);
+        txLedRef.current?.stroke('#fca5a5');
+        txLedRef.current?.shadowBlur(6);
+        txTextRef.current?.fill(BOARD_TX_COLOR);
+        setTimeout(() => {
+          txLedRef.current?.fill('#374151');
+          txLedRef.current?.stroke('#4b5563');
+          txLedRef.current?.shadowBlur(0);
+          txTextRef.current?.fill('#4b5563');
+          shapeRef.current?.getLayer()?.batchDraw();
+        }, 80);
       }
       if (Math.random() > 0.7) {
-        setRxBlink(true);
-        setTimeout(() => setRxBlink(false), 80);
+        rxLedRef.current?.fill(BOARD_RX_COLOR);
+        rxLedRef.current?.stroke('#86efac');
+        rxLedRef.current?.shadowBlur(6);
+        rxTextRef.current?.fill(BOARD_RX_COLOR);
+        setTimeout(() => {
+          rxLedRef.current?.fill('#374151');
+          rxLedRef.current?.stroke('#4b5563');
+          rxLedRef.current?.shadowBlur(0);
+          rxTextRef.current?.fill('#4b5563');
+          shapeRef.current?.getLayer()?.batchDraw();
+        }, 80);
       }
+      shapeRef.current?.getLayer()?.batchDraw();
     }, 300);
     return () => clearInterval(iv);
   }, [isSimulating, isBoard]);
@@ -1299,64 +1534,15 @@ const ComponentNode = ({
         })()}
 
         {/* Buzzer — animated expanding sound wave rings + speaker cone vibration */}
-        {isBuzzer && (() => {
-          const buzzerActive = Boolean(isSimulating) && Boolean(node.properties?.isBeeping);
-          const freq = Number(node.properties?.frequency) || 1000;
-          const cx = node.width / 2;
-          const cy = node.height / 2;
-          // Cone vibration offset
-          const vibrateY = buzzerActive ? Math.sin(animTick * 0.8) * 1.5 : 0;
-
-          return (
-            <>
-              {/* Speaker cone body */}
-              <Circle
-                x={cx} y={cy + vibrateY}
-                radius={8}
-                fill={buzzerActive ? '#475569' : '#334155'}
-                stroke={buzzerActive ? '#94a3b8' : '#4b5563'}
-                strokeWidth={1}
-                listening={false}
-              />
-              <Circle
-                x={cx} y={cy + vibrateY}
-                radius={3}
-                fill={buzzerActive ? '#cbd5e1' : '#64748b'}
-                listening={false}
-              />
-              {/* Animated expanding sound wave rings */}
-              {buzzerActive && Array.from({ length: BUZZER_WAVE_RINGS }).map((_, i) => {
-                const phase = ((animTick * 3 + i * (BUZZER_WAVE_SPEED / BUZZER_WAVE_RINGS / 50)) % (BUZZER_WAVE_SPEED / 50)) / (BUZZER_WAVE_SPEED / 50);
-                const radius = 12 + phase * BUZZER_WAVE_MAX_RADIUS;
-                const opacity = Math.max(0, 0.5 * (1 - phase));
-                return (
-                  <Circle
-                    key={`bz_wave_${i}`}
-                    x={cx} y={cy}
-                    radius={radius}
-                    fill="transparent"
-                    stroke={BUZZER_WAVE_COLOR}
-                    strokeWidth={1.2 * (1 - phase * 0.5)}
-                    opacity={opacity}
-                    listening={false}
-                  />
-                );
-              })}
-              {/* Frequency display */}
-              {buzzerActive && (
-                <Text
-                  text={`♪ ${freq}Hz`}
-                  x={0} y={node.height + 2}
-                  width={node.width} align="center"
-                  fontSize={7} fontFamily="JetBrains Mono" fontStyle="700"
-                  fill={ACTIVE_GLOW_COLOR}
-                  shadowColor={ACTIVE_GLOW_COLOR} shadowBlur={4}
-                  listening={false}
-                />
-              )}
-            </>
-          );
-        })()}
+        {isBuzzer && (
+          <BuzzerOverlay
+            isSimulating={Boolean(isSimulating)}
+            isBeeping={Boolean(node.properties?.isBeeping)}
+            frequency={Number(node.properties?.frequency) || 1000}
+            width={node.width}
+            height={node.height}
+          />
+        )}
 
         {/* Relay — per-channel LED indicators + armature contact bar + coil glow */}
         {isRelay && (() => {
@@ -1476,33 +1662,35 @@ const ComponentNode = ({
               {isPwrOn && (
                 <>
                   <Circle
+                    ref={txLedRef}
                     x={leds.l.x} y={leds.l.y + 14}
                     radius={3}
-                    fill={txBlink ? BOARD_TX_COLOR : '#374151'}
-                    stroke={txBlink ? '#fca5a5' : '#4b5563'}
+                    fill="#374151"
+                    stroke="#4b5563"
                     strokeWidth={0.8}
                     shadowColor={BOARD_TX_COLOR}
-                    shadowBlur={txBlink ? 6 : 0}
+                    shadowBlur={0}
                     listening={false}
                   />
-                  <Text text="TX" x={leds.l.x + 6} y={leds.l.y + 11}
+                  <Text ref={txTextRef} text="TX" x={leds.l.x + 6} y={leds.l.y + 11}
                     fontSize={6} fontFamily="Inter" fontStyle="700"
-                    fill={txBlink ? BOARD_TX_COLOR : '#4b5563'} listening={false}
+                    fill="#4b5563" listening={false}
                   />
                   {/* RX LED — blinks green when serial data receives */}
                   <Circle
+                    ref={rxLedRef}
                     x={leds.l.x} y={leds.l.y + 25}
                     radius={3}
-                    fill={rxBlink ? BOARD_RX_COLOR : '#374151'}
-                    stroke={rxBlink ? '#86efac' : '#4b5563'}
+                    fill="#374151"
+                    stroke="#4b5563"
                     strokeWidth={0.8}
                     shadowColor={BOARD_RX_COLOR}
-                    shadowBlur={rxBlink ? 6 : 0}
+                    shadowBlur={0}
                     listening={false}
                   />
-                  <Text text="RX" x={leds.l.x + 6} y={leds.l.y + 22}
+                  <Text ref={rxTextRef} text="RX" x={leds.l.x + 6} y={leds.l.y + 22}
                     fontSize={6} fontFamily="Inter" fontStyle="700"
-                    fill={rxBlink ? BOARD_RX_COLOR : '#4b5563'} listening={false}
+                    fill="#4b5563" listening={false}
                   />
                 </>
               )}
@@ -1542,70 +1730,24 @@ const ComponentNode = ({
         })()}
 
         {/* Ultrasonic Sensor — distance + animated wave pulses */}
-        {(node.type === 'ULTRASONIC_SENSOR' || node.type === 'SENSOR_ULTRASONIC') && isSimulating && (() => {
-          const dist = Number(node.properties?.distance ?? 100);
-          const distPct = Math.min(1, dist / 400);
-          // Wave pulse animation
-          const wavePhase = (animTick % 20) / 20;
-          return (
-            <Group listening={false}>
-              {/* Animated wave arcs from transducers */}
-              {[0, 1, 2].map(i => {
-                const phase = (wavePhase + i * 0.33) % 1;
-                const arcR = 8 + phase * 18;
-                return (
-                  <Circle key={`us_wave_${i}`}
-                    x={node.width / 2} y={10}
-                    radius={arcR}
-                    fill="transparent" stroke={ULTRASONIC_WAVE_COLOR}
-                    strokeWidth={1.2 * (1 - phase)}
-                    opacity={0.5 * (1 - phase)}
-                  />
-                );
-              })}
-              {/* Distance reading overlay */}
-              <Rect x={4} y={node.height - 18} width={node.width - 8} height={14}
-                cornerRadius={SENSOR_OVERLAY_RADIUS} fill={SENSOR_OVERLAY_BG} />
-              <Text text={`📏 ${dist.toFixed(0)} cm`}
-                x={6} y={node.height - 16} fontSize={SENSOR_OVERLAY_FONT_SIZE}
-                fontFamily={SENSOR_OVERLAY_FONT} fontStyle="700" fill={ULTRASONIC_WAVE_COLOR} />
-            </Group>
-          );
-        })()}
+        {(node.type === 'ULTRASONIC_SENSOR' || node.type === 'SENSOR_ULTRASONIC') && isSimulating && (
+          <UltrasonicOverlay
+            isSimulating={Boolean(isSimulating)}
+            distance={Number(node.properties?.distance ?? 100)}
+            width={node.width}
+            height={node.height}
+          />
+        )}
 
         {/* PIR Motion Sensor — radar sweep + motion flash */}
-        {(node.type === 'PIR_SENSOR' || node.type === 'SENSOR_PIR') && isSimulating && (() => {
-          const motionDetected = Boolean(node.properties?.motionDetected);
-          const sweepAngle = (animTick * 6) % 360;
-          const cx = node.width / 2;
-          const cy = node.height / 2 - 5;
-          return (
-            <Group listening={false}>
-              {/* Radar sweep line */}
-              <Group x={cx} y={cy} rotation={sweepAngle}>
-                <Line points={[0, 0, 0, -18]}
-                  stroke={motionDetected ? PIR_ACTIVE_COLOR : PIR_IDLE_COLOR}
-                  strokeWidth={1.5} opacity={0.6} />
-              </Group>
-              {/* Detection range circle */}
-              <Circle x={cx} y={cy} radius={18}
-                fill="transparent" stroke={motionDetected ? PIR_ACTIVE_COLOR : PIR_IDLE_COLOR}
-                strokeWidth={1} opacity={0.3} dash={[3, 3]} />
-              {/* Motion alert flash */}
-              {motionDetected && (
-                <>
-                  <Circle x={cx} y={cy} radius={22}
-                    fill={PIR_ACTIVE_COLOR} opacity={0.12 + Math.sin(animTick * 0.4) * 0.08}
-                    shadowColor={PIR_ACTIVE_COLOR} shadowBlur={12} />
-                  <Text text="🚨 MOTION"
-                    x={0} y={node.height + 2} width={node.width} align="center"
-                    fontSize={7} fontFamily={SENSOR_OVERLAY_FONT} fontStyle="700"
-                    fill={PIR_ACTIVE_COLOR} />
-                </>
-              )}
-            </Group>
-          );
-        })()}
+        {(node.type === 'PIR_SENSOR' || node.type === 'SENSOR_PIR') && isSimulating && (
+          <PirOverlay
+            isSimulating={Boolean(isSimulating)}
+            motionDetected={Boolean(node.properties?.motionDetected)}
+            width={node.width}
+            height={node.height}
+          />
+        )}
 
         {/* LDR Light Sensor — brightness indicator */}
         {(node.type === 'LDR' || node.type === 'SENSOR_LDR') && isSimulating && (() => {
@@ -1717,32 +1859,14 @@ const ComponentNode = ({
         })()}
 
         {/* DC Motor — vibration + motion blur at high RPM */}
-        {isDcMotor && isActive && (() => {
-          const rpm = Number(node.properties?.rpm) || 3000;
-          const isHighRpm = rpm > MOTOR_BLUR_RPM_THRESHOLD;
-          const vibrateX = Math.sin(animTick * 2.3) * MOTOR_VIBRATE_PX;
-          const vibrateY = Math.cos(animTick * 3.1) * MOTOR_VIBRATE_PX;
-          return (
-            <Group listening={false}>
-              {/* Motion blur circle at high RPM */}
-              {isHighRpm && (
-                <Circle x={30 + vibrateX} y={25 + vibrateY} radius={26}
-                  fill="rgba(239,68,68,0.08)"
-                  stroke="rgba(239,68,68,0.15)"
-                  strokeWidth={1}
-                  shadowColor="#ef4444" shadowBlur={8}
-                />
-              )}
-              {/* RPM readout */}
-              <Rect x={2} y={node.height - 12} width={node.width - 4} height={10}
-                cornerRadius={2} fill={SENSOR_OVERLAY_BG} />
-              <Text text={`⚙ ${rpm} RPM`}
-                x={4} y={node.height - 11} fontSize={6}
-                fontFamily={SENSOR_OVERLAY_FONT} fontStyle="700"
-                fill={isHighRpm ? '#ef4444' : ACTIVE_GLOW_COLOR} />
-            </Group>
-          );
-        })()}
+        {isDcMotor && isActive && (
+          <DcMotorOverlay
+            isActive={Boolean(isActive)}
+            rpm={Number(node.properties?.rpm) || 3000}
+            width={node.width}
+            height={node.height}
+          />
+        )}
 
         {/* ═══════════════════════════════════════════════════════════════ */}
         {/* INTERACTIVE PHYSICS TARGETS FOR SENSORS (SIMULATION MODE)      */}
@@ -2177,4 +2301,4 @@ const ComponentNode = ({
   );
 };
 
-export default ComponentNode;
+export default memo(ComponentNode);

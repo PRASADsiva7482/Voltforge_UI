@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+
 import { X, Sliders, Trash2, RotateCw, FlipHorizontal, FlipVertical, Lock, Unlock, Palette } from 'lucide-react';
 import { useCanvasStore, WIRE_COLORS } from '../../store/canvasStore';
 import type { Wire } from '../../types';
@@ -242,14 +242,9 @@ function WirePropertiesPanel() {
   if (!selectedWire) return null;
 
   return (
-    <AnimatePresence>
-      <motion.div
+      <div
         key={selectedWire.id}
-        initial={{ x: 300, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        exit={{ x: 300, opacity: 0 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="w-64 glass flex flex-col h-full bg-white/80 dark:bg-surface-950/80"
+        className="w-64 glass flex flex-col h-full bg-white/80 dark:bg-surface-950/80 animate-slide-in"
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-surface-200/70 bg-surface-50/70 dark:border-white/5 dark:bg-surface-900/50">
           <div className="flex items-center gap-2">
@@ -332,8 +327,7 @@ function WirePropertiesPanel() {
             <Trash2 className="w-3 h-3" /> Delete Wire
           </button>
         </div>
-      </motion.div>
-    </AnimatePresence>
+      </div>
   );
 }
 
@@ -412,14 +406,9 @@ export default function PropertyEditor() {
   };
 
   return (
-    <AnimatePresence>
-      <motion.div
+      <div
         key={selectedNode.id}
-        initial={{ x: 300, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        exit={{ x: 300, opacity: 0 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="w-72 glass flex flex-col h-full bg-white/80 dark:bg-surface-950/80"
+        className="w-72 glass flex flex-col h-full bg-white/80 dark:bg-surface-950/80 animate-slide-in"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-surface-200/70 bg-surface-50/70 dark:border-white/5 dark:bg-surface-900/50">
@@ -609,7 +598,6 @@ export default function PropertyEditor() {
             <Trash2 className="w-3 h-3" />
           </button>
         </div>
-      </motion.div>
-    </AnimatePresence>
+      </div>
   );
 }

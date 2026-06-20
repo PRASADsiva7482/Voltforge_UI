@@ -54,6 +54,19 @@
 
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  --animate-slide-in: slide-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+
+  @keyframes slide-in {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
 }
 
 /* ── Light Mode Variables ──────────────────────────────────────────────────── */
