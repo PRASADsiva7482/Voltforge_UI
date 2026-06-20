@@ -33,7 +33,10 @@ export default function ComponentPanel() {
   const filtered = [...(data || [])]
     .sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name))
     .filter(c =>
-      !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.type.toLowerCase().includes(search.toLowerCase())
+      !search ||
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.type.toLowerCase().includes(search.toLowerCase()) ||
+      (c.description || '').toLowerCase().includes(search.toLowerCase())
     );
 
   const grouped = filtered.reduce((acc: Record<string, ElectronicComponent[]>, c) => {
@@ -57,13 +60,17 @@ export default function ComponentPanel() {
     // Use pin registry for accurate pin positions
     const pins = getPinsForComponent(component.type, component.pinConfig as Record<string, unknown>, dim.w, dim.h);
 
+    const { viewport } = useCanvasStore.getState();
+    const spawnX = (300 - viewport.x) / viewport.scale;
+    const spawnY = (250 - viewport.y) / viewport.scale;
+
     const node: CanvasNode = {
       id: `node_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       componentId: component.id,
       type: component.type,
       name: component.name,
-      x: 200 + Math.random() * 200,
-      y: 100 + Math.random() * 200,
+      x: spawnX,
+      y: spawnY,
       width: dim.w, height: dim.h,
       rotation: 0,
       properties: { ...(component.defaultProperties || {}), svgData: component.svgData },
@@ -77,7 +84,7 @@ export default function ComponentPanel() {
   };
 
   return (
-    <div className="w-56 glass border-r border-surface-200/70 h-full overflow-y-auto flex flex-col dark:border-white/5">
+    <div className="w-56 glass border-r border-surface-200/70 h-full flex flex-col dark:border-white/5">
       <CustomComponentStudio isOpen={studioOpen} onClose={() => setStudioOpen(false)} />
       <div className="p-3 border-b border-surface-200/70 dark:border-white/5">
         <div className="mb-2 flex items-center justify-between">

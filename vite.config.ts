@@ -6,7 +6,7 @@ import path from 'path';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   define: {
-    global: 'window',
+    global: 'globalThis',
   },
   resolve: {
     alias: {
@@ -15,6 +15,7 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    strictPort: true,
     proxy: {
       '/api': {
         target: 'http://localhost:2001/voltForge-app',

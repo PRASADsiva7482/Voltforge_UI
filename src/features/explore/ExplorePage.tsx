@@ -10,7 +10,7 @@ import type { ProjectSummary } from '../../types';
 export default function ExplorePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [searchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
   const [selectedBoard, setSelectedBoard] = useState<string>('ALL');
 
@@ -61,14 +61,14 @@ export default function ExplorePage() {
         <p className="text-surface-600 text-lg pl-[52px] dark:text-surface-400">{t('Discover amazing circuits built by the community')}</p>
       </motion.div>
 
-      {/* Board Filters */}
+      {/* Board Filters and Search Bar */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="mb-8"
+        className="mb-8 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center"
       >
-        <div className="flex items-center gap-3 overflow-x-auto pb-1">
+        <div className="flex items-center gap-3 overflow-x-auto pb-1 flex-1">
           <Filter className="w-4 h-4 text-surface-400 flex-shrink-0" />
           {boardTypes.map((board) => (
             <button
@@ -83,6 +83,16 @@ export default function ExplorePage() {
               {board === 'ALL' ? 'All Boards' : board.replace(/_/g, ' ')}
             </button>
           ))}
+        </div>
+        <div className="relative w-full md:w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search projects..."
+            className="w-full pl-9 pr-4 py-2 bg-white/80 border border-surface-200 rounded-xl text-xs text-surface-950 placeholder:text-surface-500 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
+          />
         </div>
       </motion.div>
 

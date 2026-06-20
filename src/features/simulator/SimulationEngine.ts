@@ -5,11 +5,12 @@
 import { CanvasNode, Wire } from '../../types';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useSimulationStore } from '../../store/simulationStore';
-import { CPU, avrInstruction, AVRIOPort, AVRUSART, AVRTimer, portBConfig, portCConfig, portDConfig, timer0Config, timer1Config, timer2Config, usart0Config, PinState as AvrPinState } from 'avr8js';
+import { CPU, avrInstruction, AVRIOPort, AVRUSART, AVRTimer, portBConfig, portCConfig, portDConfig, timer0Config, timer1Config, timer2Config, usart0Config, PinState as AvrPinState, AVRTWI, twiConfig } from 'avr8js';
 import { buildMNACircuit } from './NetlistBuilder';
 import type { MNACircuit } from './NetlistBuilder';
 import type { WorkerInMessage, WorkerResultMessage, WorkerOscilloscopeMessage } from './SimulationWorker';
 import { LogicRegistry } from './logic/LogicRegistry';
+import { AudioEngine } from './AudioEngine';
 
 export type PinState = 'HIGH' | 'LOW' | 'INPUT' | 'OUTPUT' | 'PWM';
 
@@ -33,6 +34,137 @@ interface ParsedStatement {
   condition?: string;
   thenBlock?: ParsedStatement[];
   elseBlock?: ParsedStatement[];
+}
+
+class LcdI2CExpander {
+  private address = 0x27;
+  private rs = 0;
+  private rw = 0;
+  private en = 0;
+  private backlight = 1;
+  private highNibble: number | null = null;
+  private cursorRow = 0;
+  private cursorCol = 0;
+  private buffer: string[][] = Array.from({ length: 2 }, () => Array(16).fill(' '));
+
+  constructor(private onUpdate: (line1: string, line2: string, backlight: boolean) => void) {}
+
+  write(val: number) {
+    const rs = val & 0x01;
+    const rw = (val & 0x02) >> 1;
+    const en = (val & 0x04) >> 2;
+    const backlight = (val & 0x08) >> 3;
+    const nibble = (val & 0xF0) >> 4;
+
+    this.backlight = backlight;
+
+    // Detect high-to-low transition of EN
+    if (this.en === 1 && en === 0) {
+      if (this.highNibble === null) {
+        // This is the first nibble (high nibble)
+        this.highNibble = nibble;
+      } else {
+        // This is the second nibble (low nibble)
+        const fullByte = (this.highNibble << 4) | nibble;
+        this.highNibble = null;
+        this.processLcdByte(rs, fullByte);
+      }
+    }
+    this.en = en;
+    this.rs = rs;
+    this.rw = rw;
+
+    // Always update backlight state
+    this.triggerUpdate();
+  }
+
+  private processLcdByte(rs: number, byte: number) {
+    if (rs === 0) {
+      // Command
+      if (byte === 0x01) {
+        // Clear Display
+        this.buffer = Array.from({ length: 2 }, () => Array(16).fill(' '));
+        this.cursorRow = 0;
+        this.cursorCol = 0;
+      } else if (byte === 0x02 || byte === 0x03) {
+        // Return Home
+        this.cursorRow = 0;
+        this.cursorCol = 0;
+      } else if (byte & 0x80) {
+        // Set DDRAM Address
+        const addr = byte & 0x7F;
+        if (addr >= 0x40) {
+          this.cursorRow = 1;
+          this.cursorCol = addr - 0x40;
+        } else {
+          this.cursorRow = 0;
+          this.cursorCol = addr;
+        }
+      }
+    } else {
+      // Data (Write Character)
+      if (this.cursorRow < 2 && this.cursorCol < 16) {
+        this.buffer[this.cursorRow][this.cursorCol] = String.fromCharCode(byte);
+        this.cursorCol++;
+        if (this.cursorCol >= 16) {
+          this.cursorCol = 0;
+          this.cursorRow = (this.cursorRow + 1) % 2;
+        }
+      }
+    }
+    this.triggerUpdate();
+  }
+
+  private triggerUpdate() {
+    const line1 = this.buffer[0].join('');
+    const line2 = this.buffer[1].join('');
+    this.onUpdate(line1, line2, this.backlight === 1);
+  }
+}
+
+class LcdTWIEventHandler {
+  private activeAddress = 0;
+  private lcdExpander: LcdI2CExpander | null = null;
+
+  constructor(
+    private twi: any,
+    private lcdNodes: CanvasNode[],
+    private callbacks: SimulationCallbacks
+  ) {
+    this.lcdExpander = new LcdI2CExpander((line1, line2, backlight) => {
+      (globalThis as any).__voltforgeLcdState = (globalThis as any).__voltforgeLcdState || {};
+      this.lcdNodes.forEach(node => {
+        (globalThis as any).__voltforgeLcdState[node.id] = { line1, line2, backlight };
+        this.callbacks.onPinStateChange(node.id, '__lcd_display__', 'HIGH', 0);
+      });
+    });
+  }
+
+  start() {
+    this.twi.completeStart();
+  }
+
+  stop() {
+    this.twi.completeStop();
+  }
+
+  connectToSlave(address: number, write: boolean) {
+    this.activeAddress = address;
+    const ack = (address === 0x27 || address === 0x3f);
+    this.twi.completeConnect(ack);
+  }
+
+  writeByte(value: number) {
+    const ack = (this.activeAddress === 0x27 || this.activeAddress === 0x3f);
+    if (ack && this.lcdExpander) {
+      this.lcdExpander.write(value);
+    }
+    this.twi.completeWrite(ack);
+  }
+
+  readByte() {
+    this.twi.completeRead(0xff);
+  }
 }
 
 /**
@@ -85,6 +217,8 @@ export class SimulationEngine {
   private mcuPinVoltages: Record<string, number> = {};  // pin number → voltage
   private storeUnsubscribe: (() => void) | null = null;
   private localSerialBuffer = '';
+  private sensorAutoIntervalId: number | null = null;
+  private sensorStartTime = 0;
 
   constructor(callbacks: SimulationCallbacks) {
     this.callbacks = callbacks;
@@ -381,9 +515,99 @@ export class SimulationEngine {
         this.tick += 100;
       }, 100);
 
+      // ── Start sensor auto-cycling for live overlays ──
+      this.startSensorAutoCycling(nodes);
+
     } catch (err: any) {
       this.callbacks.onError(err.message || 'Simulation Error');
       this.stop();
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Sensor Auto-Cycling — makes sensors feel alive during simulation
+  // ═══════════════════════════════════════════════════════════════════════
+
+  private startSensorAutoCycling(initialNodes: CanvasNode[]) {
+    this.sensorStartTime = Date.now();
+    this.sensorAutoIntervalId = window.setInterval(() => {
+      if (!this.isRunning) return;
+      const nodes = useCanvasStore.getState().nodes;
+      const elapsed = (Date.now() - this.sensorStartTime) / 1000; // seconds
+
+      for (const node of nodes) {
+        const props = node.properties || {};
+
+        // ── DHT Temperature + Humidity: oscillate around set value ──
+        if (node.type === 'TEMP_SENSOR' || node.type === 'SENSOR_DHT11' || node.type === 'SENSOR_DHT22') {
+          const baseTemp = Number(props.temperature ?? 25);
+          const baseHum = Number(props.humidity ?? 60);
+          // Slow sine wave ±2°C over ~30s period
+          const tempVariation = Math.sin(elapsed * 0.2) * 2 + Math.sin(elapsed * 0.7) * 0.5;
+          const humVariation = Math.sin(elapsed * 0.15) * 5 + Math.cos(elapsed * 0.4) * 2;
+          const newTemp = Math.round((baseTemp + tempVariation) * 10) / 10;
+          const newHum = Math.max(0, Math.min(100, Math.round(baseHum + humVariation)));
+
+          LogicRegistry.dispatch(node.type, node.id, '__sensor_temp__', 'HIGH', newTemp);
+          LogicRegistry.dispatch(node.type, node.id, '__sensor_hum__', 'HIGH', newHum);
+        }
+
+        // ── Ultrasonic: distance slowly varies ±15cm ──
+        if (node.type === 'ULTRASONIC_SENSOR' || node.type === 'SENSOR_ULTRASONIC') {
+          const baseDist = Number(props.distance ?? 100);
+          const distVariation = Math.sin(elapsed * 0.3) * 15 + Math.cos(elapsed * 0.8) * 5;
+          const newDist = Math.max(2, Math.min(400, Math.round(baseDist + distVariation)));
+          LogicRegistry.dispatch(node.type, node.id, '__sensor_dist__', 'HIGH', newDist);
+        }
+
+        // ── PIR: random motion triggers every 5-10 seconds ──
+        if (node.type === 'PIR_SENSOR' || node.type === 'SENSOR_PIR') {
+          // Trigger motion in bursts
+          const isMotionPhase = Math.sin(elapsed * 0.5) > 0.6;
+          const currentMotion = Boolean(props.motionDetected);
+          if (isMotionPhase !== currentMotion) {
+            LogicRegistry.dispatch(node.type, node.id, '__sensor_motion__', isMotionPhase ? 'HIGH' : 'LOW');
+          }
+        }
+
+        // ── LDR: light level slowly drifts ──
+        if (node.type === 'LDR' || node.type === 'SENSOR_LDR') {
+          const baseLight = Number(props.lightLevel ?? 50);
+          const lightVariation = Math.sin(elapsed * 0.1) * 15 + Math.cos(elapsed * 0.3) * 8;
+          const newLight = Math.max(0, Math.min(100, Math.round(baseLight + lightVariation)));
+          LogicRegistry.dispatch(node.type, node.id, '__sensor_light__', 'HIGH', newLight);
+        }
+
+        // ── IMU: subtle accelerometer noise + gentle tilt ──
+        if (node.type === 'SENSOR_IMU') {
+          const baseAx = Number(props.accelerationX ?? 0);
+          const baseAy = Number(props.accelerationY ?? 0);
+          const noise = () => (Math.random() - 0.5) * 0.2;
+          const tiltX = Math.sin(elapsed * 0.4) * 0.5 + noise();
+          const tiltY = Math.cos(elapsed * 0.3) * 0.3 + noise();
+          LogicRegistry.dispatch(node.type, node.id, '__sensor_accel_x__', 'HIGH',
+            Math.round((baseAx + tiltX) * 100) / 100
+          );
+          LogicRegistry.dispatch(node.type, node.id, '__sensor_accel_y__', 'HIGH',
+            Math.round((baseAy + tiltY) * 100) / 100
+          );
+        }
+
+        // ── Soil Moisture: moisture slowly changes ──
+        if (node.type === 'SOIL_MOISTURE') {
+          const baseMoisture = Number(props.moistureLevel ?? 50);
+          const moistureVariation = Math.sin(elapsed * 0.08) * 10 + Math.cos(elapsed * 0.2) * 5;
+          const newMoisture = Math.max(0, Math.min(100, Math.round(baseMoisture + moistureVariation)));
+          LogicRegistry.dispatch(node.type, node.id, '__sensor_moisture__', 'HIGH', newMoisture);
+        }
+      }
+    }, 500); // Update every 500ms
+  }
+
+  private stopSensorAutoCycling() {
+    if (this.sensorAutoIntervalId) {
+      clearInterval(this.sensorAutoIntervalId);
+      this.sensorAutoIntervalId = null;
     }
   }
 
@@ -622,6 +846,13 @@ export class SimulationEngine {
       replaced = replaced.replace(match[0], String(val));
     }
 
+    // ── Preprocess logical NOT (e.g. !state) ──
+    const notMatches = Array.from(replaced.matchAll(/!\s*([a-zA-Z0-9_]+)/g));
+    for (const match of notMatches) {
+      const innerVal = this.evaluateExpression(this.resolveValue(match[1]));
+      replaced = replaced.replace(match[0], innerVal === 0 ? '1' : '0');
+    }
+
     return replaced;
   }
 
@@ -668,11 +899,13 @@ export class SimulationEngine {
         }
 
         // digitalWrite(pin, state)
-        const dw = codeText.match(/digitalWrite\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)/);
+        const dw = codeText.match(/digitalWrite\s*\(\s*([^,)]+)\s*,\s*(.+)\s*\)/);
         if (dw) {
-          const pin = this.resolveValue(dw[1]);
-          const resolvedState = this.resolveValue(dw[2]);
-          const state = (resolvedState === 'HIGH' || resolvedState === '1') ? 'HIGH' : 'LOW';
+          const pin = this.resolveValue(dw[1].trim());
+          const expr = dw[2].trim().replace(/\)$/, '');
+          const preprocessed = this.preprocessExpression(expr);
+          const stateVal = this.evaluateExpression(preprocessed);
+          const state = stateVal !== 0 ? 'HIGH' : 'LOW';
 
           if (!this.pins[pin]) this.pins[pin] = { mode: 'OUTPUT', state: 'LOW', value: 0 };
 
@@ -687,10 +920,12 @@ export class SimulationEngine {
         }
 
         // analogWrite(pin, value) — PWM
-        const aw = codeText.match(/analogWrite\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)/);
+        const aw = codeText.match(/analogWrite\s*\(\s*([^,)]+)\s*,\s*(.+)\s*\)/);
         if (aw) {
-          const pin = this.resolveValue(aw[1]);
-          const value = Math.min(255, Math.max(0, parseInt(this.resolveValue(aw[2]))));
+          const pin = this.resolveValue(aw[1].trim());
+          const expr = aw[2].trim().replace(/\)$/, '');
+          const preprocessed = this.preprocessExpression(expr);
+          const value = Math.min(255, Math.max(0, this.evaluateExpression(preprocessed)));
 
           if (!this.pins[pin]) this.pins[pin] = { mode: 'PWM', state: 'PWM', value: 0 };
           this.pins[pin].state = 'PWM';
@@ -1254,6 +1489,9 @@ export class SimulationEngine {
       if (this.avrUsart) this.callbacks.onBaudRateChange?.(this.avrUsart.baudRate);
     };
 
+    const twi = new AVRTWI(this.avrCpu, twiConfig, 16_000_000);
+    twi.eventHandler = new LcdTWIEventHandler(twi, this.lcdNodes, this.callbacks);
+
     const handlePort = (portName: 'B' | 'C' | 'D', value: number) => {
       for (let bit = 0; bit < 8; bit += 1) {
         const pin = this.avrPortToBoardPin(portName, bit);
@@ -1295,6 +1533,8 @@ export class SimulationEngine {
       }
       this.updateBldcMotorAnimation();
       this.updateDcMotorAnimation();
+      this.pushLcdToCanvas(currentNodes);
+      this.updateDiagnosticProbes(currentNodes, wires);
       this.emitDebugSnapshot(false);
     }, 16);
   }
@@ -1360,6 +1600,8 @@ export class SimulationEngine {
     this.avrUsart = null;
     this.avrPorts = {};
     this.stopMNASolver();
+    this.stopSensorAutoCycling();
+    AudioEngine.stopTone();
     if (this.storeUnsubscribe) {
       this.storeUnsubscribe();
       this.storeUnsubscribe = null;

@@ -406,7 +406,6 @@ export default function EditorPage() {
   };
 
   const handleComponentInteraction = useCallback((nodeId: string, event: 'press' | 'release') => {
-    if (!engineRef.current || !isSimulating) return;
     const node = nodes.find(n => n.id === nodeId);
     if (!node) return;
 
@@ -418,6 +417,8 @@ export default function EditorPage() {
         isPressed
       }
     });
+
+    if (!engineRef.current || !isSimulating) return;
 
     // 2. Simulate sending high/low for buttons connected to MCU
     const nodePinIds = node.pins?.map(p => p.id) || [];
@@ -599,6 +600,7 @@ export default function EditorPage() {
                   onComponentInteraction={handleComponentInteraction}
                   readOnly={!isOwner}
                   isProbeMode={isProbeMode}
+                  isSimulating={isSimulating}
                 />
               </div>
             </div>

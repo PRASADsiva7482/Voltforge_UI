@@ -482,6 +482,117 @@ export class OscilloscopeLogic implements IComponentLogic {
 }
 
 /**
+ * Logic for DHT Temperature/Humidity Sensors — updates live reading overlay
+ */
+export class SensorDHTLogic implements IComponentLogic {
+  onPinStateChange(componentId: string, pinId: string, _state: PinState, value?: number): void {
+    const { updateNode, nodes } = useCanvasStore.getState();
+    const node = nodes.find(n => n.id === componentId);
+    if (!node) return;
+
+    // Temperature and humidity updates come as __sensor_update__ synthetic events
+    if (pinId === '__sensor_temp__') {
+      updateNode(componentId, {
+        properties: { ...node.properties, temperature: value ?? 25 },
+      });
+    } else if (pinId === '__sensor_hum__') {
+      updateNode(componentId, {
+        properties: { ...node.properties, humidity: value ?? 60 },
+      });
+    }
+  }
+}
+
+/**
+ * Logic for Ultrasonic Distance Sensors — updates distance reading overlay
+ */
+export class SensorUltrasonicLogic implements IComponentLogic {
+  onPinStateChange(componentId: string, pinId: string, _state: PinState, value?: number): void {
+    const { updateNode, nodes } = useCanvasStore.getState();
+    const node = nodes.find(n => n.id === componentId);
+    if (!node) return;
+
+    if (pinId === '__sensor_dist__' || pinId === 'echo') {
+      updateNode(componentId, {
+        properties: { ...node.properties, distance: value ?? 100 },
+      });
+    }
+  }
+}
+
+/**
+ * Logic for PIR Motion Sensors — updates motion detection visual
+ */
+export class SensorPIRLogic implements IComponentLogic {
+  onPinStateChange(componentId: string, pinId: string, state: PinState, _value?: number): void {
+    const { updateNode, nodes } = useCanvasStore.getState();
+    const node = nodes.find(n => n.id === componentId);
+    if (!node) return;
+
+    if (pinId === '__sensor_motion__' || pinId === 'out') {
+      updateNode(componentId, {
+        properties: { ...node.properties, motionDetected: state === 'HIGH' },
+      });
+    }
+  }
+}
+
+/**
+ * Logic for LDR Light Sensors — updates light level visual
+ */
+export class SensorLDRLogic implements IComponentLogic {
+  onPinStateChange(componentId: string, pinId: string, _state: PinState, value?: number): void {
+    const { updateNode, nodes } = useCanvasStore.getState();
+    const node = nodes.find(n => n.id === componentId);
+    if (!node) return;
+
+    if (pinId === '__sensor_light__' || pinId === 'p1') {
+      updateNode(componentId, {
+        properties: { ...node.properties, lightLevel: value ?? 50 },
+      });
+    }
+  }
+}
+
+/**
+ * Logic for IMU Sensors — updates tilt visualization
+ */
+export class SensorIMULogic implements IComponentLogic {
+  onPinStateChange(componentId: string, pinId: string, _state: PinState, value?: number): void {
+    const { updateNode, nodes } = useCanvasStore.getState();
+    const node = nodes.find(n => n.id === componentId);
+    if (!node) return;
+
+    if (pinId === '__sensor_accel_x__') {
+      updateNode(componentId, {
+        properties: { ...node.properties, accelerationX: value ?? 0 },
+      });
+    } else if (pinId === '__sensor_accel_y__') {
+      updateNode(componentId, {
+        properties: { ...node.properties, accelerationY: value ?? 0 },
+      });
+    }
+  }
+}
+
+/**
+ * Logic for Soil Moisture Sensors — updates moisture bar
+ */
+export class SoilMoistureLogic implements IComponentLogic {
+  onPinStateChange(componentId: string, pinId: string, _state: PinState, value?: number): void {
+    const { updateNode, nodes } = useCanvasStore.getState();
+    const node = nodes.find(n => n.id === componentId);
+    if (!node) return;
+
+    if (pinId === '__sensor_moisture__' || pinId === 'sig') {
+      updateNode(componentId, {
+        properties: { ...node.properties, moistureLevel: value ?? 50 },
+      });
+    }
+  }
+}
+
+/**
  * Global Registry
  */
 export class LogicRegistry {
@@ -520,6 +631,18 @@ export class LogicRegistry {
     'PUSH_BUTTON': new ButtonLogic(),
     'BUTTON': new ButtonLogic(),
     'SWITCH_SPST': new SwitchLogic(),
+    // Sensors — live data overlay handlers
+    'TEMP_SENSOR': new SensorDHTLogic(),
+    'SENSOR_DHT11': new SensorDHTLogic(),
+    'SENSOR_DHT22': new SensorDHTLogic(),
+    'ULTRASONIC_SENSOR': new SensorUltrasonicLogic(),
+    'SENSOR_ULTRASONIC': new SensorUltrasonicLogic(),
+    'PIR_SENSOR': new SensorPIRLogic(),
+    'SENSOR_PIR': new SensorPIRLogic(),
+    'LDR': new SensorLDRLogic(),
+    'SENSOR_LDR': new SensorLDRLogic(),
+    'SENSOR_IMU': new SensorIMULogic(),
+    'SOIL_MOISTURE': new SoilMoistureLogic(),
   };
 
   public static dispatch(componentType: string, componentId: string, pinId: string, state: PinState, value?: number) {

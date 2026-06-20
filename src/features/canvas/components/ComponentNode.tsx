@@ -1,5 +1,5 @@
-import { useRef, useEffect, useMemo, useState } from 'react';
-import { Group, Rect, Text, Circle, Image as KonvaImage, Transformer, Line } from 'react-konva';
+import { useRef, useEffect, useMemo, useState, useCallback } from 'react';
+import { Group, Rect, Text, Circle, Image as KonvaImage, Transformer, Line, Arc } from 'react-konva';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { useCanvasStore } from '../../../store/canvasStore';
@@ -7,6 +7,7 @@ import { getPinAbsPos, snapToRoutingGuides } from '../../../utils/wireRouting';
 import { componentSvgs } from '../componentSvgs';
 import PinDot from './PinDot';
 import type { CanvasNode } from '../canvasTypes';
+import { AudioEngine } from '../../simulator/AudioEngine';
 import {
   MAT_GRID_MINOR,
   DRAG_SNAP_THRESHOLD,
@@ -33,6 +34,38 @@ import {
   ESC_THROTTLE_LOW,
   ESC_THROTTLE_HIGH_THRESHOLD,
   ESC_THROTTLE_MID_THRESHOLD,
+  BUZZER_WAVE_RINGS,
+  BUZZER_WAVE_MAX_RADIUS,
+  BUZZER_WAVE_COLOR,
+  BUZZER_WAVE_SPEED,
+  BUTTON_PRESS_DEPTH,
+  BUTTON_SHADOW_NORMAL,
+  BUTTON_SHADOW_PRESSED,
+  RELAY_COIL_GLOW_COLOR,
+  SENSOR_OVERLAY_FONT,
+  SENSOR_OVERLAY_FONT_SIZE,
+  SENSOR_OVERLAY_BG,
+  SENSOR_OVERLAY_TEXT,
+  SENSOR_OVERLAY_LABEL,
+  SENSOR_OVERLAY_RADIUS,
+  SENSOR_BAR_HEIGHT,
+  SENSOR_BAR_BG,
+  TEMP_HOT_COLOR,
+  TEMP_COLD_COLOR,
+  TEMP_WARM_COLOR,
+  ULTRASONIC_WAVE_COLOR,
+  PIR_ACTIVE_COLOR,
+  PIR_IDLE_COLOR,
+  LDR_SUN_COLOR,
+  SOIL_WET_COLOR,
+  SOIL_DRY_COLOR,
+  IMU_TILT_COLOR,
+  MOTOR_BLUR_RPM_THRESHOLD,
+  MOTOR_VIBRATE_PX,
+  SERVO_ARC_COLOR,
+  SERVO_ANGLE_TEXT_COLOR,
+  BOARD_TX_COLOR,
+  BOARD_RX_COLOR,
 } from '../canvasConstants';
 
 // ── SVG Image loader hook ──
@@ -83,6 +116,7 @@ interface ComponentNodeProps {
   onInteraction?: (nodeId: string, event: 'press' | 'release') => void;
   readOnly?: boolean;
   isProbeMode?: boolean;
+  isSimulating?: boolean;
 }
 
 /** Main visual component rendered on the canvas. */
@@ -100,6 +134,7 @@ const ComponentNode = ({
   onInteraction,
   readOnly,
   isProbeMode,
+  isSimulating,
 }: ComponentNodeProps) => {
   const shapeRef = useRef<Konva.Group>(null);
   const trRef = useRef<Konva.Transformer>(null);
@@ -107,6 +142,15 @@ const ComponentNode = ({
   const bldcPropellerRef = useRef<Konva.Group>(null);
   // Cached snap anchors: computed once on DragStart, reused every onDragMove frame
   const snapAnchorsRef = useRef<{ x: number; y: number }[]>([]);
+
+  // ── Animation tick state (used for buzzer waves, sensor pulses, motor vibration) ──
+  const [animTick, setAnimTick] = useState(0);
+  const [txBlink, setTxBlink] = useState(false);
+  const [rxBlink, setRxBlink] = useState(false);
+  const prevBeepingRef = useRef(false);
+  const prevPressedRef = useRef(false);
+  const prevClosedRef = useRef<boolean | undefined>(undefined);
+  const prevRelayActiveRef = useRef(false);
 
   const handleDialMouseDown = (e: KonvaEventObject<MouseEvent>) => {
     if (readOnly) return;
@@ -142,6 +186,52 @@ const ComponentNode = ({
         properties: {
           ...node.properties,
           position: Math.round(pct),
+        },
+      });
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleServoHornMouseDown = (e: KonvaEventObject<any>) => {
+    if (readOnly || isSimulating) return;
+    e.cancelBubble = true;
+
+    const stage = e.target.getStage();
+    if (!stage) return;
+
+    const handleMouseMove = () => {
+      const pos = stage.getRelativePointerPosition();
+      if (!pos) return;
+
+      const rad = (node.rotation || 0) * Math.PI / 180;
+      const localCenterX = node.width - 15;
+      const localCenterY = node.height / 2;
+
+      const canvasCenterX = node.x + localCenterX * Math.cos(rad) - localCenterY * Math.sin(rad);
+      const canvasCenterY = node.y + localCenterX * Math.sin(rad) + localCenterY * Math.cos(rad);
+
+      const dx = pos.x - canvasCenterX;
+      const dy = pos.y - canvasCenterY;
+
+      let angleDeg = Math.atan2(dy, dx) * (180 / Math.PI) - (node.rotation || 0) + 90;
+      let normAngle = (angleDeg + 360) % 360;
+      
+      let angle = Math.round(normAngle);
+      if (angle > 180) {
+        angle = angle > 270 ? 0 : 180;
+      }
+
+      onChange({
+        properties: {
+          ...node.properties,
+          servoAngle: angle,
         },
       });
     };
@@ -198,6 +288,7 @@ const ComponentNode = ({
 
   const isBlown = Boolean(node.properties?.isBlown);
   const isActive =
+    Boolean(isSimulating) &&
     !isBlown &&
     (node.properties?.isLit ||
       node.properties?.isSpinning ||
@@ -244,6 +335,81 @@ const ComponentNode = ({
     return () => cancelAnimationFrame(animId);
   }, [isActive, isDcMotor, node.type, node.properties?.rpm, node.properties?.bldcRpm]);
 
+  // ── Animation tick for buzzer waves, sensor pulses, motor vibration ──
+  useEffect(() => {
+    if (!isSimulating) return;
+    const needsAnim = isBuzzer || node.type.includes('SENSOR') || node.type === 'TEMP_SENSOR' ||
+      node.type === 'ULTRASONIC_SENSOR' || node.type === 'PIR_SENSOR' ||
+      node.type === 'SENSOR_ULTRASONIC' || node.type === 'SENSOR_PIR' ||
+      node.type === 'SENSOR_DHT11' || node.type === 'SENSOR_DHT22' ||
+      node.type === 'SENSOR_LDR' || node.type === 'LDR' ||
+      node.type === 'SENSOR_IMU' || node.type === 'SOIL_MOISTURE' ||
+      isDcMotor || node.type === 'MOTOR_BLDC' || isBoard;
+    if (!needsAnim) return;
+
+    let frameId: number;
+    let startTime = performance.now();
+    const tick = () => {
+      setAnimTick(Math.floor((performance.now() - startTime) / 50));
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [isSimulating, isBuzzer, isDcMotor, isBoard, node.type]);
+
+  // ── Board TX/RX blink simulation ──
+  useEffect(() => {
+    if (!isSimulating || !isBoard) return;
+    const iv = setInterval(() => {
+      if (Math.random() > 0.6) {
+        setTxBlink(true);
+        setTimeout(() => setTxBlink(false), 80);
+      }
+      if (Math.random() > 0.7) {
+        setRxBlink(true);
+        setTimeout(() => setRxBlink(false), 80);
+      }
+    }, 300);
+    return () => clearInterval(iv);
+  }, [isSimulating, isBoard]);
+
+  // ── Audio triggers for buzzer, buttons, switches, relays ──
+  useEffect(() => {
+    const currentBeeping = Boolean(isSimulating && node.properties?.isBeeping);
+    if (currentBeeping && !prevBeepingRef.current) {
+      const freq = Number(node.properties?.frequency) || 1000;
+      AudioEngine.playTone(freq, 'square', 0.08);
+    } else if (!currentBeeping && prevBeepingRef.current) {
+      AudioEngine.stopTone();
+    }
+    prevBeepingRef.current = currentBeeping;
+  }, [isSimulating, node.properties?.isBeeping, node.properties?.frequency]);
+
+  useEffect(() => {
+    const currentPressed = Boolean(node.properties?.isPressed);
+    if (currentPressed && !prevPressedRef.current && isButton) {
+      AudioEngine.playClick('button');
+    }
+    prevPressedRef.current = currentPressed;
+  }, [node.properties?.isPressed, isButton]);
+
+  useEffect(() => {
+    const currentClosed = Boolean(node.properties?.isClosed);
+    if (isSwitch && prevClosedRef.current !== undefined && currentClosed !== prevClosedRef.current) {
+      AudioEngine.playClick('switch');
+    }
+    prevClosedRef.current = currentClosed;
+  }, [node.properties?.isClosed, isSwitch]);
+
+  useEffect(() => {
+    const currentActive = Boolean(node.properties?.isActive);
+    if (isRelay && currentActive && !prevRelayActiveRef.current) {
+      AudioEngine.playClick('relay');
+    }
+    prevRelayActiveRef.current = currentActive;
+  }, [node.properties?.isActive, isRelay]);
+
+
   return (
     <>
       <Group
@@ -259,43 +425,10 @@ const ComponentNode = ({
         onClick={(e: KonvaEventObject<MouseEvent>) => {
           e.cancelBubble = true;
           onSelect();
-          if (isSwitch && !readOnly) {
-            const currentClosed = Boolean(node.properties?.isClosed);
-            useCanvasStore.getState().updateNode(node.id, {
-              properties: {
-                ...node.properties,
-                isClosed: !currentClosed,
-              },
-            });
-          }
         }}
         onTap={(e: KonvaEventObject<TouchEvent>) => {
           e.cancelBubble = true;
           onSelect();
-          if (isSwitch && !readOnly) {
-            const currentClosed = Boolean(node.properties?.isClosed);
-            useCanvasStore.getState().updateNode(node.id, {
-              properties: {
-                ...node.properties,
-                isClosed: !currentClosed,
-              },
-            });
-          }
-        }}
-        onMouseDown={() => {
-          if (isButton && onInteraction) onInteraction(node.id, 'press');
-        }}
-        onMouseUp={() => {
-          if (isButton && onInteraction) onInteraction(node.id, 'release');
-        }}
-        onMouseLeave={() => {
-          if (isButton && onInteraction) onInteraction(node.id, 'release');
-        }}
-        onTouchStart={() => {
-          if (isButton && onInteraction) onInteraction(node.id, 'press');
-        }}
-        onTouchEnd={() => {
-          if (isButton && onInteraction) onInteraction(node.id, 'release');
         }}
         onDragStart={() => {
           // Cache snap anchors ONCE at the start of the drag gesture
@@ -732,7 +865,9 @@ const ComponentNode = ({
             x={node.width - 15}
             y={node.height / 2}
             rotation={Number(node.properties?.servoAngle || 0) - 90}
-            listening={false}
+            listening={!isSimulating && !readOnly}
+            onMouseDown={handleServoHornMouseDown}
+            onTouchStart={handleServoHornMouseDown}
           >
             <Rect
               x={-4}
@@ -748,12 +883,12 @@ const ComponentNode = ({
           </Group>
         )}
 
-        {/* BLDC Motor — animated rotating propeller cross */}
+         {/* BLDC Motor — animated rotating propeller cross */}
         {node.type === 'MOTOR_BLDC' &&
           (() => {
             const rpm = Number(node.properties?.bldcRpm) || 0;
             const rotation = Number(node.properties?.bldcRotation) || 0;
-            const isMotorSpinning = rpm > 0;
+            const isMotorSpinning = Boolean(isSimulating) && rpm > 0;
 
             return (
               <>
@@ -764,15 +899,27 @@ const ComponentNode = ({
                   rotation={rotation}
                   listening={false}
                 >
-                  {/* Four propeller blades */}
-                  <Rect x={-3} y={-22} width={6} height={18} cornerRadius={3}
-                    fill={isMotorSpinning ? '#f8fafc' : '#6b7280'} opacity={isMotorSpinning ? 0.9 : 0.3} />
-                  <Rect x={-3} y={4} width={6} height={18} cornerRadius={3}
-                    fill={isMotorSpinning ? '#f8fafc' : '#6b7280'} opacity={isMotorSpinning ? 0.9 : 0.3} />
-                  <Rect x={-22} y={-3} width={18} height={6} cornerRadius={3}
-                    fill={isMotorSpinning ? '#f8fafc' : '#6b7280'} opacity={isMotorSpinning ? 0.9 : 0.3} />
-                  <Rect x={4} y={-3} width={18} height={6} cornerRadius={3}
-                    fill={isMotorSpinning ? '#f8fafc' : '#6b7280'} opacity={isMotorSpinning ? 0.9 : 0.3} />
+                  {/* Four propeller blades - vibrant orange and white tips */}
+                  <Group rotation={0}>
+                    <Rect x={-3} y={-22} width={6} height={18} cornerRadius={3}
+                      fill={isMotorSpinning ? '#f97316' : '#6b7280'} opacity={isMotorSpinning ? 0.95 : 0.4} />
+                    <Rect x={-3} y={-22} width={6} height={4} cornerRadius={1.5} fill="#ffffff" opacity={isMotorSpinning ? 1 : 0.4} />
+                  </Group>
+                  <Group rotation={90}>
+                    <Rect x={-3} y={-22} width={6} height={18} cornerRadius={3}
+                      fill={isMotorSpinning ? '#f97316' : '#6b7280'} opacity={isMotorSpinning ? 0.95 : 0.4} />
+                    <Rect x={-3} y={-22} width={6} height={4} cornerRadius={1.5} fill="#ffffff" opacity={isMotorSpinning ? 1 : 0.4} />
+                  </Group>
+                  <Group rotation={180}>
+                    <Rect x={-3} y={-22} width={6} height={18} cornerRadius={3}
+                      fill={isMotorSpinning ? '#f97316' : '#6b7280'} opacity={isMotorSpinning ? 0.95 : 0.4} />
+                    <Rect x={-3} y={-22} width={6} height={4} cornerRadius={1.5} fill="#ffffff" opacity={isMotorSpinning ? 1 : 0.4} />
+                  </Group>
+                  <Group rotation={270}>
+                    <Rect x={-3} y={-22} width={6} height={18} cornerRadius={3}
+                      fill={isMotorSpinning ? '#f97316' : '#6b7280'} opacity={isMotorSpinning ? 0.95 : 0.4} />
+                    <Rect x={-3} y={-22} width={6} height={4} cornerRadius={1.5} fill="#ffffff" opacity={isMotorSpinning ? 1 : 0.4} />
+                  </Group>
                   {/* Center hub */}
                   <Circle x={0} y={0} radius={MOTOR_PROPELLER_HUB_RADIUS} fill="#334155" stroke="#94a3b8" strokeWidth={1} />
                 </Group>
@@ -784,12 +931,19 @@ const ComponentNode = ({
                   />
                 )}
                 {isMotorSpinning && (
-                  <Circle
-                    x={node.width / 2} y={MOTOR_BELL_CENTER_Y} radius={MOTOR_SPIN_GLOW_RADIUS}
-                    fill="transparent" stroke={ACTIVE_GLOW_COLOR} strokeWidth={1.5}
-                    opacity={Math.min(0.6, rpm / 12000)}
-                    shadowColor={ACTIVE_GLOW_COLOR} shadowBlur={12} shadowOpacity={0.4} listening={false}
-                  />
+                  <>
+                    <Circle
+                      x={node.width / 2} y={MOTOR_BELL_CENTER_Y} radius={MOTOR_SPIN_GLOW_RADIUS}
+                      fill="transparent" stroke={ACTIVE_GLOW_COLOR} strokeWidth={1.5}
+                      opacity={Math.min(0.6, rpm / 12000)}
+                      shadowColor={ACTIVE_GLOW_COLOR} shadowBlur={12} shadowOpacity={0.4} listening={false}
+                    />
+                    <Circle
+                      x={node.width / 2} y={MOTOR_BELL_CENTER_Y} radius={26}
+                      stroke="#f97316" strokeWidth={1} opacity={0.5} dash={[6, 10]}
+                      listening={false}
+                    />
+                  </>
                 )}
               </>
             );
@@ -836,26 +990,57 @@ const ComponentNode = ({
         {/* DC Motor — animated rotating propeller */}
         {isDcMotor && (() => {
           const tick = Number(node.properties?.motorTick) || 0;
+          const isSpinning = isActive;
           return (
-            <Group ref={dcMotorShaftRef} x={30} y={25} rotation={tick} listening={false}>
-              {/* Blade 1 */}
-              <Group rotation={0}>
-                <Rect x={-4} y={-25} width={8} height={25} cornerRadius={3} fill="#ef4444" opacity={isActive ? 1 : 0.4} />
-                <Circle x={0} y={-18} radius={2} fill="#ffffff" opacity={isActive ? 0.9 : 0.5} />
+            <>
+              {isSpinning && (
+                <>
+                  <Circle
+                    x={30} y={25} radius={26}
+                    stroke={ACTIVE_GLOW_COLOR} strokeWidth={1.5}
+                    opacity={0.4} dash={[8, 12]}
+                    listening={false}
+                  />
+                  <Circle
+                    x={30} y={25} radius={20}
+                    stroke="rgba(239,68,68,0.25)" strokeWidth={1}
+                    opacity={0.3} dash={[4, 6]}
+                    listening={false}
+                  />
+                </>
+              )}
+              <Group ref={dcMotorShaftRef} x={30} y={25} rotation={tick} listening={false}>
+                {/* Blade 1 */}
+                <Group rotation={0}>
+                  <Rect x={-4} y={-25} width={8} height={25} cornerRadius={3} fill="#ef4444" opacity={isActive ? 1 : 0.4} />
+                  {/* White tip */}
+                  <Rect x={-4} y={-25} width={8} height={5} cornerRadius={2} fill="#ffffff" opacity={isActive ? 1 : 0.4} />
+                  {/* Contrasting stripe */}
+                  <Rect x={-4} y={-14} width={8} height={3} fill="#1e293b" opacity={isActive ? 1 : 0.4} />
+                  <Circle x={0} y={-8} radius={2} fill="#ffffff" opacity={isActive ? 0.9 : 0.5} />
+                </Group>
+                {/* Blade 2 */}
+                <Group rotation={120}>
+                  <Rect x={-4} y={-25} width={8} height={25} cornerRadius={3} fill="#ef4444" opacity={isActive ? 1 : 0.4} />
+                  {/* White tip */}
+                  <Rect x={-4} y={-25} width={8} height={5} cornerRadius={2} fill="#ffffff" opacity={isActive ? 1 : 0.4} />
+                  {/* Contrasting stripe */}
+                  <Rect x={-4} y={-14} width={8} height={3} fill="#1e293b" opacity={isActive ? 1 : 0.4} />
+                  <Circle x={0} y={-8} radius={2} fill="#ffffff" opacity={isActive ? 0.9 : 0.5} />
+                </Group>
+                {/* Blade 3 */}
+                <Group rotation={240}>
+                  <Rect x={-4} y={-25} width={8} height={25} cornerRadius={3} fill="#ef4444" opacity={isActive ? 1 : 0.4} />
+                  {/* White tip */}
+                  <Rect x={-4} y={-25} width={8} height={5} cornerRadius={2} fill="#ffffff" opacity={isActive ? 1 : 0.4} />
+                  {/* Contrasting stripe */}
+                  <Rect x={-4} y={-14} width={8} height={3} fill="#1e293b" opacity={isActive ? 1 : 0.4} />
+                  <Circle x={0} y={-8} radius={2} fill="#ffffff" opacity={isActive ? 0.9 : 0.5} />
+                </Group>
+                {/* Center hub */}
+                <Circle x={0} y={0} radius={5} fill="#1e293b" stroke="#f8fafc" strokeWidth={1} />
               </Group>
-              {/* Blade 2 */}
-              <Group rotation={120}>
-                <Rect x={-4} y={-25} width={8} height={25} cornerRadius={3} fill="#ef4444" opacity={isActive ? 1 : 0.4} />
-                <Circle x={0} y={-18} radius={2} fill="#ffffff" opacity={isActive ? 0.9 : 0.5} />
-              </Group>
-              {/* Blade 3 */}
-              <Group rotation={240}>
-                <Rect x={-4} y={-25} width={8} height={25} cornerRadius={3} fill="#ef4444" opacity={isActive ? 1 : 0.4} />
-                <Circle x={0} y={-18} radius={2} fill="#ffffff" opacity={isActive ? 0.9 : 0.5} />
-              </Group>
-              {/* Center hub */}
-              <Circle x={0} y={0} radius={5} fill="#1e293b" stroke="#f8fafc" strokeWidth={1} />
-            </Group>
+            </>
           );
         })()}
 
@@ -909,7 +1094,7 @@ const ComponentNode = ({
           return (
             <>
               {segRects.map(seg => {
-                const isLit = segs[seg.key];
+                const isLit = Boolean(isSimulating) && Boolean(segs[seg.key]);
                 return (
                   <Rect
                     key={`seg_${seg.key}`}
@@ -928,91 +1113,312 @@ const ComponentNode = ({
           );
         })()}
 
-        {/* Push Button — visual press feedback (scale + color shift) */}
-        {isButton && isPressed && (
-          <>
-            <Circle
-              x={20} y={20} radius={9}
-              fill="#b91c1c" stroke="#7f1d1d" strokeWidth={1.2}
-              listening={false}
-            />
-            <Circle
-              x={20} y={20} radius={4}
-              fill="#fca5a5" opacity={0.3}
-              listening={false}
-            />
-          </>
-        )}
-
-        {/* Toggle Switch — on/off indicator */}
-        {isSwitch && (() => {
-          const isClosed = Boolean(node.properties?.isClosed);
+        {/* Push Button — realistic 3D tactile press with depth + shadow */}
+        {isButton && (() => {
+          const pressed = Boolean(isPressed);
+          const offsetY = pressed ? BUTTON_PRESS_DEPTH : 0;
+          const shadowBlur = pressed ? BUTTON_SHADOW_PRESSED : BUTTON_SHADOW_NORMAL;
+          const capRadius = node.width * 0.225;
           return (
             <>
-              <Rect
-                x={node.width / 2 - 6} y={node.height / 2 - 10}
-                width={12} height={20}
-                cornerRadius={6}
-                fill={isClosed ? '#22c55e' : '#374151'}
-                stroke={isClosed ? '#16a34a' : '#6b7280'}
-                strokeWidth={1}
-                shadowColor={isClosed ? '#22c55e' : 'transparent'}
-                shadowBlur={isClosed ? 6 : 0}
+              {/* Shadow beneath button cap */}
+              <Circle
+                x={node.width / 2}
+                y={node.height / 2 + 2}
+                radius={capRadius + 2}
+                fill="rgba(0,0,0,0.25)"
+                shadowBlur={shadowBlur}
+                shadowColor="rgba(0,0,0,0.4)"
                 listening={false}
               />
+              {/* Button cap — sinks when pressed */}
               <Circle
-                x={node.width / 2} y={isClosed ? node.height / 2 - 4 : node.height / 2 + 4}
-                radius={4}
-                fill="#f8fafc" stroke="#94a3b8" strokeWidth={0.5}
+                x={node.width / 2}
+                y={node.height / 2 + offsetY}
+                radius={capRadius}
+                fill={pressed ? '#991b1b' : '#dc2626'}
+                stroke={pressed ? '#7f1d1d' : '#b91c1c'}
+                strokeWidth={1.2}
+                shadowColor="rgba(0,0,0,0.3)"
+                shadowBlur={pressed ? 2 : 6}
+                shadowOffsetY={pressed ? 0 : 2}
+                listening={true}
+                onMouseDown={(e) => {
+                  if (readOnly) return;
+                  e.cancelBubble = true;
+                  onSelect();
+                  const buttonType = node.properties?.buttonType || 'Momentary';
+                  if (buttonType === 'Latching') {
+                    const nextPressed = !pressed;
+                    if (onInteraction) onInteraction(node.id, nextPressed ? 'press' : 'release');
+                  } else {
+                    if (onInteraction) onInteraction(node.id, 'press');
+                  }
+                }}
+                onMouseUp={(e) => {
+                  if (readOnly) return;
+                  e.cancelBubble = true;
+                  const buttonType = node.properties?.buttonType || 'Momentary';
+                  if (buttonType !== 'Latching') {
+                    if (onInteraction) onInteraction(node.id, 'release');
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (readOnly) return;
+                  e.cancelBubble = true;
+                  const buttonType = node.properties?.buttonType || 'Momentary';
+                  if (buttonType !== 'Latching' && pressed) {
+                    if (onInteraction) onInteraction(node.id, 'release');
+                  }
+                }}
+                onTouchStart={(e) => {
+                  if (readOnly) return;
+                  e.cancelBubble = true;
+                  onSelect();
+                  const buttonType = node.properties?.buttonType || 'Momentary';
+                  if (buttonType === 'Latching') {
+                    const nextPressed = !pressed;
+                    if (onInteraction) onInteraction(node.id, nextPressed ? 'press' : 'release');
+                  } else {
+                    if (onInteraction) onInteraction(node.id, 'press');
+                  }
+                }}
+                onTouchEnd={(e) => {
+                  if (readOnly) return;
+                  e.cancelBubble = true;
+                  const buttonType = node.properties?.buttonType || 'Momentary';
+                  if (buttonType !== 'Latching') {
+                    if (onInteraction) onInteraction(node.id, 'release');
+                  }
+                }}
+              />
+              {/* Highlight dot — specular reflection */}
+              <Circle
+                x={node.width / 2 - capRadius * 0.25}
+                y={node.height / 2 + offsetY - capRadius * 0.25}
+                radius={capRadius * 0.15}
+                fill="rgba(255,255,255,0.45)"
+                listening={false}
+              />
+              {/* Press state label */}
+              <Text
+                text={pressed ? 'PRESSED' : ''}
+                x={0} y={node.height + 2}
+                width={node.width} align="center"
+                fontSize={6} fontFamily="JetBrains Mono" fontStyle="700"
+                fill="#fca5a5" listening={false}
+              />
+            </>
+          );
+        })()}
+
+        {/* Toggle Switch — realistic mechanical toggle with spring animation */}
+        {isSwitch && (() => {
+          const isClosed = Boolean(node.properties?.isClosed);
+          const knobY = isClosed ? node.height / 2 - 5 : node.height / 2 + 5;
+          return (
+            <>
+              <Group
+                listening={true}
+                onClick={(e) => {
+                  e.cancelBubble = true;
+                  onSelect();
+                  if (readOnly) return;
+                  const currentClosed = Boolean(node.properties?.isClosed);
+                  useCanvasStore.getState().updateNode(node.id, {
+                    properties: {
+                      ...node.properties,
+                      isClosed: !currentClosed,
+                    },
+                  });
+                }}
+                onTap={(e) => {
+                  e.cancelBubble = true;
+                  onSelect();
+                  if (readOnly) return;
+                  const currentClosed = Boolean(node.properties?.isClosed);
+                  useCanvasStore.getState().updateNode(node.id, {
+                    properties: {
+                      ...node.properties,
+                      isClosed: !currentClosed,
+                    },
+                  });
+                }}
+              >
+                {/* Track body */}
+                <Rect
+                  x={node.width / 2 - 7} y={node.height / 2 - 11}
+                  width={14} height={22}
+                  cornerRadius={7}
+                  fill={isClosed ? '#15803d' : '#1f2937'}
+                  stroke={isClosed ? '#16a34a' : '#6b7280'}
+                  strokeWidth={1.5}
+                  shadowColor={isClosed ? '#22c55e' : 'transparent'}
+                  shadowBlur={isClosed ? 8 : 0}
+                  listening={false}
+                />
+                {/* Track inner highlight */}
+                <Rect
+                  x={node.width / 2 - 4} y={node.height / 2 - 8}
+                  width={8} height={16}
+                  cornerRadius={4}
+                  fill={isClosed ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.03)'}
+                  listening={false}
+                />
+                {/* Knob — slides between positions */}
+                <Circle
+                  x={node.width / 2} y={knobY}
+                  radius={5}
+                  fill="#f8fafc"
+                  stroke={isClosed ? '#86efac' : '#94a3b8'}
+                  strokeWidth={1}
+                  shadowColor="rgba(0,0,0,0.3)"
+                  shadowBlur={3}
+                  shadowOffsetY={1}
+                  listening={false}
+                />
+                {/* Specular dot on knob */}
+                <Circle
+                  x={node.width / 2 - 1} y={knobY - 1}
+                  radius={1.5}
+                  fill="rgba(255,255,255,0.6)"
+                  listening={false}
+                />
+              </Group>
+              {/* State label */}
+              <Text
+                text={isClosed ? 'ON' : 'OFF'}
+                x={0} y={node.height + 2}
+                width={node.width} align="center"
+                fontSize={7} fontFamily="JetBrains Mono" fontStyle="700"
+                fill={isClosed ? '#22c55e' : '#6b7280'}
                 listening={false}
               />
             </>
           );
         })()}
 
-        {/* Buzzer — active pulse rings */}
-        {isBuzzer && isActive && (
-          <>
-            <Circle x={25} y={25} radius={18} fill="transparent"
-              stroke="#94a3b8" strokeWidth={1} opacity={0.3}
-              shadowColor="#94a3b8" shadowBlur={4} listening={false} />
-            <Circle x={25} y={25} radius={24} fill="transparent"
-              stroke="#64748b" strokeWidth={0.7} opacity={0.2}
-              listening={false} />
-          </>
-        )}
+        {/* Buzzer — animated expanding sound wave rings + speaker cone vibration */}
+        {isBuzzer && (() => {
+          const buzzerActive = Boolean(isSimulating) && Boolean(node.properties?.isBeeping);
+          const freq = Number(node.properties?.frequency) || 1000;
+          const cx = node.width / 2;
+          const cy = node.height / 2;
+          // Cone vibration offset
+          const vibrateY = buzzerActive ? Math.sin(animTick * 0.8) * 1.5 : 0;
 
-        {/* Relay — per-channel LED indicators */}
+          return (
+            <>
+              {/* Speaker cone body */}
+              <Circle
+                x={cx} y={cy + vibrateY}
+                radius={8}
+                fill={buzzerActive ? '#475569' : '#334155'}
+                stroke={buzzerActive ? '#94a3b8' : '#4b5563'}
+                strokeWidth={1}
+                listening={false}
+              />
+              <Circle
+                x={cx} y={cy + vibrateY}
+                radius={3}
+                fill={buzzerActive ? '#cbd5e1' : '#64748b'}
+                listening={false}
+              />
+              {/* Animated expanding sound wave rings */}
+              {buzzerActive && Array.from({ length: BUZZER_WAVE_RINGS }).map((_, i) => {
+                const phase = ((animTick * 3 + i * (BUZZER_WAVE_SPEED / BUZZER_WAVE_RINGS / 50)) % (BUZZER_WAVE_SPEED / 50)) / (BUZZER_WAVE_SPEED / 50);
+                const radius = 12 + phase * BUZZER_WAVE_MAX_RADIUS;
+                const opacity = Math.max(0, 0.5 * (1 - phase));
+                return (
+                  <Circle
+                    key={`bz_wave_${i}`}
+                    x={cx} y={cy}
+                    radius={radius}
+                    fill="transparent"
+                    stroke={BUZZER_WAVE_COLOR}
+                    strokeWidth={1.2 * (1 - phase * 0.5)}
+                    opacity={opacity}
+                    listening={false}
+                  />
+                );
+              })}
+              {/* Frequency display */}
+              {buzzerActive && (
+                <Text
+                  text={`♪ ${freq}Hz`}
+                  x={0} y={node.height + 2}
+                  width={node.width} align="center"
+                  fontSize={7} fontFamily="JetBrains Mono" fontStyle="700"
+                  fill={ACTIVE_GLOW_COLOR}
+                  shadowColor={ACTIVE_GLOW_COLOR} shadowBlur={4}
+                  listening={false}
+                />
+              )}
+            </>
+          );
+        })()}
+
+        {/* Relay — per-channel LED indicators + armature contact bar + coil glow */}
         {isRelay && (() => {
           const channelCount = node.type === 'RELAY_4CH' ? 4 : node.type === 'RELAY_2CH' ? 2 : 1;
           const spacing = node.width / (channelCount + 1);
+          const anyActive = Boolean(isSimulating) && Boolean(node.properties?.isActive);
+
           return (
             <>
+              {/* Coil energize glow */}
+              {anyActive && (
+                <Rect
+                  x={2} y={node.height * 0.3}
+                  width={node.width * 0.3} height={node.height * 0.4}
+                  cornerRadius={3}
+                  fill="transparent"
+                  stroke={RELAY_COIL_GLOW_COLOR}
+                  strokeWidth={1.5}
+                  opacity={0.6}
+                  shadowColor={RELAY_COIL_GLOW_COLOR}
+                  shadowBlur={8}
+                  listening={false}
+                />
+              )}
+              {/* Channel LED indicators */}
               {Array.from({ length: channelCount }, (_, i) => {
                 const chKey = channelCount === 1 ? 'isSwitched' : `isSwitched_${i + 1}`;
-                const isSwitched = Boolean(node.properties?.[chKey]);
+                const isSwitched = Boolean(isSimulating) && Boolean(node.properties?.[chKey]);
                 return (
-                  <Circle
-                    key={`relay_led_${i}`}
-                    x={spacing * (i + 1)}
-                    y={6}
-                    radius={3}
-                    fill={isSwitched ? '#22c55e' : '#374151'}
-                    stroke={isSwitched ? '#16a34a' : '#555'}
-                    strokeWidth={0.8}
-                    shadowColor={isSwitched ? '#22c55e' : 'transparent'}
-                    shadowBlur={isSwitched ? 6 : 0}
-                    listening={false}
-                  />
+                  <Group key={`relay_ch_${i}`}>
+                    {/* Status LED */}
+                    <Circle
+                      x={spacing * (i + 1)}
+                      y={6}
+                      radius={3}
+                      fill={isSwitched ? '#22c55e' : '#374151'}
+                      stroke={isSwitched ? '#16a34a' : '#555'}
+                      strokeWidth={0.8}
+                      shadowColor={isSwitched ? '#22c55e' : 'transparent'}
+                      shadowBlur={isSwitched ? 6 : 0}
+                      listening={false}
+                    />
+                    {/* Contact state label */}
+                    <Text
+                      text={isSwitched ? 'NO→' : 'NC→'}
+                      x={spacing * (i + 1) - 10}
+                      y={node.height - 8}
+                      width={20} align="center"
+                      fontSize={5} fontFamily="JetBrains Mono" fontStyle="700"
+                      fill={isSwitched ? '#22c55e' : '#6b7280'}
+                      listening={false}
+                    />
+                  </Group>
                 );
               })}
             </>
           );
         })()}
 
-        {/* Board LED indicators */}
+        {/* Board LED indicators + TX/RX blink LEDs */}
         {isBoard && (() => {
-          const isPwrOn = Boolean(node.properties?.boardPowered);
+          const isPwrOn = Boolean(isSimulating) && Boolean(node.properties?.boardPowered);
           const isLOn = isPwrOn && Boolean(node.properties?.builtInLedLit);
           const leds = getBoardLedPositions(node.type, node.width, node.height);
           
@@ -1065,7 +1471,674 @@ const ComponentNode = ({
                 fill={isLOn ? '#fde047' : '#4b5563'}
                 listening={false}
               />
+
+              {/* TX LED — blinks red when serial data transmits */}
+              {isPwrOn && (
+                <>
+                  <Circle
+                    x={leds.l.x} y={leds.l.y + 14}
+                    radius={3}
+                    fill={txBlink ? BOARD_TX_COLOR : '#374151'}
+                    stroke={txBlink ? '#fca5a5' : '#4b5563'}
+                    strokeWidth={0.8}
+                    shadowColor={BOARD_TX_COLOR}
+                    shadowBlur={txBlink ? 6 : 0}
+                    listening={false}
+                  />
+                  <Text text="TX" x={leds.l.x + 6} y={leds.l.y + 11}
+                    fontSize={6} fontFamily="Inter" fontStyle="700"
+                    fill={txBlink ? BOARD_TX_COLOR : '#4b5563'} listening={false}
+                  />
+                  {/* RX LED — blinks green when serial data receives */}
+                  <Circle
+                    x={leds.l.x} y={leds.l.y + 25}
+                    radius={3}
+                    fill={rxBlink ? BOARD_RX_COLOR : '#374151'}
+                    stroke={rxBlink ? '#86efac' : '#4b5563'}
+                    strokeWidth={0.8}
+                    shadowColor={BOARD_RX_COLOR}
+                    shadowBlur={rxBlink ? 6 : 0}
+                    listening={false}
+                  />
+                  <Text text="RX" x={leds.l.x + 6} y={leds.l.y + 22}
+                    fontSize={6} fontFamily="Inter" fontStyle="700"
+                    fill={rxBlink ? BOARD_RX_COLOR : '#4b5563'} listening={false}
+                  />
+                </>
+              )}
             </>
+          );
+        })()}
+
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* SENSOR LIVE DATA OVERLAYS — show readings ON the component    */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+
+        {/* DHT Temperature + Humidity Sensor — live thermometer + reading */}
+        {(node.type === 'TEMP_SENSOR' || node.type === 'SENSOR_DHT11' || node.type === 'SENSOR_DHT22') && isSimulating && (() => {
+          const temp = Number(node.properties?.temperature ?? 25);
+          const hum = Number(node.properties?.humidity ?? 60);
+          const tempPct = Math.max(0, Math.min(1, (temp + 40) / 120)); // -40 to 80
+          const tempColor = temp > 35 ? TEMP_HOT_COLOR : temp < 10 ? TEMP_COLD_COLOR : TEMP_WARM_COLOR;
+          const barW = node.width - 12;
+          return (
+            <Group listening={false}>
+              <Rect x={4} y={4} width={node.width - 8} height={28}
+                cornerRadius={SENSOR_OVERLAY_RADIUS} fill={SENSOR_OVERLAY_BG} />
+              {/* Thermometer bar */}
+              <Rect x={6} y={22} width={barW} height={SENSOR_BAR_HEIGHT}
+                cornerRadius={2} fill={SENSOR_BAR_BG} />
+              <Rect x={6} y={22} width={barW * tempPct} height={SENSOR_BAR_HEIGHT}
+                cornerRadius={2} fill={tempColor}
+                shadowColor={tempColor} shadowBlur={4} />
+              <Text text={`${temp.toFixed(1)}°C`}
+                x={6} y={7} fontSize={SENSOR_OVERLAY_FONT_SIZE} fontFamily={SENSOR_OVERLAY_FONT}
+                fontStyle="700" fill={SENSOR_OVERLAY_TEXT} />
+              <Text text={`${hum.toFixed(0)}%💧`}
+                x={node.width - 36} y={7} fontSize={SENSOR_OVERLAY_FONT_SIZE - 1} fontFamily={SENSOR_OVERLAY_FONT}
+                fill={SENSOR_OVERLAY_LABEL} />
+            </Group>
+          );
+        })()}
+
+        {/* Ultrasonic Sensor — distance + animated wave pulses */}
+        {(node.type === 'ULTRASONIC_SENSOR' || node.type === 'SENSOR_ULTRASONIC') && isSimulating && (() => {
+          const dist = Number(node.properties?.distance ?? 100);
+          const distPct = Math.min(1, dist / 400);
+          // Wave pulse animation
+          const wavePhase = (animTick % 20) / 20;
+          return (
+            <Group listening={false}>
+              {/* Animated wave arcs from transducers */}
+              {[0, 1, 2].map(i => {
+                const phase = (wavePhase + i * 0.33) % 1;
+                const arcR = 8 + phase * 18;
+                return (
+                  <Circle key={`us_wave_${i}`}
+                    x={node.width / 2} y={10}
+                    radius={arcR}
+                    fill="transparent" stroke={ULTRASONIC_WAVE_COLOR}
+                    strokeWidth={1.2 * (1 - phase)}
+                    opacity={0.5 * (1 - phase)}
+                  />
+                );
+              })}
+              {/* Distance reading overlay */}
+              <Rect x={4} y={node.height - 18} width={node.width - 8} height={14}
+                cornerRadius={SENSOR_OVERLAY_RADIUS} fill={SENSOR_OVERLAY_BG} />
+              <Text text={`📏 ${dist.toFixed(0)} cm`}
+                x={6} y={node.height - 16} fontSize={SENSOR_OVERLAY_FONT_SIZE}
+                fontFamily={SENSOR_OVERLAY_FONT} fontStyle="700" fill={ULTRASONIC_WAVE_COLOR} />
+            </Group>
+          );
+        })()}
+
+        {/* PIR Motion Sensor — radar sweep + motion flash */}
+        {(node.type === 'PIR_SENSOR' || node.type === 'SENSOR_PIR') && isSimulating && (() => {
+          const motionDetected = Boolean(node.properties?.motionDetected);
+          const sweepAngle = (animTick * 6) % 360;
+          const cx = node.width / 2;
+          const cy = node.height / 2 - 5;
+          return (
+            <Group listening={false}>
+              {/* Radar sweep line */}
+              <Group x={cx} y={cy} rotation={sweepAngle}>
+                <Line points={[0, 0, 0, -18]}
+                  stroke={motionDetected ? PIR_ACTIVE_COLOR : PIR_IDLE_COLOR}
+                  strokeWidth={1.5} opacity={0.6} />
+              </Group>
+              {/* Detection range circle */}
+              <Circle x={cx} y={cy} radius={18}
+                fill="transparent" stroke={motionDetected ? PIR_ACTIVE_COLOR : PIR_IDLE_COLOR}
+                strokeWidth={1} opacity={0.3} dash={[3, 3]} />
+              {/* Motion alert flash */}
+              {motionDetected && (
+                <>
+                  <Circle x={cx} y={cy} radius={22}
+                    fill={PIR_ACTIVE_COLOR} opacity={0.12 + Math.sin(animTick * 0.4) * 0.08}
+                    shadowColor={PIR_ACTIVE_COLOR} shadowBlur={12} />
+                  <Text text="🚨 MOTION"
+                    x={0} y={node.height + 2} width={node.width} align="center"
+                    fontSize={7} fontFamily={SENSOR_OVERLAY_FONT} fontStyle="700"
+                    fill={PIR_ACTIVE_COLOR} />
+                </>
+              )}
+            </Group>
+          );
+        })()}
+
+        {/* LDR Light Sensor — brightness indicator */}
+        {(node.type === 'LDR' || node.type === 'SENSOR_LDR') && isSimulating && (() => {
+          const light = Number(node.properties?.lightLevel ?? 50);
+          const lightPct = light / 100;
+          const barW = node.width - 12;
+          const fillColor = light > 50 ? LDR_SUN_COLOR : '#6366f1';
+          return (
+            <Group listening={false}>
+              <Rect x={4} y={4} width={node.width - 8} height={20}
+                cornerRadius={SENSOR_OVERLAY_RADIUS} fill={SENSOR_OVERLAY_BG} />
+              <Text text={light > 50 ? '☀' : '🌙'}
+                x={6} y={6} fontSize={10} />
+              <Text text={`${light}%`}
+                x={18} y={7} fontSize={SENSOR_OVERLAY_FONT_SIZE}
+                fontFamily={SENSOR_OVERLAY_FONT} fontStyle="700" fill={fillColor} />
+              <Rect x={6} y={17} width={barW} height={SENSOR_BAR_HEIGHT}
+                cornerRadius={2} fill={SENSOR_BAR_BG} />
+              <Rect x={6} y={17} width={barW * lightPct} height={SENSOR_BAR_HEIGHT}
+                cornerRadius={2} fill={fillColor}
+                shadowColor={fillColor} shadowBlur={3} />
+            </Group>
+          );
+        })()}
+
+        {/* Soil Moisture Sensor — moisture bar */}
+        {node.type === 'SOIL_MOISTURE' && isSimulating && (() => {
+          const moisture = Number(node.properties?.moistureLevel ?? 50);
+          const moistPct = moisture / 100;
+          const barW = node.width - 12;
+          const fillColor = moisture > 60 ? SOIL_WET_COLOR : SOIL_DRY_COLOR;
+          return (
+            <Group listening={false}>
+              <Rect x={4} y={4} width={node.width - 8} height={18}
+                cornerRadius={SENSOR_OVERLAY_RADIUS} fill={SENSOR_OVERLAY_BG} />
+              <Text text={`💧${moisture}%`}
+                x={6} y={6} fontSize={SENSOR_OVERLAY_FONT_SIZE}
+                fontFamily={SENSOR_OVERLAY_FONT} fontStyle="700" fill={fillColor} />
+              <Rect x={6} y={16} width={barW} height={SENSOR_BAR_HEIGHT - 1}
+                cornerRadius={2} fill={SENSOR_BAR_BG} />
+              <Rect x={6} y={16} width={barW * moistPct} height={SENSOR_BAR_HEIGHT - 1}
+                cornerRadius={2} fill={fillColor} />
+            </Group>
+          );
+        })()}
+
+        {/* IMU Sensor — tilt indicator + acceleration values */}
+        {node.type === 'SENSOR_IMU' && isSimulating && (() => {
+          const ax = Number(node.properties?.accelerationX ?? 0);
+          const ay = Number(node.properties?.accelerationY ?? 0);
+          const tiltAngle = Math.atan2(ay, ax) * (180 / Math.PI);
+          const cx = node.width / 2;
+          const cy = node.height / 2 - 5;
+          return (
+            <Group listening={false}>
+              {/* Tilt circle */}
+              <Circle x={cx} y={cy} radius={14}
+                fill="transparent" stroke={IMU_TILT_COLOR}
+                strokeWidth={1} opacity={0.4} />
+              {/* Tilt indicator */}
+              <Group x={cx} y={cy} rotation={tiltAngle}>
+                <Circle x={10} y={0} radius={3}
+                  fill={IMU_TILT_COLOR} opacity={0.8}
+                  shadowColor={IMU_TILT_COLOR} shadowBlur={4} />
+              </Group>
+              <Circle x={cx} y={cy} radius={2}
+                fill="#cbd5e1" />
+              {/* Values */}
+              <Rect x={2} y={node.height - 14} width={node.width - 4} height={12}
+                cornerRadius={2} fill={SENSOR_OVERLAY_BG} />
+              <Text text={`X:${ax.toFixed(1)} Y:${ay.toFixed(1)}`}
+                x={4} y={node.height - 12} fontSize={6}
+                fontFamily={SENSOR_OVERLAY_FONT} fontStyle="700" fill={IMU_TILT_COLOR} />
+            </Group>
+          );
+        })()}
+
+        {/* Servo Motor — tick marks arc + angle readout */}
+        {isServo && isSimulating && (() => {
+          const angle = Number(node.properties?.servoAngle || 0);
+          return (
+            <Group listening={false}>
+              {/* Sweep arc background */}
+              <Group x={node.width - 15} y={node.height / 2}>
+                {/* Tick marks every 22.5° */}
+                {Array.from({ length: 9 }).map((_, i) => {
+                  const tickAngle = (i * 22.5 - 90) * (Math.PI / 180);
+                  const r1 = 24;
+                  const r2 = 28;
+                  return (
+                    <Line key={`servo_tick_${i}`}
+                      points={[
+                        Math.cos(tickAngle) * r1, Math.sin(tickAngle) * r1,
+                        Math.cos(tickAngle) * r2, Math.sin(tickAngle) * r2,
+                      ]}
+                      stroke={SERVO_ARC_COLOR} strokeWidth={1} />
+                  );
+                })}
+              </Group>
+              {/* Angle readout */}
+              <Rect x={2} y={2} width={28} height={12}
+                cornerRadius={2} fill={SENSOR_OVERLAY_BG} />
+              <Text text={`${angle}°`}
+                x={4} y={3} fontSize={8}
+                fontFamily={SENSOR_OVERLAY_FONT} fontStyle="700"
+                fill={SERVO_ANGLE_TEXT_COLOR} />
+            </Group>
+          );
+        })()}
+
+        {/* DC Motor — vibration + motion blur at high RPM */}
+        {isDcMotor && isActive && (() => {
+          const rpm = Number(node.properties?.rpm) || 3000;
+          const isHighRpm = rpm > MOTOR_BLUR_RPM_THRESHOLD;
+          const vibrateX = Math.sin(animTick * 2.3) * MOTOR_VIBRATE_PX;
+          const vibrateY = Math.cos(animTick * 3.1) * MOTOR_VIBRATE_PX;
+          return (
+            <Group listening={false}>
+              {/* Motion blur circle at high RPM */}
+              {isHighRpm && (
+                <Circle x={30 + vibrateX} y={25 + vibrateY} radius={26}
+                  fill="rgba(239,68,68,0.08)"
+                  stroke="rgba(239,68,68,0.15)"
+                  strokeWidth={1}
+                  shadowColor="#ef4444" shadowBlur={8}
+                />
+              )}
+              {/* RPM readout */}
+              <Rect x={2} y={node.height - 12} width={node.width - 4} height={10}
+                cornerRadius={2} fill={SENSOR_OVERLAY_BG} />
+              <Text text={`⚙ ${rpm} RPM`}
+                x={4} y={node.height - 11} fontSize={6}
+                fontFamily={SENSOR_OVERLAY_FONT} fontStyle="700"
+                fill={isHighRpm ? '#ef4444' : ACTIVE_GLOW_COLOR} />
+            </Group>
+          );
+        })()}
+
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* INTERACTIVE PHYSICS TARGETS FOR SENSORS (SIMULATION MODE)      */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+
+        {/* LDR Sensor Flashlight Target */}
+        {(node.type === 'LDR' || node.type === 'SENSOR_LDR') && isSimulating && (() => {
+          const light = Number(node.properties?.lightLevel ?? 50);
+          const minD = 20;
+          const maxD = 120;
+          const dist = maxD - (light / 100) * (maxD - minD);
+          const cx = node.width / 2;
+          const cy = node.height / 2;
+
+          return (
+            <Group listening={true}>
+              <Line
+                points={[cx, cy, cx + dist, cy]}
+                stroke="#eab308"
+                strokeWidth={1.5}
+                dash={[3, 3]}
+                opacity={0.6}
+              />
+              <Group
+                x={cx + dist}
+                y={cy}
+                draggable={!readOnly}
+                dragBoundFunc={(pos) => {
+                  const rad = (node.rotation || 0) * Math.PI / 180;
+                  const cos = Math.cos(rad);
+                  const sin = Math.sin(rad);
+                  const dx = pos.x - node.x;
+                  const dy = pos.y - node.y;
+                  const localX = dx * cos + dy * sin;
+                  const d = Math.max(minD, Math.min(maxD, localX - cx));
+                  return {
+                    x: node.x + (cx + d) * cos - cy * sin,
+                    y: node.y + (cx + d) * sin + cy * cos,
+                  };
+                }}
+                onDragMove={(e) => {
+                  e.cancelBubble = true;
+                  const rad = (node.rotation || 0) * Math.PI / 180;
+                  const cos = Math.cos(rad);
+                  const sin = Math.sin(rad);
+                  const dx = e.target.x() - node.x;
+                  const dy = e.target.y() - node.y;
+                  const localX = dx * cos + dy * sin;
+                  const d = Math.max(minD, Math.min(maxD, localX - cx));
+                  const newLight = Math.round(100 * (1 - (d - minD) / (maxD - minD)));
+                  onChange({
+                    properties: {
+                      ...node.properties,
+                      lightLevel: newLight,
+                    },
+                  });
+                }}
+              >
+                <Circle radius={14} fill="#eab308" opacity={0.25} shadowColor="#eab308" shadowBlur={10} />
+                <Circle radius={7} fill="#fde047" stroke="#eab308" strokeWidth={1} />
+                <Circle x={-2} y={-2} radius={2} fill="white" opacity={0.8} />
+                {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => {
+                  const rRad = (angle * Math.PI) / 180;
+                  return (
+                    <Line
+                      key={`ray_${angle}`}
+                      points={[Math.cos(rRad) * 8, Math.sin(rRad) * 8, Math.cos(rRad) * 12, Math.sin(rRad) * 12]}
+                      stroke="#fde047"
+                      strokeWidth={1}
+                    />
+                  );
+                })}
+              </Group>
+            </Group>
+          );
+        })()}
+
+        {/* Ultrasonic Sonar Obstacle Target */}
+        {(node.type === 'ULTRASONIC_SENSOR' || node.type === 'SENSOR_ULTRASONIC') && isSimulating && (() => {
+          const dist = Number(node.properties?.distance ?? 100);
+          const maxPx = 150;
+          const minPx = 30;
+          const distPx = minPx + ((dist - 2) / (400 - 2)) * (maxPx - minPx);
+
+          return (
+            <Group x={node.width} y={node.height / 2} listening={true}>
+              <Line
+                points={[0, 0, distPx, 0]}
+                stroke="#0ea5e9"
+                strokeWidth={1.5}
+                dash={[4, 4]}
+                opacity={0.7}
+              />
+              <Arc
+                x={distPx / 2}
+                y={0}
+                angle={30}
+                innerRadius={Math.max(0, distPx / 2 - 5)}
+                outerRadius={distPx / 2 + 5}
+                fill="rgba(14,165,233,0.15)"
+                rotation={-15}
+              />
+              <Group
+                x={distPx}
+                y={0}
+                draggable={!readOnly}
+                dragBoundFunc={(pos) => {
+                  const rad = (node.rotation || 0) * Math.PI / 180;
+                  const cos = Math.cos(rad);
+                  const sin = Math.sin(rad);
+                  const dx = pos.x - node.x;
+                  const dy = pos.y - node.y;
+                  const localX = dx * cos + dy * sin;
+                  const clampedX = Math.max(node.width + minPx, Math.min(node.width + maxPx, localX));
+                  return {
+                    x: node.x + clampedX * cos - (node.height / 2) * sin,
+                    y: node.y + clampedX * sin + (node.height / 2) * cos,
+                  };
+                }}
+                onDragMove={(e) => {
+                  e.cancelBubble = true;
+                  const rad = (node.rotation || 0) * Math.PI / 180;
+                  const cos = Math.cos(rad);
+                  const sin = Math.sin(rad);
+                  const dx = e.target.x() - node.x;
+                  const dy = e.target.y() - node.y;
+                  const localX = dx * cos + dy * sin;
+                  const clampedX = Math.max(minPx, Math.min(maxPx, localX - node.width));
+                  const newDist = 2 + ((clampedX - minPx) / (maxPx - minPx)) * (400 - 2);
+                  onChange({
+                    properties: {
+                      ...node.properties,
+                      distance: Math.round(newDist),
+                    },
+                  });
+                }}
+              >
+                <Rect
+                  x={-6}
+                  y={-12}
+                  width={12}
+                  height={24}
+                  fill="#64748b"
+                  stroke="#94a3b8"
+                  strokeWidth={1.5}
+                  cornerRadius={3}
+                  shadowColor="black"
+                  shadowBlur={4}
+                />
+                <Text
+                  text="|||"
+                  x={-6}
+                  y={-8}
+                  width={12}
+                  align="center"
+                  fontSize={8}
+                  fontStyle="bold"
+                  fill="#cbd5e1"
+                />
+              </Group>
+            </Group>
+          );
+        })()}
+
+        {/* PIR Motion Sensor Intruder Target */}
+        {(node.type === 'PIR_SENSOR' || node.type === 'SENSOR_PIR') && isSimulating && (() => {
+          const motionDetected = Boolean(node.properties?.motionDetected);
+          const intX = Number(node.properties?.intruderX !== undefined ? node.properties.intruderX : 100);
+          const intY = Number(node.properties?.intruderY !== undefined ? node.properties.intruderY : 0);
+          const cx = node.width / 2;
+          const cy = node.height / 2;
+
+          return (
+            <Group listening={true}>
+              <Arc
+                x={cx}
+                y={cy}
+                angle={90}
+                innerRadius={0}
+                outerRadius={80}
+                rotation={-45}
+                fill="rgba(239,68,68,0.04)"
+                stroke="#ef4444"
+                strokeWidth={1}
+                dash={[3, 3]}
+                opacity={0.4}
+              />
+              <Group
+                x={cx + intX}
+                y={cy + intY}
+                draggable={!readOnly}
+                dragBoundFunc={(pos) => {
+                  const rad = (node.rotation || 0) * Math.PI / 180;
+                  const cos = Math.cos(rad);
+                  const sin = Math.sin(rad);
+                  const dx = pos.x - node.x;
+                  const dy = pos.y - node.y;
+                  const localX = dx * cos + dy * sin;
+                  const localY = -dx * sin + dy * cos;
+                  const clampedX = Math.max(-130, Math.min(130, localX - cx));
+                  const clampedY = Math.max(-130, Math.min(130, localY - cy));
+                  return {
+                    x: node.x + (cx + clampedX) * cos - (cy + clampedY) * sin,
+                    y: node.y + (cx + clampedX) * sin + (cy + clampedY) * cos,
+                  };
+                }}
+                onDragMove={(e) => {
+                  e.cancelBubble = true;
+                  const rad = (node.rotation || 0) * Math.PI / 180;
+                  const cos = Math.cos(rad);
+                  const sin = Math.sin(rad);
+                  const dx = e.target.x() - node.x;
+                  const dy = e.target.y() - node.y;
+                  const localX = dx * cos + dy * sin;
+                  const localY = -dx * sin + dy * cos;
+                  const curX = localX - cx;
+                  const curY = localY - cy;
+
+                  const distance = Math.sqrt(curX * curX + curY * curY);
+                  const angle = Math.atan2(curY, curX) * (180 / Math.PI);
+                  const inCone = distance <= 80 && Math.abs(angle) <= 45;
+
+                  onChange({
+                    properties: {
+                      ...node.properties,
+                      intruderX: Math.round(curX),
+                      intruderY: Math.round(curY),
+                      motionDetected: inCone,
+                    },
+                  });
+                }}
+              >
+                <Circle radius={10} fill={motionDetected ? '#ef4444' : '#6b7280'} opacity={0.8} />
+                <Circle radius={4} fill="white" />
+                <Text
+                  text="🚶"
+                  x={-6}
+                  y={-6}
+                  fontSize={10}
+                  align="center"
+                  listening={false}
+                />
+              </Group>
+            </Group>
+          );
+        })()}
+
+        {/* Soil Moisture Water Droplet Target */}
+        {node.type === 'SOIL_MOISTURE' && isSimulating && (() => {
+          const moisture = Number(node.properties?.moistureLevel ?? 50);
+          const minD = 20;
+          const maxD = 120;
+          const dist = maxD - (moisture / 100) * (maxD - minD);
+          const cx = node.width / 2;
+          const cy = node.height / 2;
+
+          return (
+            <Group listening={true}>
+              <Line
+                points={[cx, cy, cx + dist, cy]}
+                stroke="#3b82f6"
+                strokeWidth={1.5}
+                dash={[3, 3]}
+                opacity={0.6}
+              />
+              <Group
+                x={cx + dist}
+                y={cy}
+                draggable={!readOnly}
+                dragBoundFunc={(pos) => {
+                  const rad = (node.rotation || 0) * Math.PI / 180;
+                  const cos = Math.cos(rad);
+                  const sin = Math.sin(rad);
+                  const dx = pos.x - node.x;
+                  const dy = pos.y - node.y;
+                  const localX = dx * cos + dy * sin;
+                  const d = Math.max(minD, Math.min(maxD, localX - cx));
+                  return {
+                    x: node.x + (cx + d) * cos - cy * sin,
+                    y: node.y + (cx + d) * sin + cy * cos,
+                  };
+                }}
+                onDragMove={(e) => {
+                  e.cancelBubble = true;
+                  const rad = (node.rotation || 0) * Math.PI / 180;
+                  const cos = Math.cos(rad);
+                  const sin = Math.sin(rad);
+                  const dx = e.target.x() - node.x;
+                  const dy = e.target.y() - node.y;
+                  const localX = dx * cos + dy * sin;
+                  const d = Math.max(minD, Math.min(maxD, localX - cx));
+                  const newMoist = Math.round(100 * (1 - (d - minD) / (maxD - minD)));
+                  onChange({
+                    properties: {
+                      ...node.properties,
+                      moistureLevel: newMoist,
+                    },
+                  });
+                }}
+              >
+                <Circle radius={12} fill="#3b82f6" opacity={0.25} />
+                <Text
+                  text="💧"
+                  x={-6}
+                  y={-7}
+                  fontSize={11}
+                  listening={false}
+                />
+              </Group>
+            </Group>
+          );
+        })()}
+
+        {/* IMU Sensor Joystick Tilt Target */}
+        {node.type === 'SENSOR_IMU' && isSimulating && (() => {
+          const ax = Number(node.properties?.accelerationX ?? 0);
+          const ay = Number(node.properties?.accelerationY ?? 0);
+          const maxVal = 16;
+          const maxPx = 14;
+          const jx = (ax / maxVal) * maxPx;
+          const jy = (ay / maxVal) * maxPx;
+          const cx = node.width / 2;
+          const cy = node.height / 2 - 5;
+
+          return (
+            <Group listening={true}>
+              <Circle
+                x={cx}
+                y={cy}
+                radius={maxPx + 2}
+                fill="rgba(15,23,42,0.4)"
+                stroke="#a855f7"
+                strokeWidth={1}
+                dash={[2, 2]}
+              />
+              <Circle
+                x={cx + jx}
+                y={cy + jy}
+                radius={4}
+                fill="#ffffff"
+                stroke="#a855f7"
+                strokeWidth={1.5}
+                shadowColor="black"
+                shadowBlur={2}
+                draggable={!readOnly}
+                dragBoundFunc={(pos) => {
+                  const rad = (node.rotation || 0) * Math.PI / 180;
+                  const cos = Math.cos(rad);
+                  const sin = Math.sin(rad);
+                  const dx = pos.x - node.x;
+                  const dy = pos.y - node.y;
+                  const localX = dx * cos + dy * sin;
+                  const localY = -dx * sin + dy * cos;
+                  
+                  const vx = localX - cx;
+                  const vy = localY - cy;
+                  const dist = Math.sqrt(vx * vx + vy * vy);
+                  
+                  let clampedX = vx;
+                  let clampedY = vy;
+                  if (dist > maxPx) {
+                    clampedX = (vx / dist) * maxPx;
+                    clampedY = (vy / dist) * maxPx;
+                  }
+                  
+                  return {
+                    x: node.x + (cx + clampedX) * cos - (cy + clampedY) * sin,
+                    y: node.y + (cx + clampedX) * sin + (cy + clampedY) * cos,
+                  };
+                }}
+                onDragMove={(e) => {
+                  e.cancelBubble = true;
+                  const rad = (node.rotation || 0) * Math.PI / 180;
+                  const cos = Math.cos(rad);
+                  const sin = Math.sin(rad);
+                  const dx = e.target.x() - node.x;
+                  const dy = e.target.y() - node.y;
+                  const localX = dx * cos + dy * sin;
+                  const localY = -dx * sin + dy * cos;
+                  
+                  const vx = localX - cx;
+                  const vy = localY - cy;
+                  
+                  const newAx = (vx / maxPx) * maxVal;
+                  const newAy = (vy / maxPx) * maxVal;
+                  
+                  onChange({
+                    properties: {
+                      ...node.properties,
+                      accelerationX: Math.round(newAx * 10) / 10,
+                      accelerationY: Math.round(newAy * 10) / 10,
+                    },
+                  });
+                }}
+              />
+            </Group>
           );
         })()}
 

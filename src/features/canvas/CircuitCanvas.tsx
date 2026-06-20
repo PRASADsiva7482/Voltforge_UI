@@ -37,6 +37,7 @@ interface Props {
   onCursorMove?: (x: number, y: number) => void;
   readOnly?: boolean;
   isProbeMode?: boolean;
+  isSimulating?: boolean;
 }
 
 // ── Grid Layer (memoized) — professional engineering grid ──
@@ -218,6 +219,7 @@ export default function CircuitCanvas({
   onCursorMove,
   readOnly,
   isProbeMode,
+  isSimulating,
 }: Props) {
   const isDark = useThemeStore((state) => state.theme === 'dark');
   const {
@@ -401,6 +403,7 @@ export default function CircuitCanvas({
                 onInteraction={onComponentInteraction}
                 readOnly={readOnly}
                 isProbeMode={isProbeMode}
+                isSimulating={isSimulating}
               />
             ))}
           </Layer>

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Sliders, Trash2, RotateCw, FlipHorizontal, FlipVertical, Lock, Unlock, Palette } from 'lucide-react';
 import { useCanvasStore, WIRE_COLORS } from '../../store/canvasStore';
@@ -183,6 +184,55 @@ const propertySchemas: Record<string, { label: string; key: string; type: 'numbe
   ESP8266: [
     { label: 'USB Connected', key: 'usbConnected', type: 'select', options: ['Yes', 'No'] },
   ],
+  SENSOR_DHT22: [
+    { label: 'Temperature', key: 'temperature', type: 'number', unit: '°C', min: -40, max: 80, step: 0.5 },
+    { label: 'Humidity', key: 'humidity', type: 'number', unit: '%', min: 0, max: 100, step: 1 },
+  ],
+  PIR_SENSOR: [
+    { label: 'Detection Range', key: 'range', type: 'number', unit: 'm', min: 1, max: 7, step: 0.5 },
+    { label: 'Motion Detected', key: 'motionDetected', type: 'select', options: ['false', 'true'] },
+    { label: 'Retrigger Delay', key: 'delay', type: 'number', unit: 's', min: 0.3, max: 300, step: 0.1 },
+  ],
+  SOIL_MOISTURE: [
+    { label: 'Moisture Level', key: 'moistureLevel', type: 'number', unit: '%', min: 0, max: 100, step: 1 },
+    { label: 'Threshold', key: 'threshold', type: 'number', unit: '%', min: 0, max: 100, step: 5 },
+  ],
+  IR_RECEIVER: [
+    { label: 'Signal', key: 'irSignal', type: 'select', options: ['None', 'Power', 'Vol+', 'Vol-', 'Ch+', 'Ch-', 'Play', 'Custom'] },
+  ],
+  BLUETOOTH_MODULE: [
+    { label: 'Module Name', key: 'moduleName', type: 'text' },
+    { label: 'Baud Rate', key: 'baudRate', type: 'select', options: ['9600', '38400', '57600', '115200'] },
+  ],
+  WIFI_MODULE: [
+    { label: 'SSID', key: 'ssid', type: 'text' },
+    { label: 'Baud Rate', key: 'baudRate', type: 'select', options: ['9600', '115200'] },
+  ],
+  MOTOR_BLDC: [
+    { label: 'Max RPM', key: 'maxRpm', type: 'number', unit: 'rpm', min: 1000, max: 30000, step: 500 },
+    { label: 'KV Rating', key: 'kv', type: 'number', unit: 'KV', min: 100, max: 5000, step: 50 },
+  ],
+  ESC_MODULE: [
+    { label: 'Max Current', key: 'maxCurrent', type: 'select', options: ['20A', '30A', '40A', '60A'] },
+    { label: 'Throttle', key: 'escThrottle', type: 'number', unit: '%', min: 0, max: 100, step: 1 },
+  ],
+  IC_555_TIMER: [
+    { label: 'Mode', key: 'timerMode', type: 'select', options: ['Astable', 'Monostable'] },
+  ],
+  IC_74HC595: [
+    { label: 'Latch Value', key: 'latchRegValue', type: 'number', min: 0, max: 255, step: 1 },
+  ],
+  BATTERY_9V: [
+    { label: 'Voltage', key: 'voltage', type: 'number', unit: 'V', min: 0, max: 9, step: 0.1 },
+  ],
+  POWER_SUPPLY: [
+    { label: 'Voltage', key: 'voltage', type: 'select', options: ['3.3V', '5V', '9V', '12V', '24V'] },
+    { label: 'Max Current', key: 'maxCurrent', type: 'select', options: ['500mA', '1A', '2A', '3A', '5A'] },
+  ],
+  STEPPER_MOTOR: [
+    { label: 'Steps/Rev', key: 'stepsPerRev', type: 'select', options: ['200 (1.8°)', '400 (0.9°)'] },
+    { label: 'Voltage', key: 'voltage', type: 'select', options: ['5V', '12V', '24V'] },
+  ],
 };
 
 // ── Wire Properties Panel ──
@@ -284,6 +334,52 @@ function WirePropertiesPanel() {
         </div>
       </motion.div>
     </AnimatePresence>
+  );
+}
+
+function PropertyInput({
+  propKey,
+  value,
+  type,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  propKey: string;
+  value: any;
+  type: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  onChange: (key: string, val: any) => void;
+}) {
+  const [localVal, setLocalVal] = useState(value);
+
+  useEffect(() => {
+    setLocalVal(value);
+  }, [value]);
+
+  const handleCommit = () => {
+    if (localVal !== value) {
+      onChange(propKey, type === 'number' ? Number(localVal) : localVal);
+    }
+  };
+
+  return (
+    <input
+      type={type}
+      value={localVal ?? ''}
+      min={min}
+      max={max}
+      step={step}
+      onChange={(e) => setLocalVal(e.target.value)}
+      onBlur={handleCommit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') handleCommit();
+      }}
+      className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
+    />
   );
 }
 
@@ -428,21 +524,15 @@ export default function PropertyEditor() {
                     <label className="text-[10px] text-surface-500 mb-1 block">
                       {prop.label} {prop.unit && <span className="text-surface-600">({prop.unit})</span>}
                     </label>
-                    {prop.type === 'number' && (
-                      <input
-                        type="number"
-                        value={(properties[prop.key] as number) ?? prop.min ?? 0}
-                        min={prop.min} max={prop.max} step={prop.step}
-                        onChange={(e) => handlePropertyChange(prop.key, Number(e.target.value))}
-                        className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
-                      />
-                    )}
-                    {prop.type === 'text' && (
-                      <input
-                        type="text"
-                        value={(properties[prop.key] as string) || ''}
-                        onChange={(e) => handlePropertyChange(prop.key, e.target.value)}
-                        className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
+                    {(prop.type === 'number' || prop.type === 'text') && (
+                      <PropertyInput
+                        propKey={prop.key}
+                        value={properties[prop.key]}
+                        type={prop.type}
+                        min={prop.min}
+                        max={prop.max}
+                        step={prop.step}
+                        onChange={handlePropertyChange}
                       />
                     )}
                     {prop.type === 'select' && (

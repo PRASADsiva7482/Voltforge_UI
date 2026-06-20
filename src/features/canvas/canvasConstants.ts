@@ -121,3 +121,69 @@ export const OSCILLOSCOPE_SCREEN_BG = '#0a0f1e';
 export const OSCILLOSCOPE_GRID_COLOR = 'rgba(34,197,94,0.2)';
 export const OSCILLOSCOPE_TRACE_COLOR = '#22c55e';
 export const OSCILLOSCOPE_SCREEN: ScreenDimensions = { x: 8, y: 8, width: 84, height: 50 };
+
+// ── Buzzer sound wave animation ──────────────────────────────────────────
+export const BUZZER_WAVE_RINGS = 3;
+export const BUZZER_WAVE_MAX_RADIUS = 30;
+export const BUZZER_WAVE_COLOR = '#94a3b8';
+export const BUZZER_WAVE_SPEED = 1200; // ms per expansion cycle
+export const BUZZER_CONE_VIBRATE_PX = 1.5;
+
+// ── Button 3D press effect ───────────────────────────────────────────────
+export const BUTTON_PRESS_DEPTH = 3;        // px the cap sinks
+export const BUTTON_SHADOW_NORMAL = 4;      // shadow blur at rest
+export const BUTTON_SHADOW_PRESSED = 1;     // shadow blur when pressed
+export const BUTTON_HIGHLIGHT_COLOR = '#fca5a5';
+
+// ── Relay armature animation ─────────────────────────────────────────────
+export const RELAY_ARM_OPEN_Y = 18;
+export const RELAY_ARM_CLOSED_Y = 28;
+export const RELAY_COIL_GLOW_COLOR = '#f97316';
+export const RELAY_SNAP_DURATION_MS = 80;
+
+// ── Display boot animation ──────────────────────────────────────────────
+export const DISPLAY_BOOT_DURATION_MS = 800;
+export const DISPLAY_CURSOR_BLINK_MS = 530;
+
+// ── PWM flicker ─────────────────────────────────────────────────────────
+export const PWM_FLICKER_MIN_OPACITY = 0.4;
+export const PWM_FLICKER_MAX_OPACITY = 1.0;
+
+// ── Sensor overlay styles ───────────────────────────────────────────────
+export const SENSOR_OVERLAY_FONT = "'JetBrains Mono', 'Courier New', monospace";
+export const SENSOR_OVERLAY_FONT_SIZE = 8;
+export const SENSOR_OVERLAY_BG = 'rgba(15, 23, 42, 0.75)';
+export const SENSOR_OVERLAY_TEXT = '#86efac';
+export const SENSOR_OVERLAY_LABEL = '#94a3b8';
+export const SENSOR_OVERLAY_RADIUS = 4;
+export const SENSOR_BAR_HEIGHT = 4;
+export const SENSOR_BAR_BG = 'rgba(255,255,255,0.1)';
+
+// ── Sensor-specific colors ──────────────────────────────────────────────
+export const TEMP_HOT_COLOR = '#ef4444';
+export const TEMP_COLD_COLOR = '#3b82f6';
+export const TEMP_WARM_COLOR = '#f59e0b';
+export const ULTRASONIC_WAVE_COLOR = '#38bdf8';
+export const PIR_ACTIVE_COLOR = '#ef4444';
+export const PIR_IDLE_COLOR = '#22c55e';
+export const LDR_SUN_COLOR = '#fbbf24';
+export const LDR_MOON_COLOR = '#6366f1';
+export const SOIL_WET_COLOR = '#3b82f6';
+export const SOIL_DRY_COLOR = '#d97706';
+export const IMU_TILT_COLOR = '#a855f7';
+
+// ── Motor motion blur ───────────────────────────────────────────────────
+export const MOTOR_BLUR_RPM_THRESHOLD = 2000;
+export const MOTOR_VIBRATE_PX = 0.8;
+export const MOTOR_HIGH_RPM_COLOR = '#ef4444';
+export const MOTOR_LOW_RPM_COLOR = '#22c55e';
+
+// ── Servo sweep ─────────────────────────────────────────────────────────
+export const SERVO_TICK_COUNT = 9; // 0, 22.5, 45, ... 180
+export const SERVO_ARC_COLOR = 'rgba(34,197,94,0.2)';
+export const SERVO_ANGLE_TEXT_COLOR = '#86efac';
+
+// ── Board activity ──────────────────────────────────────────────────────
+export const BOARD_TX_COLOR = '#ef4444';
+export const BOARD_RX_COLOR = '#22c55e';
+export const BOARD_TX_BLINK_MS = 80;

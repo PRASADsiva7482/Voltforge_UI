@@ -17,12 +17,11 @@ export function useCollaboration(projectId: string) {
   useEffect(() => {
     if (!projectId || !user || !keycloak.token) return;
 
-    // Determine backend URL (fallback for dev)
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1';
-    // We use the backend root URL by removing /api/v1 for the WS endpoint
-    const wsUrl = window.location.origin.includes('localhost') 
-      ? 'http://localhost:2001/voltForge-app/ws' 
-      : `${window.location.origin}/ws`;
+    // Determine backend WebSocket URL
+    const wsUrl = import.meta.env.VITE_WS_URL || 
+      (import.meta.env.VITE_API_BASE_URL && import.meta.env.VITE_API_BASE_URL.startsWith('http')
+        ? import.meta.env.VITE_API_BASE_URL.replace(/\/api\/v1\/?$/, '/ws')
+        : `${window.location.origin}/ws`);
 
     const client = new Client({
       webSocketFactory: () => new SockJS(wsUrl),
