@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.4",
@@ -16,7 +17,8 @@
     "@vitejs/plugin-react": "^6.0.1",
     "tailwindcss": "^4.2.4",
     "typescript": "~6.0.2",
-    "vite": "^8.0.10"
+    "vite": "^8.0.10",
+    "vitest": "^3.2.6"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -36,5 +38,9 @@
     "sockjs-client": "^1.6.1",
     "yjs": "^13.6.30",
     "zustand": "^5.0.13"
+  },
+  "overrides": {
+    "dompurify": "^3.4.11",
+    "esbuild": "^0.28.1"
   }
 }

@@ -149,6 +149,15 @@ export class MNASolver {
       const A: number[][] = Array.from({ length: size }, () => new Array(size).fill(0));
       const b: number[] = new Array(size).fill(0);
 
+      // Real schematics commonly contain intentionally floating pins (AREF,
+      // RESET, unused IC pins). A tiny conductance to ground prevents those
+      // isolated nets from making the complete MNA matrix singular. This is
+      // the standard SPICE gmin technique and is electrically negligible.
+      const gmin = 1e-12;
+      for (let node = 0; node < n; node++) {
+        A[node][node] += gmin;
+      }
+
       // Voltage source index map
       const vsIndex = new Map<string, number>();
       this.voltageSources.forEach((vs, i) => vsIndex.set(vs.id, i));

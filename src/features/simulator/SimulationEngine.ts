@@ -5,11 +5,12 @@
 import { CanvasNode, Wire } from '../../types';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useSimulationStore } from '../../store/simulationStore';
-import { CPU, avrInstruction, AVRIOPort, AVRUSART, AVRTimer, portBConfig, portCConfig, portDConfig, timer0Config, timer1Config, timer2Config, usart0Config, PinState as AvrPinState, AVRTWI, twiConfig } from 'avr8js';
+import { CPU, avrInstruction, AVRIOPort, AVRUSART, AVRTimer, portBConfig, portCConfig, portDConfig, timer0Config, timer1Config, timer2Config, usart0Config, PinState as AvrPinState, AVRTWI, twiConfig, AVRADC, adcConfig } from 'avr8js';
 import { buildMNACircuit } from './NetlistBuilder';
 import type { MNACircuit } from './NetlistBuilder';
 import type { WorkerInMessage, WorkerResultMessage, WorkerOscilloscopeMessage } from './SimulationWorker';
 import { LogicRegistry } from './logic/LogicRegistry';
+import { evaluateNumericExpression } from './ExpressionEvaluator';
 import { AudioEngine } from './AudioEngine';
 
 export type PinState = 'HIGH' | 'LOW' | 'INPUT' | 'OUTPUT' | 'PWM';
@@ -29,11 +30,14 @@ interface PinInfo {
 }
 
 interface ParsedStatement {
-  type: 'statement' | 'if';
+  type: 'statement' | 'if' | 'for' | 'while';
   code?: string;
   condition?: string;
   thenBlock?: ParsedStatement[];
   elseBlock?: ParsedStatement[];
+  init?: string;
+  update?: string;
+  body?: ParsedStatement[];
 }
 
 class LcdI2CExpander {
@@ -192,8 +196,10 @@ export class SimulationEngine {
   private avrCpu: CPU | null = null;
   private avrPorts: Record<string, AVRIOPort> = {};
   private avrUsart: AVRUSART | null = null;
+  private avrAdc: AVRADC | null = null;
   // For toggling state with delay patterns (e.g., blink)
   private pinToggleState: Record<string, boolean> = {};
+  private lastDcMotorUpdateTime = 0;
 
   // ── LCD Display state ──
   private lcdRows = 2;
@@ -328,6 +334,19 @@ export class SimulationEngine {
       }
     });
 
+    // updateNode() is synchronous, but the nodes passed by React still refer to
+    // the pre-reset snapshot (often boardPowered=false after a previous stop).
+    // Always initialize the electrical runtime from the refreshed store state.
+    const initializedNodes = useCanvasStore.getState().nodes;
+    this.lcdNodes = initializedNodes.filter(n =>
+      n.type === 'DISPLAY_LCD_I2C' || n.type === 'LCD_16X2' ||
+      n.type === 'DISPLAY_OLED' || n.type === 'OLED_DISPLAY'
+    );
+    this.escNodes = initializedNodes.filter(n => n.type === 'ESC_MODULE');
+    this.bldcNodes = initializedNodes.filter(n => n.type === 'MOTOR_BLDC');
+    this.dcMotorNodes = initializedNodes.filter(n => n.type === 'MOTOR_DC');
+    this.stepperNodes = initializedNodes.filter(n => n.type === 'MOTOR_STEPPER' || n.type === 'STEPPER_MOTOR');
+
     // Subscribe to canvas store changes to dynamically update MNA solver values
     this.storeUnsubscribe = useCanvasStore.subscribe((state, prev) => {
       if (!this.isRunning || !this.solverWorker || !this.mnaCircuit) return;
@@ -457,8 +476,8 @@ export class SimulationEngine {
       if (hex?.trim()) {
         this.callbacks.onSerialOutput('> Starting AVR8js ATmega328P emulator...');
         this.parseCode(code);
-        this.startMNASolver(nodes, wires);
-        this.startAvr(hex, nodes, wires);
+        this.startMNASolver(initializedNodes, wires);
+        this.startAvr(hex, initializedNodes, wires);
         return;
       }
 
@@ -474,13 +493,9 @@ export class SimulationEngine {
       this.callbacks.onSerialOutput('────────────────────────────────');
 
       // Start MNA solver in WebWorker
-      this.startMNASolver(nodes, wires);
+      this.startMNASolver(initializedNodes, wires);
 
-      // Execute setup()
-      this.executeParsedStatements(this.setupStatements, nodes, wires, true);
-      this.updateDiagnosticProbes(nodes, wires);
-
-      // Start execution loop
+      // Start execution loop for visual updates, animations, and diagnostics
       this.intervalId = window.setInterval(() => {
         if (!this.isRunning) return;
 
@@ -497,27 +512,46 @@ export class SimulationEngine {
 
         if (!isPowered) return;
 
-        // Handle delay simulation
-        if (this.currentDelay > 0) {
-          this.delayAccumulator += 100;
-          if (this.delayAccumulator >= this.currentDelay) {
-            this.delayAccumulator = 0;
-            this.currentDelay = 0;
-          }
-          return;
-        }
-
-        this.executeParsedStatements(this.loopStatements, nodes, wires, false);
-        this.updateDiagnosticProbes(nodes, wires);
-        this.pushLcdToCanvas(nodes);
+        this.updateDiagnosticProbes(currentNodes, wires);
+        this.pushLcdToCanvas(currentNodes);
         this.updateBldcMotorAnimation();
         this.updateDcMotorAnimation();
         this.emitDebugSnapshot(false);
         this.tick += 100;
       }, 100);
 
+      // Run interpreter loop asynchronously in background
+      const runInterpreter = async () => {
+        try {
+          const currentNodes = useCanvasStore.getState().nodes;
+          // First run setup()
+          await this.executeParsedStatementsAsync(this.setupStatements, currentNodes, wires, true);
+          this.updateDiagnosticProbes(currentNodes, wires);
+
+          // Then run loop() continuously
+          while (this.isRunning && !this.avrCpu) {
+            const freshNodes = useCanvasStore.getState().nodes;
+            const freshMcuNode = freshNodes.find(n =>
+              n.type.startsWith('ARDUINO') || n.type.startsWith('ESP') || n.type.startsWith('RASPBERRY')
+            );
+            const isPowered = freshMcuNode ? freshMcuNode.properties?.boardPowered !== false : true;
+
+            if (isPowered) {
+              await this.executeParsedStatementsAsync(this.loopStatements, freshNodes, wires, false);
+            } else {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            // Yield control back to JS event loop
+            await new Promise(resolve => setTimeout(resolve, 5));
+          }
+        } catch (err: any) {
+          this.callbacks.onError(err.message || 'Interpreter Execution Error');
+        }
+      };
+      runInterpreter();
+
       // ── Start sensor auto-cycling for live overlays ──
-      this.startSensorAutoCycling(nodes);
+      this.startSensorAutoCycling(initializedNodes);
 
     } catch (err: any) {
       this.callbacks.onError(err.message || 'Simulation Error');
@@ -643,6 +677,26 @@ export class SimulationEngine {
     }
   }
 
+  private extractBalancedBlock(code: string, keyword: string): string | null {
+    const regex = new RegExp(`void\\s+${keyword}\\s*\\(\\s*\\)\\s*\\{`);
+    const match = code.match(regex);
+    if (!match || match.index === undefined) return null;
+
+    const startIdx = match.index + match[0].length;
+    let braceDepth = 1;
+    let i = startIdx;
+    while (i < code.length && braceDepth > 0) {
+      if (code[i] === '{') braceDepth++;
+      else if (code[i] === '}') braceDepth--;
+      i++;
+    }
+
+    if (braceDepth === 0) {
+      return code.substring(startIdx, i - 1);
+    }
+    return null;
+  }
+
   private parseCode(code: string) {
     // Pre-initialize Arduino constants
     this.globals['HIGH'] = 1;
@@ -679,15 +733,15 @@ export class SimulationEngine {
     }
 
     // Extract setup() body
-    const setupMatch = code.match(/void\s+setup\s*\(\s*\)\s*\{([\s\S]*?)\}/);
-    if (setupMatch) {
-      this.setupStatements = this.parseBlockStatements(setupMatch[1]);
+    const setupBody = this.extractBalancedBlock(code, 'setup');
+    if (setupBody !== null) {
+      this.setupStatements = this.parseBlockStatements(setupBody);
     }
 
     // Extract loop() body
-    const loopMatch = code.match(/void\s+loop\s*\(\s*\)\s*\{([\s\S]*?)\}/);
-    if (loopMatch) {
-      this.loopStatements = this.parseBlockStatements(loopMatch[1]);
+    const loopBody = this.extractBalancedBlock(code, 'loop');
+    if (loopBody !== null) {
+      this.loopStatements = this.parseBlockStatements(loopBody);
     }
   }
 
@@ -695,6 +749,7 @@ export class SimulationEngine {
     const statements: ParsedStatement[] = [];
     let i = 0;
     const len = code.length;
+    const isIdentifierChar = (ch: string | undefined) => Boolean(ch && /[a-zA-Z0-9_]/.test(ch));
 
     const skipWhitespaceAndComments = () => {
       while (i < len) {
@@ -714,107 +769,204 @@ export class SimulationEngine {
       }
     };
 
-    while (i < len) {
-      skipWhitespaceAndComments();
-      if (i >= len) break;
+    const startsWithKeyword = (keyword: string) => {
+      if (!code.startsWith(keyword, i)) return false;
+      return !isIdentifierChar(code[i - 1]) && !isIdentifierChar(code[i + keyword.length]);
+    };
 
-      if (code.startsWith('if', i) && (i + 2 >= len || !/[a-zA-Z0-9_]/.test(code[i + 2]))) {
-        i += 2;
-        skipWhitespaceAndComments();
-        if (code[i] !== '(') {
-          i++;
+    const advanceOverString = (quote: string) => {
+      i++;
+      while (i < len) {
+        if (code[i] === '\\') {
+          i += 2;
           continue;
         }
-        
-        let parenDepth = 1;
-        let condStart = i + 1;
+        if (code[i] === quote) {
+          i++;
+          return;
+        }
         i++;
-        while (i < len && parenDepth > 0) {
-          if (code[i] === '(') parenDepth++;
-          else if (code[i] === ')') parenDepth--;
+      }
+    };
+
+    const advanceOverLineComment = () => {
+      i += 2;
+      while (i < len && code[i] !== '\n') i++;
+    };
+
+    const advanceOverBlockComment = () => {
+      i += 2;
+      while (i < len && !(code[i] === '*' && code[i + 1] === '/')) i++;
+      i = Math.min(len, i + 2);
+    };
+
+    const skipIgnorableInScanner = (): boolean => {
+      if ((code[i] === '"' || code[i] === "'")) {
+        advanceOverString(code[i]);
+        return true;
+      }
+      if (code[i] === '/' && code[i + 1] === '/') {
+        advanceOverLineComment();
+        return true;
+      }
+      if (code[i] === '/' && code[i + 1] === '*') {
+        advanceOverBlockComment();
+        return true;
+      }
+      return false;
+    };
+
+    const readParenthesized = () => {
+      if (code[i] !== '(') return '';
+      const start = i + 1;
+      let depth = 1;
+      i++;
+      while (i < len && depth > 0) {
+        if (skipIgnorableInScanner()) continue;
+        if (code[i] === '(') depth++;
+        else if (code[i] === ')') depth--;
+        i++;
+      }
+      return code.substring(start, depth === 0 ? i - 1 : i).trim();
+    };
+
+    const readBracedBlock = () => {
+      if (code[i] !== '{') return '';
+      const start = i + 1;
+      let depth = 1;
+      i++;
+      while (i < len && depth > 0) {
+        if (skipIgnorableInScanner()) continue;
+        if (code[i] === '{') depth++;
+        else if (code[i] === '}') depth--;
+        i++;
+      }
+      return code.substring(start, depth === 0 ? i - 1 : i);
+    };
+
+    const readStatementText = () => {
+      const start = i;
+      let parenDepth = 0;
+      let bracketDepth = 0;
+
+      while (i < len) {
+        if (skipIgnorableInScanner()) continue;
+        const ch = code[i];
+        if (ch === '(') parenDepth++;
+        else if (ch === ')') parenDepth = Math.max(0, parenDepth - 1);
+        else if (ch === '[') bracketDepth++;
+        else if (ch === ']') bracketDepth = Math.max(0, bracketDepth - 1);
+        else if (ch === ';' && parenDepth === 0 && bracketDepth === 0) {
           i++;
+          break;
         }
-        const condition = code.substring(condStart, i - 1).trim();
+        i++;
+      }
+
+      return code.substring(start, i).trim();
+    };
+
+    const splitForHeader = (header: string): [string, string, string] => {
+      const parts: string[] = [];
+      let start = 0;
+      let parenDepth = 0;
+      let bracketDepth = 0;
+      let quote: string | null = null;
+
+      for (let j = 0; j < header.length; j++) {
+        const ch = header[j];
+        if (quote) {
+          if (ch === '\\') {
+            j++;
+          } else if (ch === quote) {
+            quote = null;
+          }
+          continue;
+        }
+        if (ch === '"' || ch === "'") {
+          quote = ch;
+          continue;
+        }
+        if (ch === '(') parenDepth++;
+        else if (ch === ')') parenDepth = Math.max(0, parenDepth - 1);
+        else if (ch === '[') bracketDepth++;
+        else if (ch === ']') bracketDepth = Math.max(0, bracketDepth - 1);
+        else if (ch === ';' && parenDepth === 0 && bracketDepth === 0) {
+          parts.push(header.substring(start, j).trim());
+          start = j + 1;
+        }
+      }
+
+      parts.push(header.substring(start).trim());
+      return [parts[0] || '', parts[1] || '', parts[2] || ''];
+    };
+
+    const readBlockOrStatement = (): ParsedStatement[] => {
+      skipWhitespaceAndComments();
+      if (code[i] === '{') {
+        return this.parseBlockStatements(readBracedBlock());
+      }
+      const statement = readStatementText();
+      return statement ? [{ type: 'statement', code: statement }] : [];
+    };
+
+    const parseOne = (): ParsedStatement | null => {
+      skipWhitespaceAndComments();
+      if (i >= len) return null;
+
+      if (startsWithKeyword('if')) {
+        i += 2;
+        skipWhitespaceAndComments();
+        const condition = readParenthesized();
+        const thenBlock = readBlockOrStatement();
 
         skipWhitespaceAndComments();
-        
-        let thenBlock: ParsedStatement[] = [];
-        if (code[i] === '{') {
-          let braceDepth = 1;
-          let blockStart = i + 1;
-          i++;
-          while (i < len && braceDepth > 0) {
-            if (code[i] === '{') braceDepth++;
-            else if (code[i] === '}') braceDepth--;
-            i++;
-          }
-          const thenBlockCode = code.substring(blockStart, i - 1);
-          thenBlock = this.parseBlockStatements(thenBlockCode);
-        } else {
-          let statementEnd = code.indexOf(';', i);
-          if (statementEnd !== -1) {
-            const singleStmt = code.substring(i, statementEnd + 1);
-            thenBlock = [{ type: 'statement', code: singleStmt.trim() }];
-            i = statementEnd + 1;
-          }
-        }
-
-        skipWhitespaceAndComments();
-
         let elseBlock: ParsedStatement[] = [];
-        if (code.startsWith('else', i) && (i + 4 >= len || !/[a-zA-Z0-9_]/.test(code[i + 4]))) {
+        if (startsWithKeyword('else')) {
           i += 4;
           skipWhitespaceAndComments();
-          if (code[i] === '{') {
-            let braceDepth = 1;
-            let blockStart = i + 1;
-            i++;
-            while (i < len && braceDepth > 0) {
-              if (code[i] === '{') braceDepth++;
-              else if (code[i] === '}') braceDepth--;
-              i++;
-            }
-            const elseBlockCode = code.substring(blockStart, i - 1);
-            elseBlock = this.parseBlockStatements(elseBlockCode);
+          if (startsWithKeyword('if')) {
+            const nested = parseOne();
+            elseBlock = nested ? [nested] : [];
           } else {
-            if (code.startsWith('if', i)) {
-              const nestedIf = this.parseBlockStatements(code.substring(i));
-              elseBlock = nestedIf;
-              break;
-            } else {
-              let statementEnd = code.indexOf(';', i);
-              if (statementEnd !== -1) {
-                const singleStmt = code.substring(i, statementEnd + 1);
-                elseBlock = [{ type: 'statement', code: singleStmt.trim() }];
-                i = statementEnd + 1;
-              }
-            }
+            elseBlock = readBlockOrStatement();
           }
         }
 
-        statements.push({
+        return {
           type: 'if',
           condition,
           thenBlock,
           elseBlock,
-        });
+        };
+      }
 
+      if (startsWithKeyword('for')) {
+        i += 3;
+        skipWhitespaceAndComments();
+        const [init, condition, update] = splitForHeader(readParenthesized());
+        const body = readBlockOrStatement();
+        return { type: 'for', init, condition, update, body };
+      }
+
+      if (startsWithKeyword('while')) {
+        i += 5;
+        skipWhitespaceAndComments();
+        const condition = readParenthesized();
+        const body = readBlockOrStatement();
+        return { type: 'while', condition, body };
+      }
+
+      const stmtText = readStatementText();
+      return stmtText ? { type: 'statement', code: stmtText } : null;
+    };
+
+    while (i < len) {
+      const statement = parseOne();
+      if (statement) {
+        statements.push(statement);
       } else {
-        let stmtStart = i;
-        let stmtEnd = code.indexOf(';', i);
-        if (stmtEnd === -1) {
-          const stmtText = code.substring(stmtStart).trim();
-          if (stmtText) {
-            statements.push({ type: 'statement', code: stmtText });
-          }
-          break;
-        } else {
-          const stmtText = code.substring(stmtStart, stmtEnd + 1).trim();
-          if (stmtText) {
-            statements.push({ type: 'statement', code: stmtText });
-          }
-          i = stmtEnd + 1;
-        }
+        i++;
       }
     }
 
@@ -825,17 +977,21 @@ export class SimulationEngine {
     let replaced = expr;
     const drMatches = replaced.matchAll(/digitalRead\s*\(\s*(\w+)\s*\)/g);
     for (const match of drMatches) {
-      const pin = this.resolveValue(match[1]);
+      const pin = this.canonicalPin(match[1]);
       const state = this.pins[pin]?.state === 'HIGH' ? '1' : '0';
       replaced = replaced.replace(match[0], state);
     }
     const arMatches = replaced.matchAll(/analogRead\s*\(\s*(\w+)\s*\)/g);
     for (const match of arMatches) {
-      const pin = this.resolveValue(match[1]);
+      const pin = this.canonicalPin(match[1]);
       const val8 = this.pins[pin]?.value ?? 0;
       const val10 = Math.round((val8 / 255) * 1023);
       replaced = replaced.replace(match[0], String(val10));
     }
+
+    replaced = replaced
+      .replace(/\bmillis\s*\(\s*\)/g, String(this.tick))
+      .replace(/\bmicros\s*\(\s*\)/g, String(this.tick * 1000));
 
     // ── UART Interactive Serial CLI ──
     replaced = replaced.replace(/Serial\.available\s*\(\s*\)/g, String(this.localSerialBuffer.length));
@@ -888,22 +1044,76 @@ export class SimulationEngine {
     return replaced;
   }
 
-  private executeParsedStatements(statements: ParsedStatement[], nodes: CanvasNode[], wires: Wire[], isSetup: boolean): boolean {
+  private toStatementCode(code: string): string {
+    const trimmed = code.trim();
+    return trimmed.endsWith(';') ? trimmed : `${trimmed};`;
+  }
+
+  private async executeParsedStatementsAsync(statements: ParsedStatement[], nodes: CanvasNode[], wires: Wire[], isSetup: boolean): Promise<void> {
     for (const stmt of statements) {
+      if (!this.isRunning) return;
       if (stmt.type === 'if') {
         const cond = stmt.condition || '0';
         const preprocessed = this.preprocessExpression(cond);
         const condVal = this.evaluateExpression(preprocessed);
         if (condVal !== 0) {
           if (stmt.thenBlock) {
-            const hitDelay = this.executeParsedStatements(stmt.thenBlock, nodes, wires, isSetup);
-            if (hitDelay) return true;
+            await this.executeParsedStatementsAsync(stmt.thenBlock, nodes, wires, isSetup);
           }
         } else {
           if (stmt.elseBlock) {
-            const hitDelay = this.executeParsedStatements(stmt.elseBlock, nodes, wires, isSetup);
-            if (hitDelay) return true;
+            await this.executeParsedStatementsAsync(stmt.elseBlock, nodes, wires, isSetup);
           }
+        }
+      } else if (stmt.type === 'for') {
+        if (stmt.init) {
+          await this.executeParsedStatementsAsync([{ type: 'statement', code: this.toStatementCode(stmt.init) }], nodes, wires, isSetup);
+        }
+
+        let iterations = 0;
+        while (this.isRunning && iterations < 10000) {
+          const condition = stmt.condition?.trim();
+          if (condition) {
+            const preprocessed = this.preprocessExpression(condition);
+            if (this.evaluateExpression(preprocessed) === 0) break;
+          }
+
+          if (stmt.body?.length) {
+            await this.executeParsedStatementsAsync(stmt.body, nodes, wires, isSetup);
+          }
+
+          if (stmt.update) {
+            await this.executeParsedStatementsAsync([{ type: 'statement', code: this.toStatementCode(stmt.update) }], nodes, wires, isSetup);
+          }
+
+          iterations++;
+          if (iterations % 50 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+          }
+        }
+
+        if (iterations >= 10000) {
+          this.callbacks.onError('Loop iteration limit reached; check for an infinite for-loop');
+        }
+      } else if (stmt.type === 'while') {
+        let iterations = 0;
+        while (this.isRunning && iterations < 10000) {
+          const condition = stmt.condition?.trim() || '0';
+          const preprocessed = this.preprocessExpression(condition);
+          if (this.evaluateExpression(preprocessed) === 0) break;
+
+          if (stmt.body?.length) {
+            await this.executeParsedStatementsAsync(stmt.body, nodes, wires, isSetup);
+          }
+
+          iterations++;
+          if (iterations % 50 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+          }
+        }
+
+        if (iterations >= 10000) {
+          this.callbacks.onError('Loop iteration limit reached; check for an infinite while-loop');
         }
       } else if (stmt.type === 'statement' && stmt.code) {
         const codeText = stmt.code.replace(/;$/, '').trim();
@@ -914,10 +1124,12 @@ export class SimulationEngine {
         // pinMode(pin, mode)
         const pinMode = codeText.match(/pinMode\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)/);
         if (pinMode) {
-          const pin = this.resolveValue(pinMode[1]);
-          const mode = pinMode[2] as 'INPUT' | 'INPUT_PULLUP' | 'OUTPUT';
-          this.pins[pin] = { mode, state: 'LOW', value: 0 };
+          const pin = this.canonicalPin(pinMode[1]);
+          const mode = this.resolvePinMode(pinMode[2]);
+          const isPullup = mode === 'INPUT_PULLUP';
+          this.pins[pin] = { mode, state: isPullup ? 'HIGH' : 'LOW', value: isPullup ? 255 : 0 };
           this.updateMNAPinMode(pin, mode);
+          this.updateMNAPinVoltage(pin, isPullup ? 5 : 0);
           continue;
         }
 
@@ -933,13 +1145,17 @@ export class SimulationEngine {
         // digitalWrite(pin, state)
         const dw = codeText.match(/digitalWrite\s*\(\s*([^,)]+)\s*,\s*(.+)\s*\)/);
         if (dw) {
-          const pin = this.resolveValue(dw[1].trim());
+          const pin = this.canonicalPin(dw[1].trim());
           const expr = dw[2].trim().replace(/\)$/, '');
           const preprocessed = this.preprocessExpression(expr);
           const stateVal = this.evaluateExpression(preprocessed);
           const state = stateVal !== 0 ? 'HIGH' : 'LOW';
 
           if (!this.pins[pin]) this.pins[pin] = { mode: 'OUTPUT', state: 'LOW', value: 0 };
+          if (this.pins[pin].mode === 'INPUT' || this.pins[pin].mode === 'INPUT_PULLUP') {
+            this.pins[pin].mode = state === 'HIGH' ? 'INPUT_PULLUP' : 'INPUT';
+            this.updateMNAPinMode(pin, this.pins[pin].mode);
+          }
 
           if (this.pins[pin].state !== state) {
             this.pins[pin].state = state;
@@ -954,14 +1170,16 @@ export class SimulationEngine {
         // analogWrite(pin, value) — PWM
         const aw = codeText.match(/analogWrite\s*\(\s*([^,)]+)\s*,\s*(.+)\s*\)/);
         if (aw) {
-          const pin = this.resolveValue(aw[1].trim());
+          const pin = this.canonicalPin(aw[1].trim());
           const expr = aw[2].trim().replace(/\)$/, '');
           const preprocessed = this.preprocessExpression(expr);
           const value = Math.min(255, Math.max(0, this.evaluateExpression(preprocessed)));
 
           if (!this.pins[pin]) this.pins[pin] = { mode: 'PWM', state: 'PWM', value: 0 };
+          this.pins[pin].mode = 'PWM';
           this.pins[pin].state = 'PWM';
           this.pins[pin].value = value;
+          this.updateMNAPinMode(pin, 'PWM');
           this.propagatePinState(pin, 'PWM', nodes, wires, value);
           this.updateMNAPinVoltage(pin, (value / 255) * 5);
           continue;
@@ -1032,21 +1250,21 @@ export class SimulationEngine {
         if (/dht\.begin\s*\(/i.test(codeText)) continue;
 
         // delay(ms) — simulate timing
-        const delay = codeText.match(/delay\s*\(\s*(\w+)\s*\)/);
-        if (delay && !isSetup) {
-          const ms = parseInt(this.resolveValue(delay[1]));
+        const delay = codeText.match(/delay\s*\(\s*(.+?)\s*\)/);
+        if (delay) {
+          const ms = this.evaluateExpression(this.preprocessExpression(delay[1]));
           if (ms > 0) {
-            this.currentDelay = ms;
-            this.delayAccumulator = 0;
-            Object.keys(this.pins).forEach(pin => {
-              if (this.pins[pin].mode === 'OUTPUT') {
-                const currentState = this.pins[pin].state;
-                const newState = currentState === 'HIGH' ? 'LOW' : 'HIGH';
-                this.pinToggleState[pin] = !this.pinToggleState[pin];
-              }
+            await new Promise<void>(resolve => {
+              const startDelay = Date.now();
+              const checkInterval = setInterval(() => {
+                if (!this.isRunning || Date.now() - startDelay >= ms) {
+                  clearInterval(checkInterval);
+                  resolve();
+                }
+              }, 5);
             });
           }
-          return true;
+          continue;
         }
 
         // Serial.print(...) / Serial.println(...)
@@ -1073,6 +1291,31 @@ export class SimulationEngine {
         // I2C / Wire.h commands — silently consume so they don't cause errors
         if (/Wire\.|lcd\.|dht\.|servo\.|esc\.|myservo\./i.test(codeText)) continue;
 
+        const unaryUpdate = codeText.match(/^(?:\+\+|--)?\s*([a-zA-Z_]\w*)\s*(?:\+\+|--)\s*$/);
+        if (unaryUpdate) {
+          const op = codeText.includes('--') ? -1 : 1;
+          const current = this.evaluateExpression(String(this.globals[unaryUpdate[1]] ?? 0));
+          this.globals[unaryUpdate[1]] = current + op;
+          this.emitDebugSnapshot(false);
+          continue;
+        }
+
+        const compoundAssign = codeText.match(/^([a-zA-Z_]\w*)\s*([+\-*/%])=\s*(.+)$/);
+        if (compoundAssign) {
+          const varName = compoundAssign[1];
+          const current = this.evaluateExpression(String(this.globals[varName] ?? 0));
+          const rhs = this.evaluateExpression(this.preprocessExpression(compoundAssign[3]));
+          switch (compoundAssign[2]) {
+            case '+': this.globals[varName] = current + rhs; break;
+            case '-': this.globals[varName] = current - rhs; break;
+            case '*': this.globals[varName] = current * rhs; break;
+            case '/': this.globals[varName] = rhs !== 0 ? Math.floor(current / rhs) : 0; break;
+            case '%': this.globals[varName] = rhs !== 0 ? current % rhs : 0; break;
+          }
+          this.emitDebugSnapshot(false);
+          continue;
+        }
+
         // Variable assignment: varName = expression
         const assignMatch = codeText.match(/^(?:int|const\s+int|byte|uint8_t|long|unsigned\s+long|float|double|auto)?\s*(\w+)\s*=\s*(.*)$/);
         if (assignMatch) {
@@ -1084,9 +1327,15 @@ export class SimulationEngine {
           this.emitDebugSnapshot(false);
           continue;
         }
+
+        const declarationMatch = codeText.match(/^(?:int|byte|uint8_t|long|unsigned\s+long|float|double|auto)\s+(\w+)$/);
+        if (declarationMatch) {
+          this.globals[declarationMatch[1]] = 0;
+          this.emitDebugSnapshot(false);
+          continue;
+        }
       }
     }
-    return false;
   }
 
   /**
@@ -1183,41 +1432,12 @@ export class SimulationEngine {
   }
 
   private evaluateExpression(expr: string): number {
-    const s = expr.trim();
-    // Handle comparisons first: a < b, a > b, a <= b, a >= b, a == b, a != b
-    const compMatch = s.match(/(.*?)\s*(<=|>=|==|!=|<|>)\s*(.*)/);
-    if (compMatch) {
-      const leftVal = this.evaluateExpression(compMatch[1]);
-      const op = compMatch[2];
-      const rightVal = this.evaluateExpression(compMatch[3]);
-      switch (op) {
-        case '<': return leftVal < rightVal ? 1 : 0;
-        case '>': return leftVal > rightVal ? 1 : 0;
-        case '<=': return leftVal <= rightVal ? 1 : 0;
-        case '>=': return leftVal >= rightVal ? 1 : 0;
-        case '==': return leftVal === rightVal ? 1 : 0;
-        case '!=': return leftVal !== rightVal ? 1 : 0;
-      }
-    }
-
-    // Handle simple math: val + 1, val - 1, val * 2, etc.
-    const parts = s.match(/([a-zA-Z0-9_]+)\s*([+\-*/])\s*([a-zA-Z0-9_]+)/);
-    if (parts) {
-      const aVal = this.globals[parts[1]] ?? parseInt(parts[1]);
-      const bVal = this.globals[parts[3]] ?? parseInt(parts[3]);
-      const a = typeof aVal === 'string' ? parseInt(aVal) || 0 : aVal;
-      const b = typeof bVal === 'string' ? parseInt(bVal) || 0 : bVal;
-      switch (parts[2]) {
-        case '+': return a + b;
-        case '-': return a - b;
-        case '*': return a * b;
-        case '/': return b !== 0 ? Math.floor(a / b) : 0;
-      }
-    }
-
-    // Single value
-    const resolved = this.resolveValue(s);
-    return parseInt(resolved) || 0;
+    return evaluateNumericExpression(expr, (name) => {
+      const value = this.globals[name];
+      if (typeof value === 'number') return value;
+      if (typeof value === 'string') return Number(value) || 0;
+      return 0;
+    });
   }
 
   private resolveSerialArgument(argument: string): string {
@@ -1241,7 +1461,7 @@ export class SimulationEngine {
     if (raw.startsWith('digitalRead')) {
       const match = raw.match(/digitalRead\s*\(\s*(\w+)\s*\)/);
       if (match) {
-        const pin = this.resolveValue(match[1]);
+        const pin = this.canonicalPin(match[1]);
         return this.pins[pin]?.state === 'HIGH' ? '1' : '0';
       }
     }
@@ -1249,7 +1469,7 @@ export class SimulationEngine {
     if (raw.startsWith('analogRead')) {
       const match = raw.match(/analogRead\s*\(\s*(\w+)\s*\)/);
       if (match) {
-        const pin = this.resolveValue(match[1]);
+        const pin = this.canonicalPin(match[1]);
         const value = this.pins[pin]?.value ?? 0;
         return Math.round((value / 255) * 1023).toString();
       }
@@ -1278,11 +1498,8 @@ export class SimulationEngine {
     );
     if (!mcuNode) return;
 
-    // Find matching pin on MCU by name (D13, A0, etc.) or number
-    const mcuPin = mcuNode.pins?.find(p =>
-      p.name === `D${pin}` || p.name === pin || p.name === `A${pin}` ||
-      p.name.includes(`/${pin}`) || p.id.includes(pin)
-    );
+    const canonical = this.canonicalPin(pin);
+    const mcuPin = mcuNode.pins?.find(p => this.pinNumberFromBoardPin(p) === canonical);
     if (!mcuPin) return;
 
     const connectedPins = this.getConnectedPins(mcuNode.id, mcuPin.id, wires);
@@ -1390,8 +1607,17 @@ export class SimulationEngine {
    * Animate DC motors: increment rotation if isSpinning is true.
    * Called every tick (~100ms).
    */
+  /**
+   * Animate DC motors: increment rotation if isSpinning is true.
+   * Throttled to 20fps to avoid freezing the React rendering main thread.
+   */
   private updateDcMotorAnimation() {
+    const now = Date.now();
+    if (now - this.lastDcMotorUpdateTime < 50) return;
+    this.lastDcMotorUpdateTime = now;
+
     const freshNodes = useCanvasStore.getState().nodes;
+    const updatesList: Array<{ id: string; changes: Partial<CanvasNode> }> = [];
 
     this.dcMotorNodes.forEach(motor => {
       const freshMotor = freshNodes.find(n => n.id === motor.id);
@@ -1405,15 +1631,20 @@ export class SimulationEngine {
 
       this.callbacks.onPinStateChange(motor.id, '__dc_anim__', 'HIGH', newTick);
 
-      // Update the store directly for the visual
-      const { updateNode } = useCanvasStore.getState();
-      updateNode(motor.id, {
-        properties: {
-          ...freshMotor.properties,
-          motorTick: newTick,
+      updatesList.push({
+        id: motor.id,
+        changes: {
+          properties: {
+            ...freshMotor.properties,
+            motorTick: newTick,
+          },
         },
       });
     });
+
+    if (updatesList.length > 0) {
+      useCanvasStore.getState().batchUpdateNodes(updatesList);
+    }
   }
 
   private voltageAtPin(nodeId: string, pinId: string, nodes: CanvasNode[], wires: Wire[]): number {
@@ -1451,6 +1682,18 @@ export class SimulationEngine {
     while (queue.length > 0) {
       const current = queue.shift()!;
       const [currentNodeId, currentPinId] = current.split(':');
+
+      const currentNode = useCanvasStore.getState().nodesById.get(currentNodeId);
+      if (currentNode?.type === 'BREADBOARD') {
+        for (const linkedPinId of this.getBreadboardLinkedPins(currentPinId, currentNode.pins || [])) {
+          const next = `${currentNodeId}:${linkedPinId}`;
+          if (!visited.has(next)) {
+            visited.add(next);
+            queue.push(next);
+          }
+        }
+      }
+
       wires.forEach(wire => {
         const a = `${wire.fromNodeId}:${wire.fromPinId}`;
         const b = `${wire.toNodeId}:${wire.toPinId}`;
@@ -1468,14 +1711,60 @@ export class SimulationEngine {
     });
   }
 
+  private getBreadboardLinkedPins(pinId: string, pins: Array<{ id: string }>): string[] {
+    const available = new Set(pins.map(pin => pin.id));
+    const rowMatch = pinId.match(/^([a-j])(\d+)$/i);
+    if (rowMatch) {
+      const row = rowMatch[1].toLowerCase();
+      const column = rowMatch[2];
+      const rows = row <= 'e' ? ['a', 'b', 'c', 'd', 'e'] : ['f', 'g', 'h', 'i', 'j'];
+      return rows.map(candidate => `${candidate}${column}`).filter(candidate => available.has(candidate));
+    }
+
+    const railMatch = pinId.match(/^(vcc|gnd)_(?:top|bottom)_\d+$/i);
+    if (railMatch) {
+      const rail = railMatch[1].toLowerCase();
+      return pins
+        .map(pin => pin.id)
+        .filter(candidate => new RegExp(`^${rail}_(?:top|bottom)_\\d+$`, 'i').test(candidate));
+    }
+
+    return [pinId];
+  }
+
   private pinNumberFromBoardPin(pin: { id: string; name: string }) {
     const pinStr = `${pin.name} ${pin.id}`;
     const analogMatch = pinStr.match(/\bA([0-9]{1,2})\b/i);
     if (analogMatch) {
-      return `A${analogMatch[1]}`;
+      return `A${Number(analogMatch[1])}`;
     }
-    const match = pinStr.match(/\bD?(\d{1,2})\b/i);
-    return match ? match[1] : '';
+    const match = pinStr.match(/\bD(\d{1,2})\b/i);
+    return match ? String(Number(match[1])) : '';
+  }
+
+  private canonicalPin(pin: string) {
+    const resolved = this.resolveValue(pin.trim()).trim();
+    const analogMatch = resolved.match(/^A([0-9]{1,2})$/i);
+    if (analogMatch) return `A${Number(analogMatch[1])}`;
+
+    const digitalMatch = resolved.match(/^D?([0-9]{1,2})$/i);
+    if (digitalMatch) return String(Number(digitalMatch[1]));
+
+    return resolved;
+  }
+
+  private mnaPinSuffix(pin: string) {
+    const canonical = this.canonicalPin(pin);
+    return canonical.toUpperCase().startsWith('A')
+      ? `a${canonical.slice(1)}`
+      : `d${canonical}`;
+  }
+
+  private resolvePinMode(modeToken: string): PinInfo['mode'] {
+    const mode = this.resolveValue(modeToken.trim()).toUpperCase();
+    if (mode === '2' || mode === 'INPUT_PULLUP') return 'INPUT_PULLUP';
+    if (mode === '1' || mode === 'OUTPUT') return 'OUTPUT';
+    return 'INPUT';
   }
 
   private resolveValue(val: string): string {
@@ -1484,12 +1773,13 @@ export class SimulationEngine {
   }
 
   public setExternalPinState(pin: string, state: PinState) {
-    if (!this.pins[pin]) {
-      this.pins[pin] = { mode: 'INPUT', state: 'LOW', value: 0 };
+    const canonical = this.canonicalPin(pin);
+    if (!this.pins[canonical]) {
+      this.pins[canonical] = { mode: 'INPUT', state: 'LOW', value: 0 };
     }
-    this.pins[pin].state = state;
-    this.pins[pin].value = state === 'HIGH' ? 1 : 0;
-    const avrPort = this.boardPinToAvrPort(pin);
+    this.pins[canonical].state = state;
+    this.pins[canonical].value = state === 'HIGH' ? 1 : 0;
+    const avrPort = this.boardPinToAvrPort(canonical);
     if (avrPort) {
       this.avrPorts[avrPort.port]?.setPin(avrPort.bit, state === 'HIGH');
     }
@@ -1521,6 +1811,8 @@ export class SimulationEngine {
       if (this.avrUsart) this.callbacks.onBaudRateChange?.(this.avrUsart.baudRate);
     };
 
+    this.avrAdc = new AVRADC(this.avrCpu, adcConfig);
+
     const twi = new AVRTWI(this.avrCpu, twiConfig, 16_000_000);
     twi.eventHandler = new LcdTWIEventHandler(twi, this.lcdNodes, this.callbacks);
 
@@ -1528,11 +1820,42 @@ export class SimulationEngine {
       for (let bit = 0; bit < 8; bit += 1) {
         const pin = this.avrPortToBoardPin(portName, bit);
         if (!pin) continue;
+
         const pinState = this.avrPorts[portName].pinState(bit);
-        const high = pinState === AvrPinState.High || Boolean(value & (1 << bit));
-        this.pins[pin] = { mode: 'OUTPUT', state: high ? 'HIGH' : 'LOW', value: high ? 255 : 0 };
-        this.propagatePinState(pin, high ? 'HIGH' : 'LOW', nodes, wires, high ? 255 : 0);
-        this.updateMNAPinVoltage(pin, high ? 5 : 0);
+        const isOutput = pinState === AvrPinState.High || pinState === AvrPinState.Low;
+        const isPullUp = pinState === AvrPinState.InputPullUp;
+
+        const mode = isOutput ? 'OUTPUT' : isPullUp ? 'INPUT_PULLUP' : 'INPUT';
+        const high = isOutput ? (pinState === AvrPinState.High) : isPullUp;
+        const state = high ? 'HIGH' : 'LOW';
+        const val = high ? 255 : 0;
+
+        const prevPin = this.pins[pin];
+        const changed = !prevPin || prevPin.mode !== mode || prevPin.state !== state;
+
+        if (changed) {
+          this.pins[pin] = { mode, state, value: val };
+          this.propagatePinState(pin, state, nodes, wires, val);
+
+          // Find MCU node
+          const mcuNode = useCanvasStore.getState().nodes.find(n =>
+            n.type.startsWith('ARDUINO') || n.type.startsWith('ESP') || n.type.startsWith('RASPBERRY')
+          );
+          if (mcuNode) {
+            const isPowered = mcuNode.properties?.boardPowered !== false;
+            let resistance = 1e8; // Default to input high impedance
+            if (isPowered) {
+              if (isOutput) resistance = 40;
+              else if (isPullUp) resistance = 40000;
+            }
+            this.solverWorker?.postMessage({
+              type: 'UPDATE_PIN',
+              elementId: `r_mcu_pin_${mcuNode.id}_${this.mnaPinSuffix(pin)}`,
+              voltage: resistance,
+            });
+            this.updateMNAPinVoltage(pin, high ? 5 : 0);
+          }
+        }
       }
     };
     this.avrPorts.B.addListener((value) => handlePort('B', value));
@@ -1558,7 +1881,7 @@ export class SimulationEngine {
       const isPowered = mcuNode ? mcuNode.properties?.boardPowered !== false : true;
 
       if (isPowered) {
-        for (let i = 0; i < 50000; i += 1) {
+        for (let i = 0; i < 25000; i += 1) {
           avrInstruction(this.avrCpu);
           this.avrCpu.tick();
         }
@@ -1593,12 +1916,20 @@ export class SimulationEngine {
   private avrPortToBoardPin(port: 'B' | 'C' | 'D', bit: number) {
     if (port === 'D') return String(bit);
     if (port === 'B' && bit <= 5) return String(bit + 8);
-    if (port === 'C' && bit <= 5) return String(bit + 14);
+    if (port === 'C' && bit <= 5) return `A${bit}`;
     return '';
   }
 
   private boardPinToAvrPort(pin: string) {
-    const value = Number(pin);
+    const canonical = this.canonicalPin(pin);
+    let value = Number(canonical);
+    if (isNaN(value)) {
+      if (canonical.startsWith('A')) {
+        value = 14 + Number(canonical.slice(1));
+      } else if (canonical.startsWith('D')) {
+        value = Number(canonical.slice(1));
+      }
+    }
     if (value >= 0 && value <= 7) return { port: 'D', bit: value };
     if (value >= 8 && value <= 13) return { port: 'B', bit: value - 8 };
     if (value >= 14 && value <= 19) return { port: 'C', bit: value - 14 };
@@ -1631,6 +1962,7 @@ export class SimulationEngine {
     this.avrCpu = null;
     this.avrUsart = null;
     this.avrPorts = {};
+    this.avrAdc = null;
     this.stopMNASolver();
     this.stopSensorAutoCycling();
     AudioEngine.stopTone();
@@ -1735,6 +2067,14 @@ export class SimulationEngine {
       // Build the circuit netlist
       this.mnaCircuit = buildMNACircuit(nodes, wires, this.mcuPinVoltages, pinModes, boardPoweredMap);
 
+      const elementIds = new Set<string>();
+      for (const element of this.mnaCircuit.elements) {
+        if (elementIds.has(element.id)) {
+          throw new Error(`Duplicate circuit element id: ${element.id}`);
+        }
+        elementIds.add(element.id);
+      }
+
       if (this.mnaCircuit.elements.length === 0) {
         // No solvable elements — skip solver
         return;
@@ -1801,7 +2141,8 @@ export class SimulationEngine {
    * Called whenever digitalWrite/analogWrite changes a pin.
    */
   private updateMNAPinVoltage(pin: string, voltage: number) {
-    this.mcuPinVoltages[pin] = voltage;
+    const canonical = this.canonicalPin(pin);
+    this.mcuPinVoltages[canonical] = voltage;
 
     if (!this.solverWorker || !this.mnaCircuit) return;
 
@@ -1813,7 +2154,7 @@ export class SimulationEngine {
     if (!mcuNode) return;
 
     // Build the element ID that matches NetlistBuilder naming (renamed to _src)
-    const elementId = `vs_mcu_${mcuNode.id}_d${pin}_src`;
+    const elementId = `vs_mcu_${mcuNode.id}_${this.mnaPinSuffix(canonical)}_src`;
 
     const updateMsg: WorkerInMessage = {
       type: 'UPDATE_PIN',
@@ -1825,6 +2166,7 @@ export class SimulationEngine {
 
   private updateMNAPinMode(pin: string, mode: string) {
     if (!this.solverWorker || !this.mnaCircuit) return;
+    const canonical = this.canonicalPin(pin);
     const nodes = useCanvasStore.getState().nodes;
     const mcuNode = nodes.find(n =>
       n.type.startsWith('ARDUINO') || n.type.startsWith('ESP') || n.type.startsWith('RASPBERRY')
@@ -1832,14 +2174,21 @@ export class SimulationEngine {
     if (!mcuNode) return;
 
     const isOutput = mode === 'OUTPUT' || mode === 'PWM';
+    const isPullup = mode === 'INPUT_PULLUP';
     const isPowered = mcuNode.properties?.boardPowered !== false;
-    const resistance = (isPowered && isOutput) ? 40 : 1e8;
+    const resistance = isPowered
+      ? isOutput ? 40 : isPullup ? 40000 : 1e8
+      : 1e8;
 
     this.solverWorker.postMessage({
       type: 'UPDATE_PIN',
-      elementId: `r_mcu_pin_${mcuNode.id}_d${pin}`,
+      elementId: `r_mcu_pin_${mcuNode.id}_${this.mnaPinSuffix(canonical)}`,
       voltage: resistance,
     });
+
+    if (isPullup) {
+      this.updateMNAPinVoltage(canonical, 5);
+    }
   }
 
   /**
@@ -1972,10 +2321,11 @@ export class SimulationEngine {
           const pinInfo = this.pins[pinNum];
           const mode = pinInfo?.mode || 'INPUT';
           const isOutput = mode === 'OUTPUT' || mode === 'PWM';
+          const isPullup = mode === 'INPUT_PULLUP';
           this.solverWorker?.postMessage({
             type: 'UPDATE_PIN',
-            elementId: `r_mcu_pin_${mcuNode.id}_d${pinNum}`,
-            voltage: (powered && isOutput) ? 40 : 1e8,
+            elementId: `r_mcu_pin_${mcuNode.id}_${this.mnaPinSuffix(pinNum)}`,
+            voltage: powered ? (isOutput ? 40 : isPullup ? 40000 : 1e8) : 1e8,
           });
         }
       }
@@ -2001,6 +2351,13 @@ export class SimulationEngine {
             const avrPort = this.boardPinToAvrPort(pinNum);
             if (avrPort) {
               this.avrPorts[avrPort.port]?.setPin(avrPort.bit, voltage >= 2.0);
+            }
+          }
+
+          if (this.avrAdc && pinNum.startsWith('A')) {
+            const ch = parseInt(pinNum.slice(1));
+            if (!isNaN(ch) && ch >= 0 && ch < 8) {
+              this.avrAdc.channelValues[ch] = voltage;
             }
           }
         }
@@ -2107,10 +2464,33 @@ export class SimulationEngine {
       // DC Motor: check current to spin
       if (node.type === 'MOTOR_DC') {
         const current = result.branchCurrents[`mot_${node.id}`] ?? 0;
-        const isSpinning = Math.abs(current) > 0.01;
-        if (node.properties?.isSpinning !== isSpinning) {
+        const m1Node = pinToMNANode.get(`${node.id}:m1`) ?? 0;
+        const m2Node = pinToMNANode.get(`${node.id}:m2`) ?? 0;
+        const appliedVoltage = (result.nodeVoltages[m1Node] ?? 0) - (result.nodeVoltages[m2Node] ?? 0);
+        const currentMa = Math.abs(current) * 1000;
+        const isSpinning = Math.abs(appliedVoltage) >= 0.5 && currentMa >= 1;
+        const ratedVoltage = Math.max(1, Number(String(node.properties?.voltage || '5').replace(/[^0-9.]/g, '')) || 5);
+        const ratedRpm = Math.max(1, Number(node.properties?.ratedRpm || node.properties?.rpm || 3000));
+        const rpm = isSpinning
+          ? Math.round(Math.min(1.5, Math.abs(appliedVoltage) / ratedVoltage) * ratedRpm)
+          : 0;
+        const direction = appliedVoltage < 0 ? 'reverse' : 'forward';
+
+        if (
+          node.properties?.isSpinning !== isSpinning ||
+          node.properties?.rpm !== rpm ||
+          node.properties?.appliedVoltage !== appliedVoltage ||
+          node.properties?.currentMa !== currentMa
+        ) {
           useCanvasStore.getState().updateNode(node.id, {
-            properties: { ...node.properties, isSpinning },
+            properties: {
+              ...node.properties,
+              isSpinning,
+              rpm,
+              direction,
+              appliedVoltage,
+              currentMa,
+            },
           });
         }
       }

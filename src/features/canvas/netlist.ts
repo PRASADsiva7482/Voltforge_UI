@@ -88,6 +88,28 @@ export function buildCircuitNetlist(nodes: CanvasNode[], wires: Wire[]): Circuit
     });
   });
 
+  nodes.filter((node) => node.type === 'BREADBOARD').forEach((breadboard) => {
+    const availablePins = new Set((breadboard.pins || []).map((pin) => pin.id));
+    const connect = (pinIds: string[]) => {
+      const existing = pinIds.filter((pinId) => availablePins.has(pinId));
+      for (let index = 1; index < existing.length; index++) {
+        unionFind.union(pinKey(breadboard.id, existing[0]), pinKey(breadboard.id, existing[index]));
+      }
+    };
+
+    for (let column = 1; column <= 30; column++) {
+      connect(['a', 'b', 'c', 'd', 'e'].map((row) => `${row}${column}`));
+      connect(['f', 'g', 'h', 'i', 'j'].map((row) => `${row}${column}`));
+    }
+
+    connect((breadboard.pins || [])
+      .map((pin) => pin.id)
+      .filter((pinId) => /^vcc_(?:top|bottom)_\d+$/i.test(pinId)));
+    connect((breadboard.pins || [])
+      .map((pin) => pin.id)
+      .filter((pinId) => /^gnd_(?:top|bottom)_\d+$/i.test(pinId)));
+  });
+
   wires.forEach((wire) => {
     unionFind.union(pinKey(wire.fromNodeId, wire.fromPinId), pinKey(wire.toNodeId, wire.toPinId));
   });
@@ -188,6 +210,58 @@ export function analyzeCircuitSafety(nodes: CanvasNode[], wires: Wire[]): Circui
     }
   }
 
+  for (const component of netlist.components) {
+    if (component.type !== 'MOTOR_DC') continue;
+
+    const terminalNets = ['m1', 'm2'].map((pinId) => component.pins[pinId]);
+    const connectedTerminals = terminalNets.map((netId) => {
+      const net = netById.get(netId);
+      return Boolean(net?.pins.some((pin) => pin.nodeId !== component.id && pin.nodeType !== 'BREADBOARD'));
+    });
+
+    if (!connectedTerminals[0] || !connectedTerminals[1]) {
+      const issue: CircuitSafetyIssue = {
+        id: `${component.id}:motor-open-circuit`,
+        severity: 'WARNING',
+        componentId: component.id,
+        message: `${component.name} has an open circuit; both M+ and M- need electrical connections.`,
+        suggestedFix: 'Connect both motor terminals to a complete supply and return path. A single D2 wire cannot produce motor current.',
+      };
+      issues.push(issue);
+      nodeStates[component.id] = {
+        ...nodeStates[component.id],
+        isSpinning: false,
+        faultMessage: issue.message,
+      };
+      continue;
+    }
+
+    const firstNet = netById.get(terminalNets[0]);
+    const secondNet = netById.get(terminalNets[1]);
+    const isDirectGpioDrive = netHasMcuGpio(firstNet) && netHasGround(secondNet)
+      || netHasMcuGpio(secondNet) && netHasGround(firstNet);
+
+    if (isDirectGpioDrive) {
+      const issue: CircuitSafetyIssue = {
+        id: `${component.id}:motor-direct-gpio`,
+        severity: 'WARNING',
+        componentId: component.id,
+        message: `${component.name} is connected directly to a microcontroller GPIO, which can exceed the pin current rating.`,
+        suggestedFix: 'Drive the motor through a transistor or motor-driver IC, add a flyback diode, use a suitable motor supply, and share ground with the board.',
+      };
+      issues.push(issue);
+      nodeStates[component.id] = {
+        ...nodeStates[component.id],
+        faultMessage: issue.message,
+      };
+    } else if (component.properties.faultMessage) {
+      nodeStates[component.id] = {
+        ...nodeStates[component.id],
+        faultMessage: undefined,
+      };
+    }
+  }
+
   checkI2cConflicts(netlist, issues);
   return { netlist, issues, nodeStates };
 }
@@ -244,6 +318,10 @@ function netHasVoltageSource(net?: NetlistNode): boolean {
 
 function netHasGround(net?: NetlistNode): boolean {
   return !!net?.pins.some((pin) => pin.pinType === 'ground' || pin.pinName.toUpperCase().includes('GND'));
+}
+
+function netHasMcuGpio(net?: NetlistNode): boolean {
+  return !!net?.pins.some((pin) => isBoard(pin.nodeType) && /^D\d+$/i.test(pin.pinName));
 }
 
 function netVoltage(net?: NetlistNode): number {

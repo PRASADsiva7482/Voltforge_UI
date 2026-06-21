@@ -63,6 +63,26 @@ function isBoard(type: string): boolean {
   return type.startsWith('ARDUINO') || type.startsWith('ESP') || type.startsWith('RASPBERRY');
 }
 
+function boardIoPinNumber(pin: { id: string; name: string; type?: string }): string {
+  const label = `${pin.name} ${pin.id}`;
+
+  // Only real GPIO labels should become MCU drivers. Power labels like "5V"
+  // used to match the old numeric regex and collide with D5.
+  const analogMatch = label.match(/\bA([0-9]{1,2})\b/i);
+  if (analogMatch) return `A${Number(analogMatch[1])}`;
+
+  const digitalMatch = label.match(/\bD([0-9]{1,2})\b/i);
+  if (digitalMatch) return String(Number(digitalMatch[1]));
+
+  return '';
+}
+
+function mcuDriverSuffix(pinNumber: string): string {
+  return pinNumber.toUpperCase().startsWith('A')
+    ? `a${pinNumber.slice(1)}`
+    : `d${pinNumber}`;
+}
+
 function getAbsolutePinPos(node: { x: number; y: number; rotation?: number }, pin: { x: number; y: number }) {
   const rotationRad = ((node.rotation || 0) * Math.PI) / 180;
   const cos = Math.cos(rotationRad);
@@ -313,20 +333,22 @@ export function buildMNACircuit(
         }
       }
 
-      // Digital output pins as switchable impedance drivers
+      // MCU I/O pins as switchable impedance drivers.
       for (const pin of node.pins || []) {
-        const match = `${pin.name} ${pin.id}`.match(/\bD?(\d{1,2})\b/i);
-        if (!match) continue;
-        const pinNum = match[1];
-        const voltage = pinStates[pinNum] ?? 0;
+        const pinNum = boardIoPinNumber(pin);
+        if (!pinNum) continue;
+
+        const suffix = mcuDriverSuffix(pinNum);
         const mode = pinModes[pinNum] || 'INPUT';
         const isOutput = mode === 'OUTPUT' || mode === 'PWM';
+        const isPullup = mode === 'INPUT_PULLUP';
+        const voltage = pinStates[pinNum] ?? (isPullup ? 5 : 0);
 
         const pinNode = nodeFor(node.id, pin.id);
         if (pinNode === 0) continue;
 
         const internalNode = nextExtraNode++;
-        const srcId = `vs_mcu_${node.id}_d${pinNum}_src`;
+        const srcId = `vs_mcu_${node.id}_${suffix}_src`;
         elements.push({
           id: srcId,
           type: 'VOLTAGE_SOURCE',
@@ -337,8 +359,10 @@ export function buildMNACircuit(
         elementToComponent.set(srcId, node.id);
         vsCounter++;
 
-        const swId = `r_mcu_pin_${node.id}_d${pinNum}`;
-        const resistance = (isPowered && isOutput) ? 40 : 1e8;
+        const swId = `r_mcu_pin_${node.id}_${suffix}`;
+        const resistance = isPowered
+          ? isOutput ? 40 : isPullup ? 40000 : 1e8
+          : 1e8;
         elements.push({
           id: swId,
           type: 'RESISTOR',

@@ -70,7 +70,7 @@ let simTime = 0;
 // Track oscilloscope probe nodes
 let scopeNodes: number[] = [];
 
-function doSolve() {
+function doSolve(shouldPost = true) {
   if (!solver || !running) return;
 
   solver.setElements(elements);
@@ -82,6 +82,11 @@ function doSolve() {
 
   // Update transient state (capacitors)
   solver.updateTransientState(result);
+
+  // Increment simulation time
+  simTime += (solver as any).dt || 0.001;
+
+  if (!shouldPost) return;
 
   // Calculate power dissipation per element
   const componentPower: Record<string, number> = {};
@@ -127,8 +132,6 @@ function doSolve() {
     };
     self.postMessage(scopeMsg);
   }
-
-  simTime += solver['dt'] || 0.001;
 }
 
 // ── Message Handler ─────────────────────────────────────────────────────
@@ -169,9 +172,10 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
       intervalId = setInterval(() => {
         if (!running) return;
         // Run 10 solver steps per frame for transient accuracy
-        for (let i = 0; i < 10; i++) {
-          doSolve();
+        for (let i = 0; i < 9; i++) {
+          doSolve(false);
         }
+        doSolve(true);
       }, 16);
       break;
     }
