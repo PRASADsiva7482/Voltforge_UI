@@ -69,6 +69,54 @@ class UnionFind {
 
 const pinKey = (nodeId: string, pinId: string) => `${nodeId}:${pinId}`;
 
+function isBoard(type: string) {
+  return type.startsWith('ARDUINO') || type.startsWith('ESP') || type.startsWith('RASPBERRY');
+}
+
+function isGroundLabel(pin: { pinName?: string; name?: string; pinId?: string; id?: string }) {
+  return /(^|\W)(GND|GROUND)(\W|$)/i.test(`${pin.pinId || pin.id || ''} ${pin.pinName || pin.name || ''}`);
+}
+
+function addLegacyPinAliases(node: CanvasNode, unionFind: UnionFind) {
+  const join = (canonical: string, aliases: string[]) => {
+    const canonicalKey = pinKey(node.id, canonical);
+    unionFind.add(canonicalKey);
+    aliases.forEach((alias) => unionFind.union(canonicalKey, pinKey(node.id, alias)));
+  };
+
+  if (node.type === 'RESISTOR') {
+    join('p1', ['pin1']);
+    join('p2', ['pin2']);
+  }
+  if (node.type.includes('CAPACITOR')) {
+    join('pos', ['p1', 'pin1', 'positive']);
+    join('neg', ['p2', 'pin2', 'negative']);
+  }
+  if (node.type === 'MOTOR_DC') {
+    join('m1', ['positive', 'pos', 'plus']);
+    join('m2', ['negative', 'neg', 'minus']);
+  }
+  if (node.type === 'DISPLAY_7SEG') {
+    join('com', ['common']);
+  }
+  if (node.type === 'RELAY_SINGLE') {
+    join('in', ['coil1']);
+    join('gnd', ['coil2']);
+  }
+  if (node.type === 'RELAY_2CH' || node.type === 'RELAY_4CH') {
+    const channels = node.type === 'RELAY_2CH' ? 2 : 4;
+    for (let channel = 1; channel <= channels; channel++) {
+      join(`in${channel}`, [`coil${channel}`]);
+    }
+  }
+  if (node.type === 'MOTOR_STEPPER') {
+    join('in1', ['a1']);
+    join('in2', ['a2']);
+    join('in3', ['b1']);
+    join('in4', ['b2']);
+  }
+}
+
 export function buildCircuitNetlist(nodes: CanvasNode[], wires: Wire[]): CircuitNetlist {
   const unionFind = new UnionFind();
   const pinRefs = new Map<string, NetlistPinRef>();
@@ -86,6 +134,14 @@ export function buildCircuitNetlist(nodes: CanvasNode[], wires: Wire[]): Circuit
         pinType: pin.type,
       });
     });
+
+    if (isBoard(node.type)) {
+      const groundPins = (node.pins || []).filter((pin) => isGroundLabel(pin));
+      for (let index = 1; index < groundPins.length; index++) {
+        unionFind.union(pinKey(node.id, groundPins[0].id), pinKey(node.id, groundPins[index].id));
+      }
+    }
+    addLegacyPinAliases(node, unionFind);
   });
 
   nodes.filter((node) => node.type === 'BREADBOARD').forEach((breadboard) => {
@@ -104,10 +160,16 @@ export function buildCircuitNetlist(nodes: CanvasNode[], wires: Wire[]): Circuit
 
     connect((breadboard.pins || [])
       .map((pin) => pin.id)
-      .filter((pinId) => /^vcc_(?:top|bottom)_\d+$/i.test(pinId)));
+      .filter((pinId) => /^vcc_top_\d+$/i.test(pinId)));
     connect((breadboard.pins || [])
       .map((pin) => pin.id)
-      .filter((pinId) => /^gnd_(?:top|bottom)_\d+$/i.test(pinId)));
+      .filter((pinId) => /^gnd_top_\d+$/i.test(pinId)));
+    connect((breadboard.pins || [])
+      .map((pin) => pin.id)
+      .filter((pinId) => /^vcc_bottom_\d+$/i.test(pinId)));
+    connect((breadboard.pins || [])
+      .map((pin) => pin.id)
+      .filter((pinId) => /^gnd_bottom_\d+$/i.test(pinId)));
   });
 
   wires.forEach((wire) => {
@@ -308,16 +370,29 @@ function findPinByRole(nodes: CanvasNode[], nodeId: string, roles: string[]): Pi
 function netHasVoltageSource(net?: NetlistNode): boolean {
   return !!net?.pins.some((pin) => {
     const label = pin.pinName.toUpperCase();
-    return pin.pinType === 'power'
-      || label === '5V'
-      || label === '3.3V'
-      || label === 'VIN'
-      || (isBoard(pin.nodeType) && /^D\d+/.test(label));
+    const pinId = pin.pinId.toLowerCase();
+    if (isBoard(pin.nodeType)) {
+      return label === '5V'
+        || label === '3.3V'
+        || label === '3V3'
+        || label === 'VIN'
+        || /^D\d+/.test(label);
+    }
+    if (pin.nodeType === 'POWER_SUPPLY' || pin.nodeType === 'BATTERY_9V') {
+      return pin.pinType === 'power' || /(^|\W)(\+|POS|POSITIVE|VCC|VIN)(\W|$)/i.test(`${pin.pinId} ${pin.pinName}`);
+    }
+    return pin.nodeType === 'VOLTAGE_REGULATOR_7805' && (pinId === 'vout' || label === '5V');
   });
 }
 
 function netHasGround(net?: NetlistNode): boolean {
-  return !!net?.pins.some((pin) => pin.pinType === 'ground' || pin.pinName.toUpperCase().includes('GND'));
+  return !!net?.pins.some((pin) => {
+    if (isBoard(pin.nodeType)) return isGroundLabel(pin);
+    if (pin.nodeType === 'POWER_SUPPLY' || pin.nodeType === 'BATTERY_9V') {
+      return pin.pinType === 'ground' || /(^|\W)(-|NEG|NEGATIVE|GND|GROUND)(\W|$)/i.test(`${pin.pinId} ${pin.pinName}`);
+    }
+    return false;
+  });
 }
 
 function netHasMcuGpio(net?: NetlistNode): boolean {
@@ -326,14 +401,10 @@ function netHasMcuGpio(net?: NetlistNode): boolean {
 
 function netVoltage(net?: NetlistNode): number {
   if (!net) return 0;
-  if (net.pins.some((pin) => pin.pinName.toUpperCase() === '3.3V')) return 3.3;
-  if (net.pins.some((pin) => pin.pinName.toUpperCase() === 'VIN')) return 7;
+  if (net.pins.some((pin) => isBoard(pin.nodeType) && /^(3\.3V|3V3)$/i.test(pin.pinName))) return 3.3;
+  if (net.pins.some((pin) => isBoard(pin.nodeType) && pin.pinName.toUpperCase() === 'VIN')) return 7;
   if (netHasVoltageSource(net)) return 5;
   return 0;
-}
-
-function isBoard(type: string) {
-  return type.startsWith('ARDUINO') || type.startsWith('ESP') || type.startsWith('RASPBERRY');
 }
 
 function parseMilliAmps(value: unknown, fallback: number): number {

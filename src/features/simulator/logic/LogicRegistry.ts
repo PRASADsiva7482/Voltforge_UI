@@ -73,6 +73,7 @@ export class NeoPixelLogic implements IComponentLogic {
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
     if (node.properties?.isBlown) return;
+    if (node.properties?.powered === false) return;
 
     const pin = node.pins?.find(p => p.id === pinId);
     const pinLabel = `${pinId} ${pin?.name || ''}`.toLowerCase();
@@ -119,6 +120,7 @@ export class ServoLogic implements IComponentLogic {
     const { updateNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
+    if (node.properties?.powered === false) return;
 
     const pin = node.pins?.find(p => p.id === pinId);
     const pinLabel = `${pinId} ${pin?.name || ''}`.toLowerCase();

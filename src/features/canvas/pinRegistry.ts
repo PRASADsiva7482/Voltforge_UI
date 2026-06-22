@@ -49,9 +49,9 @@ const ARDUINO_UNO_PINS: PinPosition[] = [
 // ── Arduino Mega (280×120 SVG viewBox) ──
 const ARDUINO_MEGA_PINS: PinPosition[] = (() => {
   const pins: PinPosition[] = [];
-  // Digital 0-13 top (14 pins, 18px spacing)
-  for (let i = 0; i <= 13; i++) {
-    pins.push(pin(`d${i}`, `D${i}`, 14 + i * 18, 0, 'bidirectional'));
+  // Digital 0-21 top
+  for (let i = 0; i <= 21; i++) {
+    pins.push(pin(`d${i}`, `D${i}`, 8 + i * 12.5, 0, 'bidirectional'));
   }
   // Digital 22-53 bottom (32 pins, 8px spacing)
   for (let i = 22; i <= 53; i++) {
@@ -71,13 +71,36 @@ const ARDUINO_MEGA_PINS: PinPosition[] = (() => {
   return pins;
 })();
 
+// Arduino Nano (100x160 SVG viewport)
+const ARDUINO_NANO_PINS: PinPosition[] = (() => {
+  const pins: PinPosition[] = [];
+  for (let i = 0; i <= 13; i++) {
+    pins.push(pin(`d${i}`, `D${i}`, 0, 28 + i * 8.5, 'bidirectional'));
+  }
+  pins.push(pin('gnd1', 'GND', 0, 151, 'ground'));
+
+  const rightPins: Array<[string, string, PinType]> = [
+    ['vin', 'VIN', 'power'], ['5v', '5V', 'power'], ['3v3', '3.3V', 'power'],
+    ['rst', 'RESET', 'input'], ['gnd2', 'GND', 'ground'], ['aref', 'AREF', 'input'],
+    ['a0', 'A0', 'bidirectional'], ['a1', 'A1', 'bidirectional'],
+    ['a2', 'A2', 'bidirectional'], ['a3', 'A3', 'bidirectional'],
+    ['a4', 'A4/SDA', 'bidirectional'], ['a5', 'A5/SCL', 'bidirectional'],
+    ['a6', 'A6', 'input'], ['a7', 'A7', 'input'],
+  ];
+  rightPins.forEach(([id, name, type], i) => pins.push(pin(id, name, 100, 28 + i * 9.4, type)));
+  return pins;
+})();
+
 // ── ESP32 DevKit (100×160) ──
 const ESP32_PINS: PinPosition[] = (() => {
   const pins: PinPosition[] = [];
   const leftPins = ['3V3', 'EN', 'VP', 'VN', 'D34', 'D35', 'D32', 'D33', 'D25', 'D26', 'D27', 'D14', 'D12', 'GND', 'D13'];
   const rightPins = ['VIN', 'GND', 'D23', 'D22', 'TX', 'RX', 'D21', 'D19', 'D18', 'D5', 'D17', 'D16', 'D4', 'D2', 'D15'];
   leftPins.forEach((name, i) => {
-    const type: PinType = name === 'GND' ? 'ground' : name.includes('V') || name === 'EN' ? 'power' : 'bidirectional';
+    const type: PinType = name === 'GND' ? 'ground'
+      : name === '3V3' ? 'power'
+        : name === 'EN' || name === 'VP' || name === 'VN' ? 'input'
+          : 'bidirectional';
     pins.push(pin(`l${i}`, name, 0, 10 + i * 10, type));
   });
   rightPins.forEach((name, i) => {
@@ -108,7 +131,7 @@ const CERAMIC_CAPACITOR_PINS: PinPosition[] = [
 
 const ELECTROLYTIC_CAPACITOR_PINS: PinPosition[] = [
   pin('pos', '+', 16, 70, 'power'),
-  pin('neg', '-', 30, 70, 'ground'),
+  pin('neg', '-', 30, 70, 'bidirectional'),
 ];
 
 const DIODE_PINS: PinPosition[] = [
@@ -119,7 +142,7 @@ const DIODE_PINS: PinPosition[] = [
 const NPN_TRANSISTOR_PINS: PinPosition[] = [
   pin('collector', 'C', 14, 70, 'output'),
   pin('base', 'B', 28, 70, 'input'),
-  pin('emitter', 'E', 42, 70, 'ground'),
+  pin('emitter', 'E', 42, 70, 'bidirectional'),
 ];
 
 const PNP_TRANSISTOR_PINS: PinPosition[] = [
@@ -174,7 +197,7 @@ const SERVO_PINS: PinPosition[] = [
 
 const MULTIMETER_PINS: PinPosition[] = [
   pin('v_probe', 'VCC', 24, 70, 'input'),
-  pin('com', 'COM', 66, 70, 'ground'),
+  pin('com', 'COM', 66, 70, 'bidirectional'),
 ];
 
 // MOTOR_DC: SVG viewBox 70×50, terminals on left side
@@ -186,7 +209,7 @@ const DC_MOTOR_PINS: PinPosition[] = [
 // RELAY: SVG viewBox 70×50
 const RELAY_PINS: PinPosition[] = [
   pin('coil1', 'Coil+', 0, 15, 'input'),
-  pin('coil2', 'Coil−', 0, 35, 'ground'),
+  pin('coil2', 'Coil-', 0, 35, 'bidirectional'),
   pin('com', 'COM', 70, 10, 'bidirectional'),
   pin('no', 'NO', 70, 25, 'bidirectional'),
   pin('nc', 'NC', 70, 40, 'bidirectional'),
@@ -332,22 +355,24 @@ const NEOPIXEL_PINS: PinPosition[] = [
 
 // DISPLAY_7SEG: SVG viewBox 50×70
 const SEG7_PINS: PinPosition[] = [
-  pin('a', 'A', 5, 70, 'input'),
-  pin('b', 'B', 12, 70, 'input'),
-  pin('c', 'C', 19, 70, 'input'),
-  pin('d', 'D', 26, 70, 'input'),
-  pin('e', 'E', 33, 70, 'input'),
-  pin('f', 'F', 40, 70, 'input'),
-  pin('g', 'G', 47, 70, 'input'),
-  pin('com', 'COM', 25, 0, 'ground'),
+  pin('a', 'A', 3, 70, 'input'),
+  pin('b', 'B', 9, 70, 'input'),
+  pin('c', 'C', 15, 70, 'input'),
+  pin('d', 'D', 21, 70, 'input'),
+  pin('e', 'E', 29, 70, 'input'),
+  pin('f', 'F', 35, 70, 'input'),
+  pin('g', 'G', 41, 70, 'input'),
+  pin('dp', 'DP', 47, 70, 'input'),
+  pin('com', 'COM', 25, 0, 'bidirectional'),
 ];
 
 // SENSOR_IMU: SVG viewBox 60×60
 const IMU_PINS: PinPosition[] = [
-  pin('vcc', 'VCC', 10, 60, 'power'),
-  pin('gnd', 'GND', 22, 60, 'ground'),
-  pin('scl', 'SCL', 38, 60, 'bidirectional'),
-  pin('sda', 'SDA', 50, 60, 'bidirectional'),
+  pin('vcc', 'VCC', 6, 60, 'power'),
+  pin('gnd', 'GND', 18, 60, 'ground'),
+  pin('scl', 'SCL', 30, 60, 'bidirectional'),
+  pin('sda', 'SDA', 42, 60, 'bidirectional'),
+  pin('int', 'INT', 54, 60, 'output'),
 ];
 
 // BREADBOARD: SVG viewBox 220x120 - power rails + terminal strips
@@ -381,25 +406,30 @@ const BREADBOARD_PINS: PinPosition[] = (() => {
 
 // MOTOR_STEPPER: SVG viewBox 70×70
 const STEPPER_V2_PINS: PinPosition[] = [
-  pin('a1', 'A+', 15, 70, 'input'),
-  pin('a2', 'A−', 27, 70, 'input'),
-  pin('b1', 'B+', 39, 70, 'input'),
-  pin('b2', 'B−', 51, 70, 'input'),
+  pin('in1', 'IN1', 7, 70, 'input'),
+  pin('in2', 'IN2', 18, 70, 'input'),
+  pin('in3', 'IN3', 29, 70, 'input'),
+  pin('in4', 'IN4', 40, 70, 'input'),
+  pin('vcc', 'VCC', 51, 70, 'power'),
+  pin('gnd', 'GND', 62, 70, 'ground'),
 ];
 
 // RELAY_SINGLE: SVG viewBox 70×50
 const RELAY_SINGLE_PINS: PinPosition[] = [
-  pin('coil1', 'Coil+', 0, 15, 'input'),
-  pin('coil2', 'Coil−', 0, 35, 'ground'),
-  pin('com', 'COM', 70, 15, 'bidirectional'),
-  pin('no', 'NO', 70, 35, 'bidirectional'),
+  pin('vcc', 'VCC', 0, 8, 'power'),
+  pin('gnd', 'GND', 0, 25, 'ground'),
+  pin('in', 'IN', 0, 42, 'input'),
+  pin('com', 'COM', 70, 8, 'bidirectional'),
+  pin('no', 'NO', 70, 25, 'bidirectional'),
+  pin('nc', 'NC', 70, 42, 'bidirectional'),
 ];
 
 // RELAY_2CH: SVG viewBox 90×50
 const RELAY_2CH_PINS: PinPosition[] = [
-  pin('coil1', 'Coil1+', 0, 12, 'input'),
-  pin('coil2', 'Coil2+', 0, 38, 'input'),
+  pin('in1', 'IN1', 0, 10, 'input'),
+  pin('in2', 'IN2', 0, 20, 'input'),
   pin('gnd', 'GND', 0, 25, 'ground'),
+  pin('vcc', 'VCC', 0, 40, 'power'),
   pin('com1', 'COM1', 90, 12, 'bidirectional'),
   pin('no1', 'NO1', 90, 25, 'bidirectional'),
   pin('com2', 'COM2', 90, 38, 'bidirectional'),
@@ -408,11 +438,11 @@ const RELAY_2CH_PINS: PinPosition[] = [
 
 // RELAY_4CH: SVG viewBox 120×50
 const RELAY_4CH_PINS: PinPosition[] = [
-  pin('coil1', 'IN1', 0, 10, 'input'),
-  pin('coil2', 'IN2', 0, 18, 'input'),
+  pin('in1', 'IN1', 0, 10, 'input'),
+  pin('in2', 'IN2', 0, 18, 'input'),
   pin('gnd', 'GND', 0, 25, 'ground'),
-  pin('coil3', 'IN3', 0, 32, 'input'),
-  pin('coil4', 'IN4', 0, 40, 'input'),
+  pin('in3', 'IN3', 0, 32, 'input'),
+  pin('in4', 'IN4', 0, 40, 'input'),
   pin('vcc', 'VCC', 0, 47, 'power'),
   pin('com1', 'COM1', 120, 6, 'bidirectional'),
   pin('no1', 'NO1', 120, 11, 'bidirectional'),
@@ -427,8 +457,7 @@ const RELAY_4CH_PINS: PinPosition[] = [
 // SWITCH_SPST: SVG viewBox 60×30
 const SWITCH_SPST_PINS: PinPosition[] = [
   pin('p1', 'Pin 1', 34, 15, 'bidirectional'),
-  pin('p2', 'Pin 2', 44, 15, 'bidirectional'),
-  pin('p3', 'Pin 3', 54, 15, 'bidirectional'),
+  pin('p2', 'Pin 2', 54, 15, 'bidirectional'),
 ];
 
 // ESC_MODULE: SVG viewBox 120×60, input left (Signal/VCC/GND), output right (Phase A/B/C)
@@ -472,7 +501,7 @@ const OSCILLOSCOPE_PINS: PinPosition[] = [
 export const boardPinRegistry: Record<string, PinPosition[]> = {
   ARDUINO_UNO: ARDUINO_UNO_PINS,
   ARDUINO_MEGA: ARDUINO_MEGA_PINS,
-  ARDUINO_NANO: ARDUINO_UNO_PINS,
+  ARDUINO_NANO: ARDUINO_NANO_PINS,
   ESP32: ESP32_PINS,
   ESP32_S3: ESP32_PINS,
   ESP8266: ESP32_PINS.slice(0, 20),

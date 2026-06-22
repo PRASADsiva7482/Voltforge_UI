@@ -11,6 +11,7 @@ export type MNAElementType =
   | 'CURRENT_SOURCE'
   | 'CAPACITOR'
   | 'DIODE'
+  | 'BJT'
   | 'AMMETER';
 
 export interface MNAElement {
@@ -23,6 +24,12 @@ export interface MNAElement {
   // Diode parameters (Shockley model)
   saturationCurrent?: number;  // Is (A), default 1e-12
   thermalVoltage?: number;     // Vt (V), default 0.02585 (≈26mV at 25°C)
+
+  // BJT parameters: nodeA=collector, nodeB=emitter, controlNode=base
+  controlNode?: number;
+  gain?: number;
+  pnp?: boolean;
+  maxCurrent?: number;
 
   // Capacitor companion model state
   prevVoltage?: number;  // Voltage across capacitor at previous time step
@@ -184,6 +191,9 @@ export class MNASolver {
           case 'DIODE':
             this.stampDiode(A, b, elem, prevSolution);
             break;
+          case 'BJT':
+            this.stampBjt(A, b, elem, prevSolution);
+            break;
         }
       }
 
@@ -202,7 +212,7 @@ export class MNASolver {
       }
 
       // Check convergence (only matters if we have nonlinear elements)
-      const hasNonlinear = this.elements.some((e) => e.type === 'DIODE');
+      const hasNonlinear = this.elements.some((e) => e.type === 'DIODE' || e.type === 'BJT');
       if (hasNonlinear && prevSolution) {
         let maxDiff = 0;
         for (let i = 0; i < size; i++) {
@@ -345,6 +355,62 @@ export class MNASolver {
     if (nodeB > 0) b[nodeB - 1] += ieq;
   }
 
+  private stampBjt(
+    A: number[][],
+    b: number[],
+    elem: MNAElement,
+    prevSolution: number[] | null
+  ) {
+    const collector = elem.nodeA;
+    const emitter = elem.nodeB;
+    const base = elem.controlNode ?? 0;
+    const beta = Math.max(1, elem.gain ?? 100);
+    const maxCurrent = Math.max(0.001, elem.maxCurrent ?? 0.5);
+    const Is = elem.saturationCurrent ?? 1e-15;
+    const Vt = elem.thermalVoltage ?? 0.02585;
+    const pnp = Boolean(elem.pnp);
+
+    const voltageAt = (node: number) => node > 0 && prevSolution ? prevSolution[node - 1] : 0;
+    let junctionVoltage = prevSolution
+      ? pnp ? voltageAt(emitter) - voltageAt(base) : voltageAt(base) - voltageAt(emitter)
+      : 0.6;
+    junctionVoltage = Math.max(-5, Math.min(junctionVoltage, 0.78));
+
+    const expV = Math.exp(junctionVoltage / Vt);
+    const baseCurrent = Is * (expV - 1);
+    const baseConductance = (Is / Vt) * expV;
+    const baseEquivalentCurrent = baseCurrent - baseConductance * junctionVoltage;
+
+    const rawCollectorCurrent = beta * baseCurrent;
+    const collectorCurrent = Math.min(maxCurrent, Math.max(-Is, rawCollectorCurrent));
+    const collectorConductance = rawCollectorCurrent >= maxCurrent ? 0 : beta * baseConductance;
+    const collectorEquivalentCurrent = collectorCurrent - collectorConductance * junctionVoltage;
+
+    const stampBranch = (from: number, to: number, controlPositive: number, controlNegative: number, gm: number, ieq: number) => {
+      if (from > 0) {
+        if (controlPositive > 0) A[from - 1][controlPositive - 1] += gm;
+        if (controlNegative > 0) A[from - 1][controlNegative - 1] -= gm;
+        b[from - 1] -= ieq;
+      }
+      if (to > 0) {
+        if (controlPositive > 0) A[to - 1][controlPositive - 1] -= gm;
+        if (controlNegative > 0) A[to - 1][controlNegative - 1] += gm;
+        b[to - 1] += ieq;
+      }
+    };
+
+    if (pnp) {
+      stampBranch(emitter, base, emitter, base, baseConductance, baseEquivalentCurrent);
+      stampBranch(emitter, collector, emitter, base, collectorConductance, collectorEquivalentCurrent);
+    } else {
+      stampBranch(base, emitter, base, emitter, baseConductance, baseEquivalentCurrent);
+      stampBranch(collector, emitter, base, emitter, collectorConductance, collectorEquivalentCurrent);
+    }
+
+    // Finite output resistance keeps the collector defined when the device is off.
+    this.stampResistor(A, { ...elem, type: 'RESISTOR', value: 100_000_000 });
+  }
+
   // ── Result builder ────────────────────────────────────────────────────
 
   private buildResult(
@@ -380,6 +446,17 @@ export class MNASolver {
         const vd = Math.max(-5, Math.min(va - vb, 0.8));
         const current = Is * (Math.exp(vd / Vt) - 1);
         branchCurrents.set(elem.id, current);
+      }
+      if (elem.type === 'BJT') {
+        const baseNode = elem.controlNode ?? 0;
+        const vb = baseNode > 0 ? nodeVoltages[baseNode] : 0;
+        const ve = elem.nodeB > 0 ? nodeVoltages[elem.nodeB] : 0;
+        const junctionVoltage = Math.max(-5, Math.min(elem.pnp ? ve - vb : vb - ve, 0.78));
+        const Is = elem.saturationCurrent ?? 1e-15;
+        const beta = Math.max(1, elem.gain ?? 100);
+        const maxCurrent = Math.max(0.001, elem.maxCurrent ?? 0.5);
+        const current = Math.min(maxCurrent, Math.max(-Is, beta * Is * (Math.exp(junctionVoltage / (elem.thermalVoltage ?? 0.02585)) - 1)));
+        branchCurrents.set(elem.id, elem.pnp ? -current : current);
       }
     }
 

@@ -63,6 +63,71 @@ function isBoard(type: string): boolean {
   return type.startsWith('ARDUINO') || type.startsWith('ESP') || type.startsWith('RASPBERRY');
 }
 
+function boardLogicVoltage(type: string): number {
+  return type.startsWith('ESP') || type.startsWith('RASPBERRY') ? 3.3 : 5;
+}
+
+function isBoardGroundPin(pin: { id: string; name: string }): boolean {
+  return /(^|\W)(GND|GROUND)(\W|$)/i.test(`${pin.id} ${pin.name}`);
+}
+
+function addBoardConnections(node: CanvasNode, uf: UnionFind) {
+  if (!isBoard(node.type)) return;
+
+  const groundPins = (node.pins || []).filter(isBoardGroundPin);
+  for (let i = 1; i < groundPins.length; i++) {
+    uf.union(pinKey(node.id, groundPins[0].id), pinKey(node.id, groundPins[i].id));
+  }
+}
+
+function addLegacyPinAliases(node: CanvasNode, uf: UnionFind) {
+  const join = (canonical: string, aliases: string[]) => {
+    const canonicalKey = pinKey(node.id, canonical);
+    uf.add(canonicalKey);
+    for (const alias of aliases) {
+      uf.union(canonicalKey, pinKey(node.id, alias));
+    }
+  };
+
+  if (node.type === 'RESISTOR') {
+    join('p1', ['pin1']);
+    join('p2', ['pin2']);
+  }
+
+  if (node.type.includes('CAPACITOR')) {
+    join('pos', ['p1', 'pin1', 'positive']);
+    join('neg', ['p2', 'pin2', 'negative']);
+  }
+
+  if (node.type === 'MOTOR_DC') {
+    join('m1', ['positive', 'pos', 'plus']);
+    join('m2', ['negative', 'neg', 'minus']);
+  }
+
+  if (node.type === 'DISPLAY_7SEG') {
+    join('com', ['common']);
+  }
+
+  if (node.type === 'RELAY_SINGLE') {
+    join('in', ['coil1']);
+    join('gnd', ['coil2']);
+  }
+
+  if (node.type === 'RELAY_2CH' || node.type === 'RELAY_4CH') {
+    const channels = node.type === 'RELAY_2CH' ? 2 : 4;
+    for (let channel = 1; channel <= channels; channel++) {
+      join(`in${channel}`, [`coil${channel}`]);
+    }
+  }
+
+  if (node.type === 'MOTOR_STEPPER') {
+    join('in1', ['a1']);
+    join('in2', ['a2']);
+    join('in3', ['b1']);
+    join('in4', ['b2']);
+  }
+}
+
 function boardIoPinNumber(pin: { id: string; name: string; type?: string }): string {
   const label = `${pin.name} ${pin.id}`;
 
@@ -73,6 +138,9 @@ function boardIoPinNumber(pin: { id: string; name: string; type?: string }): str
 
   const digitalMatch = label.match(/\bD([0-9]{1,2})\b/i);
   if (digitalMatch) return String(Number(digitalMatch[1]));
+
+  if (/\bTX\b/i.test(label)) return '1';
+  if (/\bRX\b/i.test(label)) return '3';
 
   return '';
 }
@@ -145,15 +213,6 @@ function addBreadboardConnections(node: CanvasNode, uf: UnionFind) {
     }
   }
 
-  // Connect top and bottom power rails to each other
-  uf.union(
-    pinKey(node.id, `vcc_top_1`),
-    pinKey(node.id, `vcc_bottom_1`)
-  );
-  uf.union(
-    pinKey(node.id, `gnd_top_1`),
-    pinKey(node.id, `gnd_bottom_1`)
-  );
 }
 
 // ── Main Builder ────────────────────────────────────────────────────────
@@ -185,6 +244,8 @@ export function buildMNACircuit(
     }
     // Auto-connect breadboard internal rows
     addBreadboardConnections(node, uf);
+    addBoardConnections(node, uf);
+    addLegacyPinAliases(node, uf);
   }
 
   // 2. Merge pins connected by wires
@@ -215,26 +276,25 @@ export function buildMNACircuit(
     }
   }
 
-  // 3. Assign MNA node indices to each group
-  //    Ground node = 0; all GND pins merge to ground
+  // 3. Assign MNA node indices to each group. MNA needs one reference net,
+  // but a GND/COM label is not a wire. Disconnected ground-labelled pins stay
+  // electrically separate.
   const groups = uf.groups();
   const rootToMNANode = new Map<string, number>();
   let nextNode = 1; // 0 is reserved for ground
 
-  // First pass: identify ground groups
-  for (const [root, members] of groups) {
-    const isGround = members.some((key) => {
-      const [nodeId, pinId] = key.split(':');
-      const node = nodes.find((n) => n.id === nodeId);
-      const pin = node?.pins?.find((p) => p.id === pinId);
-      if (!pin) return false;
-      const label = `${pin.id} ${pin.name}`.toUpperCase();
-      return pin.type === 'ground' || label.includes('GND') || label.includes('COM') || label === '-';
-    });
-    if (isGround) {
-      rootToMNANode.set(root, 0);
-    }
-  }
+  const referencePin = nodes
+    .filter((node) => isBoard(node.type))
+    .flatMap((node) => (node.pins || []).map((pin) => ({ node, pin })))
+    .find(({ pin }) => isBoardGroundPin(pin))
+    ?? nodes
+      .flatMap((node) => (node.pins || []).map((pin) => ({ node, pin })))
+      .find(({ pin }) => /(^|\W)(GND|GROUND)(\W|$)/i.test(`${pin.id} ${pin.name}`));
+
+  const referenceRoot = referencePin
+    ? uf.find(pinKey(referencePin.node.id, referencePin.pin.id))
+    : groups.keys().next().value as string | undefined;
+  if (referenceRoot) rootToMNANode.set(referenceRoot, 0);
 
   // Second pass: assign indices to non-ground groups
   for (const [root] of groups) {
@@ -260,6 +320,12 @@ export function buildMNACircuit(
     return pinToMNANode.get(pinKey(componentId, pinId)) ?? 0;
   };
 
+  const wireTouchesPin = (componentId: string, test: (pinId: string) => boolean): boolean =>
+    wires.some((wire) =>
+      (wire.fromNodeId === componentId && test(wire.fromPinId)) ||
+      (wire.toNodeId === componentId && test(wire.toPinId))
+    );
+
   // 4. Create MNA elements from canvas components
   let vsCounter = 0;
 
@@ -272,6 +338,9 @@ export function buildMNACircuit(
     // ── MCU Boards (Arduino, ESP, etc.) ──
     if (isBoard(node.type)) {
       const isPowered = boardPoweredMap[node.id] !== false;
+      const logicVoltage = boardLogicVoltage(node.type);
+      const groundPin = (node.pins || []).find(isBoardGroundPin);
+      const boardGroundNode = groundPin ? nodeFor(node.id, groundPin.id) : 0;
 
       // Power pins as switchable voltage sources
       for (const pin of node.pins || []) {
@@ -283,7 +352,7 @@ export function buildMNACircuit(
             id: srcId,
             type: 'VOLTAGE_SOURCE',
             nodeA: internalNode,
-            nodeB: 0, // GND reference
+            nodeB: boardGroundNode,
             value: 5,
           });
           elementToComponent.set(srcId, node.id);
@@ -305,7 +374,7 @@ export function buildMNACircuit(
             id: srcId,
             type: 'VOLTAGE_SOURCE',
             nodeA: internalNode,
-            nodeB: 0,
+            nodeB: boardGroundNode,
             value: 3.3,
           });
           elementToComponent.set(srcId, node.id);
@@ -326,7 +395,7 @@ export function buildMNACircuit(
             id,
             type: 'RESISTOR',
             nodeA: nodeFor(node.id, pin.id),
-            nodeB: 0,
+            nodeB: boardGroundNode,
             value: 100000,
           });
           elementToComponent.set(id, node.id);
@@ -342,7 +411,8 @@ export function buildMNACircuit(
         const mode = pinModes[pinNum] || 'INPUT';
         const isOutput = mode === 'OUTPUT' || mode === 'PWM';
         const isPullup = mode === 'INPUT_PULLUP';
-        const voltage = pinStates[pinNum] ?? (isPullup ? 5 : 0);
+        const requestedVoltage = pinStates[pinNum] ?? (isPullup ? logicVoltage : 0);
+        const voltage = Math.max(0, Math.min(logicVoltage, requestedVoltage));
 
         const pinNode = nodeFor(node.id, pin.id);
         if (pinNode === 0) continue;
@@ -353,7 +423,7 @@ export function buildMNACircuit(
           id: srcId,
           type: 'VOLTAGE_SOURCE',
           nodeA: internalNode,
-          nodeB: 0,
+          nodeB: boardGroundNode,
           value: voltage,
         });
         elementToComponent.set(srcId, node.id);
@@ -530,6 +600,40 @@ export function buildMNACircuit(
     }
 
     // ── PUSH BUTTON / BUTTON ──
+    // Addressable LED strip/module: powered load plus high-impedance data pins.
+    if (node.type === 'LED_NEOPIXEL') {
+      const vccNode = nodeFor(node.id, 'vcc');
+      const gndNode = nodeFor(node.id, 'gnd');
+      const pixelCount = Math.max(1, Number(props.pixelCount) || Number(props.pixels) || 1);
+      const brightness = Math.max(0.02, Math.min(1, (Number(props.brightness) || 30) / 100));
+      const activeCurrent = pixelCount * 0.06 * brightness;
+      const resistance = activeCurrent > 0 ? 5 / activeCurrent : 1e8;
+
+      const powerId = `r_neopixel_power_${node.id}`;
+      elements.push({
+        id: powerId,
+        type: 'RESISTOR',
+        nodeA: vccNode,
+        nodeB: gndNode,
+        value: Math.max(10, resistance),
+      });
+      elementToComponent.set(powerId, node.id);
+
+      for (const dataPin of ['din', 'dout']) {
+        if (!node.pins?.some((pin) => pin.id === dataPin)) continue;
+        const inputId = `r_neopixel_${dataPin}_${node.id}`;
+        elements.push({
+          id: inputId,
+          type: 'RESISTOR',
+          nodeA: nodeFor(node.id, dataPin),
+          nodeB: gndNode,
+          value: 100_000,
+        });
+        elementToComponent.set(inputId, node.id);
+      }
+      continue;
+    }
+
     if (node.type === 'PUSH_BUTTON' || node.type === 'BUTTON') {
       const isPressed = Boolean(props.isPressed);
       const swVal = isPressed ? 0.01 : 1e8;
@@ -569,11 +673,10 @@ export function buildMNACircuit(
       continue;
     }
 
-    // ── SWITCH SPST (toggles p1-p2, inverse p2-p3 acting as SPDT) ──
+    // ── SWITCH SPST ──
     if (node.type === 'SWITCH_SPST') {
       const isClosed = Boolean(props.isClosed);
       const rClosed = isClosed ? 0.01 : 1e8;
-      const rOpen = isClosed ? 1e8 : 0.01;
 
       const idSw = `r_sw_${node.id}`;
       elements.push({
@@ -584,21 +687,11 @@ export function buildMNACircuit(
         value: rClosed,
       });
       elementToComponent.set(idSw, node.id);
-
-      const idSwNC = `r_sw_nc_${node.id}`;
-      elements.push({
-        id: idSwNC,
-        type: 'RESISTOR',
-        nodeA: nodeFor(node.id, 'p2'),
-        nodeB: nodeFor(node.id, 'p3'),
-        value: rOpen,
-      });
-      elementToComponent.set(idSwNC, node.id);
       continue;
     }
 
-    // ── Single Channel Relay ──
-    if (node.type === 'RELAY_SINGLE' || node.type === 'RELAY_SPDT') {
+    // ── Bare SPDT relay ──
+    if (node.type === 'RELAY_SPDT') {
       const isActive = Boolean(props.isActive);
 
       // Coil resistance
@@ -639,99 +732,150 @@ export function buildMNACircuit(
       continue;
     }
 
-    // ── 2-Channel Relay Module ──
-    if (node.type === 'RELAY_2CH') {
-      const active1 = Boolean(props.isSwitched_1);
-      const active2 = Boolean(props.isSwitched_2);
-      const nodeGnd = nodeFor(node.id, 'gnd');
+    // ── Powered relay modules ──
+    if (node.type === 'RELAY_SINGLE' || node.type === 'RELAY_2CH' || node.type === 'RELAY_4CH') {
+      const legacySingleRelayCoil = node.type === 'RELAY_SINGLE'
+        && wireTouchesPin(node.id, (pinId) => pinId === 'coil1' || pinId === 'coil2');
 
-      // Coil 1
-      const idCoil1 = `r_coil1_${node.id}`;
-      elements.push({
-        id: idCoil1,
-        type: 'RESISTOR',
-        nodeA: nodeFor(node.id, 'coil1'),
-        nodeB: nodeGnd,
-        value: 70,
-      });
-      elementToComponent.set(idCoil1, node.id);
+      if (legacySingleRelayCoil) {
+        const isActive = Boolean(props.isActive);
 
-      // Coil 2
-      const idCoil2 = `r_coil2_${node.id}`;
-      elements.push({
-        id: idCoil2,
-        type: 'RESISTOR',
-        nodeA: nodeFor(node.id, 'coil2'),
-        nodeB: nodeGnd,
-        value: 70,
-      });
-      elementToComponent.set(idCoil2, node.id);
-
-      // NO contacts
-      const idNO1 = `r_contact_no1_${node.id}`;
-      elements.push({
-        id: idNO1,
-        type: 'RESISTOR',
-        nodeA: nodeFor(node.id, 'com1'),
-        nodeB: nodeFor(node.id, 'no1'),
-        value: active1 ? 0.01 : 1e8,
-      });
-      elementToComponent.set(idNO1, node.id);
-
-      const idNO2 = `r_contact_no2_${node.id}`;
-      elements.push({
-        id: idNO2,
-        type: 'RESISTOR',
-        nodeA: nodeFor(node.id, 'com2'),
-        nodeB: nodeFor(node.id, 'no2'),
-        value: active2 ? 0.01 : 1e8,
-      });
-      elementToComponent.set(idNO2, node.id);
-      continue;
-    }
-
-    // ── 4-Channel Relay Module ──
-    if (node.type === 'RELAY_4CH') {
-      const nodeGnd = nodeFor(node.id, 'gnd');
-
-      // VCC power draw
-      const idVccDraw = `r_power_draw_${node.id}`;
-      elements.push({
-        id: idVccDraw,
-        type: 'RESISTOR',
-        nodeA: nodeFor(node.id, 'vcc'),
-        nodeB: nodeGnd,
-        value: 10000,
-      });
-      elementToComponent.set(idVccDraw, node.id);
-
-      for (let ch = 1; ch <= 4; ch++) {
-        const isActive = Boolean(props[`isSwitched_${ch}`]);
-
-        const idCoil = `r_coil${ch}_${node.id}`;
+        const coilId = `r_coil_${node.id}`;
         elements.push({
-          id: idCoil,
+          id: coilId,
           type: 'RESISTOR',
-          nodeA: nodeFor(node.id, `coil${ch}`),
-          nodeB: nodeGnd,
+          nodeA: nodeFor(node.id, 'coil1'),
+          nodeB: nodeFor(node.id, 'coil2'),
           value: 70,
         });
-        elementToComponent.set(idCoil, node.id);
+        elementToComponent.set(coilId, node.id);
 
-        const idContact = `r_contact_no${ch}_${node.id}`;
+        const noId = `r_contact_no_${node.id}`;
         elements.push({
-          id: idContact,
+          id: noId,
           type: 'RESISTOR',
-          nodeA: nodeFor(node.id, `com${ch}`),
-          nodeB: nodeFor(node.id, `no${ch}`),
-          value: isActive ? 0.01 : 1e8,
+          nodeA: nodeFor(node.id, 'com'),
+          nodeB: nodeFor(node.id, 'no'),
+          value: isActive ? 0.05 : 1e8,
         });
-        elementToComponent.set(idContact, node.id);
+        elementToComponent.set(noId, node.id);
+
+        const ncId = `r_contact_nc_${node.id}`;
+        elements.push({
+          id: ncId,
+          type: 'RESISTOR',
+          nodeA: nodeFor(node.id, 'com'),
+          nodeB: nodeFor(node.id, 'nc'),
+          value: isActive ? 1e8 : 0.05,
+        });
+        elementToComponent.set(ncId, node.id);
+        continue;
+      }
+
+      const channels = node.type === 'RELAY_SINGLE' ? 1 : node.type === 'RELAY_2CH' ? 2 : 4;
+      const nodeGnd = nodeFor(node.id, 'gnd');
+      const nodeVcc = nodeFor(node.id, 'vcc');
+      const activeLow = String(props.triggerType || 'Active Low').toLowerCase() !== 'active high';
+
+      const idleId = `r_relay_idle_${node.id}`;
+      elements.push({
+        id: idleId,
+        type: 'RESISTOR',
+        nodeA: nodeVcc,
+        nodeB: nodeGnd,
+        value: 10_000,
+      });
+      elementToComponent.set(idleId, node.id);
+
+      for (let ch = 1; ch <= channels; ch++) {
+        const inputId = channels === 1 ? 'in' : `in${ch}`;
+        const isActive = channels === 1
+          ? Boolean(props.isActive)
+          : Boolean(props[`isSwitched_${ch}`]);
+
+        const inputBiasId = `r_relay_input_${ch}_${node.id}`;
+        elements.push({
+          id: inputBiasId,
+          type: 'RESISTOR',
+          nodeA: nodeFor(node.id, inputId),
+          nodeB: activeLow ? nodeVcc : nodeGnd,
+          value: 100_000,
+        });
+        elementToComponent.set(inputBiasId, node.id);
+
+        const coilId = `r_relay_coil_${ch}_${node.id}`;
+        elements.push({
+          id: coilId,
+          type: 'RESISTOR',
+          nodeA: nodeVcc,
+          nodeB: nodeGnd,
+          value: isActive ? 70 : 1e8,
+        });
+        elementToComponent.set(coilId, node.id);
+
+        const suffix = channels === 1 ? '' : String(ch);
+        const noId = `r_contact_no${suffix}_${node.id}`;
+        elements.push({
+          id: noId,
+          type: 'RESISTOR',
+          nodeA: nodeFor(node.id, `com${suffix}`),
+          nodeB: nodeFor(node.id, `no${suffix}`),
+          value: isActive ? 0.05 : 1e8,
+        });
+        elementToComponent.set(noId, node.id);
+
+        const ncPinId = `nc${suffix}`;
+        if (node.pins?.some((pin) => pin.id === ncPinId)) {
+          const ncId = `r_contact_nc${suffix}_${node.id}`;
+          elements.push({
+            id: ncId,
+            type: 'RESISTOR',
+            nodeA: nodeFor(node.id, `com${suffix}`),
+            nodeB: nodeFor(node.id, ncPinId),
+            value: isActive ? 1e8 : 0.05,
+          });
+          elementToComponent.set(ncId, node.id);
+        }
       }
       continue;
     }
 
     // ── 7-Segment Display (segment diodes to com) ──
+    if (node.type === 'DISPLAY_LCD_I2C' || node.type === 'LCD_16X2' || node.type === 'DISPLAY_OLED' || node.type === 'OLED_DISPLAY') {
+      const vccPin = node.pins?.find((pin) => /^(vcc|vdd|5v|3v3)$/i.test(pin.id));
+      const gndPin = node.pins?.find((pin) => /^(gnd|vss)$/i.test(pin.id));
+      if (vccPin && gndPin) {
+        const vccNode = nodeFor(node.id, vccPin.id);
+        const gndNode = nodeFor(node.id, gndPin.id);
+        const isOled = node.type === 'DISPLAY_OLED' || node.type === 'OLED_DISPLAY';
+        const backlightOn = props.lcdBacklight !== false && String(props.backlight || 'On').toLowerCase() !== 'off';
+
+        const drawId = `r_display_power_${node.id}`;
+        elements.push({
+          id: drawId,
+          type: 'RESISTOR',
+          nodeA: vccNode,
+          nodeB: gndNode,
+          value: isOled ? 330 : backlightOn ? 250 : 1_000,
+        });
+        elementToComponent.set(drawId, node.id);
+
+        for (const busPin of ['sda', 'scl', 'rs', 'en', 'd4', 'd5', 'd6', 'd7']) {
+          if (!node.pins?.some((pin) => pin.id === busPin)) continue;
+          const busId = `r_display_bus_${busPin}_${node.id}`;
+          elements.push({
+            id: busId,
+            type: 'RESISTOR',
+            nodeA: nodeFor(node.id, busPin),
+            nodeB: vccNode,
+            value: 10_000,
+          });
+          elementToComponent.set(busId, node.id);
+        }
+      }
+      continue;
+    }
+
     if (node.type === 'DISPLAY_7SEG') {
       const segments = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'dp'];
       const comNode = nodeFor(node.id, 'com');
@@ -758,6 +902,7 @@ export function buildMNACircuit(
     // ── PIR Motion Sensor (Active Voltage Source on Motion) ──
     if (node.type === 'SENSOR_PIR' || node.type === 'PIR_SENSOR') {
       const nodeGnd = nodeFor(node.id, 'gnd');
+      const internalOutNode = nextExtraNode++;
 
       const idDraw = `r_power_draw_${node.id}`;
       elements.push({
@@ -774,17 +919,27 @@ export function buildMNACircuit(
       elements.push({
         id: idOut,
         type: 'VOLTAGE_SOURCE',
-        nodeA: nodeFor(node.id, 'out'),
+        nodeA: internalOutNode,
         nodeB: nodeGnd,
         value: hasMotion ? 5 : 0,
       });
       elementToComponent.set(idOut, node.id);
       vsCounter++;
+
+      const outResistanceId = `r_pir_out_${node.id}`;
+      elements.push({
+        id: outResistanceId,
+        type: 'RESISTOR',
+        nodeA: internalOutNode,
+        nodeB: nodeFor(node.id, 'out'),
+        value: props.powered ? 100 : 1e8,
+      });
+      elementToComponent.set(outResistanceId, node.id);
       continue;
     }
 
-    // ── Stepper Motor (Coil A & B internal windings) ──
-    if (node.type === 'MOTOR_STEPPER' || node.type === 'STEPPER_MOTOR') {
+    // ── Bare bipolar stepper motor ──
+    if (node.type === 'STEPPER_MOTOR') {
       const idCoilA = `r_coil_a_${node.id}`;
       elements.push({
         id: idCoilA,
@@ -807,7 +962,63 @@ export function buildMNACircuit(
       continue;
     }
 
+    // ── 28BYJ-48 stepper with ULN2003 driver ──
+    if (node.type === 'MOTOR_STEPPER') {
+      const nodeVcc = nodeFor(node.id, 'vcc');
+      const nodeGnd = nodeFor(node.id, 'gnd');
+      const activePhases = [1, 2, 3, 4].filter((ch) => Boolean(props[`phase${ch}Active`])).length;
+
+      const motorLoadId = `r_stepper_load_${node.id}`;
+      elements.push({
+        id: motorLoadId,
+        type: 'RESISTOR',
+        nodeA: nodeVcc,
+        nodeB: nodeGnd,
+        value: activePhases > 0 ? 50 / activePhases : 1e8,
+      });
+      elementToComponent.set(motorLoadId, node.id);
+
+      for (let ch = 1; ch <= 4; ch++) {
+        const inputId = `r_stepper_input_${ch}_${node.id}`;
+        elements.push({
+          id: inputId,
+          type: 'RESISTOR',
+          nodeA: nodeFor(node.id, `in${ch}`),
+          nodeB: nodeGnd,
+          value: 100_000,
+        });
+        elementToComponent.set(inputId, node.id);
+      }
+      continue;
+    }
+
     // ── Buzzer (modeled as ~42Ω resistor) ──
+    if (node.type === 'MOTOR_SERVO' || node.type === 'SERVO_MOTOR') {
+      const vccNode = nodeFor(node.id, 'vcc');
+      const gndNode = nodeFor(node.id, 'gnd');
+
+      const powerId = `r_servo_power_${node.id}`;
+      elements.push({
+        id: powerId,
+        type: 'RESISTOR',
+        nodeA: vccNode,
+        nodeB: gndNode,
+        value: 75,
+      });
+      elementToComponent.set(powerId, node.id);
+
+      const signalId = `r_servo_signal_${node.id}`;
+      elements.push({
+        id: signalId,
+        type: 'RESISTOR',
+        nodeA: nodeFor(node.id, 'signal'),
+        nodeB: gndNode,
+        value: 100_000,
+      });
+      elementToComponent.set(signalId, node.id);
+      continue;
+    }
+
     if (node.type === 'BUZZER') {
       const id = `bz_${node.id}`;
       elements.push({
@@ -934,67 +1145,89 @@ export function buildMNACircuit(
     // ── Voltage Regulator 7805 (simplified: ideal 5V source) ──
     if (node.type === 'VOLTAGE_REGULATOR_7805') {
       const id = `vreg_${node.id}`;
+      const outputVoltage = Number(props.outputVoltage) || 5;
       elements.push({
         id,
         type: 'VOLTAGE_SOURCE',
         nodeA: nodeFor(node.id, 'vout'),
         nodeB: nodeFor(node.id, 'gnd'),
-        value: Number(props.outputVoltage) || 5,
+        value: props.isRegulating ? outputVoltage : 0,
       });
       elementToComponent.set(id, node.id);
       vsCounter++;
+
+      const idleId = `r_vreg_idle_${node.id}`;
+      elements.push({
+        id: idleId,
+        type: 'RESISTOR',
+        nodeA: nodeFor(node.id, 'vin'),
+        nodeB: nodeFor(node.id, 'gnd'),
+        value: 50_000,
+      });
+      elementToComponent.set(idleId, node.id);
       continue;
     }
 
-    // ── NPN Transistor (simplified: base-emitter diode + current-controlled source) ──
+    // ── NPN transistor ──
     if (node.type === 'NPN_TRANSISTOR') {
-      const idBE = `q_be_${node.id}`;
+      const id = `q_${node.id}`;
       elements.push({
-        id: idBE,
-        type: 'DIODE',
-        nodeA: nodeFor(node.id, 'base'),
-        nodeB: nodeFor(node.id, 'emitter'),
-        value: 0,
-        saturationCurrent: 1e-12,
-        thermalVoltage: 0.02585,
-      });
-      elementToComponent.set(idBE, node.id);
-
-      const idCE = `q_ce_${node.id}`;
-      elements.push({
-        id: idCE,
-        type: 'RESISTOR',
+        id,
+        type: 'BJT',
         nodeA: nodeFor(node.id, 'collector'),
         nodeB: nodeFor(node.id, 'emitter'),
-        value: 100_000,
+        controlNode: nodeFor(node.id, 'base'),
+        value: 0,
+        gain: Number(props.gain) || 100,
+        maxCurrent: (Number(props.collectorCurrent) || 500) / 1000,
+        saturationCurrent: 1e-15,
+        thermalVoltage: 0.02585,
       });
-      elementToComponent.set(idCE, node.id);
+      elementToComponent.set(id, node.id);
+
+      const bcId = `q_bc_${node.id}`;
+      elements.push({
+        id: bcId,
+        type: 'DIODE',
+        nodeA: nodeFor(node.id, 'base'),
+        nodeB: nodeFor(node.id, 'collector'),
+        value: 0,
+        saturationCurrent: 1e-15,
+        thermalVoltage: 0.02585,
+      });
+      elementToComponent.set(bcId, node.id);
       continue;
     }
 
-    // ── PNP Transistor (mirror of NPN) ──
+    // ── PNP transistor ──
     if (node.type === 'PNP_TRANSISTOR') {
-      const idBE = `q_be_${node.id}`;
+      const id = `q_${node.id}`;
       elements.push({
-        id: idBE,
-        type: 'DIODE',
-        nodeA: nodeFor(node.id, 'emitter'),
-        nodeB: nodeFor(node.id, 'base'),
+        id,
+        type: 'BJT',
+        nodeA: nodeFor(node.id, 'collector'),
+        nodeB: nodeFor(node.id, 'emitter'),
+        controlNode: nodeFor(node.id, 'base'),
         value: 0,
-        saturationCurrent: 1e-12,
+        pnp: true,
+        gain: Number(props.gain) || 100,
+        maxCurrent: (Number(props.collectorCurrent) || 500) / 1000,
+        saturationCurrent: 1e-15,
         thermalVoltage: 0.02585,
       });
-      elementToComponent.set(idBE, node.id);
+      elementToComponent.set(id, node.id);
 
-      const idCE = `q_ce_${node.id}`;
+      const bcId = `q_bc_${node.id}`;
       elements.push({
-        id: idCE,
-        type: 'RESISTOR',
-        nodeA: nodeFor(node.id, 'emitter'),
-        nodeB: nodeFor(node.id, 'collector'),
-        value: 100_000,
+        id: bcId,
+        type: 'DIODE',
+        nodeA: nodeFor(node.id, 'collector'),
+        nodeB: nodeFor(node.id, 'base'),
+        value: 0,
+        saturationCurrent: 1e-15,
+        thermalVoltage: 0.02585,
       });
-      elementToComponent.set(idCE, node.id);
+      elementToComponent.set(bcId, node.id);
       continue;
     }
 

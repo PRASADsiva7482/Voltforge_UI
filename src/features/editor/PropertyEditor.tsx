@@ -137,22 +137,25 @@ const propertySchemas: Record<string, { label: string; key: string; type: 'numbe
   RELAY_SINGLE: [
     { label: 'Coil Voltage', key: 'coilVoltage', type: 'select', options: ['5V', '12V'] },
     { label: 'Max Load', key: 'maxLoad', type: 'select', options: ['5A', '10A'] },
+    { label: 'Trigger', key: 'triggerType', type: 'select', options: ['Active Low', 'Active High'] },
   ],
   RELAY_2CH: [
     { label: 'Coil Voltage', key: 'coilVoltage', type: 'select', options: ['5V', '12V'] },
     { label: 'Max Load', key: 'maxLoad', type: 'select', options: ['5A', '10A', '20A'] },
+    { label: 'Trigger', key: 'triggerType', type: 'select', options: ['Active Low', 'Active High'] },
   ],
   RELAY_4CH: [
     { label: 'Coil Voltage', key: 'coilVoltage', type: 'select', options: ['5V', '12V'] },
     { label: 'Max Load', key: 'maxLoad', type: 'select', options: ['5A', '10A', '20A'] },
+    { label: 'Trigger', key: 'triggerType', type: 'select', options: ['Active Low', 'Active High'] },
   ],
   SWITCH_SPST: [
     { label: 'Type', key: 'switchType', type: 'select', options: ['Toggle', 'Slide'] },
     { label: 'State', key: 'state', type: 'select', options: ['Open', 'Closed'] },
   ],
   MOTOR_STEPPER: [
-    { label: 'Steps/Rev', key: 'stepsPerRev', type: 'select', options: ['200 (1.8°)', '400 (0.9°)'] },
-    { label: 'Voltage', key: 'voltage', type: 'select', options: ['5V', '12V', '24V'] },
+    { label: 'Steps/Rev', key: 'stepsPerRev', type: 'select', options: ['2048 (half-step)', '4096 (geared)'] },
+    { label: 'Voltage', key: 'voltage', type: 'select', options: ['5V'] },
   ],
   MOTOR_SERVO: [
     { label: 'Angle', key: 'angle', type: 'number', unit: '°', min: 0, max: 180, step: 1 },
