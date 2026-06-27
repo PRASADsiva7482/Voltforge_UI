@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { X, ShieldAlert, CheckCircle, AlertTriangle, Info, Play, Loader2 } from 'lucide-react';
+import { ShieldAlert, CheckCircle, AlertTriangle, Info, Play, Loader2 } from 'lucide-react';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useProjectStore } from '../../store/projectStore';
 import { aiApi } from '../../api/services';
+import VfFloatingPanel from '../../components/ui/VfFloatingPanel';
+import VfCallout from '../../components/ui/VfCallout';
+import VfActionButton from '../../components/ui/VfActionButton';
 
 interface Props { isOpen: boolean; onClose: () => void; }
 
@@ -32,27 +34,27 @@ export default function AiValidatorPanel({ isOpen, onClose }: Props) {
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
-      className="absolute top-16 right-4 w-80 glass rounded-2xl overflow-hidden z-30 shadow-2xl border border-surface-200 flex flex-col max-h-[80vh] dark:border-white/10">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-surface-200/70 bg-surface-50/70 dark:border-white/5 dark:bg-surface-900/60">
-        <div className="flex items-center gap-2">
-          <ShieldAlert className="w-4 h-4 text-purple-500 dark:text-purple-400" />
-          <span className="text-xs font-bold text-surface-950 dark:text-white">AI Circuit Validator</span>
-        </div>
-        <button onClick={onClose} className="text-surface-500 hover:text-surface-950 dark:text-surface-400 dark:hover:text-white"><X className="w-4 h-4" /></button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4">
+    <VfFloatingPanel
+      isOpen={isOpen}
+      onClose={onClose}
+      title="AI Circuit Validator"
+      icon={<ShieldAlert className="w-4 h-4 text-purple-500 dark:text-purple-400" />}
+      width="w-80"
+    >
+      <div className="flex-1 p-1">
         {!validationResult && !isValidating && (
           <div className="text-center py-6">
             <ShieldAlert className="w-10 h-10 text-surface-400 mx-auto mb-3 dark:text-surface-600" />
             <p className="text-xs text-surface-600 mb-4 dark:text-surface-400">Validate your circuit wiring, power distribution, and component logic for potential safety or functional issues.</p>
-            <button onClick={handleValidate} className="btn-primary w-full text-xs py-2 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 shadow-[0_0_15px_rgba(147,51,234,0.3)]">
-              <Play className="w-3.5 h-3.5" /> Start Validation
-            </button>
+            <VfActionButton
+              onClick={handleValidate}
+              icon={<Play className="w-3.5 h-3.5" />}
+              variant="primary"
+              className="w-full"
+            >
+              Start Validation
+            </VfActionButton>
           </div>
         )}
 
@@ -65,15 +67,12 @@ export default function AiValidatorPanel({ isOpen, onClose }: Props) {
 
         {validationResult && !isValidating && (
           <div className="space-y-4">
-            <div className={`p-3 rounded-xl border flex items-start gap-3 ${validationResult.isValid ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
-              {validationResult.isValid ? <CheckCircle className="w-5 h-5 text-green-500 dark:text-green-400 shrink-0" /> : <AlertTriangle className="w-5 h-5 text-red-500 dark:text-red-400 shrink-0" />}
-              <div>
-                <h4 className={`text-sm font-bold mb-1 ${validationResult.isValid ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                  {validationResult.isValid ? 'Circuit looks safe!' : 'Circuit validation failed'}
-                </h4>
-                <p className="text-[10px] text-surface-700 leading-relaxed dark:text-surface-300">{validationResult.generalFeedback}</p>
-              </div>
-            </div>
+            <VfCallout
+              type={validationResult.isValid ? 'success' : 'error'}
+              title={validationResult.isValid ? 'Circuit looks safe!' : 'Circuit validation failed'}
+            >
+              {validationResult.generalFeedback}
+            </VfCallout>
 
             <div className="flex items-center justify-between p-3 bg-surface-50 rounded-xl border border-surface-200 dark:bg-surface-800 dark:border-white/5">
               <span className="text-[11px] font-medium text-surface-700 dark:text-surface-300">Safety Score</span>
@@ -103,12 +102,16 @@ export default function AiValidatorPanel({ isOpen, onClose }: Props) {
               </div>
             )}
 
-            <button onClick={handleValidate} className="w-full mt-4 bg-surface-100 hover:bg-surface-200 text-surface-950 text-[11px] font-medium py-2 rounded-lg border border-surface-200 transition-colors dark:bg-surface-800 dark:hover:bg-surface-700 dark:text-white dark:border-white/10">
+            <VfActionButton
+              onClick={handleValidate}
+              variant="secondary"
+              className="w-full mt-4"
+            >
               Re-Validate Circuit
-            </button>
+            </VfActionButton>
           </div>
         )}
       </div>
-    </motion.div>
+    </VfFloatingPanel>
   );
 }

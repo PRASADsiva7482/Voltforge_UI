@@ -1,7 +1,9 @@
 import { motion } from 'framer-motion';
-import { X, Download, ShoppingCart, Package } from 'lucide-react';
+import { Download, Package } from 'lucide-react';
 import { useCanvasStore } from '../../store/canvasStore';
 import type { CanvasNode } from '../../types';
+import VfFloatingPanel from '../../components/ui/VfFloatingPanel';
+import VfTable from '../../components/ui/VfTable';
 
 interface Props { isOpen: boolean; onClose: () => void; }
 
@@ -26,50 +28,59 @@ export default function BomPanel({ isOpen, onClose }: Props) {
     URL.revokeObjectURL(url);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
-      className="absolute top-16 right-4 w-72 glass rounded-2xl overflow-hidden z-30 shadow-2xl border border-surface-200 dark:border-white/10">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-surface-200/70 bg-surface-50/70 dark:border-white/5 dark:bg-surface-900/60">
-        <div className="flex items-center gap-2"><Package className="w-4 h-4 text-forge-500 dark:text-forge-400" /><span className="text-xs font-bold text-surface-950 dark:text-white">Bill of Materials</span></div>
-        <button onClick={onClose} className="text-surface-500 hover:text-surface-950 dark:text-surface-400 dark:hover:text-white"><X className="w-3.5 h-3.5" /></button>
-      </div>
-      <div className="p-3 max-h-80 overflow-y-auto">
+    <VfFloatingPanel
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Bill of Materials"
+      icon={<Package className="w-4 h-4 text-forge-500 dark:text-forge-400" />}
+      width="w-72"
+      footer={
+        bomItems.length > 0 ? (
+          <div className="flex items-center justify-between w-full">
+            <span className="text-[10px] text-surface-500 dark:text-surface-400">{bomItems.length} types · {bomItems.reduce((s, i) => s + i.quantity, 0)} total</span>
+            <button onClick={exportCsv} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-volt-500/10 text-volt-600 text-[10px] font-bold hover:bg-volt-500/20 transition-colors dark:text-volt-400 cursor-pointer">
+              <Download className="w-3 h-3" /> Export CSV
+            </button>
+          </div>
+        ) : undefined
+      }
+    >
+      <div className="p-1">
         {bomItems.length === 0 ? (
           <p className="text-xs text-surface-500 text-center py-6">Add components to canvas to generate BOM</p>
         ) : (
-          <table className="w-full text-[10px]">
-            <thead>
-              <tr className="text-surface-500 border-b border-surface-200 dark:text-surface-400 dark:border-white/5">
-                <th className="text-left py-1.5 font-medium">#</th>
-                <th className="text-left py-1.5 font-medium">Component</th>
-                <th className="text-center py-1.5 font-medium">Qty</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bomItems.map((item, i) => (
-                <tr key={item.type} className="border-b border-surface-200 hover:bg-surface-50 dark:border-white/5 dark:hover:bg-white/5">
-                  <td className="py-1.5 text-surface-500">{i + 1}</td>
-                  <td className="py-1.5">
-                    <div className="text-surface-950 font-medium dark:text-white">{item.name}</div>
-                    <div className="text-surface-500">{item.type.replace(/_/g, ' ')}</div>
-                  </td>
-                  <td className="py-1.5 text-center text-volt-400 font-bold">{item.quantity}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <VfTable
+            data={bomItems}
+            keyExtractor={(item) => item.type}
+            columns={[
+              {
+                key: 'index',
+                header: '#',
+                render: (_, index) => <span className="text-surface-500">{index + 1}</span>,
+                width: '30px'
+              },
+              {
+                key: 'component',
+                header: 'Component',
+                render: (item) => (
+                  <div>
+                    <div className="text-surface-950 font-medium dark:text-white text-[10px]">{item.name}</div>
+                    <div className="text-surface-500 text-[9px]">{item.type.replace(/_/g, ' ')}</div>
+                  </div>
+                )
+              },
+              {
+                key: 'quantity',
+                header: 'Qty',
+                align: 'center',
+                render: (item) => <span className="text-volt-500 dark:text-volt-400 font-bold">{item.quantity}</span>,
+                width: '40px'
+              }
+            ]}
+          />
         )}
       </div>
-      {bomItems.length > 0 && (
-        <div className="p-3 border-t border-surface-200/70 flex items-center justify-between dark:border-white/5">
-          <span className="text-[10px] text-surface-500 dark:text-surface-400">{bomItems.length} types · {bomItems.reduce((s, i) => s + i.quantity, 0)} total</span>
-          <button onClick={exportCsv} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-volt-500/10 text-volt-600 text-[10px] font-bold hover:bg-volt-500/20 transition-colors dark:text-volt-400">
-            <Download className="w-3 h-3" /> Export CSV
-          </button>
-        </div>
-      )}
-    </motion.div>
+    </VfFloatingPanel>
   );
 }

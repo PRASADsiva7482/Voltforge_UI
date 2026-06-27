@@ -1,5 +1,8 @@
 import { motion } from 'framer-motion';
 import { Plus, Search, Cpu, Eye, GitFork, Clock } from 'lucide-react';
+import VfButton from '../../components/ui/VfButton';
+import VfProjectGrid from '../../components/ui/VfProjectGrid';
+import VfEmptyState from '../../components/ui/VfEmptyState';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { projectApi } from '../../api/services';
@@ -50,17 +53,17 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto pt-16 pb-20">
+    <div className="p-8 max-w-7xl mx-auto pt-10 pb-24">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-12"
+        className="mb-14"
       >
         <h1 className="text-4xl font-bold text-surface-950 mb-3 dark:text-white">
           {t('Welcome back')}, <span className="bg-gradient-to-r from-volt-400 to-forge-400 bg-clip-text text-transparent">{user?.displayName || user?.username || keycloak.tokenParsed?.name || keycloak.tokenParsed?.preferred_username || user?.email}</span>
         </h1>
-        <p className="text-surface-600 text-lg dark:text-surface-400">{t('Build, simulate, and share your electronics projects')}</p>
+        <p className="text-surface-600 text-base dark:text-surface-400">{t('Build, simulate, and share your electronics projects')}</p>
       </motion.div>
 
       {/* Quick Actions */}
@@ -68,7 +71,7 @@ export default function DashboardPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16"
+        className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-14"
       >
         <button
           onClick={() => navigate('/projects/new')}
@@ -101,14 +104,14 @@ export default function DashboardPage() {
           transition={{ delay: 0.15 }}
           className="mb-16"
         >
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-10">
             <h2 className="text-2xl font-semibold text-surface-950 dark:text-white">{t('Starter Templates')}</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {templates.map((template: ProjectSummary) => (
-              <ProjectCard key={template.id} project={template} onClick={() => navigate(`/editor/${template.id}`)} />
-            ))}
-          </div>
+          <VfProjectGrid
+            projects={templates}
+            columns={4}
+            onProjectClick={(template) => navigate(`/editor/${template.id}`)}
+          />
         </motion.div>
       )}
 
@@ -118,102 +121,32 @@ export default function DashboardPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-10">
           <h2 className="text-2xl font-semibold text-surface-950 dark:text-white">{t('Recent Projects')}</h2>
-          <button
-            onClick={() => navigate('/projects')}
-            className="text-sm text-volt-400 hover:text-volt-300 transition-colors font-medium"
-          >
+          <VfButton variant="ghost" size="sm" onClick={() => navigate('/projects')}>
             {t('View all')} →
-          </button>
+          </VfButton>
         </div>
 
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="glass rounded-2xl p-6 animate-pulse">
-                <div className="h-40 bg-surface-200 rounded-xl mb-5 dark:bg-surface-800" />
-                <div className="h-5 bg-surface-200 rounded w-3/4 mb-3 dark:bg-surface-800" />
-                <div className="h-4 bg-surface-200 rounded w-1/2 dark:bg-surface-800" />
-              </div>
-            ))}
-          </div>
-        ) : projects.length === 0 ? (
-          <div className="glass rounded-2xl p-10 flex flex-col items-center justify-center border border-dashed border-surface-300/70 dark:border-white/10">
-            <Cpu className="w-12 h-12 text-surface-600 mb-4" />
-            <h3 className="text-lg font-medium text-surface-950 mb-2 dark:text-white">{t('No projects yet')}</h3>
-            <p className="text-surface-600 mb-6 text-center max-w-sm dark:text-surface-400">{t('Create your first circuit to get started and see it appear here.')}</p>
-            <button
-              onClick={() => navigate('/projects/new')}
-              className="vf-btn vf-btn-primary shadow-[0_0_18px_rgba(34,197,94,0.25)]"
-            >
-              {t('Create Project')}
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {projects.map((project: ProjectSummary) => (
-              <ProjectCard key={project.id} project={project} onClick={() => navigate(`/editor/${project.id}`)} />
-            ))}
-          </div>
-        )}
+        <VfProjectGrid
+          projects={projects}
+          isLoading={isLoading}
+          skeletonCount={3}
+          columns={3}
+          onProjectClick={(project) => navigate(`/editor/${project.id}`)}
+          emptyState={
+            <VfEmptyState
+              icon={<Cpu className="w-12 h-12" />}
+              title={t('No projects yet')}
+              description={t('Create your first circuit to get started and see it appear here.')}
+              actionText={t('Create Project')}
+              onActionClick={() => navigate('/projects/new')}
+              actionIcon={<Plus className="w-4 h-4" />}
+            />
+          }
+        />
       </motion.div>
     </div>
   );
 }
 
-function ProjectCard({ project, onClick }: { project: ProjectSummary; onClick: () => void }) {
-  const { t } = useTranslation();
-  const boardColors: Record<string, string> = {
-    ARDUINO_UNO: 'from-blue-500 to-cyan-500',
-    ARDUINO_MEGA: 'from-indigo-500 to-blue-500',
-    ARDUINO_NANO: 'from-sky-500 to-blue-400',
-    ESP32: 'from-emerald-500 to-green-500',
-    ESP32_S3: 'from-teal-500 to-emerald-500',
-    ESP8266: 'from-green-500 to-lime-500',
-  };
-
-  return (
-    <motion.div
-      whileHover={{ y: -4, scale: 1.01 }}
-      transition={{ duration: 0.2 }}
-      onClick={onClick}
-      className="glass glass-hover rounded-2xl p-5 cursor-pointer group transition-all duration-300"
-    >
-      {/* Thumbnail */}
-      <div className={`h-32 rounded-xl bg-gradient-to-br ${boardColors[project.boardType] || 'from-surface-700 to-surface-800'} mb-4 flex items-center justify-center opacity-60 group-hover:opacity-80 transition-opacity`}>
-        <Cpu className="w-12 h-12 text-white/50" />
-      </div>
-
-      {/* Info */}
-      <h3 className="text-base font-semibold text-surface-950 mb-1 truncate dark:text-white">{project.name}</h3>
-      <p className="text-xs text-surface-600 mb-3 line-clamp-2 min-h-[2.5rem] dark:text-surface-400">{project.description || t('No description')}</p>
-
-      {/* Meta */}
-      <div className="flex items-center gap-4 text-xs text-surface-500 dark:text-surface-500">
-        <span className="flex items-center gap-1">
-          <Eye className="w-3.5 h-3.5" /> {project.viewCount}
-        </span>
-        <span className="flex items-center gap-1">
-          <GitFork className="w-3.5 h-3.5" /> {project.forkCount}
-        </span>
-        <span className="flex items-center gap-1 ml-auto">
-          <Clock className="w-3.5 h-3.5" />
-          {new Date(project.updatedAt).toLocaleDateString()}
-        </span>
-      </div>
-
-      {/* Board Badge */}
-      <div className="mt-3">
-        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-surface-100 text-surface-700 border border-surface-200 dark:bg-surface-800 dark:text-surface-300 dark:border-surface-700">
-          {project.boardType.replace(/_/g, ' ')}
-        </span>
-        {project.isPublic && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-volt-500/10 text-volt-400 border border-volt-500/20 ml-1">
-            {t('Public')}
-          </span>
-        )}
-      </div>
-    </motion.div>
-  );
-}

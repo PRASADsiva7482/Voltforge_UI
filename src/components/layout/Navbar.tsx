@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Globe, Sun, Moon, Menu, Bell, User, X, LayoutDashboard, FolderOpen, Cpu, Settings, Shield, LogOut, BellOff } from 'lucide-react';
+import VfInput from '../ui/VfInput';
+import VfAvatar from '../ui/VfAvatar';
+import { useClickOutside } from '../../hooks/useClickOutside';
 import { useTranslation } from 'react-i18next';
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
@@ -36,15 +39,11 @@ export default function Navbar() {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   // ── Click-outside handler ──
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (langRef.current && !langRef.current.contains(e.target as Node)) setIsLangOpen(false);
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setIsProfileOpen(false);
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setIsNotifOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  useClickOutside([langRef, profileRef, notifRef], () => {
+    setIsLangOpen(false);
+    setIsProfileOpen(false);
+    setIsNotifOpen(false);
+  });
 
   // ── Close mobile menu on route change ──
   useEffect(() => {
@@ -119,7 +118,6 @@ export default function Navbar() {
   const iconButtonActive = 'bg-white border-volt-500/30 text-surface-950 dark:bg-surface-700 dark:border-surface-600 dark:text-white';
   const dropdownPanel = 'absolute right-0 mt-3 bg-white border border-surface-200 rounded-xl shadow-2xl overflow-hidden z-50 dark:bg-surface-900 dark:border-surface-700';
   const dropdownItem = 'text-surface-700 hover:bg-surface-100 hover:text-surface-950 border-l-2 border-transparent dark:text-surface-300 dark:hover:bg-surface-800 dark:hover:text-white';
-  const searchInputClass = 'w-full pl-10 pr-4 py-2 bg-white/80 border border-surface-200 rounded-xl text-sm text-surface-950 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-volt-500/50 focus:border-volt-500/40 transition-all dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-surface-400 dark:focus:border-volt-500/30';
 
   // ── Dropdown animation variants ──
   const dropdownVariants = {
@@ -139,17 +137,15 @@ export default function Navbar() {
       <nav className="glass sticky top-0 z-50 border-b border-surface-200/70 px-5 lg:px-8 py-3 flex items-center justify-between dark:border-white/5">
         {/* Left side: Search */}
         <div className="flex items-center flex-1">
-          <form onSubmit={handleSearch} className="hidden md:flex relative max-w-md w-full ml-4">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="w-4 h-4 text-surface-400" />
-            </div>
-            <input
+          <form onSubmit={handleSearch} className="hidden md:flex max-w-md w-full ml-4">
+            <VfInput
               id="global-search"
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('Search projects...')}
-              className={searchInputClass}
+              inputSize="md"
+              iconLeft={<Search className="w-4 h-4" />}
             />
           </form>
         </div>
@@ -278,9 +274,7 @@ export default function Navbar() {
               onClick={() => setIsProfileOpen(!isProfileOpen)}
               className={`flex items-center gap-2 p-1.5 pr-4 pl-1.5 rounded-xl border transition-all bloom-hover ${isProfileOpen ? 'bg-white border-volt-500/30 dark:bg-surface-700 dark:border-surface-600' : 'bg-white/70 border-surface-200 hover:bg-surface-100 hover:border-surface-300 dark:bg-surface-800/50 dark:border-surface-700/50 dark:hover:bg-surface-700 dark:hover:border-surface-600'}`}
             >
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-volt-500 to-forge-500 flex items-center justify-center text-xs font-bold text-white shadow-lg">
-                {displayName.charAt(0).toUpperCase()}
-              </div>
+              <VfAvatar name={displayName} size="sm" />
               <span className="text-sm font-medium text-surface-800 dark:text-surface-200">{displayName}</span>
             </button>
 
@@ -347,9 +341,7 @@ export default function Navbar() {
               {/* Mobile Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-surface-200/70 dark:border-white/5">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-volt-500 to-forge-500 flex items-center justify-center text-sm font-bold text-white shadow-lg">
-                    {displayName.charAt(0).toUpperCase()}
-                  </div>
+                  <VfAvatar name={displayName} size="md" className="!w-9 !h-9 shadow-lg" />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-surface-950 truncate dark:text-white">{displayName}</p>
                     <p className="text-[10px] text-surface-400 truncate">{user?.email || keycloak.tokenParsed?.email}</p>
@@ -366,18 +358,14 @@ export default function Navbar() {
               {/* Mobile Search */}
               <div className="px-5 py-4 border-b border-surface-200/70 dark:border-white/5">
                 <form onSubmit={(e) => { handleSearch(e); setIsMobileMenuOpen(false); }}>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Search className="w-4 h-4 text-surface-400" />
-                    </div>
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder={t('Search projects...')}
-                      className={`${searchInputClass} py-2.5`}
-                    />
-                  </div>
+                  <VfInput
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={t('Search projects...')}
+                    inputSize="lg"
+                    iconLeft={<Search className="w-4 h-4" />}
+                  />
                 </form>
               </div>
 

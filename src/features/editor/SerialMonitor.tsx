@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Send, Terminal, Trash2, X } from 'lucide-react';
 import { BAUD_RATES, useSimulationStore } from '../../store/simulationStore';
+import VfSelect from '../../components/ui/VfSelect';
+import VfInput from '../../components/ui/VfInput';
+import VfPanelHeader from '../../components/ui/VfPanelHeader';
+import VfTerminal from '../../components/ui/VfTerminal';
 
 export default function SerialMonitor() {
   const { serialLogs, serialPanelOpen, baudRate, debugSnapshot, clearSerial, setBaudRate, setSerialPanelOpen, sendSerialInput } = useSimulationStore();
@@ -15,61 +19,50 @@ export default function SerialMonitor() {
 
   return (
     <div className="border-t border-white/5 bg-[#080812] flex-shrink-0">
-      <div className="h-9 flex items-center justify-between px-3 bg-surface-900/80 border-b border-white/5">
-        <button
-          onClick={() => setSerialPanelOpen(!serialPanelOpen)}
-          className="flex items-center gap-2 text-surface-300 hover:text-white transition-colors"
-        >
-          <Terminal className="w-3.5 h-3.5 text-volt-400" />
-          <span className="text-[10px] font-semibold uppercase tracking-wider">Serial Monitor</span>
-          <ChevronDown className={`w-3 h-3 transition-transform ${serialPanelOpen ? '' : '-rotate-90'}`} />
-        </button>
-
-        <div className="flex items-center gap-2">
-          <select
-            value={baudRate}
-            onChange={(event) => setBaudRate(Number(event.target.value))}
-            className="h-6 px-2 rounded-md bg-white/5 border border-white/10 text-[10px] text-surface-300 focus:outline-none focus:ring-1 focus:ring-volt-500/50"
-            title="Baud rate"
-          >
-            {BAUD_RATES.map((rate) => (
-              <option key={rate} value={rate}>{rate} baud</option>
-            ))}
-          </select>
-          <button
-            onClick={clearSerial}
-            className="p-1 rounded-md text-surface-500 hover:text-white hover:bg-white/5"
-            title="Clear serial output"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => setSerialPanelOpen(false)}
-            className="p-1 rounded-md text-surface-500 hover:text-white hover:bg-white/5"
-            title="Close serial monitor"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
+      <VfPanelHeader
+        title="Serial Monitor"
+        icon={<Terminal className="w-3.5 h-3.5 text-volt-400" />}
+        isOpen={serialPanelOpen}
+        onToggleCollapse={() => setSerialPanelOpen(!serialPanelOpen)}
+        onClose={() => setSerialPanelOpen(false)}
+        actions={
+          <>
+            <div className="w-[85px]">
+              <VfSelect
+                value={baudRate}
+                onChange={(event) => setBaudRate(Number(event.target.value))}
+                options={BAUD_RATES.map((rate) => ({ value: rate, label: `${rate} baud` }))}
+                className="h-6 py-0 pl-2 pr-6 rounded-md bg-white/5 border border-white/10 text-[10px] text-surface-300"
+                title="Baud rate"
+              />
+            </div>
+            <button
+              onClick={clearSerial}
+              className="p-1 rounded text-surface-500 hover:text-white hover:bg-white/5"
+              title="Clear serial output"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </>
+        }
+      />
 
       {serialPanelOpen && (
         <div className="h-56 grid grid-cols-[1fr_220px]">
           <div className="flex min-w-0 flex-col">
-            <div
-              ref={scrollRef}
-              className="flex-1 overflow-y-auto px-3 py-2 font-mono text-[11px] leading-relaxed text-green-400"
-            >
-              {serialLogs.length === 0 ? (
-                <div className="text-surface-500 italic">No serial output yet...</div>
-              ) : (
-                serialLogs.map((line, index) => (
-                  <div key={`${index}-${line}`} className="whitespace-pre-wrap break-words">
-                    {line}
-                  </div>
-                ))
-              )}
-            </div>
+            <VfTerminal
+              lines={serialLogs.map(text => {
+                const lower = text.toLowerCase();
+                let type: 'info' | 'error' | 'warning' | 'success' = 'info';
+                if (lower.includes('error') || lower.includes('fail')) type = 'error';
+                else if (lower.includes('warn')) type = 'warning';
+                else if (lower.includes('success') || lower.includes('ok')) type = 'success';
+                return { text, type };
+              })}
+              emptyMessage="No serial output yet..."
+              height="h-auto flex-1 bg-transparent border-none rounded-none"
+              showLineNumbers={true}
+            />
             <form
               className="flex items-center gap-2 border-t border-white/5 px-2 py-1.5"
               onSubmit={(event) => {
@@ -79,10 +72,11 @@ export default function SerialMonitor() {
                 setInput('');
               }}
             >
-              <input
+              <VfInput
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
-                className="h-7 flex-1 rounded-md border border-white/10 bg-white/5 px-2 text-[11px] text-white outline-none focus:ring-1 focus:ring-volt-500/50"
+                inputSize="sm"
+                className="h-7 bg-white/5 border border-white/10 text-[11px] text-white focus:ring-1 focus:ring-volt-500/50"
                 placeholder="Send to UART..."
               />
               <button className="h-7 w-7 rounded-md bg-volt-500/15 text-volt-300 hover:bg-volt-500/25" title="Send serial input">

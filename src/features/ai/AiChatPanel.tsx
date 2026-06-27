@@ -4,6 +4,7 @@ import { X, Send, Bot, User, Sparkles, Copy, Check, Code2 } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { aiApi } from '../../api/services';
 import type { AiChatMessage } from '../../types';
+import VfTextarea from '../../components/ui/VfTextarea';
 
 interface Props {
   isOpen: boolean;
@@ -190,7 +191,7 @@ export default function AiChatPanel({ isOpen, onClose, onApplyCode, projectConte
           {/* Input */}
           <div className="p-3 border-t border-surface-200/70 bg-surface-50/70 dark:border-white/5 dark:bg-surface-900/50">
             <div className="flex items-end gap-2">
-              <textarea
+              <VfTextarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}

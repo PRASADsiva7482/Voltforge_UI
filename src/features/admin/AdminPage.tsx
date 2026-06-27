@@ -5,6 +5,8 @@ import { adminApi } from '../../api/services';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
 import { useNavigate } from 'react-router-dom';
+import VfPageHeader from '../../components/ui/VfPageHeader';
+import VfCardSkeleton from '../../components/ui/VfCardSkeleton';
 import { useEffect } from 'react';
 
 export default function AdminPage() {
@@ -35,27 +37,18 @@ export default function AdminPage() {
   ];
 
   return (
-    <div className="p-8 max-w-7xl mx-auto pt-8 pb-20">
+    <div className="p-8 max-w-7xl mx-auto pt-10 pb-24">
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-10">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center">
-            <Shield className="w-5 h-5 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-surface-950 dark:text-white">{t('Admin Dashboard')}</h1>
-        </div>
-        <p className="text-surface-600 text-lg ml-13 dark:text-surface-400">Platform overview and management</p>
-      </motion.div>
+      <VfPageHeader
+        title={t('Admin Dashboard')}
+        description={t('Platform overview and management')}
+        icon={<Shield className="w-5 h-5 text-white" />}
+        iconGradient="from-red-500 to-pink-500"
+      />
 
       {/* Stats Grid */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="glass rounded-2xl p-6 animate-pulse">
-              <div className="h-20 bg-surface-200 rounded-xl dark:bg-surface-800" />
-            </div>
-          ))}
-        </div>
+        <VfCardSkeleton count={6} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
           {statCards.map((stat, index) => {

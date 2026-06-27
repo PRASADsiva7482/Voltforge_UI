@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react';
 
 import { X, Sliders, Trash2, RotateCw, FlipHorizontal, FlipVertical, Lock, Unlock, Palette } from 'lucide-react';
+import VfSegmentedControl from '../../components/ui/VfSegmentedControl';
+import VfConfirmDialog from '../../components/ui/VfConfirmDialog';
+import VfBadge from '../../components/ui/VfBadge';
+import VfFormField from '../../components/ui/VfFormField';
+import VfSelect from '../../components/ui/VfSelect';
+import VfTextarea from '../../components/ui/VfTextarea';
+import VfInput from '../../components/ui/VfInput';
+import VfColorSelector from '../../components/ui/VfColorSelector';
+import VfPropertyGrid from '../../components/ui/VfPropertyGrid';
 import { useCanvasStore, WIRE_COLORS } from '../../store/canvasStore';
 import type { Wire } from '../../types';
 
@@ -262,14 +271,11 @@ function WirePropertiesPanel() {
           {/* Color picker */}
           <div>
             <h4 className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-2 dark:text-surface-400">Color</h4>
-            <div className="flex flex-wrap gap-2">
-              {WIRE_COLORS.map(c => (
-                <button key={c} onClick={() => updateWire(selectedWire.id, { color: c })}
-                  className={`w-7 h-7 rounded-lg border-2 transition-all ${selectedWire.color === c ? 'border-surface-950 scale-110 dark:border-white' : 'border-transparent hover:scale-105'}`}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
-            </div>
+            <VfColorSelector
+              value={selectedWire.color || ''}
+              onChange={(val) => updateWire(selectedWire.id, { color: val })}
+              options={WIRE_COLORS.map(c => ({ value: c, label: c }))}
+            />
           </div>
 
           {/* Routing mode */}
@@ -305,11 +311,12 @@ function WirePropertiesPanel() {
 
           {/* Label */}
           <div>
-            <label className="text-[10px] text-surface-500 mb-1 block">Label</label>
-            <input type="text" value={selectedWire.label || ''}
+            <VfInput
+              type="text"
+              value={selectedWire.label || ''}
               onChange={(e) => updateWire(selectedWire.id, { label: e.target.value })}
               placeholder="e.g. SCL, SDA, VCC..."
-              className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
+              inputSize="sm"
             />
           </div>
 
@@ -364,7 +371,7 @@ function PropertyInput({
   };
 
   return (
-    <input
+    <VfInput
       type={type}
       value={localVal ?? ''}
       min={min}
@@ -375,7 +382,7 @@ function PropertyInput({
       onKeyDown={(e) => {
         if (e.key === 'Enter') handleCommit();
       }}
-      className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
+      inputSize="sm"
     />
   );
 }
@@ -383,6 +390,7 @@ function PropertyInput({
 // ── Component Properties Panel ──
 export default function PropertyEditor() {
   const { selectedNodeId, selectedWireId, nodes, updateNode, removeNode } = useCanvasStore();
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   // If wire is selected, show wire panel
   if (selectedWireId) return <WirePropertiesPanel />;
@@ -432,51 +440,48 @@ export default function PropertyEditor() {
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Type Badge */}
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-medium bg-surface-100 text-surface-700 border border-surface-200 dark:bg-surface-800 dark:text-surface-300 dark:border-surface-700">
+            <VfBadge variant="secondary">
               {selectedNode.type.replace(/_/g, ' ')}
-            </span>
+            </VfBadge>
           </div>
 
           {/* Position */}
-          <div>
-            <h4 className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-2 dark:text-surface-400">Position</h4>
+          <VfFormField label="Position">
             <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] text-surface-500 mb-1 block">X</label>
-                <input type="number" value={Math.round(selectedNode.x)}
-                  onChange={(e) => updateNode(selectedNode.id, { x: Number(e.target.value) })}
-                  className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-surface-500 mb-1 block">Y</label>
-                <input type="number" value={Math.round(selectedNode.y)}
-                  onChange={(e) => updateNode(selectedNode.id, { y: Number(e.target.value) })}
-                  className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
-                />
-              </div>
+              <VfInput
+                type="number"
+                value={Math.round(selectedNode.x)}
+                onChange={(e) => updateNode(selectedNode.id, { x: Number(e.target.value) })}
+                inputSize="sm"
+                iconLeft={<span className="text-[10px] text-slate-500 font-bold">X</span>}
+              />
+              <VfInput
+                type="number"
+                value={Math.round(selectedNode.y)}
+                onChange={(e) => updateNode(selectedNode.id, { y: Number(e.target.value) })}
+                inputSize="sm"
+                iconLeft={<span className="text-[10px] text-slate-500 font-bold">Y</span>}
+              />
             </div>
-          </div>
+          </VfFormField>
 
           {/* Rotation with quick buttons */}
           <div>
             <h4 className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-2 dark:text-surface-400">Transform</h4>
-            <div className="flex items-center gap-1 mb-2">
-              {[0, 90, 180, 270].map(a => (
-                <button key={a} onClick={() => updateNode(selectedNode.id, { rotation: a })}
-                  className={`flex-1 px-2 py-1.5 rounded-lg text-[10px] font-medium border transition-colors ${
-                    (selectedNode.rotation || 0) === a
-                      ? 'bg-volt-500/20 text-volt-400 border-volt-500/30'
-                      : 'bg-surface-100 text-surface-600 border-surface-200 hover:text-surface-950 dark:bg-white/5 dark:text-surface-400 dark:border-white/10 dark:hover:text-white'
-                  }`}
-                >
-                  {a}°
-                </button>
-              ))}
-            </div>
+            <VfSegmentedControl
+              options={[
+                { value: 0, label: '0°' },
+                { value: 90, label: '90°' },
+                { value: 180, label: '180°' },
+                { value: 270, label: '270°' }
+              ]}
+              selected={selectedNode.rotation || 0}
+              onChange={(val) => updateNode(selectedNode.id, { rotation: val })}
+              className="mb-2"
+            />
             <input type="range" min="0" max="359" step="1" value={selectedNode.rotation || 0}
               onChange={(e) => updateNode(selectedNode.id, { rotation: Number(e.target.value) })}
-              className="w-full accent-volt-500"
+              className="w-full accent-volt-500 cursor-pointer"
             />
             <div className="flex justify-between text-[9px] text-surface-500 mt-1">
               <span>0°</span>
@@ -486,36 +491,34 @@ export default function PropertyEditor() {
           </div>
 
           {/* Size */}
-          <div>
-            <h4 className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-2 dark:text-surface-400">Size</h4>
+          <VfFormField label="Size">
             <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] text-surface-500 mb-1 block">Width</label>
-                <input type="number" value={Math.round(selectedNode.width)} min={20}
-                  onChange={(e) => updateNode(selectedNode.id, { width: Math.max(20, Number(e.target.value)) })}
-                  className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-surface-500 mb-1 block">Height</label>
-                <input type="number" value={Math.round(selectedNode.height)} min={20}
-                  onChange={(e) => updateNode(selectedNode.id, { height: Math.max(20, Number(e.target.value)) })}
-                  className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
-                />
-              </div>
+              <VfInput
+                type="number"
+                value={Math.round(selectedNode.width)}
+                min={20}
+                onChange={(e) => updateNode(selectedNode.id, { width: Math.max(20, Number(e.target.value)) })}
+                inputSize="sm"
+                iconLeft={<span className="text-[10px] text-slate-500 font-bold">W</span>}
+              />
+              <VfInput
+                type="number"
+                value={Math.round(selectedNode.height)}
+                min={20}
+                onChange={(e) => updateNode(selectedNode.id, { height: Math.max(20, Number(e.target.value)) })}
+                inputSize="sm"
+                iconLeft={<span className="text-[10px] text-slate-500 font-bold">H</span>}
+              />
             </div>
-          </div>
+          </VfFormField>
 
           {/* Component Properties */}
           {schema.length > 0 && (
-            <div>
-              <h4 className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-3 dark:text-surface-400">Properties</h4>
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 dark:text-slate-400">Properties</h4>
               <div className="space-y-3">
                 {schema.map((prop) => (
-                  <div key={prop.key}>
-                    <label className="text-[10px] text-surface-500 mb-1 block">
-                      {prop.label} {prop.unit && <span className="text-surface-600">({prop.unit})</span>}
-                    </label>
+                  <VfFormField key={prop.key} label={`${prop.label} ${prop.unit ? `(${prop.unit})` : ''}`}>
                     {(prop.type === 'number' || prop.type === 'text') && (
                       <PropertyInput
                         propKey={prop.key}
@@ -528,54 +531,48 @@ export default function PropertyEditor() {
                       />
                     )}
                     {prop.type === 'select' && (
-                      <select
+                      <VfSelect
                         value={(properties[prop.key] as string) || prop.options?.[0] || ''}
                         onChange={(e) => handlePropertyChange(prop.key, e.target.value)}
-                        className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
-                      >
-                        {prop.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                      </select>
+                        options={prop.options?.map(opt => ({ value: opt, label: opt })) || []}
+                      />
                     )}
                     {prop.type === 'color' && (
-                      <div className="flex items-center gap-2">
-                        <input type="color"
-                          value={(properties[prop.key] as string) || '#ff0000'}
-                          onChange={(e) => handlePropertyChange(prop.key, e.target.value)}
-                          className="w-8 h-8 rounded-lg border border-surface-200 cursor-pointer dark:border-white/10"
-                        />
-                        <span className="text-xs text-surface-500 dark:text-surface-400">{(properties[prop.key] as string) || '#ff0000'}</span>
-                      </div>
+                      <VfColorSelector
+                        value={(properties[prop.key] as string) || '#ff0000'}
+                        onChange={(val) => handlePropertyChange(prop.key, val)}
+                        options={WIRE_COLORS.map(color => ({ value: color, label: color }))}
+                      />
                     )}
-                  </div>
+                  </VfFormField>
                 ))}
               </div>
             </div>
           )}
 
           {/* Label */}
-          <div>
-            <label className="text-[10px] text-surface-500 mb-1 block">Display Name</label>
-            <input type="text" value={selectedNode.name}
+          <VfFormField label="Display Name">
+            <VfInput
+              type="text"
+              value={selectedNode.name}
               onChange={(e) => updateNode(selectedNode.id, { name: e.target.value })}
-              className="w-full px-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-xs text-surface-950 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
+              inputSize="sm"
             />
-          </div>
+          </VfFormField>
 
           {/* Pins */}
           {selectedNode.pins && selectedNode.pins.length > 0 && (
             <div>
               <h4 className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-2 dark:text-surface-400">Pins ({selectedNode.pins.length})</h4>
-              <div className="space-y-0.5 max-h-40 overflow-y-auto">
-                {selectedNode.pins.map((pin) => {
-                  const typeColor = pin.type === 'power' ? 'text-red-500 dark:text-red-400' : pin.type === 'ground' ? 'text-surface-500' : pin.type === 'output' ? 'text-blue-500 dark:text-blue-400' : pin.type === 'input' ? 'text-amber-500 dark:text-amber-400' : 'text-surface-600 dark:text-surface-300';
-                  return (
-                    <div key={pin.id} className="flex items-center justify-between px-2 py-1 rounded bg-white/[0.02] text-[10px]">
-                      <span className="text-surface-800 font-mono dark:text-surface-200">{pin.name}</span>
-                      <span className={typeColor}>{pin.type}</span>
-                    </div>
-                  );
-                })}
-              </div>
+              <VfPropertyGrid
+                items={selectedNode.pins.map(pin => ({
+                  key: pin.id,
+                  label: pin.name,
+                  value: pin.type,
+                  mono: true,
+                  copyable: true
+                }))}
+              />
             </div>
           )}
         </div>
@@ -595,12 +592,20 @@ export default function PropertyEditor() {
             <RotateCw className="w-3 h-3 -scale-x-100" /> −90°
           </button>
           <button
-            onClick={() => { if (confirm('Delete this component?')) removeNode(selectedNode.id); }}
+            onClick={() => setConfirmOpen(true)}
             className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs text-red-400 bg-red-500/5 hover:bg-red-500/10 transition-colors"
           >
             <Trash2 className="w-3 h-3" />
           </button>
         </div>
+        <VfConfirmDialog
+          isOpen={confirmOpen}
+          onClose={() => setConfirmOpen(false)}
+          onConfirm={() => removeNode(selectedNode.id)}
+          title="Delete Component"
+          message={`Are you sure you want to delete this ${selectedNode.name || 'component'}?`}
+          isDestructive={true}
+        />
       </div>
   );
 }

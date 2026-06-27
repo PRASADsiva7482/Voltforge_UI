@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Save, ArrowLeft, Play, Square, Settings, Layout, Terminal, Undo, Redo, Gauge, Activity, Package, Download, Share2, Layers, GitFork, Zap } from 'lucide-react';
+import { Save, ArrowLeft, Play, Square, Settings, Layout, Terminal, Undo, Redo, Gauge, Activity, Package, Download, Share2, Layers, GitFork, Zap, Trash2 } from 'lucide-react';
 import CircuitCanvas from '../canvas/CircuitCanvas';
 import ComponentPanel from '../components/ComponentPanel';
 const CodeEditor = lazy(() => import('../editor/CodeEditor'));
@@ -10,6 +10,10 @@ import ProjectSettingsModal from './ProjectSettingsModal';
 import MultimeterPanel from './MultimeterPanel';
 import OscilloscopePanel from './OscilloscopePanel';
 import BomPanel from './BomPanel';
+import VfSplitPane from '../../components/ui/VfSplitPane';
+import VfStatusIndicator from '../../components/ui/VfStatusIndicator';
+import VfActionButton from '../../components/ui/VfActionButton';
+import VfContextMenu from '../../components/ui/VfContextMenu';
 import { projectApi, projectExportApi, simulationApi } from '../../api/services';
 import { useProjectStore, SMART_DEVICE_PRESET } from '../../store/projectStore';
 import { useCanvasStore } from '../../store/canvasStore';
@@ -82,43 +86,18 @@ export default function EditorPage() {
   const [showOscilloscope, setShowOscilloscope] = useState(false);
   const [showBom, setShowBom] = useState(false);
   const [isProbeMode, setIsProbeMode] = useState(false);
-  const [splitRatio, setSplitRatio] = useState(50); // percentage for canvas width
   const [canvasViewMode, setCanvasViewMode] = useState<CanvasViewMode>('breadboard');
-  const isDraggingSplit = useRef(false);
-
   const engineRef = useRef<SimulationEngine | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
-  // Split resize handlers
-  const handleSplitDragStart = (e: React.MouseEvent) => {
-    isDraggingSplit.current = true;
+  const handleContextMenu = (e: React.MouseEvent) => {
+    // Check if right-clicking on canvas or workspace
     e.preventDefault();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY
+    });
   };
-
-  useEffect(() => {
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      if (!isDraggingSplit.current) return;
-      const windowWidth = window.innerWidth;
-      const componentPanelWidth = (activePanel === 'canvas' || activePanel === 'split') ? 224 : 0; // w-56 is 224px
-      const availableWidth = windowWidth - componentPanelWidth;
-      const mouseX = e.clientX - componentPanelWidth;
-
-      let newRatio = (mouseX / availableWidth) * 100;
-      // Constraint to reasonable bounds (e.g., 20% to 80%)
-      newRatio = Math.max(20, Math.min(80, newRatio));
-      setSplitRatio(newRatio);
-    };
-
-    const handleGlobalMouseUp = () => {
-      isDraggingSplit.current = false;
-    };
-
-    window.addEventListener('mousemove', handleGlobalMouseMove);
-    window.addEventListener('mouseup', handleGlobalMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleGlobalMouseMove);
-      window.removeEventListener('mouseup', handleGlobalMouseUp);
-    };
-  }, [activePanel]);
 
   const { setCurrentProject, currentProject, isDirty, isSaving, setSaving, activeCodeFile, updateCodeFileContent } = useProjectStore();
   const { nodes, wires, addWire, updateNode, selectedNodeId, undo, redo, historyIndex, history } = useCanvasStore();
@@ -527,7 +506,7 @@ export default function EditorPage() {
           <h2 className="text-xs font-semibold text-surface-950 truncate dark:text-white">{currentProject?.name || 'Untitled'}</h2>
           <p className="text-[9px] text-surface-500">{currentProject?.boardType?.replace(/_/g, ' ')}</p>
         </div>
-        {isConnected && <span className="w-2 h-2 rounded-full bg-volt-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />}
+        {isConnected && <VfStatusIndicator status="running" label="Live Sync" />}
 
         {/* ── View Mode Switcher ── */}
         <div className="flex items-center gap-0.5 bg-surface-100 rounded-lg p-0.5 dark:bg-surface-900/80">
@@ -565,9 +544,23 @@ export default function EditorPage() {
         {/* ── Project Actions (Run / Export / Save) ── */}
         <div className="flex items-center gap-1.5 pl-1">
           {isSimulating ? (
-            <button onClick={toggleSimulation} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-all"><Square className="w-3 h-3 fill-current" /> Stop</button>
+            <VfActionButton
+              onClick={toggleSimulation}
+              icon={<Square className="w-3 h-3 fill-current" />}
+              variant="danger"
+              className="py-1 px-2.5 h-[26px]"
+            >
+              Stop
+            </VfActionButton>
           ) : (
-            <button onClick={toggleSimulation} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-volt-500/10 text-volt-400 hover:bg-volt-500/20 border border-volt-500/20 transition-all"><Play className="w-3 h-3 fill-current" /> Run</button>
+            <VfActionButton
+              onClick={toggleSimulation}
+              icon={<Play className="w-3 h-3 fill-current" />}
+              variant="primary"
+              className="py-1 px-2.5 h-[26px]"
+            >
+              Run
+            </VfActionButton>
           )}
           <button onClick={handleExportZip} disabled={!currentProject} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-white text-surface-600 hover:text-surface-950 hover:bg-surface-100 transition-all border border-surface-200 dark:bg-surface-800 dark:text-surface-400 dark:hover:text-white dark:hover:bg-surface-700 dark:border-white/5"><Download className="w-3 h-3" /> Export</button>
           <button onClick={handleExportGerber} disabled={!currentProject} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-white text-surface-600 hover:text-surface-950 hover:bg-surface-100 transition-all border border-surface-200 dark:bg-surface-800 dark:text-surface-400 dark:hover:text-white dark:hover:bg-surface-700 dark:border-white/5"><Layout className="w-3 h-3" /> Gerber</button>
@@ -583,14 +576,18 @@ export default function EditorPage() {
       <div className="flex flex-1 overflow-hidden relative">
         {isOwner && (activePanel === 'canvas' || activePanel === 'split') && <ComponentPanel />}
         <div className="flex flex-1">
-          {(activePanel === 'canvas' || activePanel === 'split') && (
-            <div
-              className="bg-surface-100 relative flex flex-col dark:bg-[#0a0a14]"
-              style={{ width: activePanel === 'split' ? `${splitRatio}%` : '100%' }}
-            >
-              {isSimulating && <div className="absolute top-3 right-3 z-10 glass px-2.5 py-1 rounded-full flex items-center gap-1.5 border border-volt-500/30"><span className="w-1.5 h-1.5 rounded-full bg-volt-500 animate-pulse" /><span className="text-[10px] font-medium text-volt-400">Simulating</span></div>}
-
-              <div ref={canvasContainerCallbackRef} className="flex-1 relative min-h-0 min-w-0 p-0 m-0 border-0">
+          {activePanel === 'canvas' ? (
+            <div className="bg-surface-100 relative flex flex-col dark:bg-[#0a0a14] w-full">
+              {isSimulating && (
+                <div className="absolute top-3 right-3 z-10 glass px-3 py-1.5 rounded-full border border-volt-500/30">
+                  <VfStatusIndicator status="running" label="Simulating" />
+                </div>
+              )}
+              <div 
+                ref={canvasContainerCallbackRef} 
+                className="flex-1 relative min-h-0 min-w-0 p-0 m-0 border-0"
+                onContextMenu={handleContextMenu}
+              >
                 <CircuitCanvas
                   width={canvasSize.width}
                   height={canvasSize.height}
@@ -604,24 +601,49 @@ export default function EditorPage() {
                 />
               </div>
             </div>
-          )}
-
-          {activePanel === 'split' && (
-            <div
-              className="w-1.5 bg-surface-200 border-x border-surface-300/60 cursor-col-resize hover:bg-volt-500/50 active:bg-volt-500 flex-shrink-0 z-10 transition-colors dark:bg-surface-900 dark:border-white/5"
-              onMouseDown={handleSplitDragStart}
-            />
-          )}
-
-          {(activePanel === 'code' || activePanel === 'split') && (
-            <div
-              className="relative min-w-0"
-              style={{ width: activePanel === 'split' ? `${100 - splitRatio}%` : '100%' }}
-            >
+          ) : activePanel === 'code' ? (
+            <div className="relative min-w-0 w-full">
               <Suspense fallback={<div className="p-4 text-xs text-surface-400 font-mono">Loading Code Editor...</div>}>
                 <CodeEditor readOnly={!isOwner} />
               </Suspense>
             </div>
+          ) : (
+            <VfSplitPane
+              initialRatio={50}
+              left={
+                <div className="bg-surface-100 relative flex flex-col dark:bg-[#0a0a14] h-full w-full">
+                  {isSimulating && (
+                    <div className="absolute top-3 right-3 z-10 glass px-3 py-1.5 rounded-full border border-volt-500/30">
+                      <VfStatusIndicator status="running" label="Simulating" />
+                    </div>
+                  )}
+                  <div 
+                    ref={canvasContainerCallbackRef} 
+                    className="flex-1 relative min-h-0 min-w-0 p-0 m-0 border-0"
+                    onContextMenu={handleContextMenu}
+                  >
+                    <CircuitCanvas
+                      width={canvasSize.width}
+                      height={canvasSize.height}
+                      viewMode={canvasViewMode}
+                      collaborators={activeUsers}
+                      onCursorMove={broadcastCursorMove}
+                      onComponentInteraction={handleComponentInteraction}
+                      readOnly={!isOwner}
+                      isProbeMode={isProbeMode}
+                      isSimulating={isSimulating}
+                    />
+                  </div>
+                </div>
+              }
+              right={
+                <div className="relative min-w-0 h-full w-full">
+                  <Suspense fallback={<div className="p-4 text-xs text-surface-400 font-mono">Loading Code Editor...</div>}>
+                    <CodeEditor readOnly={!isOwner} />
+                  </Suspense>
+                </div>
+              }
+            />
           )}
         </div>
 
@@ -637,6 +659,35 @@ export default function EditorPage() {
         <MultimeterPanel isOpen={showMultimeter} onClose={() => setShowMultimeter(false)} voltage={isSimulating ? 5 : 0} current={isSimulating ? 20 : 0} />
         <OscilloscopePanel isOpen={showOscilloscope} onClose={() => setShowOscilloscope(false)} />
         <BomPanel isOpen={showBom} onClose={() => setShowBom(false)} />
+
+        <VfContextMenu
+          isOpen={!!contextMenu}
+          onClose={() => setContextMenu(null)}
+          x={contextMenu?.x || 0}
+          y={contextMenu?.y || 0}
+          items={[
+            {
+              label: 'Undo Action',
+              icon: <Undo className="w-3.5 h-3.5" />,
+              onClick: undo
+            },
+            {
+              label: 'Redo Action',
+              icon: <Redo className="w-3.5 h-3.5" />,
+              onClick: redo
+            },
+            {
+              label: 'Reset Workspace',
+              icon: <Trash2 className="w-3.5 h-3.5 text-red-500" />,
+              destructive: true,
+              onClick: () => {
+                if (confirm('Are you sure you want to clear the entire canvas? This action cannot be undone.')) {
+                  useCanvasStore.getState().clearCanvas();
+                }
+              }
+            }
+          ]}
+        />
       </div>
 
     </div>

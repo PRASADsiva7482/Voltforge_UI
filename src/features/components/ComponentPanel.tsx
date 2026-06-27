@@ -8,6 +8,7 @@ import { componentDimensions } from '../canvas/componentSvgs';
 import { getPinsForComponent } from '../canvas/pinRegistry';
 import type { ElectronicComponent, CanvasNode } from '../../types';
 import CustomComponentStudio from './CustomComponentStudio';
+import VfInput from '../../components/ui/VfInput';
 
 const categoryIcons: Record<string, any> = {
   BOARD: Cpu, LED: Zap, SENSOR: Thermometer, DISPLAY: Monitor,
@@ -93,13 +94,14 @@ export default function ComponentPanel() {
             <Plus className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="relative">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-surface-500" />
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search..."
-            className="w-full pl-7 pr-3 py-1.5 bg-white/80 border border-surface-200 rounded-lg text-[11px] text-surface-950 placeholder:text-surface-500 focus:outline-none focus:ring-1 focus:ring-volt-500/50 dark:bg-white/5 dark:border-white/10 dark:text-white"
-          />
-        </div>
+        <VfInput
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search..."
+          inputSize="sm"
+          iconLeft={<Search className="w-3.5 h-3.5" />}
+        />
       </div>
       <div className="p-2 flex-1 overflow-y-auto">
         {sortedCategories.map((category) => {

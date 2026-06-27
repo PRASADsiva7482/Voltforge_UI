@@ -61,7 +61,7 @@ export default function Sidebar() {
         </AnimatePresence>
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="ml-auto p-1.5 rounded-lg text-surface-500 transition-colors hover:bg-surface-100 hover:text-surface-950 dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white"
+          className="ml-auto p-2 rounded-lg text-surface-500 transition-colors hover:bg-surface-100 hover:text-surface-950 dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white"
         >
           {collapsed ? <Menu className="w-4 h-4" /> : <X className="w-4 h-4" />}
         </button>
