@@ -3,6 +3,7 @@ import { Plus, Search, Cpu, Eye, GitFork, Clock } from 'lucide-react';
 import VfButton from '../../components/ui/VfButton';
 import VfProjectGrid from '../../components/ui/VfProjectGrid';
 import VfEmptyState from '../../components/ui/VfEmptyState';
+import VfCard from '../../components/ui/VfCard';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { projectApi } from '../../api/services';
@@ -73,27 +74,31 @@ export default function DashboardPage() {
         transition={{ delay: 0.1 }}
         className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-14"
       >
-        <button
+        <VfCard
+          animate
+          hoverGlow="volt"
           onClick={() => navigate('/projects/new')}
-          className="glass glass-hover p-8 rounded-2xl text-center flex flex-col items-center justify-center group cursor-pointer transition-all duration-300 hover:glow-volt"
+          className="text-center flex flex-col items-center justify-center group p-8"
         >
           <div className="w-16 h-16 rounded-2xl bg-volt-500/10 flex items-center justify-center mb-5 group-hover:bg-volt-500/20 transition-colors">
             <Plus className="w-8 h-8 text-volt-400" />
           </div>
           <h3 className="text-xl font-semibold text-surface-950 mb-2 dark:text-white">{t('New Project')}</h3>
           <p className="text-sm text-surface-600 dark:text-surface-400">{t('Start a new circuit from scratch')}</p>
-        </button>
+        </VfCard>
 
-        <button
+        <VfCard
+          animate
+          hoverGlow="forge"
           onClick={() => navigate('/explore')}
-          className="glass glass-hover p-8 rounded-2xl text-center flex flex-col items-center justify-center group cursor-pointer transition-all duration-300 hover:glow-forge"
+          className="text-center flex flex-col items-center justify-center group p-8"
         >
           <div className="w-16 h-16 rounded-2xl bg-forge-500/10 flex items-center justify-center mb-5 group-hover:bg-forge-500/20 transition-colors">
             <Search className="w-8 h-8 text-forge-400" />
           </div>
           <h3 className="text-xl font-semibold text-surface-950 mb-2 dark:text-white">{t('Explore')}</h3>
           <p className="text-sm text-surface-600 dark:text-surface-400">{t('Browse community projects')}</p>
-        </button>
+        </VfCard>
       </motion.div>
 
       {/* Starter Templates */}

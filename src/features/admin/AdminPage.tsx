@@ -64,7 +64,7 @@ export default function AdminPage() {
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm text-surface-600 mb-1 dark:text-surface-400">{stat.label}</p>
+                    <p className="text-sm text-surface-600 mb-1 dark:text-surface-400">{t(stat.label)}</p>
                     <p className="text-3xl font-bold text-surface-950 dark:text-white">{stat.value.toLocaleString()}</p>
                   </div>
                   <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity`}>
@@ -89,7 +89,7 @@ export default function AdminPage() {
           <div className="glass rounded-2xl p-6">
             <div className="flex items-center gap-3 mb-6">
               <Users className="w-5 h-5 text-blue-400" />
-              <h2 className="text-lg font-semibold text-surface-950 dark:text-white">User Roles</h2>
+              <h2 className="text-lg font-semibold text-surface-950 dark:text-white">{t('User Roles')}</h2>
             </div>
             <div className="space-y-4">
               {Object.entries(stats.roleBreakdown || {}).map(([role, count]) => {

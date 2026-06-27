@@ -6,10 +6,12 @@ import VfFormField from '../../components/ui/VfFormField';
 import VfTextarea from '../../components/ui/VfTextarea';
 import VfConfirmDialog from '../../components/ui/VfConfirmDialog';
 import VfInput from '../../components/ui/VfInput';
+import VfSelectableCard from '../../components/ui/VfSelectableCard';
 import { useProjectStore } from '../../store/projectStore';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { projectApi } from '../../api/services';
 import type { BoardType } from '../../types';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   isOpen: boolean;
@@ -17,6 +19,7 @@ interface Props {
 }
 
 export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
+  const { t } = useTranslation();
   const { currentProject, setCurrentProject } = useProjectStore();
   const queryClient = useQueryClient();
 
@@ -66,11 +69,11 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
         icon={<Trash2 className="w-3.5 h-3.5" />}
         onClick={() => setConfirmDeleteOpen(true)}
       >
-        Delete Project
+        {t('Delete Project')}
       </VfButton>
       <div className="flex gap-2">
         <VfButton variant="ghost" size="xs" onClick={onClose}>
-          Cancel
+          {t('Cancel')}
         </VfButton>
         <VfButton
           variant="primary"
@@ -80,7 +83,7 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
           loading={updateMutation.isPending}
           icon={<Save className="w-3.5 h-3.5" />}
         >
-          {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+          {updateMutation.isPending ? t('Saving...') : t('Save Changes')}
         </VfButton>
       </div>
     </div>
@@ -91,13 +94,13 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
       <VfModal
         isOpen={isOpen}
         onClose={onClose}
-        title="Project Settings"
+        title={t('Project Settings')}
         icon={<Settings className="w-5 h-5" />}
         footer={footer}
         size="md"
       >
         <div className="space-y-5">
-          <VfFormField label="Project Name" htmlFor="settings-name">
+          <VfFormField label={t('Project Name')} htmlFor="settings-name">
             <VfInput
               id="settings-name"
               type="text"
@@ -106,7 +109,7 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
             />
           </VfFormField>
 
-          <VfFormField label="Description" htmlFor="settings-desc">
+          <VfFormField label={t('Description')} htmlFor="settings-desc">
             <VfTextarea
               id="settings-desc"
               value={description}
@@ -115,29 +118,24 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
             />
           </VfFormField>
 
-          <VfFormField label="Board Type">
+          <VfFormField label={t('Board Type')}>
             <div className="grid grid-cols-2 gap-2">
               {boards.map((b) => (
-                <button
+                <VfSelectableCard
                   key={b}
-                  type="button"
-                  onClick={() => setBoardType(b)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs transition-all ${
-                    boardType === b
-                      ? 'bg-volt-500/20 border-volt-500/40 text-volt-500 dark:text-volt-400'
-                      : 'bg-white/80 border-slate-200 text-slate-600 hover:text-slate-950 dark:bg-white/5 dark:border-white/5 dark:text-slate-400 dark:hover:text-white'
-                  }`}
-                >
-                  <Cpu className="w-3.5 h-3.5" />
-                  {b.replace(/_/g, ' ')}
-                </button>
+                  selected={boardType === b}
+                  onSelect={() => setBoardType(b)}
+                  title={b.replace(/_/g, ' ')}
+                  icon={<Cpu className="w-4 h-4 text-white" />}
+                  className="p-3"
+                />
               ))}
             </div>
           </VfFormField>
 
           <VfFormField
-            label="Visibility"
-            helperText={isPublic ? 'Anyone can view and fork this project.' : 'Only you can access this project.'}
+            label={t('Visibility')}
+            helperText={isPublic ? t('Anyone can view and fork this project.') : t('Only you can access this project.')}
           >
             <div className="flex gap-2">
               <button
@@ -149,7 +147,7 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
                     : 'bg-white/80 border-slate-200 text-slate-600 dark:bg-white/5 dark:border-white/5 dark:text-slate-400'
                 }`}
               >
-                <Globe className="w-4 h-4" /> Public
+                <Globe className="w-4 h-4" /> {t('Public')}
               </button>
               <button
                 type="button"
@@ -160,18 +158,18 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
                     : 'bg-white/80 border-slate-200 text-slate-600 dark:bg-white/5 dark:border-white/5 dark:text-slate-400'
                 }`}
               >
-                <Lock className="w-4 h-4" /> Private
+                <Lock className="w-4 h-4" /> {t('Private')}
               </button>
             </div>
           </VfFormField>
 
-          <VfFormField label="Tags" htmlFor="settings-tags">
+          <VfFormField label={t('Tags')} htmlFor="settings-tags">
             <VfInput
               id="settings-tags"
               type="text"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
-              placeholder="iot, arduino, sensor (comma-separated)"
+              placeholder={t('iot, arduino, sensor (comma-separated)')}
             />
           </VfFormField>
         </div>
@@ -181,8 +179,8 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
         isOpen={confirmDeleteOpen}
         onClose={() => setConfirmDeleteOpen(false)}
         onConfirm={handleDelete}
-        title="Delete Project permanently?"
-        message="Are you sure you want to delete this project permanently? All files, netlist, and collaboration session history will be lost."
+        title={t('Delete Project permanently?')}
+        message={t('Are you sure you want to delete this project permanently? All files, netlist, and collaboration session history will be lost.')}
         isDestructive={true}
       />
     </>

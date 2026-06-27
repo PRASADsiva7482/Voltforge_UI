@@ -8,7 +8,9 @@ import { componentDimensions } from '../canvas/componentSvgs';
 import { getPinsForComponent } from '../canvas/pinRegistry';
 import type { ElectronicComponent, CanvasNode } from '../../types';
 import CustomComponentStudio from './CustomComponentStudio';
-import VfInput from '../../components/ui/VfInput';
+import VfSearchInput from '../../components/ui/VfSearchInput';
+import VfCollapsible from '../../components/ui/VfCollapsible';
+import { useTranslation } from 'react-i18next';
 
 const categoryIcons: Record<string, any> = {
   BOARD: Cpu, LED: Zap, SENSOR: Thermometer, DISPLAY: Monitor,
@@ -19,6 +21,7 @@ const categoryIcons: Record<string, any> = {
 const categoryOrder = ['BOARD', 'PASSIVE', 'LED', 'SENSOR', 'DISPLAY', 'MOTOR', 'RELAY', 'COMMUNICATION', 'POWER'];
 
 export default function ComponentPanel() {
+  const { t } = useTranslation();
   const { setComponentLibrary } = useCanvasStore();
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -89,18 +92,16 @@ export default function ComponentPanel() {
       <CustomComponentStudio isOpen={studioOpen} onClose={() => setStudioOpen(false)} />
       <div className="p-3 border-b border-surface-200/70 dark:border-white/5">
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-surface-950 dark:text-white">Components</h3>
-          <button onClick={() => setStudioOpen(true)} className="rounded-md p-1 text-surface-500 hover:bg-surface-100 hover:text-surface-950 dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white" title="Create custom component">
+          <h3 className="text-xs font-semibold text-surface-955 dark:text-white">{t("Components")}</h3>
+          <button onClick={() => setStudioOpen(true)} className="rounded-md p-1 text-surface-500 hover:bg-surface-100 hover:text-surface-950 dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white" title={t("Create custom component")}>
             <Plus className="h-3.5 w-3.5" />
           </button>
         </div>
-        <VfInput
-          type="text"
+        <VfSearchInput
           value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search..."
-          inputSize="sm"
-          iconLeft={<Search className="w-3.5 h-3.5" />}
+          onChange={setSearch}
+          placeholder={t("Search...")}
+          hotkey="/"
         />
       </div>
       <div className="p-2 flex-1 overflow-y-auto">
@@ -109,38 +110,42 @@ export default function ComponentPanel() {
           const Icon = categoryIcons[category] || Cpu;
           const isCollapsed = collapsed[category];
           return (
-            <div key={category} className="mb-1">
-              <button
-                onClick={() => toggleCategory(category)}
-                className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold text-surface-500 uppercase tracking-wider hover:text-surface-900 transition-colors dark:text-surface-400 dark:hover:text-surface-200"
-              >
-                <Icon className="w-3 h-3" />
-                <span className="flex-1 text-left">{category}</span>
-                <span className="text-[8px] bg-surface-100 px-1 py-0.5 rounded text-surface-500 dark:bg-surface-800">{components.length}</span>
-                <ChevronDown className={`h-3 w-3 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
-              </button>
-              {!isCollapsed && components.map((comp) => (
+            <VfCollapsible
+              key={category}
+              isOpen={!isCollapsed}
+              onToggle={() => toggleCategory(category)}
+              title={t(category)}
+              icon={<Icon className="w-3.5 h-3.5" />}
+              actions={
+                <span className="text-[8px] bg-slate-100 dark:bg-surface-800 px-1 py-0.5 rounded text-slate-500 dark:text-slate-400 font-bold">
+                  {components.length}
+                </span>
+              }
+              headerClassName="!bg-transparent border-none px-2 py-1"
+              bodyClassName="p-0 space-y-0.5"
+            >
+              {components.map((comp) => (
                 <motion.button key={comp.id} whileHover={{ x: 3 }}
                   onClick={() => addToCanvas(comp)}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 text-left rounded-lg hover:bg-surface-100 transition-colors group dark:hover:bg-white/5"
+                  className="w-full flex items-center gap-2 px-2 py-1.5 text-left rounded-lg hover:bg-surface-100 transition-colors group dark:hover:bg-white/5 outline-none cursor-pointer"
                 >
                   <div className="w-6 h-6 rounded bg-surface-100 flex items-center justify-center flex-shrink-0 group-hover:bg-volt-500/10 dark:bg-surface-800">
                     <Cpu className="w-3 h-3 text-surface-500 group-hover:text-volt-500 dark:text-surface-400 dark:group-hover:text-volt-400" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-medium text-surface-800 truncate dark:text-surface-200">{comp.name}</p>
-                    <p className="text-[9px] text-surface-500">{comp.type.replace(/_/g, ' ')}</p>
+                    <p className="text-[11px] font-medium text-surface-800 truncate dark:text-surface-200">{t(comp.name)}</p>
+                    <p className="text-[9px] text-surface-500">{t(comp.type.replace(/_/g, ' '))}</p>
                   </div>
                   {comp.isPremium && (
-                    <span className="text-[8px] bg-forge-500/10 text-forge-400 px-1 py-0.5 rounded">PRO</span>
+                    <span className="text-[8px] bg-forge-500/10 text-forge-400 px-1 py-0.5 rounded font-bold">PRO</span>
                   )}
                 </motion.button>
               ))}
-            </div>
+            </VfCollapsible>
           );
         })}
         {sortedCategories.length === 0 && (
-          <p className="text-xs text-surface-500 text-center py-4">No components found</p>
+          <p className="text-xs text-surface-500 text-center py-4">{t("No components found")}</p>
         )}
       </div>
     </div>

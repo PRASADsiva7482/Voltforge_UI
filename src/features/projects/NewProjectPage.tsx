@@ -7,6 +7,8 @@ import VfSwitch from '../../components/ui/VfSwitch';
 import VfFormField from '../../components/ui/VfFormField';
 import VfTextarea from '../../components/ui/VfTextarea';
 import VfInput from '../../components/ui/VfInput';
+import VfBreadcrumbs from '../../components/ui/VfBreadcrumbs';
+import VfSelectableCard from '../../components/ui/VfSelectableCard';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { projectApi } from '../../api/services';
@@ -96,10 +98,19 @@ export default function NewProjectPage() {
 
   return (
     <div className="p-8 max-w-3xl mx-auto pt-8 pb-20">
+      {/* Breadcrumbs */}
+      <VfBreadcrumbs
+        items={[
+          { label: t('My Projects'), onClick: () => navigate('/projects') },
+          { label: isAi ? t('AI Generate') : t('New Project') }
+        ]}
+      />
+      <div className="mt-4" />
+
       {/* Header */}
       <VfPageHeader
         title={isAi ? t('AI Generate Project') : t('New Project')}
-        description={isAi ? 'Let AI create a circuit for you' : 'Set up your new circuit project'}
+        description={isAi ? t('Let AI create a circuit for you') : t('Set up your new circuit project')}
         icon={<Zap className="w-5 h-5 text-white" />}
         onBackClick={handleBack}
       />
@@ -107,34 +118,22 @@ export default function NewProjectPage() {
       {/* Step 1: Select Board */}
       {step === 1 && (
         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-          <h2 className="text-lg font-semibold text-surface-950 mb-1 dark:text-white">Choose Your Board</h2>
-          <p className="text-surface-600 text-sm mb-6 dark:text-surface-400">Select the microcontroller for your project</p>
+          <h2 className="text-lg font-semibold text-surface-950 mb-1 dark:text-white">{t('Choose Your Board')}</h2>
+          <p className="text-surface-600 text-sm mb-6 dark:text-surface-400">{t('Select the microcontroller for your project')}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {boards.map((board) => {
               const Icon = board.icon;
               const selected = selectedBoard === board.type;
               return (
-                <motion.button
+                <VfSelectableCard
                   key={board.type}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setSelectedBoard(board.type)}
-                  className={`p-5 rounded-2xl text-left transition-all duration-300 border ${
-                    selected
-                      ? 'glass border-volt-500/40 shadow-[0_0_20px_rgba(34,197,94,0.15)]'
-                      : 'glass glass-hover border-surface-200 dark:border-white/5'
-                  }`}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${board.gradient} flex items-center justify-center flex-shrink-0 ${selected ? 'opacity-100' : 'opacity-70'}`}>
-                      <Icon className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-surface-950 dark:text-white">{board.name}</h3>
-                      <p className="text-xs text-surface-600 mt-1 dark:text-surface-400">{board.description}</p>
-                    </div>
-                  </div>
-                </motion.button>
+                  selected={selected}
+                  onSelect={() => setSelectedBoard(board.type)}
+                  title={t(board.name)}
+                  description={t(board.description)}
+                  icon={<Icon className="w-6 h-6 text-white" />}
+                  iconGradient={board.gradient}
+                />
               );
             })}
           </div>
@@ -142,7 +141,7 @@ export default function NewProjectPage() {
             <VfButton variant="primary" size="md" onClick={() => setStep(2)}
               disabled={!selectedBoard}
               icon={<ChevronRight className="w-4 h-4" />} iconPosition="right">
-              Continue
+              {t('Continue')}
             </VfButton>
           </div>
         </motion.div>
@@ -151,8 +150,8 @@ export default function NewProjectPage() {
       {/* Step 2: Project Details */}
       {step === 2 && (
         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-          <h2 className="text-lg font-semibold text-surface-950 mb-1 dark:text-white">Project Details</h2>
-          <p className="text-surface-600 text-sm mb-6 dark:text-surface-400">Give your project a name and description</p>
+          <h2 className="text-lg font-semibold text-surface-950 mb-1 dark:text-white">{t('Project Details')}</h2>
+          <p className="text-surface-600 text-sm mb-6 dark:text-surface-400">{t('Give your project a name and description')}</p>
 
           <div className="space-y-5">
             <VfFormField
@@ -166,7 +165,7 @@ export default function NewProjectPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value.slice(0, MAX_NAME_LENGTH))}
                 maxLength={MAX_NAME_LENGTH}
-                placeholder="e.g., Smart Home Controller"
+                placeholder={t('e.g., Smart Home Controller')}
                 aria-required="true"
                 autoFocus
               />
@@ -182,7 +181,7 @@ export default function NewProjectPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value.slice(0, MAX_DESCRIPTION_LENGTH))}
                 maxLength={MAX_DESCRIPTION_LENGTH}
-                placeholder="Describe your circuit project..."
+                placeholder={t('Describe your circuit project...')}
                 rows={3}
               />
             </VfFormField>
@@ -193,27 +192,27 @@ export default function NewProjectPage() {
                 type="text"
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
-                placeholder="e.g., iot, sensor, led (comma-separated)"
+                placeholder={t('e.g., iot, sensor, led (comma-separated)')}
               />
             </VfFormField>
 
             <VfSwitch
               checked={isPublic}
               onChange={setIsPublic}
-              label={isPublic ? 'Public — visible to everyone' : 'Private — only you can see this'}
+              label={isPublic ? t('Public — visible to everyone') : t('Private — only you can see this')}
             />
           </div>
 
           <div className="flex justify-between mt-10">
             <VfButton variant="ghost" size="md" onClick={() => setStep(1)}>
-              ← Back
+              {t('← Back')}
             </VfButton>
             <VfButton variant="primary" size="md"
               onClick={handleCreate}
               disabled={!name.trim() || createMutation.isPending}
               loading={createMutation.isPending}
               icon={<ChevronRight className="w-4 h-4" />} iconPosition="right">
-              {createMutation.isPending ? 'Creating...' : isAi ? 'Create & Generate with AI' : 'Create Project'}
+              {createMutation.isPending ? t('Creating...') : isAi ? t('Create & Generate with AI') : t('Create Project')}
             </VfButton>
           </div>
         </motion.div>

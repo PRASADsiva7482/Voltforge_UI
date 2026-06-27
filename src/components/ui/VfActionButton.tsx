@@ -24,7 +24,7 @@ export default function VfActionButton({
   className = '',
 }: VfActionButtonProps) {
   const baseClasses = 'flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer outline-none transition-all duration-205 select-none';
-  
+
   const variants = {
     primary: 'bg-volt-500/10 text-volt-600 hover:bg-volt-500/20 dark:text-volt-400 border border-volt-500/20 shadow-[0_0_12px_rgba(34,197,94,0.05)]',
     success: 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/20',

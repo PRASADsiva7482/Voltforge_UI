@@ -5,6 +5,7 @@ import type { ProjectSummary } from '../../types';
 import { useTranslation } from 'react-i18next';
 import VfConfirmDialog from './VfConfirmDialog';
 import VfBadge from './VfBadge';
+import VfCard from './VfCard';
 
 export interface VfProjectCardProps {
   project: ProjectSummary;
@@ -29,10 +30,10 @@ export default function VfProjectCard({ project, onClick, onDelete, showOwner = 
   const gradient = BOARD_GRADIENTS[project.boardType] || 'from-slate-700 to-slate-800';
 
   return (
-    <motion.div
-      whileHover={{ y: -6, scale: 1.01 }}
-      transition={{ type: 'spring', stiffness: 350, damping: 25 }}
-      className="glass group relative overflow-hidden rounded-2xl p-5 border border-slate-200 dark:border-white/5 cursor-pointer bg-white/70 dark:bg-slate-900/40 backdrop-blur-md shadow-sm hover:shadow-xl hover:border-volt-500/20 dark:hover:border-white/10 transition-all duration-300"
+    <VfCard
+      animate
+      onClick={onClick}
+      className="group relative overflow-hidden p-5"
     >
       {/* Background ambient glow on hover */}
       <div className={`absolute -inset-20 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-5 blur-3xl pointer-events-none transition-all duration-500`} />
@@ -74,7 +75,7 @@ export default function VfProjectCard({ project, onClick, onDelete, showOwner = 
       )}
 
       {/* Card Content click trigger */}
-      <div onClick={onClick}>
+      <div>
         {/* Card Thumbnail */}
         <div className={`h-32 rounded-xl bg-gradient-to-br ${gradient} mb-4 flex items-center justify-center relative overflow-hidden border border-white/10 shadow-inner opacity-80 group-hover:opacity-100 group-hover:scale-[1.01] transition-all duration-300`}>
           <Cpu className="w-12 h-12 text-white/50 group-hover:rotate-3 transition-all duration-300" />
@@ -130,6 +131,6 @@ export default function VfProjectCard({ project, onClick, onDelete, showOwner = 
           isDestructive={true}
         />
       )}
-    </motion.div>
+    </VfCard>
   );
 }

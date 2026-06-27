@@ -4,6 +4,7 @@ import { Maximize2, Minimize2, FileCode2, Bug, AlignLeft, Eye, EyeOff } from 'lu
 import { useProjectStore } from '../../store/projectStore';
 import { useSimulationStore } from '../../store/simulationStore';
 import { useCanvasStore } from '../../store/canvasStore';
+import { useTranslation } from 'react-i18next';
 import SerialMonitor from './SerialMonitor';
 
 // ── Arduino framework boilerplate generator ──
@@ -66,6 +67,7 @@ function generateFullCode(userCode: string, boardType?: string): string {
 }
 
 export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
+  const { t } = useTranslation();
   const { currentProject, activeCodeFile, setActiveCodeFile, updateCodeFileContent } = useProjectStore();
   const { debugSnapshot, setBreakpoints } = useSimulationStore();
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -109,7 +111,7 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
     // Register Arduino keywords
     editor.addAction({
       id: 'find-replace',
-      label: 'Find and Replace',
+      label: t('Find and Replace'),
       keybindings: [],
       run: (ed: any) => ed.getAction('editor.action.startFindReplaceAction')?.run(),
     });
@@ -155,8 +157,8 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
       <div className="flex items-center justify-center h-full bg-surface-950 text-surface-500">
         <div className="text-center">
           <FileCode2 className="w-10 h-10 mx-auto mb-3 text-surface-700" />
-          <p className="text-sm font-medium">No file selected</p>
-          <p className="text-xs text-surface-600 mt-1">Select a file from the tabs above</p>
+          <p className="text-sm font-medium">{t('No file selected')}</p>
+          <p className="text-xs text-surface-600 mt-1">{t('Select a file from the tabs above')}</p>
         </div>
       </div>
     );
@@ -203,7 +205,7 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
           <button
             onClick={handleFormatCode}
             className="p-1 rounded hover:bg-white/5 text-surface-400 hover:text-white transition-colors"
-            title="Format Code (Auto-indent)"
+            title={t("Format Code (Auto-indent)")}
           >
             <AlignLeft className="w-3.5 h-3.5" />
           </button>
@@ -216,15 +218,15 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
                 ? 'bg-forge-500/20 text-forge-400 border border-forge-500/30'
                 : 'hover:bg-white/5 text-surface-400 hover:text-white'
             }`}
-            title={showFullCode ? 'Show user code only' : 'Show full generated code (includes, pin defs, libraries)'}
+            title={showFullCode ? t('Show user code only') : t('Show full generated code (includes, pin defs, libraries)')}
           >
             {showFullCode ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-            {showFullCode ? 'User' : 'Full'}
+            {showFullCode ? t('User') : t('Full')}
           </button>
 
           <button onClick={() => setIsFullscreen(!isFullscreen)}
             className="p-1 rounded hover:bg-white/5 text-surface-400 hover:text-white transition-colors"
-            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+            title={isFullscreen ? t('Exit Fullscreen') : t('Fullscreen')}
           >
             {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </button>
@@ -236,7 +238,7 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
         <div className="flex items-center gap-2 px-3 py-1.5 bg-forge-500/10 border-b border-forge-500/20 text-[10px]">
           <Eye className="w-3 h-3 text-forge-400 flex-shrink-0" />
           <span className="text-forge-300">
-            <strong className="text-forge-400">Full Code View</strong> — Read-only preview with auto-generated #includes, pin definitions, and library headers based on your canvas components.
+            <strong className="text-forge-400">{t("Full Code View")}</strong> — {t("Read-only preview with auto-generated #includes, pin definitions, and library headers based on your canvas components.")}
           </span>
         </div>
       )}

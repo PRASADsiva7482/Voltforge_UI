@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
@@ -138,6 +139,7 @@ const stats = [
    Landing Page Component
    ═════════════════════════════════════════════════════════════════════════════ */
 export default function LandingPage() {
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const navigate = useNavigate();
@@ -164,7 +166,7 @@ export default function LandingPage() {
   useEffect(() => {
     if (!simRunning) { setSimStep(-1); setSerialLogs([]); setLedOn(false); return; }
     let idx = 0;
-    setSerialLogs(['[BOOT] Virtual ATmega328P ready']);
+    setSerialLogs([t('[BOOT] Virtual ATmega328P ready')]);
     const timer = setInterval(() => {
       const s = simSteps[idx];
       setSimStep(s.line);
@@ -207,7 +209,7 @@ export default function LandingPage() {
           {/* Right Actions */}
           <div className="flex items-center gap-2">
             <VfButton variant="ghost" size="sm" icon={theme === 'dark' ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
-              onClick={toggleTheme} title="Toggle theme" />
+              onClick={toggleTheme} title={t("Toggle theme")} />
 
             <div className="w-px h-5 bg-slate-200 dark:bg-white/10 mx-1" />
 
@@ -216,17 +218,17 @@ export default function LandingPage() {
                 <span className="hidden sm:inline text-xs font-semibold text-slate-500 dark:text-slate-400">{displayName}</span>
                 <VfButton variant="primary" size="sm" onClick={() => navigate('/dashboard')}
                   icon={<ArrowRight className="w-3.5 h-3.5" />} iconPosition="right">
-                  Dashboard
+                  {t('Dashboard')}
                 </VfButton>
               </div>
             ) : (
               <div className="flex items-center gap-2">
                 <VfButton variant="ghost" size="sm"
                   onClick={() => keycloak.login({ redirectUri: window.location.origin + '/dashboard' })}>
-                  Log in
+                  {t('Log in')}
                 </VfButton>
                 <VfButton variant="primary" size="sm" onClick={handleSignUp}>
-                  Get Started
+                  {t('Get Started')}
                 </VfButton>
               </div>
             )}
@@ -246,31 +248,31 @@ export default function LandingPage() {
 
             <motion.div variants={fadeUp} custom={0}
               className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
-              <Sparkles className="w-3.5 h-3.5" /> Virtual Electronics Workspace
+              <Sparkles className="w-3.5 h-3.5" /> {t('Virtual Electronics Workspace')}
             </motion.div>
 
             <motion.h1 variants={fadeUp} custom={1}
               className="text-[clamp(2.2rem,5.5vw,4rem)] font-extrabold leading-[1.08] tracking-tight text-slate-950 dark:text-white">
-              Design circuits.{' '}
+              {t('Design circuits.')}{' '}
               <br className="hidden md:block" />
               <span className="bg-gradient-to-r from-emerald-500 via-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-                Simulate instantly.
+                {t('Simulate instantly.')}
               </span>
             </motion.h1>
 
             <motion.p variants={fadeUp} custom={2}
               className="text-[clamp(0.95rem,1.8vw,1.15rem)] text-slate-600 dark:text-slate-400 max-w-lg mx-auto lg:mx-0 leading-relaxed font-medium">
-              A virtual electronics lab where you drag components onto a canvas, write firmware in the browser, and watch your circuit come alive — all inside your browser.
+              {t('A virtual electronics lab where you drag components onto a canvas, write firmware in the browser, and watch your circuit come alive — all inside your browser.')}
             </motion.p>
 
             <motion.div variants={fadeUp} custom={3} className="flex flex-wrap items-center justify-center lg:justify-start gap-4">
               <VfButton variant="primary" size="xl" onClick={handleLaunch}
                 icon={<ArrowRight className="w-4.5 h-4.5" />} iconPosition="right">
-                {isAuthenticated ? 'Open Workspace' : 'Start Building — Free'}
+                {isAuthenticated ? t('Open Workspace') : t('Start Building — Free')}
               </VfButton>
               <VfButton variant="secondary" size="xl" onClick={() => document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' })}
                 icon={<Play className="w-4 h-4" />}>
-                Watch Demo
+                {t('Watch Demo')}
               </VfButton>
             </motion.div>
           </motion.div>
@@ -297,8 +299,8 @@ export default function LandingPage() {
                 <s.icon className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-base font-extrabold text-slate-900 dark:text-white leading-tight">{s.value}</p>
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{s.label}</p>
+                <p className="text-base font-extrabold text-slate-900 dark:text-white leading-tight">{t(s.value)}</p>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{t(s.label)}</p>
               </div>
             </motion.div>
           ))}
@@ -309,10 +311,10 @@ export default function LandingPage() {
       <Section className="max-w-7xl mx-auto px-6 lg:px-10 pt-8 pb-28">
         <motion.div variants={fadeUp} className="text-center mb-16 space-y-4">
           <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-950 dark:text-white">
-            Everything you need to build electronics
+            {t('Everything you need to build electronics')}
           </h2>
           <p className="text-base text-slate-500 dark:text-slate-400 max-w-xl mx-auto">
-            From schematic design to firmware testing — one integrated platform.
+            {t('From schematic design to firmware testing — one integrated platform.')}
           </p>
         </motion.div>
 
@@ -336,8 +338,8 @@ export default function LandingPage() {
                     </div>
                     <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform duration-300 mt-1 ${isOpen ? 'rotate-90' : 'group-hover:translate-x-0.5'}`} />
                   </div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">{f.title}</h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{f.tagline}</p>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">{t(f.title)}</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{t(f.tagline)}</p>
                 </div>
 
                 <AnimatePresence>
@@ -353,7 +355,7 @@ export default function LandingPage() {
                           <div key={j} className="flex items-start gap-2.5">
                             <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${c.text}`}
                               style={{ backgroundColor: 'currentColor', opacity: 0.6 }} />
-                            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{d}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{t(d)}</p>
                           </div>
                         ))}
                       </div>
@@ -374,15 +376,15 @@ export default function LandingPage() {
             {/* Info */}
             <motion.div variants={fadeUp} className="lg:col-span-4 space-y-6">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold">
-                <Terminal className="w-3.5 h-3.5" /> Interactive Preview
+                <Terminal className="w-3.5 h-3.5" /> {t('Interactive Preview')}
               </div>
               <h2 className="text-3xl font-extrabold tracking-tight text-slate-950 dark:text-white leading-tight">
-                Try the simulator.
+                {t('Try the simulator.')}
                 <br />
-                <span className="bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">No account needed.</span>
+                <span className="bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">{t('No account needed.')}</span>
               </h2>
               <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Press play to compile firmware and watch the virtual MCU execute code line-by-line. The LED responds, the serial monitor updates — just like real hardware.
+                {t('Press play to compile firmware and watch the virtual MCU execute code line-by-line. The LED responds, the serial monitor updates — just like real hardware.')}
               </p>
 
               <VfButton
@@ -390,7 +392,7 @@ export default function LandingPage() {
                 size="md"
                 icon={simRunning ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
                 onClick={() => setSimRunning(!simRunning)}>
-                {simRunning ? 'Stop' : 'Run Simulator'}
+                {simRunning ? t('Stop') : t('Run Simulator')}
               </VfButton>
             </motion.div>
 
@@ -410,7 +412,7 @@ export default function LandingPage() {
                   </div>
                   <span className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded transition-colors ${simRunning ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-100 dark:bg-white/[0.04] text-slate-400'
                     }`}>
-                    {simRunning ? '● RUNNING' : '○ IDLE'}
+                    {simRunning ? t('● RUNNING') : t('○ IDLE')}
                   </span>
                 </div>
 
@@ -457,7 +459,7 @@ export default function LandingPage() {
                         <div className="w-40 h-20 bg-slate-800 dark:bg-[#111827] rounded-lg border border-slate-700 flex flex-col items-center justify-center shadow-lg relative">
                           <span className="text-[9px] font-bold text-slate-300 tracking-[0.2em] font-mono">ATmega328P</span>
                           <span className={`text-[8px] font-bold font-mono mt-0.5 transition-colors ${simRunning ? 'text-emerald-400' : 'text-slate-600'}`}>
-                            {simRunning ? '5V — ACTIVE' : 'STANDBY'}
+                            {simRunning ? t('5V — ACTIVE') : t('STANDBY')}
                           </span>
                           <div className={`absolute top-2 right-2 w-2 h-2 rounded-full transition-all duration-300 ${simRunning ? 'bg-emerald-400 shadow-[0_0_6px_#10b981]' : 'bg-slate-700'}`} />
                           <div className="absolute -left-1.5 top-3 space-y-1.5">
@@ -485,9 +487,9 @@ export default function LandingPage() {
 
                     {/* Serial Monitor */}
                     <div className="h-28 border-t border-slate-200 dark:border-white/[0.06] bg-[#0d1117] p-3 font-mono text-[10px] overflow-y-auto flex flex-col justify-end">
-                      <div className="text-[9px] font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Serial Monitor</div>
+                      <div className="text-[9px] font-bold text-slate-600 mb-1.5 uppercase tracking-wider">{t('Serial Monitor')}</div>
                       {serialLogs.length === 0 ? (
-                        <span className="text-slate-600 italic text-[10px]">Press "Run Simulator" to begin...</span>
+                        <span className="text-slate-600 italic text-[10px]">{t('Press "Run Simulator" to begin...')}</span>
                       ) : (
                         serialLogs.map((log, i) => (
                           <div key={i} className="text-emerald-400/80 leading-relaxed truncate">{log}</div>
@@ -510,24 +512,24 @@ export default function LandingPage() {
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-40 bg-emerald-500/[0.08] rounded-full blur-[80px] pointer-events-none" />
 
           <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-950 dark:text-white relative z-10 mb-5">
-            Ready to build?
+            {t('Ready to build?')}
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-10 relative z-10 leading-relaxed">
-            Jump into VoltForge and start designing circuits with simulation and real-time collaboration.
+            {t('Jump into VoltForge and start designing circuits with simulation and real-time collaboration.')}
           </p>
           <div className="flex flex-wrap justify-center gap-4 relative z-10">
             {isAuthenticated ? (
               <VfButton variant="primary" size="lg" onClick={() => navigate('/dashboard')}>
-                Go to Workspace
+                {t('Go to Workspace')}
               </VfButton>
             ) : (
               <>
                 <VfButton variant="primary" size="lg" onClick={handleSignUp}>
-                  Create Free Account
+                  {t('Create Free Account')}
                 </VfButton>
                 <VfButton variant="secondary" size="lg"
                   onClick={() => keycloak.login({ redirectUri: window.location.origin + '/dashboard' })}>
-                  Sign In
+                  {t('Sign In')}
                 </VfButton>
               </>
             )}
@@ -544,11 +546,11 @@ export default function LandingPage() {
             </div>
             <span className="font-bold text-slate-700 dark:text-slate-300">VoltForge</span>
           </div>
-          <p>© {new Date().getFullYear()} VoltForge — Forge Your Ideas into Reality.</p>
+          <p>© {new Date().getFullYear()} {t('VoltForge — Forge Your Ideas into Reality.')}</p>
           <div className="flex gap-5">
-            <a href="#" className="hover:text-slate-900 dark:hover:text-white cursor-pointer transition-colors hover:underline">Privacy</a>
-            <a href="#" className="hover:text-slate-900 dark:hover:text-white cursor-pointer transition-colors hover:underline">Terms</a>
-            <a href="#" className="hover:text-slate-900 dark:hover:text-white cursor-pointer transition-colors hover:underline">Docs</a>
+            <a href="#" className="hover:text-slate-900 dark:hover:text-white cursor-pointer transition-colors hover:underline">{t('Privacy')}</a>
+            <a href="#" className="hover:text-slate-900 dark:hover:text-white cursor-pointer transition-colors hover:underline">{t('Terms')}</a>
+            <a href="#" className="hover:text-slate-900 dark:hover:text-white cursor-pointer transition-colors hover:underline">{t('Docs')}</a>
           </div>
         </div>
       </footer>

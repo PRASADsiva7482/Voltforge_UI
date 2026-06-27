@@ -1,6 +1,7 @@
 import { useRef, useEffect, useMemo, useState, useCallback, memo } from 'react';
 import { Group, Rect, Text, Circle, Image as KonvaImage, Transformer, Line, Arc } from 'react-konva';
 import Konva from 'konva';
+import { useTranslation } from 'react-i18next';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { useCanvasStore } from '../../../store/canvasStore';
 import { getPinAbsPos, snapToRoutingGuides } from '../../../utils/wireRouting';
@@ -366,6 +367,7 @@ const ComponentNode = ({
   isProbeMode,
   isSimulating,
 }: ComponentNodeProps) => {
+  const { t } = useTranslation();
   const shapeRef = useRef<Konva.Group>(null);
   const trRef = useRef<Konva.Transformer>(null);
   const dcMotorShaftRef = useRef<Konva.Group>(null);
@@ -806,7 +808,7 @@ const ComponentNode = ({
               shadowBlur={18}
             />
             <Text
-              text="BLOWN"
+              text={t("BLOWN")}
               x={4}
               y={Math.max(4, node.height / 2 - 7)}
               width={node.width - 8}

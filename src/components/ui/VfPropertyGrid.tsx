@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Copy, Check } from 'lucide-react';
+import VfCopyButton from './VfCopyButton';
 
 export interface VfPropertyItem {
   key: string;
@@ -15,14 +14,6 @@ export interface VfPropertyGridProps {
 }
 
 export default function VfPropertyGrid({ items, className = '' }: VfPropertyGridProps) {
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
-
-  const handleCopy = (key: string, val: string | number) => {
-    navigator.clipboard.writeText(String(val));
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 1500);
-  };
-
   return (
     <div className={`grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs ${className}`}>
       {items.map((item) => (
@@ -38,18 +29,10 @@ export default function VfPropertyGrid({ items, className = '' }: VfPropertyGrid
               {item.value}
             </span>
             {item.copyable && (
-              <button
-                type="button"
-                onClick={() => handleCopy(item.key, item.value)}
-                className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-white transition-all ml-2"
-                title="Copy Value"
-              >
-                {copiedKey === item.key ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-500" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5" />
-                )}
-              </button>
+              <VfCopyButton
+                text={String(item.value)}
+                className="opacity-0 group-hover:opacity-100 p-0.5 rounded border-none bg-transparent hover:bg-transparent dark:bg-transparent dark:hover:bg-transparent transition-all ml-2"
+              />
             )}
           </div>
         </div>

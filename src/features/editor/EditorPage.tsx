@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Save, ArrowLeft, Play, Square, Settings, Layout, Terminal, Undo, Redo, Gauge, Activity, Package, Download, Share2, Layers, GitFork, Zap, Trash2 } from 'lucide-react';
 import CircuitCanvas from '../canvas/CircuitCanvas';
@@ -13,6 +14,7 @@ import BomPanel from './BomPanel';
 import VfSplitPane from '../../components/ui/VfSplitPane';
 import VfStatusIndicator from '../../components/ui/VfStatusIndicator';
 import VfActionButton from '../../components/ui/VfActionButton';
+import VfLoadingSpinner from '../../components/ui/VfLoadingSpinner';
 import VfContextMenu from '../../components/ui/VfContextMenu';
 import { projectApi, projectExportApi, simulationApi } from '../../api/services';
 import { useProjectStore, SMART_DEVICE_PRESET } from '../../store/projectStore';
@@ -65,8 +67,8 @@ function bundleCodeFiles(activeFile: CodeFile | null, files: CodeFile[]): string
       if (includedFile) {
         replaced = true;
         return `\n// ── Begin Include: ${includedFile.filename} ──\n` +
-               includedFile.content +
-               `\n// ── End Include: ${includedFile.filename} ──\n`;
+          includedFile.content +
+          `\n// ── End Include: ${includedFile.filename} ──\n`;
       }
       return match;
     });
@@ -76,6 +78,7 @@ function bundleCodeFiles(activeFile: CodeFile | null, files: CodeFile[]): string
 }
 
 export default function EditorPage() {
+  const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const [activePanel, setActivePanel] = useState<ActivePanel>('split');
@@ -177,8 +180,8 @@ export default function EditorPage() {
             const shareState = JSON.parse(decoded);
             const mockProject: Project = {
               id: 'share',
-              name: shareState.name || 'Shared Project',
-              description: 'Shared via portable link',
+              name: shareState.name || t('Shared Project'),
+              description: t('Shared via portable link'),
               boardType: shareState.boardType || 'ARDUINO_UNO',
               isPublic: false,
               forkCount: 0,
@@ -492,7 +495,7 @@ export default function EditorPage() {
     }
   };
 
-  if (isLoading) return <div className="flex items-center justify-center h-screen bg-surface-50 dark:bg-surface-950"><div className="w-8 h-8 border-2 border-volt-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (isLoading) return <div className="flex items-center justify-center h-screen bg-surface-50 dark:bg-surface-955"><VfLoadingSpinner size="lg" /></div>;
 
   return (
     <div className="flex flex-col h-screen bg-surface-50 text-surface-900 relative dark:bg-surface-950 dark:text-surface-100">
@@ -501,18 +504,18 @@ export default function EditorPage() {
       {/* Toolbar */}
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-surface-200/70 glass z-10 dark:border-white/5">
         {/* ── Navigation & Project Info ── */}
-        <button onClick={() => navigate('/dashboard')} className="p-2 rounded-lg text-surface-500 hover:bg-surface-100 hover:text-surface-950 transition-all dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white" title="Back to Dashboard"><ArrowLeft className="w-4 h-4" /></button>
+        <button onClick={() => navigate('/dashboard')} className="p-2 rounded-lg text-surface-500 hover:bg-surface-100 hover:text-surface-950 transition-all dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white" title={t("Back to Dashboard")}><ArrowLeft className="w-4 h-4" /></button>
         <div className="flex-1 min-w-0 ml-1">
-          <h2 className="text-xs font-semibold text-surface-950 truncate dark:text-white">{currentProject?.name || 'Untitled'}</h2>
+          <h2 className="text-xs font-semibold text-surface-950 truncate dark:text-white">{currentProject?.name || t('Untitled')}</h2>
           <p className="text-[9px] text-surface-500">{currentProject?.boardType?.replace(/_/g, ' ')}</p>
         </div>
-        {isConnected && <VfStatusIndicator status="running" label="Live Sync" />}
+        {isConnected && <VfStatusIndicator status="running" label={t("Live Sync")} />}
 
         {/* ── View Mode Switcher ── */}
         <div className="flex items-center gap-0.5 bg-surface-100 rounded-lg p-0.5 dark:bg-surface-900/80">
           {(['canvas', 'split', 'code'] as ActivePanel[]).map(p => (
             <button key={p} onClick={() => setActivePanel(p)} className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${activePanel === p ? 'bg-volt-500/20 text-volt-500 dark:text-volt-400' : 'text-surface-500 hover:text-surface-950 hover:bg-white dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`}>
-              {p === 'canvas' ? 'Canvas' : p === 'split' ? 'Split' : 'Code'}
+              {p === 'canvas' ? t('Canvas') : p === 'split' ? t('Split') : t('Code')}
             </button>
           ))}
         </div>
@@ -521,22 +524,22 @@ export default function EditorPage() {
 
         {/* ── Canvas Operations (Undo / Redo) ── */}
         <div className="flex items-center gap-0.5">
-          <button onClick={undo} disabled={!isOwner || historyIndex < 0} className="p-2 rounded-lg text-surface-500 hover:text-surface-950 hover:bg-surface-100 disabled:opacity-30 transition-all dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5" title="Undo (Ctrl+Z)"><Undo className="w-3.5 h-3.5" /></button>
-          <button onClick={redo} disabled={!isOwner || historyIndex >= history.length - 1} className="p-2 rounded-lg text-surface-500 hover:text-surface-950 hover:bg-surface-100 disabled:opacity-30 transition-all dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5" title="Redo (Ctrl+Y)"><Redo className="w-3.5 h-3.5" /></button>
+          <button onClick={undo} disabled={!isOwner || historyIndex < 0} className="p-2 rounded-lg text-surface-500 hover:text-surface-950 hover:bg-surface-100 disabled:opacity-30 transition-all dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5" title={t("Undo (Ctrl+Z)")}><Undo className="w-3.5 h-3.5" /></button>
+          <button onClick={redo} disabled={!isOwner || historyIndex >= history.length - 1} className="p-2 rounded-lg text-surface-500 hover:text-surface-950 hover:bg-surface-100 disabled:opacity-30 transition-all dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5" title={t("Redo (Ctrl+Y)")}><Redo className="w-3.5 h-3.5" /></button>
         </div>
 
         <div className="toolbar-divider" />
 
         {/* ── Instrument Tools ── */}
         <div className="flex items-center gap-0.5">
-          <button onClick={() => setShowMultimeter(!showMultimeter)} className={`p-2 rounded-lg transition-all ${showMultimeter ? 'bg-volt-500/20 text-volt-500 dark:text-volt-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title="Multimeter"><Gauge className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setShowOscilloscope(!showOscilloscope)} className={`p-2 rounded-lg transition-all ${showOscilloscope ? 'bg-volt-500/20 text-volt-500 dark:text-volt-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title="Oscilloscope"><Activity className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setIsProbeMode(!isProbeMode)} className={`p-2 rounded-lg transition-all ${isProbeMode ? 'bg-purple-500/20 text-purple-500 dark:text-purple-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title="Diagnostic Probe Mode"><Zap className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setShowBom(!showBom)} className={`p-2 rounded-lg transition-all ${showBom ? 'bg-forge-500/20 text-forge-500 dark:text-forge-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title="Bill of Materials"><Package className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setCanvasViewMode(canvasViewMode === 'breadboard' ? 'pcb' : 'breadboard')} className={`p-2 rounded-lg transition-all ${canvasViewMode === 'pcb' ? 'bg-forge-500/20 text-forge-500 dark:text-forge-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title="Breadboard / PCB View"><Layers className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setSerialPanelOpen(!serialPanelOpen)} className={`p-2 rounded-lg transition-all ${serialPanelOpen ? 'bg-surface-100 text-surface-950 dark:bg-surface-800 dark:text-white' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title="Serial Monitor"><Terminal className="w-3.5 h-3.5" /></button>
-          <button onClick={handleShareLiveSession} className="p-2 rounded-lg transition-all text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5" title="Copy Share Link"><Share2 className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setShowSettings(true)} disabled={!isOwner} className="p-2 rounded-lg text-surface-500 hover:bg-surface-100 hover:text-surface-950 transition-all disabled:opacity-30 dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white" title="Settings"><Settings className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setShowMultimeter(!showMultimeter)} className={`p-2 rounded-lg transition-all ${showMultimeter ? 'bg-volt-500/20 text-volt-500 dark:text-volt-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title={t("Multimeter")}><Gauge className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setShowOscilloscope(!showOscilloscope)} className={`p-2 rounded-lg transition-all ${showOscilloscope ? 'bg-volt-500/20 text-volt-500 dark:text-volt-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title={t("Oscilloscope")}><Activity className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setIsProbeMode(!isProbeMode)} className={`p-2 rounded-lg transition-all ${isProbeMode ? 'bg-purple-500/20 text-purple-500 dark:text-purple-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title={t("Diagnostic Probe Mode")}><Zap className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setShowBom(!showBom)} className={`p-2 rounded-lg transition-all ${showBom ? 'bg-forge-500/20 text-forge-500 dark:text-forge-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title={t("Bill of Materials")}><Package className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setCanvasViewMode(canvasViewMode === 'breadboard' ? 'pcb' : 'breadboard')} className={`p-2 rounded-lg transition-all ${canvasViewMode === 'pcb' ? 'bg-forge-500/20 text-forge-500 dark:text-forge-400' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title={t("Breadboard / PCB View")}><Layers className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setSerialPanelOpen(!serialPanelOpen)} className={`p-2 rounded-lg transition-all ${serialPanelOpen ? 'bg-surface-100 text-surface-950 dark:bg-surface-800 dark:text-white' : 'text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5'}`} title={t("Serial Monitor")}><Terminal className="w-3.5 h-3.5" /></button>
+          <button onClick={handleShareLiveSession} className="p-2 rounded-lg transition-all text-surface-500 hover:text-surface-950 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-white dark:hover:bg-white/5" title={t("Copy Share Link")}><Share2 className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setShowSettings(true)} disabled={!isOwner} className="p-2 rounded-lg text-surface-500 hover:bg-surface-100 hover:text-surface-950 transition-all disabled:opacity-30 dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white" title={t("Settings")}><Settings className="w-3.5 h-3.5" /></button>
         </div>
 
         <div className="toolbar-divider" />
@@ -550,7 +553,7 @@ export default function EditorPage() {
               variant="danger"
               className="py-1 px-2.5 h-[26px]"
             >
-              Stop
+              {t('Stop')}
             </VfActionButton>
           ) : (
             <VfActionButton
@@ -559,15 +562,48 @@ export default function EditorPage() {
               variant="primary"
               className="py-1 px-2.5 h-[26px]"
             >
-              Run
+              {t('Run')}
             </VfActionButton>
           )}
-          <button onClick={handleExportZip} disabled={!currentProject} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-white text-surface-600 hover:text-surface-950 hover:bg-surface-100 transition-all border border-surface-200 dark:bg-surface-800 dark:text-surface-400 dark:hover:text-white dark:hover:bg-surface-700 dark:border-white/5"><Download className="w-3 h-3" /> Export</button>
-          <button onClick={handleExportGerber} disabled={!currentProject} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-white text-surface-600 hover:text-surface-950 hover:bg-surface-100 transition-all border border-surface-200 dark:bg-surface-800 dark:text-surface-400 dark:hover:text-white dark:hover:bg-surface-700 dark:border-white/5"><Layout className="w-3 h-3" /> Gerber</button>
+          <VfActionButton
+            onClick={handleExportZip}
+            disabled={!currentProject}
+            icon={<Download className="w-3.5 h-3.5" />}
+            variant="secondary"
+            className="py-1 px-3 h-[26px]"
+          >
+            {t('Export')}
+          </VfActionButton>
+          <VfActionButton
+            onClick={handleExportGerber}
+            disabled={!currentProject}
+            icon={<Layout className="w-3.5 h-3.5" />}
+            variant="secondary"
+            className="py-1 px-3 h-[26px]"
+          >
+            {t('Gerber')}
+          </VfActionButton>
           {isOwner ? (
-            <button onClick={handleSave} disabled={!isDirty && !isSaving} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${isSaving ? 'bg-volt-500/30 text-volt-500 animate-pulse dark:text-volt-300' : isDirty ? 'bg-volt-500 text-white hover:bg-volt-400 shadow-[0_0_16px_rgba(34,197,94,0.25)]' : 'bg-surface-100 text-surface-500 dark:bg-surface-800'}`}><Save className={`w-3 h-3 ${isSaving ? 'animate-spin' : ''}`} /> {isSaving ? 'Saving…' : 'Save'}</button>
+            <VfActionButton
+              onClick={handleSave}
+              icon={<Save className="w-3.5 h-3.5" />}
+              disabled={saveMutation.isPending}
+              loading={saveMutation.isPending}
+              className="py-1 px-3 h-[26px]"
+            >
+              {saveMutation.isPending ? t('Saving...') : t('Save')}
+            </VfActionButton>
           ) : (
-            <button onClick={handleFork} disabled={forkMutation.isPending} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${forkMutation.isPending ? 'bg-purple-500/30 text-purple-300 animate-pulse' : 'bg-purple-500 text-white hover:bg-purple-400 shadow-[0_0_16px_rgba(168,85,247,0.25)]'}`}><GitFork className={`w-3 h-3 ${forkMutation.isPending ? 'animate-spin' : ''}`} /> {forkMutation.isPending ? 'Forking…' : 'Fork to Edit'}</button>
+            <VfActionButton
+              onClick={() => forkMutation.mutate()}
+              disabled={forkMutation.isPending}
+              loading={forkMutation.isPending}
+              icon={<GitFork className="w-3.5 h-3.5" />}
+              variant="primary"
+              className="py-1 px-3 h-[26px]"
+            >
+              {forkMutation.isPending ? t('Forking...') : t('Fork to Edit')}
+            </VfActionButton>
           )}
         </div>
       </div>
@@ -580,11 +616,11 @@ export default function EditorPage() {
             <div className="bg-surface-100 relative flex flex-col dark:bg-[#0a0a14] w-full">
               {isSimulating && (
                 <div className="absolute top-3 right-3 z-10 glass px-3 py-1.5 rounded-full border border-volt-500/30">
-                  <VfStatusIndicator status="running" label="Simulating" />
+                  <VfStatusIndicator status="running" label={t("Simulating")} />
                 </div>
               )}
-              <div 
-                ref={canvasContainerCallbackRef} 
+              <div
+                ref={canvasContainerCallbackRef}
                 className="flex-1 relative min-h-0 min-w-0 p-0 m-0 border-0"
                 onContextMenu={handleContextMenu}
               >
@@ -603,7 +639,7 @@ export default function EditorPage() {
             </div>
           ) : activePanel === 'code' ? (
             <div className="relative min-w-0 w-full">
-              <Suspense fallback={<div className="p-4 text-xs text-surface-400 font-mono">Loading Code Editor...</div>}>
+              <Suspense fallback={<div className="p-4 text-xs text-surface-400 font-mono">{t("Loading Code Editor...")}</div>}>
                 <CodeEditor readOnly={!isOwner} />
               </Suspense>
             </div>
@@ -614,11 +650,11 @@ export default function EditorPage() {
                 <div className="bg-surface-100 relative flex flex-col dark:bg-[#0a0a14] h-full w-full">
                   {isSimulating && (
                     <div className="absolute top-3 right-3 z-10 glass px-3 py-1.5 rounded-full border border-volt-500/30">
-                      <VfStatusIndicator status="running" label="Simulating" />
+                      <VfStatusIndicator status="running" label={t("Simulating")} />
                     </div>
                   )}
-                  <div 
-                    ref={canvasContainerCallbackRef} 
+                  <div
+                    ref={canvasContainerCallbackRef}
                     className="flex-1 relative min-h-0 min-w-0 p-0 m-0 border-0"
                     onContextMenu={handleContextMenu}
                   >
@@ -638,7 +674,7 @@ export default function EditorPage() {
               }
               right={
                 <div className="relative min-w-0 h-full w-full">
-                  <Suspense fallback={<div className="p-4 text-xs text-surface-400 font-mono">Loading Code Editor...</div>}>
+                  <Suspense fallback={<div className="p-4 text-xs text-surface-400 font-mono">{t("Loading Code Editor...")}</div>}>
                     <CodeEditor readOnly={!isOwner} />
                   </Suspense>
                 </div>
@@ -667,21 +703,21 @@ export default function EditorPage() {
           y={contextMenu?.y || 0}
           items={[
             {
-              label: 'Undo Action',
+              label: t('Undo Action'),
               icon: <Undo className="w-3.5 h-3.5" />,
               onClick: undo
             },
             {
-              label: 'Redo Action',
+              label: t('Redo Action'),
               icon: <Redo className="w-3.5 h-3.5" />,
               onClick: redo
             },
             {
-              label: 'Reset Workspace',
+              label: t('Reset Workspace'),
               icon: <Trash2 className="w-3.5 h-3.5 text-red-500" />,
               destructive: true,
               onClick: () => {
-                if (confirm('Are you sure you want to clear the entire canvas? This action cannot be undone.')) {
+                if (confirm(t('Are you sure you want to clear the entire canvas? This action cannot be undone.'))) {
                   useCanvasStore.getState().clearCanvas();
                 }
               }

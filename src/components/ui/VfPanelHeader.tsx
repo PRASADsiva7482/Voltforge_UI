@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { ChevronDown, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export interface VfPanelHeaderProps {
   title: string;
@@ -20,6 +21,7 @@ export default function VfPanelHeader({
   actions,
   className = '',
 }: VfPanelHeaderProps) {
+  const { t } = useTranslation();
   return (
     <div className={`h-9 flex items-center justify-between px-3 bg-slate-50 border-b border-slate-200 dark:bg-surface-900/50 dark:border-white/5 shrink-0 select-none ${className}`}>
       <div className="flex items-center gap-2">
@@ -45,8 +47,8 @@ export default function VfPanelHeader({
         {onClose && (
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-white/5 dark:hover:text-white text-slate-500 transition-colors outline-none"
-            title="Close"
+            className="p-1 rounded hover:bg-slate-100 hover:text-slate-955 dark:hover:bg-white/5 dark:hover:text-white text-slate-500 transition-colors outline-none"
+            title={t("Close")}
           >
             <X className="w-3.5 h-3.5" />
           </button>

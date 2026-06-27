@@ -7,11 +7,11 @@ import { projectApi } from '../../api/services';
 import { useTranslation } from 'react-i18next';
 import type { ProjectSummary } from '../../types';
 import VfButton from '../../components/ui/VfButton';
-import VfInput from '../../components/ui/VfInput';
 import VfPageHeader from '../../components/ui/VfPageHeader';
 import VfProjectGrid from '../../components/ui/VfProjectGrid';
 import VfEmptyState from '../../components/ui/VfEmptyState';
 import VfPagination from '../../components/ui/VfPagination';
+import VfSearchInput from '../../components/ui/VfSearchInput';
 
 export default function ProjectsPage() {
   const { t } = useTranslation();
@@ -70,13 +70,11 @@ export default function ProjectsPage() {
         className="mb-10"
       >
         <div className="max-w-md">
-          <VfInput
-            type="text"
+          <VfSearchInput
             value={searchFilter}
-            onChange={(e) => setSearchFilter(e.target.value)}
+            onChange={setSearchFilter}
             placeholder={t('Filter projects...')}
-            inputSize="md"
-            iconLeft={<Search className="w-4 h-4" />}
+            hotkey="/"
           />
         </div>
       </motion.div>

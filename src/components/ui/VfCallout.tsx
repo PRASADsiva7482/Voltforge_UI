@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { AlertTriangle, CheckCircle, Info, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export type VfCalloutType = 'success' | 'warning' | 'error' | 'info';
 
@@ -25,6 +26,7 @@ export default function VfCallout({
   onClose,
   className = '',
 }: VfCalloutProps) {
+  const { t } = useTranslation();
   const { icon: Icon, classes } = config[type];
   
   return (
@@ -38,7 +40,7 @@ export default function VfCallout({
         <button 
           onClick={onClose} 
           className="p-0.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 opacity-60 hover:opacity-100 transition-opacity self-start"
-          title="Dismiss"
+          title={t("Dismiss")}
         >
           <X className="w-3.5 h-3.5" />
         </button>

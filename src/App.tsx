@@ -37,7 +37,10 @@ function syncUserOnce() {
   return syncUserPromise;
 }
 
+import { useTranslation } from 'react-i18next';
+
 function AuthInit({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   const { isAuthenticated, isLoading, setUser, setAuthenticated, setLoading } = useAuthStore();
   const [kcReady, setKcReady] = useState(false);
 
@@ -79,8 +82,8 @@ function AuthInit({ children }: { children: React.ReactNode }) {
         <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-volt-500 to-forge-500 flex items-center justify-center mx-auto mb-6 animate-pulse">
           <Zap className="w-8 h-8 text-white" />
         </div>
-        <h2 className="text-xl font-bold text-surface-950 dark:text-white mb-2">VoltForge</h2>
-        <p className="text-surface-600 dark:text-surface-400 text-sm">Loading your workspace...</p>
+        <h2 className="text-xl font-bold text-surface-950 dark:text-white mb-2">{t('VoltForge')}</h2>
+        <p className="text-surface-600 dark:text-surface-400 text-sm">{t('Loading your workspace...')}</p>
         <div className="mt-4 w-32 h-1 bg-surface-200 dark:bg-surface-800 rounded-full mx-auto overflow-hidden">
           <div className="h-full bg-gradient-to-r from-volt-500 to-forge-500 rounded-full animate-[pulse_1.5s_ease-in-out_infinite]" style={{ width: '60%' }} />
         </div>
@@ -92,13 +95,14 @@ function AuthInit({ children }: { children: React.ReactNode }) {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuthStore();
 
   if (!isAuthenticated) {
     keycloak.login({ redirectUri: window.location.origin + '/dashboard' });
     return (
       <div className="flex items-center justify-center h-screen bg-surface-50 text-surface-950 dark:bg-surface-950 dark:text-white font-semibold">
-        Redirecting to login...
+        {t('Redirecting to login...')}
       </div>
     );
   }

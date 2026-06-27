@@ -1,5 +1,6 @@
 import VfButton from './VfButton';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export interface VfPaginationProps {
   page: number; // 0-indexed
@@ -8,6 +9,7 @@ export interface VfPaginationProps {
 }
 
 export default function VfPagination({ page, totalPages, onPageChange }: VfPaginationProps) {
+  const { t } = useTranslation();
   if (totalPages <= 1) return null;
 
   return (
@@ -19,11 +21,11 @@ export default function VfPagination({ page, totalPages, onPageChange }: VfPagin
         disabled={page === 0}
         icon={<ChevronLeft className="w-3.5 h-3.5" />}
       >
-        Previous
+        {t('Previous')}
       </VfButton>
       
       <div className="flex items-center gap-1.5 px-3 py-1.5 glass rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 border border-slate-200/50 dark:border-white/5">
-        <span>Page</span>
+        <span>{t('Page')}</span>
         <span className="text-volt-500 font-bold dark:text-volt-400">{page + 1}</span>
         <span className="text-slate-400">/</span>
         <span>{totalPages}</span>
@@ -37,7 +39,7 @@ export default function VfPagination({ page, totalPages, onPageChange }: VfPagin
         icon={<ChevronRight className="w-3.5 h-3.5" />}
         iconPosition="right"
       >
-        Next
+        {t('Next')}
       </VfButton>
     </div>
   );

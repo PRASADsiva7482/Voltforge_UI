@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { User, Mail, Shield, Save, Check, Calendar } from 'lucide-react';
 import VfButton from '../../components/ui/VfButton';
 import VfPageHeader from '../../components/ui/VfPageHeader';
+import VfCard from '../../components/ui/VfCard';
 import VfAvatar from '../../components/ui/VfAvatar';
 import VfBadge from '../../components/ui/VfBadge';
 import VfFormField from '../../components/ui/VfFormField';
@@ -48,12 +49,7 @@ export default function SettingsPage() {
       />
 
       {/* Profile Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="glass rounded-2xl p-8 mb-10"
-      >
+      <VfCard className="mb-10">
         <div className="flex items-center gap-3 mb-8">
           <User className="w-5 h-5 text-volt-400" />
           <h2 className="text-lg font-semibold text-surface-950 dark:text-white">{t('Profile')}</h2>
@@ -110,18 +106,13 @@ export default function SettingsPage() {
             disabled={updateMutation.isPending}
             loading={updateMutation.isPending}
             icon={saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}>
-            {saved ? 'Saved!' : updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+            {saved ? t('Saved!') : updateMutation.isPending ? t('Saving...') : t('Save Changes')}
           </VfButton>
         </div>
-      </motion.div>
+      </VfCard>
 
       {/* Account Info (read-only) */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-        className="glass rounded-2xl p-8 mb-10"
-      >
+      <VfCard className="mb-10">
         <div className="flex items-center gap-3 mb-6">
           <Shield className="w-5 h-5 text-forge-400" />
           <h2 className="text-lg font-semibold text-surface-950 dark:text-white">{t('Account')}</h2>
@@ -131,33 +122,33 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between py-3 border-b border-surface-200/70 dark:border-white/5">
             <div className="flex items-center gap-3">
               <Mail className="w-4 h-4 text-surface-400" />
-              <span className="text-sm text-surface-700 dark:text-surface-300">Email</span>
+              <span className="text-sm text-surface-700 dark:text-surface-300">{t('Email')}</span>
             </div>
             <span className="text-sm text-surface-950 dark:text-white">{user?.email}</span>
           </div>
           <div className="flex items-center justify-between py-3 border-b border-surface-200/70 dark:border-white/5">
             <div className="flex items-center gap-3">
               <User className="w-4 h-4 text-surface-400" />
-              <span className="text-sm text-surface-700 dark:text-surface-300">Username</span>
+              <span className="text-sm text-surface-700 dark:text-surface-300">{t('Username')}</span>
             </div>
             <span className="text-sm text-surface-950 dark:text-white">{user?.username}</span>
           </div>
           <div className="flex items-center justify-between py-3 border-b border-surface-200/70 dark:border-white/5">
             <div className="flex items-center gap-3">
               <Shield className="w-4 h-4 text-surface-400" />
-              <span className="text-sm text-surface-700 dark:text-surface-300">Role</span>
+              <span className="text-sm text-surface-700 dark:text-surface-300">{t('Role')}</span>
             </div>
             <span className="text-sm text-surface-950 dark:text-white">{user?.role}</span>
           </div>
           <div className="flex items-center justify-between py-3">
             <div className="flex items-center gap-3">
               <Calendar className="w-4 h-4 text-surface-400" />
-              <span className="text-sm text-surface-700 dark:text-surface-300">Member since</span>
+              <span className="text-sm text-surface-700 dark:text-surface-300">{t('Member since')}</span>
             </div>
             <span className="text-sm text-surface-950 dark:text-white">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</span>
           </div>
         </div>
-      </motion.div>
+      </VfCard>
     </div>
   );
 }

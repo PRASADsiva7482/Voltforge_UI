@@ -2,6 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Globe, Sun, Moon, Menu, Bell, User, X, LayoutDashboard, FolderOpen, Cpu, Settings, Shield, LogOut, BellOff } from 'lucide-react';
 import VfInput from '../ui/VfInput';
 import VfAvatar from '../ui/VfAvatar';
+import VfSearchInput from '../ui/VfSearchInput';
+import VfIconButton from '../ui/VfIconButton';
+import VfThemeToggle from '../ui/VfThemeToggle';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useTranslation } from 'react-i18next';
 import { useThemeStore } from '../../store/themeStore';
@@ -138,14 +141,11 @@ export default function Navbar() {
         {/* Left side: Search */}
         <div className="flex items-center flex-1">
           <form onSubmit={handleSearch} className="hidden md:flex max-w-md w-full ml-4">
-            <VfInput
-              id="global-search"
-              type="text"
+            <VfSearchInput
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={setSearchQuery}
               placeholder={t('Search projects...')}
-              inputSize="md"
-              iconLeft={<Search className="w-4 h-4" />}
+              hotkey="/"
             />
           </form>
         </div>
@@ -154,14 +154,13 @@ export default function Navbar() {
         <div className="flex items-center gap-3">
           {/* Language Switcher */}
           <div className="relative" ref={langRef}>
-            <button
+            <VfIconButton
               id="lang-switcher"
               onClick={() => setIsLangOpen(!isLangOpen)}
-              className={`${iconButtonBase} ${isLangOpen ? iconButtonActive : iconButtonIdle}`}
-              title="Language"
-            >
-              <Globe className="w-4 h-4" />
-            </button>
+              active={isLangOpen}
+              icon={<Globe className="w-4 h-4" />}
+              title={t("Language")}
+            />
 
             <AnimatePresence>
               {isLangOpen && (
@@ -190,28 +189,27 @@ export default function Navbar() {
           </div>
 
           {/* Theme Toggle */}
-          <button
-            id="theme-toggle"
-            onClick={toggleTheme}
-            className={`${iconButtonBase} ${iconButtonIdle}`}
-            title="Toggle Theme"
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
+          <VfThemeToggle
+            theme={theme}
+            onToggle={toggleTheme}
+          />
 
           {/* Notifications Dropdown */}
           <div className="hidden md:block relative" ref={notifRef}>
-            <button
+            <VfIconButton
               id="notifications-bell"
               onClick={toggleNotifications}
-              className={`${iconButtonBase} relative ${isNotifOpen ? iconButtonActive : iconButtonIdle}`}
-              title="Notifications"
-            >
-              <Bell className="w-4 h-4" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-forge-500 rounded-full border-2 border-surface-900" />
-              )}
-            </button>
+              active={isNotifOpen}
+              icon={
+                <div className="relative">
+                  <Bell className="w-4 h-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 w-2 h-2 bg-forge-500 rounded-full" />
+                  )}
+                </div>
+              }
+              title={t("Notifications")}
+            />
 
             <AnimatePresence>
               {isNotifOpen && (
@@ -252,8 +250,8 @@ export default function Navbar() {
                           <div className="flex items-start gap-3">
                             <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${notif.read ? 'bg-surface-600' : 'bg-volt-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]'}`} />
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs text-surface-950 font-medium leading-relaxed dark:text-white">{notif.title}</p>
-                              <p className="text-[10px] text-surface-500 mt-0.5">{notif.time}</p>
+                              <p className="text-xs text-surface-950 font-medium leading-relaxed dark:text-white">{t(notif.title)}</p>
+                              <p className="text-[10px] text-surface-500 mt-0.5">{t(notif.time)}</p>
                             </div>
                           </div>
                         </div>
@@ -358,13 +356,11 @@ export default function Navbar() {
               {/* Mobile Search */}
               <div className="px-5 py-4 border-b border-surface-200/70 dark:border-white/5">
                 <form onSubmit={(e) => { handleSearch(e); setIsMobileMenuOpen(false); }}>
-                  <VfInput
-                    type="text"
+                  <VfSearchInput
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={setSearchQuery}
                     placeholder={t('Search projects...')}
-                    inputSize="lg"
-                    iconLeft={<Search className="w-4 h-4" />}
+                    hotkey=""
                   />
                 </form>
               </div>

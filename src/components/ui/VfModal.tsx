@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 export interface VfModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title: string;
+  title: ReactNode;
   icon?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;

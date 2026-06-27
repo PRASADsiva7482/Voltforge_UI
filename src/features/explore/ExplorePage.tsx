@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Cpu, Filter, TrendingUp, Search } from 'lucide-react';
 import VfButton from '../../components/ui/VfButton';
-import VfInput from '../../components/ui/VfInput';
 import VfPageHeader from '../../components/ui/VfPageHeader';
+import VfSearchInput from '../../components/ui/VfSearchInput';
 import VfSegmentedControl from '../../components/ui/VfSegmentedControl';
 import VfProjectGrid from '../../components/ui/VfProjectGrid';
 import VfEmptyState from '../../components/ui/VfEmptyState';
@@ -76,13 +76,11 @@ export default function ExplorePage() {
           />
         </div>
         <div className="w-full md:w-72">
-          <VfInput
-            type="text"
+          <VfSearchInput
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search projects..."
-            inputSize="md"
-            iconLeft={<Search className="w-4 h-4" />}
+            onChange={setSearchQuery}
+            placeholder={t("Search projects...")}
+            hotkey="/"
           />
         </div>
       </motion.div>

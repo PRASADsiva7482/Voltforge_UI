@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Bot, User, Sparkles, Copy, Check, Code2 } from 'lucide-react';
+import { X, Send, Bot, User, Sparkles, Code2 } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { aiApi } from '../../api/services';
 import type { AiChatMessage } from '../../types';
 import VfTextarea from '../../components/ui/VfTextarea';
+import VfCodeBlock from '../../components/ui/VfCodeBlock';
+import VfSuggestionsList from '../../components/ui/VfSuggestionsList';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   isOpen: boolean;
@@ -14,9 +17,9 @@ interface Props {
 }
 
 export default function AiChatPanel({ isOpen, onClose, onApplyCode, projectContext }: Props) {
+  const { t } = useTranslation();
   const [messages, setMessages] = useState<AiChatMessage[]>([]);
   const [input, setInput] = useState('');
-  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const chatMutation = useMutation({
@@ -30,7 +33,7 @@ export default function AiChatPanel({ isOpen, onClose, onApplyCode, projectConte
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
     },
     onError: () => {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: t('Sorry, I encountered an error. Please try again.') }]);
     },
   });
 
@@ -55,12 +58,6 @@ export default function AiChatPanel({ isOpen, onClose, onApplyCode, projectConte
     }
   }, [messages, chatMutation.isPending]);
 
-  const copyToClipboard = (text: string, idx: number) => {
-    navigator.clipboard.writeText(text);
-    setCopiedIdx(idx);
-    setTimeout(() => setCopiedIdx(null), 1500);
-  };
-
   // Extract code blocks from message
   const renderMessage = (content: string, msgIdx: number) => {
     const parts = content.split(/(```[\s\S]*?```)/g);
@@ -69,28 +66,22 @@ export default function AiChatPanel({ isOpen, onClose, onApplyCode, projectConte
         const codeMatch = part.match(/```(?:\w+)?\s*\n?([\s\S]*?)```/);
         const code = codeMatch ? codeMatch[1].trim() : part.replace(/```/g, '').trim();
         return (
-          <div key={i} className="my-2 rounded-lg bg-surface-50 border border-surface-200 overflow-hidden dark:bg-surface-900 dark:border-white/5">
-            <div className="flex items-center justify-between px-3 py-1.5 bg-white border-b border-surface-200 dark:bg-surface-800/80 dark:border-white/5">
-              <span className="text-[10px] text-surface-500 uppercase font-mono dark:text-surface-400">Code</span>
-              <div className="flex items-center gap-1">
-                {onApplyCode && (
-                  <button
-                    onClick={() => onApplyCode(code)}
-                    className="flex items-center gap-1 text-[10px] text-volt-600 hover:text-volt-500 px-2 py-0.5 rounded dark:text-volt-400 dark:hover:text-volt-300"
-                  >
-                    <Code2 className="w-3 h-3" /> Apply
-                  </button>
-                )}
+          <VfCodeBlock
+            key={i}
+            code={code}
+            language="cpp"
+            actions={
+              onApplyCode && (
                 <button
-                  onClick={() => copyToClipboard(code, msgIdx * 100 + i)}
-                  className="flex items-center gap-1 text-[10px] text-surface-500 hover:text-surface-950 px-2 py-0.5 rounded dark:text-surface-400 dark:hover:text-white"
+                  onClick={() => onApplyCode(code)}
+                  className="flex items-center gap-1 text-[10px] text-volt-600 hover:text-volt-500 px-2 py-0.5 rounded dark:text-volt-400 dark:hover:text-volt-300 outline-none cursor-pointer font-bold"
                 >
-                  {copiedIdx === msgIdx * 100 + i ? <Check className="w-3 h-3 text-volt-400" /> : <Copy className="w-3 h-3" />}
+                  <Code2 className="w-3.5 h-3.5" /> {t('Apply')}
                 </button>
-              </div>
-            </div>
-            <pre className="p-3 text-xs text-emerald-700 font-mono overflow-x-auto whitespace-pre-wrap dark:text-green-400">{code}</pre>
-          </div>
+              )
+            }
+            className="my-2"
+          />
         );
       }
       return <span key={i} className="whitespace-pre-wrap">{part}</span>;
@@ -114,8 +105,8 @@ export default function AiChatPanel({ isOpen, onClose, onApplyCode, projectConte
                 <Sparkles className="w-4 h-4 text-white" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-surface-950 dark:text-white">VoltForge AI</h3>
-                <p className="text-[10px] text-surface-500 dark:text-surface-400">Powered by Gemma</p>
+                <h3 className="text-sm font-semibold text-surface-950 dark:text-white">{t('VoltForge AI')}</h3>
+                <p className="text-[10px] text-surface-500 dark:text-surface-400">{t('Powered by Gemma')}</p>
               </div>
             </div>
             <button onClick={onClose} className="p-1.5 rounded-lg text-surface-500 hover:bg-surface-100 hover:text-surface-950 transition-colors dark:text-surface-400 dark:hover:bg-white/5 dark:hover:text-white">
@@ -130,23 +121,16 @@ export default function AiChatPanel({ isOpen, onClose, onApplyCode, projectConte
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center mb-4">
                   <Bot className="w-8 h-8 text-purple-400" />
                 </div>
-                <h3 className="text-sm font-semibold text-surface-950 mb-2 dark:text-white">VoltForge AI Assistant</h3>
-                <p className="text-xs text-surface-600 mb-6 dark:text-surface-400">Ask me about circuits, components, Arduino code, or debugging</p>
-                <div className="space-y-2 w-full">
-                  {[
-                    'How do I connect an LED to Arduino?',
-                    'Generate code for a temperature sensor',
-                    'What resistor do I need for a 5V LED?',
-                  ].map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      onClick={() => { setInput(suggestion); }}
-                      className="w-full text-left px-3 py-2 rounded-lg bg-white border border-surface-200 text-xs text-surface-700 hover:bg-surface-50 hover:text-surface-950 transition-colors dark:bg-white/[0.03] dark:border-white/5 dark:text-surface-300 dark:hover:bg-white/5 dark:hover:text-white"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
+                <h3 className="text-sm font-semibold text-surface-950 mb-2 dark:text-white">{t('VoltForge AI Assistant')}</h3>
+                <p className="text-xs text-surface-600 mb-6 dark:text-surface-400">{t('Ask me about circuits, components, Arduino code, or debugging')}</p>
+                <VfSuggestionsList
+                  suggestions={[
+                    t('How do I connect an LED to Arduino?'),
+                    t('Generate code for a temperature sensor'),
+                    t('What resistor do I need for a 5V LED?'),
+                  ]}
+                  onSelect={(suggestion) => setInput(suggestion)}
+                />
               </div>
             )}
 
@@ -195,7 +179,7 @@ export default function AiChatPanel({ isOpen, onClose, onApplyCode, projectConte
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask VoltForge AI..."
+                placeholder={t('Ask VoltForge AI...')}
                 rows={1}
                 className="flex-1 px-3 py-2 bg-white border border-surface-200 rounded-xl text-xs text-surface-950 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none max-h-24 dark:bg-white/5 dark:border-white/10 dark:text-white"
                 style={{ minHeight: '36px' }}
