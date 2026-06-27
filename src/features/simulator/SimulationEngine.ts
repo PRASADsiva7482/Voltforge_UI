@@ -50,6 +50,7 @@ class LcdI2CExpander {
   private cursorRow = 0;
   private cursorCol = 0;
   private buffer: string[][] = Array.from({ length: 2 }, () => Array(16).fill(' '));
+  private fourBitMode = false;
 
   constructor(private onUpdate: (line1: string, line2: string, backlight: boolean) => void) {}
 
@@ -64,14 +65,33 @@ class LcdI2CExpander {
 
     // Detect high-to-low transition of EN
     if (this.en === 1 && en === 0) {
-      if (this.highNibble === null) {
-        // This is the first nibble (high nibble)
-        this.highNibble = nibble;
+      if (!this.fourBitMode) {
+        if (nibble === 0x03) {
+          this.processLcdByte(rs, 0x30);
+          this.highNibble = null;
+        } else if (nibble === 0x02) {
+          this.processLcdByte(rs, 0x20);
+          this.fourBitMode = true;
+          this.highNibble = null;
+        } else {
+          if (this.highNibble === null) {
+            this.highNibble = nibble;
+          } else {
+            const fullByte = (this.highNibble << 4) | nibble;
+            this.highNibble = null;
+            this.processLcdByte(rs, fullByte);
+          }
+        }
       } else {
-        // This is the second nibble (low nibble)
-        const fullByte = (this.highNibble << 4) | nibble;
-        this.highNibble = null;
-        this.processLcdByte(rs, fullByte);
+        if (this.highNibble === null) {
+          // This is the first nibble (high nibble)
+          this.highNibble = nibble;
+        } else {
+          // This is the second nibble (low nibble)
+          const fullByte = (this.highNibble << 4) | nibble;
+          this.highNibble = null;
+          this.processLcdByte(rs, fullByte);
+        }
       }
     }
     this.en = en;
