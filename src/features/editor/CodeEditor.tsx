@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
-import Editor, { OnMount } from '@monaco-editor/react';
-import { Maximize2, Minimize2, FileCode2, Bug, AlignLeft, Eye, EyeOff } from 'lucide-react';
+import { lazy, Suspense, useEffect, useRef, useState, useMemo } from 'react';
 import { useProjectStore } from '../../store/projectStore';
-import { useSimulationStore } from '../../store/simulationStore';
 import { useCanvasStore } from '../../store/canvasStore';
-import { useTranslation } from 'react-i18next';
-import SerialMonitor from './SerialMonitor';
+import { Loader2, Maximize2, Minimize2, AlignLeft, Eye, EyeOff } from 'lucide-react';
+import type { OnMount } from '@monaco-editor/react';
+
+const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.default })));
 
 // ── Arduino framework boilerplate generator ──
 function generateFullCode(userCode: string, boardType?: string): string {
@@ -13,7 +12,6 @@ function generateFullCode(userCode: string, boardType?: string): string {
 
   // Collect pin assignments from connected components
   const pinDefs: string[] = [];
-  const setupLines: string[] = [];
   const seenTypes = new Set<string>();
 
   nodes.forEach(node => {
@@ -66,227 +64,163 @@ function generateFullCode(userCode: string, boardType?: string): string {
   return header + userCode;
 }
 
-export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
-  const { t } = useTranslation();
-  const { currentProject, activeCodeFile, setActiveCodeFile, updateCodeFileContent } = useProjectStore();
-  const { debugSnapshot, setBreakpoints } = useSimulationStore();
+export default function CodeEditor() {
+  const activeCodeFile = useProjectStore((s) => s.activeCodeFile);
+  const codeFiles = useProjectStore((s) => s.currentProject?.codeFiles || []);
+  const updateCodeFileContent = useProjectStore((s) => s.updateCodeFileContent);
+  const setActiveCodeFile = useProjectStore((s) => s.setActiveCodeFile);
+  const boardType = useProjectStore((s) => s.currentProject?.boardType);
+
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFullCode, setShowFullCode] = useState(false);
+
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
-  const decorationIds = useRef<string[]>([]);
-
-  const lastShowFullCode = useRef(showFullCode);
-  const lastFileId = useRef(activeCodeFile?.id);
   const ignoreChange = useRef(false);
 
-  if (lastShowFullCode.current !== showFullCode || lastFileId.current !== activeCodeFile?.id) {
-    lastShowFullCode.current = showFullCode;
-    lastFileId.current = activeCodeFile?.id;
-    ignoreChange.current = true;
-  }
-
+  // Sync to prevent onChange updates during fullCode toggling
   useEffect(() => {
-    if (ignoreChange.current) {
-      const timer = setTimeout(() => {
-        ignoreChange.current = false;
-      }, 100);
-      return () => clearTimeout(timer);
-    }
+    ignoreChange.current = true;
+    const timer = setTimeout(() => {
+      ignoreChange.current = false;
+    }, 100);
+    return () => clearTimeout(timer);
   }, [showFullCode, activeCodeFile?.id]);
 
-  const codeFiles = currentProject?.codeFiles || [];
-
-  // Generate full code view when toggled
   const fullCode = useMemo(() => {
     if (!activeCodeFile || !showFullCode) return null;
-    return generateFullCode(activeCodeFile.content, currentProject?.boardType);
-  }, [activeCodeFile?.content, showFullCode, currentProject?.boardType]);
+    return generateFullCode(activeCodeFile.content, boardType);
+  }, [activeCodeFile?.content, showFullCode, boardType]);
 
   const displayedContent = showFullCode && fullCode ? fullCode : activeCodeFile?.content || '';
 
   const handleEditorMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
-    // Register Arduino keywords
-    editor.addAction({
-      id: 'find-replace',
-      label: t('Find and Replace'),
-      keybindings: [],
-      run: (ed: any) => ed.getAction('editor.action.startFindReplaceAction')?.run(),
-    });
-    editor.onMouseDown((event: any) => {
-      if (event.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN && event.target.type !== monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS) return;
-      const lineNumber = event.target.position?.lineNumber;
-      if (!lineNumber) return;
-      const currentBreakpoints = useSimulationStore.getState().debugSnapshot.breakpoints;
-      const next = currentBreakpoints.includes(lineNumber)
-        ? currentBreakpoints.filter(line => line !== lineNumber)
-        : [...currentBreakpoints, lineNumber].sort((a, b) => a - b);
-      setBreakpoints(next);
-      window.dispatchEvent(new CustomEvent('voltforge:breakpoints', { detail: next }));
-    });
   };
 
-  useEffect(() => {
-    const editor = editorRef.current;
-    const monaco = monacoRef.current;
-    if (!editor || !monaco) return;
-    const decorations = [
-      ...debugSnapshot.breakpoints.map(line => ({
-        range: new monaco.Range(line, 1, line, 1),
-        options: { glyphMarginClassName: 'vf-breakpoint-glyph', glyphMarginHoverMessage: { value: 'Breakpoint' } },
-      })),
-      ...(debugSnapshot.currentLine ? [{
-        range: new monaco.Range(debugSnapshot.currentLine, 1, debugSnapshot.currentLine, 1),
-        options: { isWholeLine: true, className: 'vf-current-line', glyphMarginClassName: 'vf-current-glyph' },
-      }] : []),
-    ];
-    decorationIds.current = editor.deltaDecorations(decorationIds.current, decorations);
-  }, [debugSnapshot.breakpoints, debugSnapshot.currentLine]);
-
-  // Format code using Monaco's built-in formatter
   const handleFormatCode = () => {
     const editor = editorRef.current;
     if (!editor) return;
     editor.getAction('editor.action.formatDocument')?.run();
   };
 
-  if (!activeCodeFile) {
-    return (
-      <div className="flex items-center justify-center h-full bg-surface-950 text-surface-500">
-        <div className="text-center">
-          <FileCode2 className="w-10 h-10 mx-auto mb-3 text-surface-700" />
-          <p className="text-sm font-medium">{t('No file selected')}</p>
-          <p className="text-xs text-surface-600 mt-1">{t('Select a file from the tabs above')}</p>
-        </div>
-      </div>
-    );
-  }
-
   const languageMap: Record<string, string> = {
     cpp: 'cpp', c: 'c', h: 'cpp', ino: 'cpp', py: 'python', js: 'javascript', json: 'json',
   };
-  const ext = activeCodeFile.filename.split('.').pop() || 'cpp';
-  const lang = languageMap[ext] || activeCodeFile.language || 'cpp';
-
-  const containerClass = isFullscreen
-    ? 'fixed inset-0 z-50 bg-surface-950 flex flex-col'
-    : 'h-full flex flex-col bg-surface-950';
+  const ext = activeCodeFile?.filename.split('.').pop() || 'cpp';
+  const lang = languageMap[ext] || activeCodeFile?.language || 'cpp';
 
   return (
-    <div className={containerClass}>
-      {/* File Tabs */}
-      <div className="flex items-center border-b border-white/5 bg-surface-900/60 overflow-x-auto">
-        <div className="flex items-center flex-1 min-w-0">
+    <div className={`vf-code-editor ${isFullscreen ? 'is-fullscreen' : ''}`}>
+      {/* Tabs / Toolbar bar */}
+      <div className="vf-code-editor__tabs">
+        <div className="vf-code-editor__tabs-list">
           {codeFiles.map(file => (
-            <button key={file.id} onClick={() => { setActiveCodeFile(file); setShowFullCode(false); }}
-              className={`flex items-center gap-1.5 px-3 py-2 text-[11px] font-medium border-r border-white/5 whitespace-nowrap transition-colors ${
-                activeCodeFile?.id === file.id
-                  ? 'bg-surface-950 text-volt-400 border-b-2 border-b-volt-500'
-                  : 'text-surface-400 hover:text-white hover:bg-white/5'
-              }`}
+            <button
+              key={file.id}
+              className={`vf-code-editor__tab ${activeCodeFile?.id === file.id ? 'is-active' : ''}`}
+              onClick={() => {
+                setActiveCodeFile(file);
+                setShowFullCode(false);
+              }}
             >
-              <FileCode2 className="w-3 h-3" />
               {file.filename}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-1 px-2">
-          <span className="text-[9px] text-surface-500 bg-surface-800 px-1.5 py-0.5 rounded font-mono">
-            {lang.toUpperCase()}
-          </span>
-          <span className="flex items-center gap-1 text-[9px] text-surface-500 bg-surface-800 px-1.5 py-0.5 rounded">
-            <Bug className="w-3 h-3" />
-            {debugSnapshot.breakpoints.length}
-          </span>
 
-          {/* Format Code Button */}
-          <button
-            onClick={handleFormatCode}
-            className="p-1 rounded hover:bg-white/5 text-surface-400 hover:text-white transition-colors"
-            title={t("Format Code (Auto-indent)")}
-          >
-            <AlignLeft className="w-3.5 h-3.5" />
-          </button>
+        {activeCodeFile && (
+          <div className="vf-code-editor__actions">
+            <span className="vf-code-editor__lang-badge">{lang}</span>
 
-          {/* Toggle Full Code / User Code Button */}
-          <button
-            onClick={() => setShowFullCode(!showFullCode)}
-            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-all ${
-              showFullCode
-                ? 'bg-forge-500/20 text-forge-400 border border-forge-500/30'
-                : 'hover:bg-white/5 text-surface-400 hover:text-white'
-            }`}
-            title={showFullCode ? t('Show user code only') : t('Show full generated code (includes, pin defs, libraries)')}
-          >
-            {showFullCode ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-            {showFullCode ? t('User') : t('Full')}
-          </button>
+            {/* Format code button */}
+            <button
+              className="vf-code-editor__action-btn"
+              onClick={handleFormatCode}
+              title="Format Code (Auto-indent)"
+            >
+              <AlignLeft size={13} />
+            </button>
 
-          <button onClick={() => setIsFullscreen(!isFullscreen)}
-            className="p-1 rounded hover:bg-white/5 text-surface-400 hover:text-white transition-colors"
-            title={isFullscreen ? t('Exit Fullscreen') : t('Fullscreen')}
-          >
-            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-          </button>
-        </div>
+            {/* View Full Code / User Code */}
+            <button
+              className={`vf-code-editor__action-btn vf-code-editor__action-btn--full ${showFullCode ? 'is-active' : ''}`}
+              onClick={() => setShowFullCode(!showFullCode)}
+              title={showFullCode ? "Show user code only" : "Show full generated sketch code"}
+            >
+              {showFullCode ? <EyeOff size={13} /> : <Eye size={13} />}
+              <span>{showFullCode ? 'User Code' : 'Full Sketch'}</span>
+            </button>
+
+            {/* Fullscreen button */}
+            <button
+              className="vf-code-editor__action-btn"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            >
+              {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Full Code Banner */}
+      {/* Full code warning banner */}
       {showFullCode && (
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-forge-500/10 border-b border-forge-500/20 text-[10px]">
-          <Eye className="w-3 h-3 text-forge-400 flex-shrink-0" />
-          <span className="text-forge-300">
-            <strong className="text-forge-400">{t("Full Code View")}</strong> — {t("Read-only preview with auto-generated #includes, pin definitions, and library headers based on your canvas components.")}
+        <div className="vf-code-editor__banner">
+          <Eye size={13} />
+          <span>
+            <strong>Full Sketch View</strong> — Read-only boilerplate containing auto-generated libraries and pin definitions.
           </span>
         </div>
       )}
 
-      {/* Editor */}
-      <div className="flex-1 min-h-0">
-        <Editor
-          height="100%"
-          language={lang}
-          value={displayedContent}
-          theme="vs-dark"
-          onMount={handleEditorMount}
-          onChange={(value) => {
-            if (showFullCode || ignoreChange.current) return;
-            if (value === undefined) return;
+      {/* Editor Body */}
+      <div className="vf-code-editor__body">
+        {activeCodeFile ? (
+          <Suspense fallback={
+            <div className="vf-code-editor__loading">
+              <Loader2 size={24} className="vf-spin" />
+              <span>Loading editor...</span>
+            </div>
+          }>
+            <MonacoEditor
+              height="100%"
+              language={lang}
+              theme="vs-dark"
+              value={displayedContent}
+              onMount={handleEditorMount}
+              onChange={(value) => {
+                if (showFullCode || ignoreChange.current) return;
+                if (value === undefined) return;
 
-            // Prevent saving full code view contents if it contains auto-generated headers
-            if (value.includes('VoltForge — Auto-generated Full Sketch') || value.includes('Auto-generated Full Sketch')) {
-              return;
-            }
+                // Protect content integrity
+                if (value.includes('VoltForge — Auto-generated Full Sketch')) {
+                  return;
+                }
 
-            updateCodeFileContent(activeCodeFile.id, value);
-          }}
-          options={{
-            fontSize: 13,
-            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-            minimap: { enabled: true, maxColumn: 80 },
-            scrollBeyondLastLine: false,
-            wordWrap: 'on',
-            tabSize: 2,
-            automaticLayout: true,
-            bracketPairColorization: { enabled: true },
-            padding: { top: 12 },
-            suggestOnTriggerCharacters: true,
-            quickSuggestions: true,
-            lineNumbers: 'on',
-            folding: true,
-            renderWhitespace: 'selection',
-            smoothScrolling: true,
-            cursorSmoothCaretAnimation: 'on',
-            cursorBlinking: 'smooth',
-            formatOnPaste: true,
-            readOnly: readOnly || showFullCode, // Read-only in full code view or non-owner mode
-          }}
-        />
+                updateCodeFileContent(activeCodeFile.id, value);
+              }}
+              options={{
+                fontSize: 13,
+                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                lineNumbers: 'on',
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                tabSize: 2,
+                wordWrap: 'on',
+                bracketPairColorization: { enabled: true },
+                padding: { top: 12 },
+                readOnly: showFullCode,
+              }}
+            />
+          </Suspense>
+        ) : (
+          <div className="vf-code-editor__empty">
+            <p>No code file selected</p>
+          </div>
+        )}
       </div>
-
-      <SerialMonitor />
     </div>
   );
 }

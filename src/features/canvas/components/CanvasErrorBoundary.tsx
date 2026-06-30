@@ -35,11 +35,12 @@ export default class CanvasErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex items-center justify-center w-full h-full bg-surface-50 dark:bg-surface-950">
-          <div className="text-center px-6 py-10 max-w-md">
-            <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+        <div className="vf-canvas-error">
+          <div className="vf-canvas-error__body">
+            <div className="vf-canvas-error__icon">
               <svg
-                className="w-7 h-7 text-red-500"
+                width="28"
+                height="28"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -52,20 +53,16 @@ export default class CanvasErrorBoundary extends Component<Props, State> {
                 />
               </svg>
             </div>
-            <h2 className="text-lg font-semibold text-surface-950 dark:text-white mb-2">
-              Canvas Rendering Error
-            </h2>
-            <p className="text-sm text-surface-600 dark:text-surface-400 mb-1">
-              Something went wrong while rendering the circuit canvas.
-            </p>
+            <h2>Canvas Rendering Error</h2>
+            <p>Something went wrong while rendering the circuit canvas.</p>
             {this.state.error && (
-              <p className="text-xs text-red-500/80 font-mono mb-6 break-all">
+              <p className="vf-canvas-error__detail">
                 {this.state.error.message}
               </p>
             )}
             <button
               onClick={this.handleReload}
-              className="vf-btn vf-btn-primary shadow-[0_0_18px_rgba(34,197,94,0.25)]"
+              className="vf-button vf-button--primary"
             >
               Reload Canvas
             </button>

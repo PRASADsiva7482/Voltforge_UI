@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { DebugSnapshot } from '../types';
+import type { DebugSnapshot } from '../types/domain';
 
 interface SerialWriteOptions {
   newline?: boolean;
@@ -134,4 +134,5 @@ export const useSimulationStore = create<SimulationState>((set) => ({
 
   setOscilloscopePanelOpen: (open) => set({ oscilloscopePanelOpen: open }),
 }));
+
 

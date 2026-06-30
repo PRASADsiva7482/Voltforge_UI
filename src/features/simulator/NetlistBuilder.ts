@@ -4,8 +4,8 @@
 // electrical node mapping, breadboard auto-connect, and component models.
 // ═══════════════════════════════════════════════════════════════════════════
 
-import type { CanvasNode, Wire } from '../../types';
-import type { MNAElement, MNAElementType } from './MNASolver';
+import type { CanvasNode, Wire } from '../../types/domain';
+import type { MNAElement } from './MNASolver';
 
 // ── Intermediate types ──────────────────────────────────────────────────
 
@@ -312,7 +312,6 @@ export function buildMNACircuit(
     }
   }
 
-  const numNodes = nextNode - 1;
   let nextExtraNode = nextNode;
 
   // Helper to get MNA node for a component's pin
@@ -1363,3 +1362,4 @@ export function buildMNACircuit(
     elementToComponent,
   };
 }
+

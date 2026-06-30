@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Project, CodeFile } from '../types';
+import type { Project, CodeFile } from '../types/domain';
 
 interface ProjectState {
   currentProject: Project | null;
@@ -339,3 +339,4 @@ void loop() {
   createdAt: '2026-06-13T08:00:00Z',
   updatedAt: '2026-06-13T08:00:00Z',
 };
+

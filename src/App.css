@@ -1,0 +1,264 @@
+.app-shell {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.app-sidebar {
+  align-content: start;
+  background: var(--vf-sidebar);
+  border-right: 1px solid var(--vf-border);
+  display: grid;
+  gap: 22px;
+  padding: 24px 18px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.brand-mark {
+  align-items: center;
+  color: var(--vf-text-strong);
+  display: flex;
+  font-weight: 760;
+  gap: 10px;
+  letter-spacing: 0;
+}
+
+.brand-mark__icon {
+  background: var(--vf-teal-soft);
+  border-radius: 8px;
+  color: var(--vf-teal-dark);
+  display: grid;
+  height: 38px;
+  place-items: center;
+  width: 38px;
+}
+
+.brand-mark svg {
+  color: currentColor;
+}
+
+.app-sidebar nav {
+  display: grid;
+  gap: 6px;
+}
+
+.app-sidebar nav a {
+  align-items: center;
+  border-radius: 8px;
+  color: var(--vf-text-muted);
+  display: flex;
+  font-size: 14px;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 10px;
+  text-decoration: none;
+}
+
+.app-sidebar nav a:hover,
+.app-sidebar nav a.is-active {
+  background: var(--vf-surface);
+  color: var(--vf-text-strong);
+}
+
+.app-sidebar__note {
+  color: var(--vf-text-muted);
+  display: block;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
+.app-sidebar__session {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.app-content {
+  display: grid;
+  gap: 24px;
+  padding: 24px;
+}
+
+.app-topbar {
+  align-items: start;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+}
+
+.app-topbar h1 {
+  margin: 4px 0 0;
+}
+
+.app-topbar__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: end;
+}
+
+.app-topbar__actions .vf-input-wrap {
+  min-width: min(340px, 42vw);
+}
+
+.metrics-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.content-band {
+  display: grid;
+  gap: 18px;
+}
+
+.two-column {
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+}
+
+.section-heading {
+  align-items: end;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.section-heading h2 {
+  margin: 2px 0 0;
+}
+
+.project-grid,
+.board-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.project-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.board-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.library-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.library-grid[data-density='compact'] {
+  gap: 10px;
+}
+
+.component-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.form-grid {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.code-layout {
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.6fr);
+}
+
+.auth-loader,
+.auth-gate {
+  align-items: center;
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  text-align: center;
+}
+
+.auth-loader {
+  gap: 8px;
+}
+
+.auth-loader__mark {
+  background: var(--vf-teal);
+  border-radius: 16px;
+  color: #ffffff;
+  display: grid;
+  height: 70px;
+  margin-bottom: 12px;
+  place-items: center;
+  width: 70px;
+}
+
+.auth-loader span,
+.auth-gate p {
+  color: var(--vf-text-muted);
+}
+
+.auth-gate > div {
+  display: grid;
+  gap: 14px;
+  max-width: 420px;
+  padding: 24px;
+}
+
+@media (max-width: 1180px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .app-sidebar {
+    height: auto;
+    position: static;
+  }
+
+  .app-sidebar nav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .metrics-grid,
+  .library-grid,
+  .two-column,
+  .code-layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .app-content,
+  .app-sidebar {
+    padding: 16px;
+  }
+
+  .app-topbar,
+  .section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .app-topbar__actions {
+    justify-content: start;
+  }
+
+  .app-topbar__actions .vf-input-wrap {
+    min-width: 100%;
+  }
+
+  .app-sidebar nav,
+  .metrics-grid,
+  .library-grid,
+  .two-column,
+  .project-grid,
+  .board-grid,
+  .code-layout {
+    grid-template-columns: 1fr;
+  }
+}

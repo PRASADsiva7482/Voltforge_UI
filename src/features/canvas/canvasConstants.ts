@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Canvas Constants — shared across all canvas sub-components
+// Ported from Voltforge_UI with identical values
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── Grid ──────────────────────────────────────────────────────────────────
@@ -53,8 +54,8 @@ export const ACTIVE_GLOW_PADDING = 4;
 export const ACTIVE_GLOW_SHADOW_BLUR = 16;
 
 // ── Canvas background ─────────────────────────────────────────────────────
-export const CANVAS_BG_DARK = '#06060f';
-export const CANVAS_BG_LIGHT = '#f8fafc';
+export const CANVAS_BG_DARK = '#000000';
+export const CANVAS_BG_LIGHT = '#f5f7f2';
 
 // ── Origin axis color ─────────────────────────────────────────────────────
 export const ORIGIN_AXIS_COLOR = 'rgba(34,197,94,0.24)';
@@ -63,7 +64,7 @@ export const ORIGIN_AXIS_COLOR = 'rgba(34,197,94,0.24)';
 export const WIRING_PREVIEW_COLOR = '#22c55e';
 export const WIRING_SOURCE_HIGHLIGHT = '#60a5fa';
 
-// ── LED color map (inferred from component name) ──────────────────────────
+// ── LED color map ─────────────────────────────────────────────────────────
 export const LED_COLOR_MAP: Record<string, string> = {
   green: '#22c55e',
   blue: '#3b82f6',
@@ -126,13 +127,13 @@ export const OSCILLOSCOPE_SCREEN: ScreenDimensions = { x: 8, y: 8, width: 84, he
 export const BUZZER_WAVE_RINGS = 3;
 export const BUZZER_WAVE_MAX_RADIUS = 30;
 export const BUZZER_WAVE_COLOR = '#94a3b8';
-export const BUZZER_WAVE_SPEED = 1200; // ms per expansion cycle
+export const BUZZER_WAVE_SPEED = 1200;
 export const BUZZER_CONE_VIBRATE_PX = 1.5;
 
 // ── Button 3D press effect ───────────────────────────────────────────────
-export const BUTTON_PRESS_DEPTH = 3;        // px the cap sinks
-export const BUTTON_SHADOW_NORMAL = 4;      // shadow blur at rest
-export const BUTTON_SHADOW_PRESSED = 1;     // shadow blur when pressed
+export const BUTTON_PRESS_DEPTH = 3;
+export const BUTTON_SHADOW_NORMAL = 4;
+export const BUTTON_SHADOW_PRESSED = 1;
 export const BUTTON_HIGHLIGHT_COLOR = '#fca5a5';
 
 // ── Relay armature animation ─────────────────────────────────────────────
@@ -179,7 +180,7 @@ export const MOTOR_HIGH_RPM_COLOR = '#ef4444';
 export const MOTOR_LOW_RPM_COLOR = '#22c55e';
 
 // ── Servo sweep ─────────────────────────────────────────────────────────
-export const SERVO_TICK_COUNT = 9; // 0, 22.5, 45, ... 180
+export const SERVO_TICK_COUNT = 9;
 export const SERVO_ARC_COLOR = 'rgba(34,197,94,0.2)';
 export const SERVO_ANGLE_TEXT_COLOR = '#86efac';
 

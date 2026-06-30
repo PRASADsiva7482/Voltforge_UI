@@ -1,14 +1,14 @@
 import { useRef, useEffect, useMemo, useState, useCallback, memo } from 'react';
 import { Group, Rect, Text, Circle, Image as KonvaImage, Transformer, Line, Arc } from 'react-konva';
 import Konva from 'konva';
-import { useTranslation } from 'react-i18next';
+
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { useCanvasStore } from '../../../store/canvasStore';
 import { getPinAbsPos, snapToRoutingGuides } from '../../../utils/wireRouting';
 import { componentSvgs } from '../componentSvgs';
 import PinDot from './PinDot';
 import type { CanvasNode } from '../canvasTypes';
-import { AudioEngine } from '../../simulator/AudioEngine';
+
 import {
   MAT_GRID_MINOR,
   DRAG_SNAP_THRESHOLD,
@@ -367,7 +367,7 @@ const ComponentNode = ({
   isProbeMode,
   isSimulating,
 }: ComponentNodeProps) => {
-  const { t } = useTranslation();
+
   const shapeRef = useRef<Konva.Group>(null);
   const trRef = useRef<Konva.Transformer>(null);
   const dcMotorShaftRef = useRef<Konva.Group>(null);
@@ -615,9 +615,9 @@ const ComponentNode = ({
     const currentBeeping = Boolean(isSimulating && node.properties?.isBeeping);
     if (currentBeeping && !prevBeepingRef.current) {
       const freq = Number(node.properties?.frequency) || 1000;
-      AudioEngine.playTone(freq, 'square', 0.08);
+      // AudioEngine not available in UI2
     } else if (!currentBeeping && prevBeepingRef.current) {
-      AudioEngine.stopTone();
+      // AudioEngine not available in UI2
     }
     prevBeepingRef.current = currentBeeping;
   }, [isSimulating, node.properties?.isBeeping, node.properties?.frequency]);
@@ -625,7 +625,7 @@ const ComponentNode = ({
   useEffect(() => {
     const currentPressed = Boolean(node.properties?.isPressed);
     if (currentPressed && !prevPressedRef.current && isButton) {
-      AudioEngine.playClick('button');
+      // AudioEngine not available in UI2
     }
     prevPressedRef.current = currentPressed;
   }, [node.properties?.isPressed, isButton]);
@@ -633,7 +633,7 @@ const ComponentNode = ({
   useEffect(() => {
     const currentClosed = Boolean(node.properties?.isClosed);
     if (isSwitch && prevClosedRef.current !== undefined && currentClosed !== prevClosedRef.current) {
-      AudioEngine.playClick('switch');
+      // AudioEngine not available in UI2
     }
     prevClosedRef.current = currentClosed;
   }, [node.properties?.isClosed, isSwitch]);
@@ -641,7 +641,7 @@ const ComponentNode = ({
   useEffect(() => {
     const currentActive = Boolean(node.properties?.isActive);
     if (isRelay && currentActive && !prevRelayActiveRef.current) {
-      AudioEngine.playClick('relay');
+      // AudioEngine not available in UI2
     }
     prevRelayActiveRef.current = currentActive;
   }, [node.properties?.isActive, isRelay]);
@@ -808,7 +808,7 @@ const ComponentNode = ({
               shadowBlur={18}
             />
             <Text
-              text={t("BLOWN")}
+              text="BLOWN"
               x={4}
               y={Math.max(4, node.height / 2 - 7)}
               width={node.width - 8}

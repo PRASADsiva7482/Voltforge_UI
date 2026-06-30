@@ -1,114 +1,77 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Cpu, Filter, TrendingUp, Search } from 'lucide-react';
-import VfButton from '../../components/ui/VfButton';
-import VfPageHeader from '../../components/ui/VfPageHeader';
-import VfSearchInput from '../../components/ui/VfSearchInput';
-import VfSegmentedControl from '../../components/ui/VfSegmentedControl';
-import VfProjectGrid from '../../components/ui/VfProjectGrid';
-import VfEmptyState from '../../components/ui/VfEmptyState';
-import VfPagination from '../../components/ui/VfPagination';
-import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { projectApi } from '../../api/services';
-import { useTranslation } from 'react-i18next';
-import type { ProjectSummary } from '../../types';
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Search } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { projectApi } from '../../api/services'
+import { EmptyState, ErrorState, LoadingState } from '../../components/data'
+import { Topbar } from '../../components/layout'
+import { ProjectSummaryCard } from '../../components/product'
+import { TextInput } from '../../components/ui'
 
-export default function ExplorePage() {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [page, setPage] = useState(0);
-  const [selectedBoard, setSelectedBoard] = useState<string>('ALL');
+export function ExplorePage() {
+  const navigate = useNavigate()
+  const [query, setQuery] = useState('')
+  const { t } = useTranslation()
 
-  const { data: projectsData, isLoading } = useQuery({
-    queryKey: ['public-projects', page, searchQuery],
-    queryFn: async () => {
-      if (searchQuery.trim()) {
-        const res = await projectApi.searchPublic(searchQuery, page, 12);
-        return res.data.data;
-      }
-      const res = await projectApi.getPublic(page, 12);
-      return res.data.data;
+  const publicProjects = useQuery({
+    queryFn: () => {
+      const term = query.trim()
+      return (term ? projectApi.searchPublic(term, 0, 24) : projectApi.getPublic(0, 24)).then((res) => res.data.data)
     },
-  });
+    queryKey: ['projects', 'public', query.trim()],
+  })
 
-  const projects = projectsData?.content || [];
-  const totalPages = projectsData?.totalPages || 0;
+  const templates = useQuery({
+    queryFn: () => projectApi.getTemplates(0, 8).then((res) => res.data.data),
+    queryKey: ['projects', 'templates'],
+  })
 
-  const boardTypes = ['ALL', 'ARDUINO_UNO', 'ARDUINO_MEGA', 'ESP32', 'ESP32_S3', 'ESP8266'];
-
-  const filteredProjects = selectedBoard === 'ALL'
-    ? projects
-    : projects.filter((p: ProjectSummary) => p.boardType === selectedBoard);
-
-  const filterOptions = boardTypes.map((board: string) => ({
-    value: board,
-    label: board === 'ALL' ? t('All Boards') : board.replace(/_/g, ' '),
-  }));
+  const projects = publicProjects.data?.content ?? []
+  const templateProjects = templates.data?.content ?? []
 
   return (
-    <div className="p-8 max-w-7xl mx-auto pt-10 pb-24">
-      {/* Header */}
-      <VfPageHeader
-        title={t('Explore')}
-        description={t('Discover amazing circuits built by the community')}
-        icon={<TrendingUp className="w-5 h-5 text-white" />}
-        iconGradient="from-forge-500 to-forge-600"
-      />
+    <>
+      <Topbar eyebrow={t("Explore")} title={t("Explore circuits")} />
+      <section className="page-toolbar">
+        <TextInput leftSlot={<Search size={16} />} onChange={(event) => setQuery(event.target.value)} placeholder={t("Search public circuits")} value={query} />
+      </section>
 
-      {/* Board Filters and Search Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="mb-10 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center"
-      >
-        <div className="flex items-center gap-3 overflow-x-auto pb-1 flex-1">
-          <Filter className="w-4 h-4 text-surface-400 flex-shrink-0" />
-          <VfSegmentedControl
-            options={filterOptions}
-            selected={selectedBoard}
-            onChange={(val) => {
-              setPage(0);
-              setSelectedBoard(val);
-            }}
-          />
+      <section className="content-band">
+        <div className="section-heading">
+          <div>
+            <p className="vf-eyebrow">{t("Templates")}</p>
+            <h2>{t("Start faster")}</h2>
+          </div>
         </div>
-        <div className="w-full md:w-72">
-          <VfSearchInput
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder={t("Search projects...")}
-            hotkey="/"
-          />
+        {templates.isLoading ? <LoadingState label={t("Loading templates")} /> : null}
+        {templateProjects.length > 0 ? (
+          <div className="project-grid">
+            {templateProjects.map((project) => (
+              <ProjectSummaryCard key={project.id} onOpen={() => navigate(`/editor/${project.id}`)} project={project} />
+            ))}
+          </div>
+        ) : null}
+      </section>
+
+      <section className="content-band">
+        <div className="section-heading">
+          <div>
+            <p className="vf-eyebrow">{t("Community")}</p>
+            <h2>{t("Public projects")}</h2>
+          </div>
         </div>
-      </motion.div>
-
-      <VfProjectGrid
-        projects={filteredProjects}
-        isLoading={isLoading}
-        skeletonCount={6}
-        showOwner={true}
-        onProjectClick={(project) => navigate(`/editor/${project.id}`)}
-        emptyState={
-          <VfEmptyState
-            icon={<Search className="w-12 h-12" />}
-            title={t('No projects found')}
-            description={
-              searchQuery
-                ? t(`No results for "${searchQuery}". Try different search terms.`, { query: searchQuery })
-                : t('Be the first to share a public project!')
-            }
-          />
-        }
-      />
-
-      <VfPagination
-        page={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-      />
-    </div>
-  );
+        {publicProjects.isLoading ? <LoadingState label={t("Loading public projects")} /> : null}
+        {publicProjects.isError ? <ErrorState label={t("Explore API offline")} onRetry={() => void publicProjects.refetch()} /> : null}
+        {!publicProjects.isLoading && !publicProjects.isError && projects.length === 0 ? <EmptyState label={t("Nothing here yet")} text={t("No public projects matched this search.")} /> : null}
+        {projects.length > 0 ? (
+          <div className="project-grid">
+            {projects.map((project) => (
+              <ProjectSummaryCard key={project.id} onOpen={() => navigate(`/editor/${project.id}`)} project={project} />
+            ))}
+          </div>
+        ) : null}
+      </section>
+    </>
+  )
 }

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CanvasNode, Wire, ElectronicComponent, WireBendPoint, PinPosition } from '../types';
+import type { CanvasNode, Wire, ElectronicComponent, WireBendPoint, PinPosition } from '../types/domain';
 import { rerouteAutoWires, routeWireBetweenNodes } from '../utils/wireRouting';
 import { getPinsForComponent } from '../features/canvas/pinRegistry';
 
@@ -422,3 +422,4 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 }));
 
 export { WIRE_COLORS };
+

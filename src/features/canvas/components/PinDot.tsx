@@ -30,7 +30,6 @@ interface PinDotProps {
   isProbeMode?: boolean;
 }
 
-/** Resolves the fill and glow colors for a pin based on its electrical type. */
 function resolvePinColors(type: PinPosition['type']) {
   const fill =
     type === 'power'
@@ -49,7 +48,6 @@ function resolvePinColors(type: PinPosition['type']) {
   return { fill, glow };
 }
 
-/** Computes the label position and rotation based on which edge the pin sits on. */
 function computeLabelLayout(pin: PinPosition, node: CanvasNode) {
   const isLeft = pin.x <= 5;
   const isRight = pin.x >= node.width - 5;
@@ -95,7 +93,6 @@ function computeLabelLayout(pin: PinPosition, node: CanvasNode) {
   return { labelX, labelY, rotation, labelWidth, labelAlign };
 }
 
-/** Interactive pin dot with magnetic snap zones, hover states, and edge-aware labels. */
 const PinDot = memo(function PinDot({
   pin,
   nodeId,
@@ -115,7 +112,7 @@ const PinDot = memo(function PinDot({
 
   return (
     <Group>
-      {/* Magnetic snap zone — large invisible hit area */}
+      {/* Magnetic snap zone */}
       {isValidTarget && (
         <>
           <Circle
@@ -130,7 +127,6 @@ const PinDot = memo(function PinDot({
             shadowBlur={hovered ? 12 : 0}
             listening={false}
           />
-          {/* Direction indicator lines */}
           {hovered && (
             <>
               <Line points={[pin.x - 22, pin.y, pin.x - 14, pin.y]} stroke={WIRING_PREVIEW_COLOR} strokeWidth={1} opacity={0.5} listening={false} />
@@ -142,7 +138,7 @@ const PinDot = memo(function PinDot({
         </>
       )}
 
-      {/* Type glow ring (always visible during wiring on source node) */}
+      {/* Type glow ring on source node */}
       {isWiring && !isValidTarget && wiringFromNodeId === nodeId && (
         <Circle
           x={pin.x}
@@ -197,7 +193,7 @@ const PinDot = memo(function PinDot({
         }}
       />
 
-      {/* Pin label — edge-aware orientation */}
+      {/* Pin label */}
       {node.type === 'BREADBOARD' && !hovered ? null : (
         <Text
           text={pin.name}

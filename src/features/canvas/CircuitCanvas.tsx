@@ -4,7 +4,6 @@ import { Stage, Layer, Rect, Group, Text, Circle, Line, Shape } from 'react-konv
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { Download, Layers } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 import { useCanvasStore, WIRE_COLORS } from '../../store/canvasStore';
 import { useThemeStore } from '../../store/themeStore';
 import { getPinAbsPos, getWireRenderPoints, snapToRoutingGuides } from '../../utils/wireRouting';
@@ -135,7 +134,6 @@ const CanvasMat = ({
 
 // ── Wire Color Picker Toolbar ──
 const WireToolbar = () => {
-  const { t } = useTranslation();
   const { wiringColor, setWiringColor, wiringMode, setWiringMode, isWiring } = useCanvasStore();
 
   if (!isWiring) return null;
@@ -155,26 +153,23 @@ const WireToolbar = () => {
   };
 
   return (
-    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 glass rounded-xl px-3 py-2 flex items-center gap-3 border border-surface-200 dark:border-white/10">
-      <span className="text-[10px] text-surface-600 font-medium dark:text-surface-400">{t("Wire Color:")}</span>
-      <div className="flex gap-1">
+    <div className="vf-wire-toolbar">
+      <span className="vf-wire-toolbar__label">Wire Color:</span>
+      <div className="vf-wire-toolbar__swatches">
         {WIRE_COLORS.map((c) => (
           <button
             key={c}
             onClick={() => setWiringColor(c)}
-            className={`w-5 h-5 rounded-full border-2 transition-transform ${wiringColor === c ? 'border-surface-950 scale-125 dark:border-white' : 'border-transparent'}`}
+            className={`vf-wire-swatch ${wiringColor === c ? 'is-active' : ''}`}
             style={{ backgroundColor: c }}
           />
         ))}
       </div>
-      <div className="h-4 w-px bg-surface-200 dark:bg-white/10" />
-      <button
-        onClick={cycleMode}
-        className="text-[10px] px-2 py-1 rounded bg-surface-100 text-surface-700 hover:text-surface-950 hover:bg-white dark:bg-white/5 dark:text-surface-300 dark:hover:text-white dark:hover:bg-white/10"
-      >
-        {t(modeLabels[wiringMode])}
+      <span className="vf-wire-toolbar__divider" />
+      <button onClick={cycleMode} className="vf-wire-toolbar__mode">
+        {modeLabels[wiringMode]}
       </button>
-      <span className="text-[9px] text-surface-500 ml-1">{t("Click a pin to connect • ESC to cancel")}</span>
+      <span className="vf-wire-toolbar__hint">Click a pin to connect • ESC to cancel</span>
     </div>
   );
 };
@@ -289,7 +284,6 @@ export default function CircuitCanvas({
   isProbeMode,
   isSimulating,
 }: Props) {
-  const { t } = useTranslation();
   const isDark = useThemeStore((state) => state.theme === 'dark');
 
   const nodeIds = useCanvasStore(
@@ -393,7 +387,7 @@ export default function CircuitCanvas({
   }, [selectNode, selectWire]);
 
   return (
-    <div className="relative w-full h-full">
+    <div className="vf-canvas-container">
       <CanvasErrorBoundary>
         <Stage
           ref={stageRef}
@@ -520,22 +514,22 @@ export default function CircuitCanvas({
 
       <button
         onClick={handleExportImage}
-        className="absolute top-3 left-3 z-20 glass px-2.5 py-1.5 rounded-lg text-[10px] text-surface-600 hover:text-surface-950 border border-surface-200 flex items-center gap-1.5 dark:text-surface-300 dark:hover:text-white dark:border-white/10"
-        title={t("Export circuit PNG")}
+        className="vf-canvas-overlay-btn"
+        title="Export circuit PNG"
       >
-        <Download className="w-3.5 h-3.5" />
+        <Download size={14} />
         PNG
       </button>
 
       {viewMode === 'pcb' && (
-        <div className="absolute top-3 left-20 z-20 glass px-2.5 py-1.5 rounded-lg text-[10px] text-surface-600 border border-surface-200 flex items-center gap-1.5 dark:text-surface-300 dark:border-white/10">
-          <Layers className="w-3.5 h-3.5 text-forge-400" />
-          {t("2-layer PCB traces")}
+        <div className="vf-canvas-overlay-btn" style={{ left: 80 }}>
+          <Layers size={14} />
+          2-layer PCB traces
         </div>
       )}
 
       {/* Zoom indicator */}
-      <div className="absolute bottom-4 right-4 z-20 glass px-2 py-1 rounded-lg text-[9px] text-surface-400 font-mono">
+      <div className="vf-canvas-zoom">
         {Math.round(viewport.scale * 100)}%
       </div>
     </div>

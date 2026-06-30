@@ -4,7 +4,7 @@
 // precise positions matching SVG geometry.
 // ═══════════════════════════════════════════════════════════════════════════
 
-import type { PinPosition } from '../../types';
+import type { PinPosition } from '../../types/domain';
 
 type PinType = PinPosition['type'];
 
@@ -508,7 +508,7 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
 
   // Passives
   RESISTOR: RESISTOR_PINS,
-  CAPACITOR: CERAMIC_CAPACITOR_PINS,
+  CAPACITOR: CAPACITOR_PINS,
   CERAMIC_CAPACITOR: CERAMIC_CAPACITOR_PINS,
   ELECTROLYTIC_CAPACITOR: ELECTROLYTIC_CAPACITOR_PINS,
   DIODE: DIODE_PINS,
@@ -620,3 +620,4 @@ export function getPinsForComponent(type: string, pinConfig?: Record<string, unk
 }
 
 export { analyzeCircuitSafety, buildCircuitNetlist } from './netlist';
+

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Circle, Line, Text, Group, Rect } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { getPinAbsPos, distToSegment, getWireRenderPoints } from '../../../utils/wireRouting';
-import type { CanvasNode, Wire, ActiveBendPoint } from '../canvasTypes';
+import type { Wire, ActiveBendPoint } from '../canvasTypes';
 import BendPointHandle from './BendPointHandle';
 import {
   WIRE_HIT_STROKE_WIDTH,
@@ -50,7 +50,6 @@ const WireShape = ({
   const endPos = getPinAbsPos(to, wire.toPinId);
   if (!startPos || !endPos) return null;
 
-  // Insert phantom bend point if actively dragging a new one
   const currentBendPoints = [...(wire.bendPoints || [])];
   if (activeNewBendPoint && activeNewBendPoint.wireId === wire.id) {
     currentBendPoints.splice(activeNewBendPoint.index, 0, {
@@ -93,7 +92,7 @@ const WireShape = ({
 
   return (
     <>
-      {/* Dark outline for wire separation — prevents merging of adjacent wires */}
+      {/* Dark outline for wire separation */}
       <Line
         points={allPoints}
         stroke={isDark ? WIRE_OUTLINE_DARK : WIRE_OUTLINE_LIGHT}
@@ -131,7 +130,7 @@ const WireShape = ({
         }}
       />
 
-      {/* Real Bend point circles */}
+      {/* Bend point circles */}
       {isSelected &&
         wire.routingMode !== 'auto' &&
         (wire.bendPoints || []).map((bp, idx) => (

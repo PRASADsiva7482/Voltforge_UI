@@ -1,4 +1,4 @@
-import type { CanvasNode, Wire, WireBendPoint } from '../types';
+import type { CanvasNode, Wire, WireBendPoint } from '../types/domain';
 
 export const ROUTING_GRID = 10;
 const SMART_STUB = 36;
@@ -558,3 +558,4 @@ export function distToSegment(
   t = Math.max(0, Math.min(1, t));
   return Math.hypot(px - (p1.x + t * dx), py - (p1.y + t * dy));
 }
+

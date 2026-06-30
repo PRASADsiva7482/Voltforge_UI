@@ -219,18 +219,18 @@ export class MNASolver {
           maxDiff = Math.max(maxDiff, Math.abs(solution[i] - prevSolution[i]));
         }
         if (maxDiff < tolerance) {
-          return this.buildResult(solution, n, m, vsIndex, true, iterations);
+          return this.buildResult(solution, n, vsIndex, true, iterations);
         }
       } else if (!hasNonlinear) {
         // Linear circuit — one iteration is enough
-        return this.buildResult(solution, n, m, vsIndex, true, 1);
+        return this.buildResult(solution, n, vsIndex, true, 1);
       }
 
       prevSolution = solution;
     }
 
     // Did not converge — return last result anyway
-    return this.buildResult(prevSolution!, n, m, new Map(
+    return this.buildResult(prevSolution!, n, new Map(
       this.voltageSources.map((vs, i) => [vs.id, i])
     ), false, iterations);
   }
@@ -416,7 +416,6 @@ export class MNASolver {
   private buildResult(
     solution: number[],
     n: number,
-    m: number,
     vsIndex: Map<string, number>,
     converged: boolean,
     iterations: number

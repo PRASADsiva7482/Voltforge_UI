@@ -2,7 +2,7 @@
 // VoltForge — Simulation Engine (Code-Driven Logic Interpreter + MNA Solver)
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { CanvasNode, Wire } from '../../types';
+import type { CanvasNode, Wire } from '../../types/domain';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useSimulationStore } from '../../store/simulationStore';
 import { CPU, avrInstruction, AVRIOPort, AVRUSART, AVRTimer, portBConfig, portCConfig, portDConfig, timer0Config, timer1Config, timer2Config, usart0Config, PinState as AvrPinState, AVRTWI, twiConfig, AVRADC, adcConfig } from 'avr8js';

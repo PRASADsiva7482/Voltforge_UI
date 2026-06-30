@@ -2,7 +2,7 @@
 // Canvas-specific TypeScript types
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type { CanvasNode, Wire, PinPosition, WireBendPoint } from '../../types';
+export type { CanvasNode, Wire, PinPosition, WireBendPoint } from '../../types/domain';
 
 /** A collaborator cursor visible on the shared canvas. */
 export interface Collaborator {

@@ -1,4 +1,4 @@
-import type { CanvasNode, PinPosition, Wire } from '../../types';
+import type { CanvasNode, PinPosition, Wire } from '../../types/domain';
 
 export interface NetlistPinRef {
   nodeId: string;
@@ -543,7 +543,7 @@ function checkI2cConflicts(netlist: CircuitNetlist, issues: CircuitSafetyIssue[]
     }
   }
 
-  for (const [busId, devices] of Object.entries(busGroups)) {
+  for (const devices of Object.values(busGroups)) {
     const addrToDevices: Record<number, typeof devices> = {};
     for (const dev of devices) {
       if (!addrToDevices[dev.addr]) {
@@ -569,3 +569,4 @@ function checkI2cConflicts(netlist: CircuitNetlist, issues: CircuitSafetyIssue[]
     }
   }
 }
+

@@ -1,0 +1,113 @@
+/* ================================================================
+   Page-level layout utilities
+   Shared spacing, grids, and section layout used across feature pages.
+   ================================================================ */
+
+.content-band {
+  margin: 0 auto;
+  max-width: 1280px;
+  padding: 32px 24px;
+}
+
+.content-band + .content-band {
+  padding-top: 0;
+}
+
+/* Two-column split (e.g. projects + explorer) */
+.two-column {
+  display: grid;
+  gap: 32px;
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 768px) {
+  .two-column {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Section heading row (title left, action right) */
+.section-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.section-heading h2 {
+  margin-bottom: 0;
+}
+
+/* Metrics row */
+.metrics-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin: 0 auto;
+  max-width: 1280px;
+  padding: 32px 24px 0;
+}
+
+/* Quick actions row */
+.quick-actions {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  margin: 0 auto;
+  max-width: 1280px;
+  padding: 24px 24px 0;
+}
+
+/* Project cards grid */
+.project-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+/* Board cards grid */
+.board-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+/* Library showcase */
+.library-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.library-grid[data-density='compact'] {
+  gap: 12px;
+}
+
+/* Component preview rows */
+.component-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* Form grid */
+.form-grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+/* Code layout */
+.code-layout {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 2fr 1fr;
+}
+
+@media (max-width: 900px) {
+  .code-layout {
+    grid-template-columns: 1fr;
+  }
+}

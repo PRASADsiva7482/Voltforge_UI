@@ -2,7 +2,7 @@
 // VoltForge — Component Logic Registry
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { PinState } from '../SimulationEngine';
+import type { PinState } from '../SimulationEngine';
 import { useCanvasStore } from '../../../store/canvasStore';
 
 export interface IComponentLogic {

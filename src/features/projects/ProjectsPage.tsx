@@ -1,111 +1,70 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Plus, Search, Cpu, FolderOpen } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { projectApi } from '../../api/services';
-import { useTranslation } from 'react-i18next';
-import type { ProjectSummary } from '../../types';
-import VfButton from '../../components/ui/VfButton';
-import VfPageHeader from '../../components/ui/VfPageHeader';
-import VfProjectGrid from '../../components/ui/VfProjectGrid';
-import VfEmptyState from '../../components/ui/VfEmptyState';
-import VfPagination from '../../components/ui/VfPagination';
-import VfSearchInput from '../../components/ui/VfSearchInput';
+import { useMemo, useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Plus, Search } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { projectApi } from '../../api/services'
+import { EmptyState, ErrorState, LoadingState } from '../../components/data'
+import { Topbar } from '../../components/layout'
+import { ProjectSummaryCard } from '../../components/product'
+import { Button, TextInput } from '../../components/ui'
 
-export default function ProjectsPage() {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [page, setPage] = useState(0);
-  const [searchFilter, setSearchFilter] = useState('');
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+export function ProjectsPage() {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [query, setQuery] = useState('')
+  const { t } = useTranslation()
 
-  const { data: projectsData, isLoading } = useQuery({
-    queryKey: ['user-projects-all', page],
-    queryFn: async () => {
-      const res = await projectApi.getUserProjects(page, 12);
-      return res.data.data;
-    },
-  });
+  const projectsQuery = useQuery({
+    queryFn: () => projectApi.getUserProjects(0, 24).then((res) => res.data.data),
+    queryKey: ['projects', 'mine'],
+  })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => projectApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user-projects-all'] });
-      queryClient.invalidateQueries({ queryKey: ['user-projects'] });
-      setMenuOpenId(null);
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
     },
-  });
+  })
 
-  const projects = projectsData?.content || [];
-  const totalPages = projectsData?.totalPages || 0;
-
-  const filteredProjects = searchFilter
-    ? projects.filter(p => p.name.toLowerCase().includes(searchFilter.toLowerCase()))
-    : projects;
-
-
+  const projects = projectsQuery.data?.content ?? []
+  const filtered = useMemo(() => {
+    const term = query.trim().toLowerCase()
+    if (!term) return projects
+    return projects.filter((project) => [project.name, project.description, project.boardType, project.tags].filter(Boolean).join(' ').toLowerCase().includes(term))
+  }, [projects, query])
 
   return (
-    <div className="p-8 max-w-7xl mx-auto pt-10 pb-24">
-      {/* Header */}
-      <VfPageHeader
-        title={t('My Projects')}
-        description={`${projects.length} ${t('projects total')}`}
-        icon={<FolderOpen className="w-5 h-5 text-white" />}
-        actions={
-          <VfButton variant="primary" size="md" onClick={() => navigate('/projects/new')}
-            icon={<Plus className="w-4 h-4" />}>
-            {t('New Project')}
-          </VfButton>
-        }
-      />
+    <>
+      <Topbar eyebrow={t("My Projects")} title={t("Projects")} />
+      <section className="page-toolbar">
+        <TextInput leftSlot={<Search size={16} />} onChange={(event) => setQuery(event.target.value)} placeholder={t("Search your projects")} value={query} />
+        <Button icon={<Plus size={16} />} onClick={() => navigate('/projects/new')} variant="primary">
+          {t("New project")}
+        </Button>
+      </section>
 
-      {/* Search */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-        className="mb-10"
-      >
-        <div className="max-w-md">
-          <VfSearchInput
-            value={searchFilter}
-            onChange={setSearchFilter}
-            placeholder={t('Filter projects...')}
-            hotkey="/"
-          />
-        </div>
-      </motion.div>
-
-      <VfProjectGrid
-        projects={filteredProjects}
-        isLoading={isLoading}
-        skeletonCount={3}
-        onProjectClick={(project) => navigate(`/editor/${project.id}`)}
-        onProjectDelete={(id) => deleteMutation.mutate(id)}
-        emptyState={
-          <VfEmptyState
-            icon={<Cpu className="w-12 h-12" />}
-            title={searchFilter ? t('No matching projects') : t('No projects yet')}
-            description={
-              searchFilter
-                ? t('Try a different filter.')
-                : t('Create your first circuit to get started.')
-            }
-            actionText={!searchFilter ? t('Create Project') : undefined}
-            onActionClick={!searchFilter ? () => navigate('/projects/new') : undefined}
-            actionIcon={<Plus className="w-4 h-4" />}
-          />
-        }
-      />
-
-      <VfPagination
-        page={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-      />
-    </div>
-  );
+      {projectsQuery.isLoading ? <LoadingState label={t("Loading projects")} /> : null}
+      {projectsQuery.isError ? <ErrorState label={t("Projects API offline")} onRetry={() => void projectsQuery.refetch()} /> : null}
+      {!projectsQuery.isLoading && !projectsQuery.isError && filtered.length === 0 ? (
+        <EmptyState
+          action={<Button onClick={() => navigate('/projects/new')} variant="primary">{t("Create project")}</Button>}
+          label={t("No projects found")}
+          text={t("Create a new circuit project or clear the search filter.")}
+        />
+      ) : null}
+      {filtered.length > 0 ? (
+        <section className="project-grid">
+          {filtered.map((project) => (
+            <ProjectSummaryCard
+              key={project.id}
+              onOpen={() => navigate(`/editor/${project.id}`)}
+              onDelete={(id) => deleteMutation.mutate(id)}
+              project={project}
+            />
+          ))}
+        </section>
+      ) : null}
+    </>
+  )
 }

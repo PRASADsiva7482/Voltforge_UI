@@ -1,154 +1,75 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { User, Mail, Shield, Save, Check, Calendar } from 'lucide-react';
-import VfButton from '../../components/ui/VfButton';
-import VfPageHeader from '../../components/ui/VfPageHeader';
-import VfCard from '../../components/ui/VfCard';
-import VfAvatar from '../../components/ui/VfAvatar';
-import VfBadge from '../../components/ui/VfBadge';
-import VfFormField from '../../components/ui/VfFormField';
-import VfTextarea from '../../components/ui/VfTextarea';
-import VfInput from '../../components/ui/VfInput';
-import { useMutation } from '@tanstack/react-query';
-import { userApi } from '../../api/services';
-import { useAuthStore } from '../../store/authStore';
-import { useTranslation } from 'react-i18next';
+import { useEffect, useState } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { LogOut, Save, ShieldCheck } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { userApi } from '../../api/services'
+import { useAuth } from '../../auth/useAuth'
+import { ErrorState, LoadingState } from '../../components/data'
+import { Topbar } from '../../components/layout'
+import { Box, Button, FieldShell, TextInput, Textarea } from '../../components/ui'
 
-export default function SettingsPage() {
-  const { t } = useTranslation();
-  const { user, setUser } = useAuthStore();
-
-  const [displayName, setDisplayName] = useState(user?.displayName || '');
-  const [bio, setBio] = useState(user?.bio || '');
-  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || '');
-  const [saved, setSaved] = useState(false);
+export function SettingsPage() {
+  const auth = useAuth()
+  const { t } = useTranslation()
+  const profile = useQuery({
+    queryFn: () => userApi.getProfile().then((res) => res.data.data),
+    queryKey: ['user', 'profile'],
+  })
+  const [displayName, setDisplayName] = useState(auth.user?.displayName ?? '')
+  const [bio, setBio] = useState('')
 
   useEffect(() => {
-    if (user) {
-      setDisplayName(user.displayName || '');
-      setBio(user.bio || '');
-      setAvatarUrl(user.avatarUrl || '');
+    if (profile.data) {
+      setDisplayName(profile.data.displayName)
+      setBio(profile.data.bio ?? '')
     }
-  }, [user]);
+  }, [profile.data])
 
-  const updateMutation = useMutation({
-    mutationFn: () => userApi.updateProfile({ displayName, bio, avatarUrl: avatarUrl || undefined }),
-    onSuccess: (res) => {
-      setUser(res.data.data);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    },
-  });
+  const updateProfile = useMutation({
+    mutationFn: () => userApi.updateProfile({ bio, displayName }),
+    onSuccess: () => void profile.refetch(),
+  })
 
   return (
-    <div className="p-8 max-w-4xl mx-auto pt-10 pb-24">
-      {/* Header */}
-      <VfPageHeader
-        title={t('Settings')}
-        description={t('Manage your profile and preferences')}
-      />
-
-      {/* Profile Section */}
-      <VfCard className="mb-10">
-        <div className="flex items-center gap-3 mb-8">
-          <User className="w-5 h-5 text-volt-400" />
-          <h2 className="text-lg font-semibold text-surface-950 dark:text-white">{t('Profile')}</h2>
-        </div>
-
-        {/* Avatar Preview */}
-        <div className="flex items-center gap-6 mb-8">
-          <VfAvatar src={avatarUrl} name={displayName || user?.username || ''} size="lg" />
-          <div>
-            <h3 className="text-lg font-semibold text-surface-950 dark:text-white">{displayName || user?.username}</h3>
-            <p className="text-sm text-surface-600 dark:text-surface-400">{user?.email}</p>
-            <div className="flex items-center gap-2 mt-1">
-              <VfBadge variant="secondary">
-                {user?.role}
-              </VfBadge>
+    <>
+      <Topbar eyebrow={t("Settings")} title={t("Profile and account")} />
+      {profile.isLoading ? <LoadingState label={t("Loading profile")} /> : null}
+      {profile.isError ? <ErrorState label={t("Profile API offline")} onRetry={() => void profile.refetch()} /> : null}
+      <section className="form-page">
+        <Box tone="raised">
+          <div className="section-heading">
+            <div>
+              <p className="vf-eyebrow">{t("Profile")}</p>
+              <h2>{t("Workspace identity")}</h2>
             </div>
+            <ShieldCheck size={26} />
           </div>
-        </div>
-
-        <div className="space-y-5">
-          <VfFormField label={t('Display Name')} htmlFor="settings-display-name">
-            <VfInput
-              id="settings-display-name"
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-            />
-          </VfFormField>
-
-          <VfFormField label={t('Bio')} htmlFor="settings-bio">
-            <VfTextarea
-              id="settings-bio"
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              placeholder={t('Tell us about yourself...')}
-              rows={3}
-            />
-          </VfFormField>
-
-          <VfFormField label={t('Avatar URL')} htmlFor="settings-avatar-url">
-            <VfInput
-              id="settings-avatar-url"
-              type="url"
-              value={avatarUrl}
-              onChange={(e) => setAvatarUrl(e.target.value)}
-              placeholder="https://example.com/avatar.jpg"
-            />
-          </VfFormField>
-        </div>
-
-        <div className="flex justify-end mt-10">
-          <VfButton variant="primary" size="md"
-            onClick={() => updateMutation.mutate()}
-            disabled={updateMutation.isPending}
-            loading={updateMutation.isPending}
-            icon={saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}>
-            {saved ? t('Saved!') : updateMutation.isPending ? t('Saving...') : t('Save Changes')}
-          </VfButton>
-        </div>
-      </VfCard>
-
-      {/* Account Info (read-only) */}
-      <VfCard className="mb-10">
-        <div className="flex items-center gap-3 mb-6">
-          <Shield className="w-5 h-5 text-forge-400" />
-          <h2 className="text-lg font-semibold text-surface-950 dark:text-white">{t('Account')}</h2>
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between py-3 border-b border-surface-200/70 dark:border-white/5">
-            <div className="flex items-center gap-3">
-              <Mail className="w-4 h-4 text-surface-400" />
-              <span className="text-sm text-surface-700 dark:text-surface-300">{t('Email')}</span>
-            </div>
-            <span className="text-sm text-surface-950 dark:text-white">{user?.email}</span>
+          <div className="form-grid">
+            <FieldShell label={t("Display name")}>
+              <TextInput onChange={(event) => setDisplayName(event.target.value)} value={displayName} />
+            </FieldShell>
+            <FieldShell label={t("Email")}>
+              <TextInput disabled value={profile.data?.email ?? auth.user?.email ?? ''} />
+            </FieldShell>
+            <FieldShell label={t("Bio")}>
+              <Textarea onChange={(event) => setBio(event.target.value)} rows={4} value={bio} />
+            </FieldShell>
           </div>
-          <div className="flex items-center justify-between py-3 border-b border-surface-200/70 dark:border-white/5">
-            <div className="flex items-center gap-3">
-              <User className="w-4 h-4 text-surface-400" />
-              <span className="text-sm text-surface-700 dark:text-surface-300">{t('Username')}</span>
-            </div>
-            <span className="text-sm text-surface-950 dark:text-white">{user?.username}</span>
+          <div className="component-row">
+            <Button icon={<Save size={16} />} isLoading={updateProfile.isPending} onClick={() => updateProfile.mutate()} variant="primary">
+              {t("Save profile")}
+            </Button>
+            <Button icon={<LogOut size={16} />} onClick={auth.logout}>
+              {t("Logout")}
+            </Button>
           </div>
-          <div className="flex items-center justify-between py-3 border-b border-surface-200/70 dark:border-white/5">
-            <div className="flex items-center gap-3">
-              <Shield className="w-4 h-4 text-surface-400" />
-              <span className="text-sm text-surface-700 dark:text-surface-300">{t('Role')}</span>
-            </div>
-            <span className="text-sm text-surface-950 dark:text-white">{user?.role}</span>
-          </div>
-          <div className="flex items-center justify-between py-3">
-            <div className="flex items-center gap-3">
-              <Calendar className="w-4 h-4 text-surface-400" />
-              <span className="text-sm text-surface-700 dark:text-surface-300">{t('Member since')}</span>
-            </div>
-            <span className="text-sm text-surface-950 dark:text-white">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</span>
-          </div>
-        </div>
-      </VfCard>
-    </div>
-  );
+        </Box>
+        <Box tone="accent">
+          <p className="vf-eyebrow">{t("Security")}</p>
+          <h3>{t("Secured Session")}</h3>
+          <p className="vf-muted">{t("Login credentials, token refresh, and session management are protected by secure authentication protocols.")}</p>
+        </Box>
+      </section>
+    </>
+  )
 }

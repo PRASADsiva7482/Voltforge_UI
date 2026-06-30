@@ -1,0 +1,92 @@
+.quick-actions {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.action-card {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  display: block;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.action-card .vf-card {
+  transition: box-shadow 160ms ease, transform 160ms ease;
+}
+
+.action-card:hover .vf-card {
+  box-shadow: inset 0 0 0 1px var(--vf-teal), var(--vf-shadow);
+  transform: translateY(-1px);
+}
+
+.action-card .vf-card__body {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.action-card__icon {
+  background: var(--vf-teal-soft);
+  border-radius: 8px;
+  color: var(--vf-teal-dark);
+  display: grid;
+  grid-row: span 2;
+  height: 46px;
+  place-items: center;
+  width: 46px;
+}
+
+.action-card strong {
+  align-self: end;
+  color: var(--vf-text-strong);
+}
+
+.action-card p {
+  color: var(--vf-text-muted);
+  font-size: 13px;
+  grid-column: 2 / 3;
+}
+
+.action-card svg:last-child {
+  color: var(--vf-text-soft);
+  grid-row: 1 / 3;
+}
+
+.workspace-placeholder {
+  align-items: center;
+  display: grid;
+  justify-items: center;
+  margin: min(8vh, 72px) auto 0;
+  max-width: 560px;
+  text-align: center;
+}
+
+.workspace-placeholder .vf-card__body {
+  align-items: center;
+  gap: 14px;
+  justify-items: center;
+  padding: 34px;
+}
+
+.workspace-placeholder__icon {
+  background: var(--vf-teal-soft);
+  border-radius: 14px;
+  color: var(--vf-teal-dark);
+  display: grid;
+  height: 72px;
+  place-items: center;
+  width: 72px;
+}
+
+.workspace-placeholder p {
+  color: var(--vf-text-muted);
+  max-width: 420px;
+}
+
+@media (max-width: 900px) {
+  .quick-actions {
+    grid-template-columns: 1fr;
+  }
+}
