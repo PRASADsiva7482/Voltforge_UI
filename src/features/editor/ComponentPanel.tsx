@@ -6,6 +6,7 @@ import { useCanvasStore } from '../../store/canvasStore';
 import { componentDimensions } from '../canvas/componentSvgs';
 import { getPinsForComponent } from '../canvas/pinRegistry';
 import type { ElectronicComponent, CanvasNode } from '../../types/domain';
+import CustomComponentStudio from '../components/CustomComponentStudio';
 
 const categoryIcons: Record<string, React.FC<{ size?: number }>> = {
   BOARD: Cpu, LED: Zap, SENSOR: Thermometer, DISPLAY: Monitor,
@@ -19,6 +20,7 @@ export default function ComponentPanel() {
   const { setComponentLibrary } = useCanvasStore();
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [studioOpen, setStudioOpen] = useState(false);
 
   const { data } = useQuery({
     queryKey: ['components'],
@@ -80,10 +82,20 @@ export default function ComponentPanel() {
 
   return (
     <div className="vf-component-panel">
+      <CustomComponentStudio isOpen={studioOpen} onClose={() => setStudioOpen(false)} />
       <div className="vf-component-panel__header">
         <h3 className="vf-component-panel__title">Components</h3>
+        <button
+          onClick={() => setStudioOpen(true)}
+          className="vf-panel-header__btn"
+          title="Create custom component"
+          type="button"
+        >
+          <Plus size={14} />
+        </button>
       </div>
       <div className="vf-component-panel__search">
+
         <Search size={14} />
         <input
           type="text"

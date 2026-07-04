@@ -13,6 +13,7 @@ import { NewProjectPage } from './features/projects/NewProjectPage'
 import { ProjectsPage } from './features/projects/ProjectsPage'
 import { SettingsPage } from './features/settings/SettingsPage'
 import { useThemeStore } from './store/themeStore'
+import { ToastContainer } from './components/layout/ToastContainer'
 import './App.css'
 import './styles/components.css'
 import './styles/landing.css'
@@ -42,8 +43,12 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
+          <ToastContainer />
           <Routes>
             <Route element={<LandingPage />} path="/" />
+
+            {/* Public share route (bypass login, read-only) */}
+            <Route element={<CircuitEditorPage />} path="/editor/share" />
 
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
