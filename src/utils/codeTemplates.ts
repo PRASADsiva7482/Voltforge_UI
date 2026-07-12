@@ -18,8 +18,7 @@ function getDefaultBaud(boardType: BoardType): number {
     type === 'ARDUINO_LEONARDO' ||
     type === 'ARDUINO_MICRO' ||
     type === 'ATMEL_AVR_ATMEGA328P' ||
-    type === 'ATMEL_AVR_ATTINY' ||
-    type === 'MICROCHIP_PICKIT'
+    type === 'ATMEL_AVR_ATTINY'
   ) {
     return 9600
   }
@@ -31,7 +30,7 @@ function getDefaultBaud(boardType: BoardType): number {
 /**
  * Generate the default `main.ino` starter code for a new project.
  *
- * Includes platform-specific hints for WiFi, Linux SBC, Pico, Teensy, etc.
+ * Includes platform-specific hints for WiFi, Pico, Teensy, etc.
  */
 export function generateDefaultCode(boardType: BoardType, projectName: string): string {
   const profile = getBoardProfile(boardType)
@@ -40,22 +39,15 @@ export function generateDefaultCode(boardType: BoardType, projectName: string): 
   const type = boardType as string
 
   const isEsp = type.startsWith('ESP')
-  const isLinux = profile?.compiler === 'linux'
   const isPico = type.startsWith('RASPBERRY_PI_PICO')
   const isTeensy = type.startsWith('TEENSY')
-  const isNordic = type.startsWith('NORDIC') || type === 'SEEED_XIAO_NRF52840' || type === 'ADAFRUIT_FEATHER_NRF52840'
-  const isMicrobit = type.startsWith('BBC_MICROBIT')
-  const isParticle = type.startsWith('PARTICLE')
+  const isNordic = type === 'SEEED_XIAO_NRF52840' || type === 'ADAFRUIT_FEATHER_NRF52840'
 
   const hints: string[] = []
 
   if (isEsp) {
     hints.push(`\n  // WiFi.begin("SSID", "password");`)
     hints.push(`  // WiFi is available on ${boardLabel}`)
-  }
-  if (isLinux) {
-    hints.push(`\n  // Linux SBC note: use this sketch for GPIO planning;`)
-    hints.push(`  // compile native Linux code outside the AVR compiler.`)
   }
   if (isPico) {
     hints.push(`\n  // Pico note: also supports MicroPython and C/C++ SDK.`)
@@ -66,14 +58,6 @@ export function generateDefaultCode(boardType: BoardType, projectName: string): 
   }
   if (isNordic) {
     hints.push(`\n  // BLE (Bluetooth Low Energy) is available on ${boardLabel}.`)
-  }
-  if (isMicrobit) {
-    hints.push(`\n  // micro:bit note: uses MakeCode / MicroPython primarily.`)
-    hints.push(`  // This sketch is for GPIO pin planning reference.`)
-  }
-  if (isParticle) {
-    hints.push(`\n  // Particle boards use Particle OS / Device Cloud.`)
-    hints.push(`  // This sketch template is for GPIO pin planning.`)
   }
 
   const hintBlock = hints.length > 0 ? hints.join('\n') : ''

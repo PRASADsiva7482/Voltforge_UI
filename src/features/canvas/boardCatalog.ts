@@ -107,23 +107,12 @@ export const BOARD_CATALOG: BoardCatalogEntry[] = [
   board('RASPBERRY_PI_PICO_W', 'Raspberry Pi Pico W', 'Raspberry Pi Pico', 'pico', ['RP2040', 'Wi-Fi', 'Bluetooth'], 3.3, '133MHz', 'arduino-core', 111),
   board('RASPBERRY_PI_PICO_2', 'Raspberry Pi Pico 2', 'Raspberry Pi Pico', 'pico', ['RP2350', 'dual architecture', 'microcontroller'], 3.3, '150MHz', 'arduino-core', 112),
 
-  board('RASPBERRY_PI_ZERO_2_W', 'Raspberry Pi Zero 2 W', 'Raspberry Pi SBC', 'pi40', ['Linux SBC', 'WiFi', 'Bluetooth 4.2', 'Mini HDMI', 'CSI camera', '40-pin header'], 3.3, '1GHz', 'linux', 140),
-  board('RASPBERRY_PI_3', 'Raspberry Pi 3', 'Raspberry Pi SBC', 'pi40', ['Linux SBC', 'WiFi', 'Bluetooth 4.1', 'HDMI', '10/100 Ethernet', '40-pin header'], 3.3, '1.2GHz', 'linux', 141),
-  board('RASPBERRY_PI_4', 'Raspberry Pi 4', 'Raspberry Pi SBC', 'pi40', ['Linux SBC', 'Gigabit Ethernet', '2x USB 3.0', '2x USB 2.0', '2x Micro HDMI (4K)', '40-pin header'], 3.3, '1.5GHz', 'linux', 142),
-  board('RASPBERRY_PI_5', 'Raspberry Pi 5', 'Raspberry Pi SBC', 'pi40', ['Linux SBC', 'PCIe 2.0', 'Gigabit Ethernet', '2x USB 3.0', '2x USB 2.0', '2x Micro HDMI (4K@60)', '40-pin header'], 3.3, '2.4GHz', 'linux', 143),
-  board('RASPBERRY_PI_COMPUTE_MODULE', 'Raspberry Pi Compute Module', 'Raspberry Pi SBC', 'pi40', ['Linux module', 'carrier board I/O', 'PCIe', 'HDMI', 'Gigabit Ethernet', 'industrial'], 3.3, 'varies', 'linux', 144),
-
   board('STM32_BLUE_PILL', 'STM32 Blue Pill', 'STM32', 'stm32', ['STM32F103C8', 'ARM Cortex-M3', 'low-cost'], 3.3, '72MHz', 'arduino-core', 170),
   board('STM32_BLACK_PILL', 'STM32 Black Pill', 'STM32', 'stm32', ['STM32F401/F411', 'USB-C variants', 'ARM Cortex-M4'], 3.3, '84MHz', 'arduino-core', 171),
-  board('STM32_NUCLEO', 'STM32 Nucleo', 'STM32', 'eval', ['ARM Cortex-M', 'Arduino headers', 'ST-LINK'], 3.3, 'varies', 'external', 172),
-  board('STM32_DISCOVERY', 'STM32 Discovery', 'STM32', 'eval', ['ARM Cortex-M', 'sensors/display variants', 'ST-LINK'], 3.3, 'varies', 'external', 173),
 
   board('TEENSY_4_0', 'Teensy 4.0', 'Teensy', 'teensy', ['i.MX RT1062', 'high performance', 'USB'], 3.3, '600MHz', 'arduino-core', 200),
   board('TEENSY_4_1', 'Teensy 4.1', 'Teensy', 'teensy', ['i.MX RT1062', 'Ethernet pins', 'expanded I/O'], 3.3, '600MHz', 'arduino-core', 201),
   board('TEENSY_LC', 'Teensy LC', 'Teensy', 'teensy', ['ARM Cortex-M0+', 'low cost', 'USB'], 3.3, '48MHz', 'arduino-core', 202),
-
-  board('BBC_MICROBIT_V1', 'BBC micro:bit V1', 'BBC micro:bit', 'microbit', ['education', 'LED matrix', 'Bluetooth LE'], 3.3, '16MHz', 'external', 230),
-  board('BBC_MICROBIT_V2', 'BBC micro:bit V2', 'BBC micro:bit', 'microbit', ['education', 'speaker/mic', 'Bluetooth LE'], 3.3, '64MHz', 'external', 231),
 
   board('SEEED_XIAO_SAMD21', 'Seeed XIAO SAMD21', 'Seeed XIAO', 'xiao', ['ultra compact', 'SAMD21', 'USB-C'], 3.3, '48MHz', 'arduino-core', 260),
   board('SEEED_XIAO_RP2040', 'Seeed XIAO RP2040', 'Seeed XIAO', 'xiao', ['ultra compact', 'RP2040', 'USB-C'], 3.3, '133MHz', 'arduino-core', 261),
@@ -141,53 +130,8 @@ export const BOARD_CATALOG: BoardCatalogEntry[] = [
   board('SPARKFUN_THING_PLUS_RP2040', 'SparkFun Thing Plus RP2040', 'SparkFun Thing Plus', 'feather', ['Thing Plus', 'RP2040', 'Qwiic'], 3.3, '133MHz', 'arduino-core', 321),
   board('SPARKFUN_THING_PLUS_ARTEMIS', 'SparkFun Thing Plus Artemis', 'SparkFun Thing Plus', 'feather', ['Thing Plus', 'Apollo3', 'BLE'], 3.3, '48MHz', 'arduino-core', 322),
 
-  board('BEAGLEBONE_BLACK', 'BeagleBone Black', 'BeagleBone', 'beaglebone', ['Linux SBC', 'PRU real-time units', 'industrial I/O', 'HDMI', '10/100 Ethernet', 'USB Host', 'eMMC'], 3.3, '1GHz', 'linux', 380),
-  board('BEAGLEBONE_AI64', 'BeagleBone AI-64', 'BeagleBone', 'beaglebone', ['Linux SBC', 'AI acceleration', 'industrial I/O', 'Mini DisplayPort', 'Gigabit Ethernet', 'USB 3.0'], 3.3, '2GHz', 'linux', 381),
-
-  board('ODROID_C4', 'ODROID-C4', 'ODROID', 'pi40', ['Linux SBC', 'Amlogic S905X3', '40-pin header', 'HDMI 2.0', 'Gigabit Ethernet', '4x USB 3.0'], 3.3, '2GHz', 'linux', 410),
-  board('ODROID_M1', 'ODROID-M1', 'ODROID', 'pi40', ['Linux SBC', 'RK3568B2', 'SATA/NVMe', 'HDMI 2.0', 'Gigabit Ethernet', 'USB 3.0'], 3.3, '2GHz', 'linux', 411),
-
-  board('ORANGE_PI_ZERO', 'Orange Pi Zero', 'Orange Pi', 'pi40', ['Linux SBC', 'compact', 'networking', '100M Ethernet', 'WiFi', 'USB 2.0'], 3.3, '1.2GHz', 'linux', 440),
-  board('ORANGE_PI_3B', 'Orange Pi 3B', 'Orange Pi', 'pi40', ['Linux SBC', 'RK3566', '40-pin header', 'HDMI 2.0', 'Gigabit Ethernet', 'USB 3.0'], 3.3, '1.8GHz', 'linux', 441),
-
-  board('JETSON_NANO', 'NVIDIA Jetson Nano', 'Jetson', 'pi40', ['edge AI', 'CUDA', '40-pin header', 'HDMI/DisplayPort', 'Gigabit Ethernet', '4x USB 3.0'], 3.3, '1.43GHz', 'linux', 530),
-  board('JETSON_ORIN_NANO', 'NVIDIA Jetson Orin Nano', 'Jetson', 'pi40', ['edge AI', 'Ampere GPU', '40-pin header', 'DisplayPort', 'Gigabit Ethernet', 'USB 3.2'], 3.3, '1.5GHz', 'linux', 532),
-
-  board('CORAL_DEV_BOARD', 'Google Coral Dev Board', 'Coral', 'pi40', ['Edge TPU', 'Linux SBC', 'machine learning', 'HDMI', 'Gigabit Ethernet', 'USB-C'], 3.3, '1.5GHz', 'linux', 560),
-
-  board('TI_LAUNCHPAD_MSP430', 'TI LaunchPad MSP430', 'Texas Instruments', 'eval', ['low power', 'MSP430', 'industrial learning'], 3.3, '16MHz', 'external', 620),
-  board('TI_LAUNCHPAD_TIVA_C', 'TI Tiva C LaunchPad', 'Texas Instruments', 'eval', ['ARM Cortex-M4F', 'industrial', 'BoosterPack headers'], 3.3, '80MHz', 'external', 621),
-  board('TI_SIMPLELINK_CC32XX', 'TI SimpleLink CC32xx', 'Texas Instruments', 'eval', ['Wi-Fi MCU', 'low power', 'industrial IoT'], 3.3, '80MHz', 'external', 622),
-
-  board('NXP_FRDM', 'NXP FRDM Board', 'NXP', 'eval', ['ARM Cortex-M', 'automotive/industrial', 'Arduino headers'], 3.3, 'varies', 'external', 650),
-  board('NXP_LPCXPRESSO', 'NXP LPCXpresso', 'NXP', 'eval', ['LPC MCU', 'debug probe', 'embedded control'], 3.3, 'varies', 'external', 651),
-  board('NXP_IMX_RT_EVK', 'NXP i.MX RT EVK', 'NXP', 'eval', ['crossover MCU', 'high performance', 'industrial'], 3.3, '600MHz', 'external', 652),
-
-  board('MICROCHIP_CURIOSITY_NANO', 'Microchip Curiosity Nano', 'Microchip', 'eval', ['PIC/AVR dev board', 'debugger', 'tiny footprint'], 3.3, 'varies', 'external', 680),
-  board('MICROCHIP_PICKIT', 'Microchip PICkit Ecosystem', 'Microchip', 'eval', ['PIC programming', 'debugging', 'prototype headers'], 5, 'varies', 'external', 681),
-
   board('ATMEL_AVR_ATMEGA328P', 'ATmega328P DIP', 'Atmel AVR', 'avr28', ['classic AVR MCU', 'Arduino Uno core', '28-pin DIP'], 5, '16MHz', 'avr', 710),
   board('ATMEL_AVR_ATTINY', 'ATtiny Series DIP', 'Atmel AVR', 'attiny8', ['classic AVR MCU', 'tiny package', 'low power'], 5, '1-20MHz', 'arduino-core', 711),
-
-  board('NORDIC_NRF52840_DK', 'Nordic nRF52840 DK', 'Nordic', 'eval', ['Bluetooth LE', 'Thread', 'Matter capable'], 3.3, '64MHz', 'external', 740),
-  board('NORDIC_NRF5340_DK', 'Nordic nRF5340 DK', 'Nordic', 'eval', ['dual-core Bluetooth LE', 'Thread', 'Matter capable'], 3.3, '128MHz', 'external', 741),
-
-  board('SILICON_LABS_EFR32_DEV_KIT', 'Silicon Labs EFR32 Dev Kit', 'Silicon Labs', 'eval', ['Zigbee', 'Thread', 'Matter capable'], 3.3, 'varies', 'external', 770),
-
-  board('INFINEON_XMC', 'Infineon XMC Board', 'Infineon', 'eval', ['industrial MCU', 'motor control', 'automation'], 3.3, 'varies', 'external', 800),
-  board('INFINEON_PSOC4', 'Infineon PSoC 4', 'Infineon', 'eval', ['configurable analog', 'low power', 'Cortex-M0'], 3.3, '48MHz', 'external', 801),
-  board('INFINEON_PSOC5', 'Infineon PSoC 5', 'Infineon', 'eval', ['configurable analog', 'Cortex-M3', 'mixed-signal'], 5, '80MHz', 'external', 802),
-  board('INFINEON_PSOC6', 'Infineon PSoC 6', 'Infineon', 'eval', ['dual-core', 'Bluetooth LE', 'low power'], 3.3, '150MHz', 'external', 803),
-
-  board('RENESAS_RA', 'Renesas RA Board', 'Renesas', 'eval', ['ARM Cortex-M', 'industrial', 'security features'], 3.3, 'varies', 'external', 830),
-  board('RENESAS_RX', 'Renesas RX Board', 'Renesas', 'eval', ['RX MCU', 'industrial controllers', 'motor control'], 3.3, 'varies', 'external', 831),
-  board('RENESAS_RZ', 'Renesas RZ Board', 'Renesas', 'eval', ['MPU/industrial Linux', 'control applications', 'HMI'], 3.3, 'varies', 'external', 832),
-
-  board('CH32V003', 'WCH CH32V003', 'CH32', 'eval', ['low-cost RISC-V', 'tiny MCU', '3.3V logic'], 3.3, '48MHz', 'external', 860),
-  board('CH32V203', 'WCH CH32V203', 'CH32', 'eval', ['RISC-V MCU', 'USB/CAN variants', 'low cost'], 3.3, '144MHz', 'external', 861),
-
-  board('RISC_V_SIPEED_LONGAN_NANO', 'Sipeed Longan Nano', 'RISC-V', 'eval', ['GD32VF103', 'RISC-V MCU', 'LCD module'], 3.3, '108MHz', 'external', 890),
-  board('RISC_V_VISIONFIVE', 'StarFive VisionFive', 'RISC-V', 'pi40', ['RISC-V Linux SBC', 'open ISA', '40-pin header'], 3.3, '1.5GHz', 'linux', 891),
 ];
 
 export const BOARD_TYPE_SET = new Set<string>(BOARD_CATALOG.map((boardItem) => boardItem.type));
@@ -199,26 +143,10 @@ export const BOARD_FAMILY_PREFIXES = [
   'RASPBERRY_PI',
   'STM32',
   'TEENSY',
-  'BBC_MICROBIT',
   'SEEED_XIAO',
   'ADAFRUIT_FEATHER',
   'SPARKFUN_THING_PLUS',
-  'PARTICLE',
-  'BEAGLEBONE',
-  'ODROID',
-  'ORANGE_PI',
-  'JETSON',
-  'CORAL',
-  'TI_',
-  'NXP',
-  'MICROCHIP',
   'ATMEL_AVR',
-  'NORDIC',
-  'SILICON_LABS',
-  'INFINEON',
-  'RENESAS',
-  'CH32',
-  'RISC_V',
 ];
 
 export const BOARD_OPTIONS: BoardType[] = BOARD_CATALOG.map((boardItem) => boardItem.type);
