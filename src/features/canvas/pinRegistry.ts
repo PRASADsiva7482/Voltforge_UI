@@ -5,6 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import type { PinPosition } from '../../types/domain';
+import { BOARD_CATALOG, createBoardPins } from './boardCatalog';
 
 type PinType = PinPosition['type'];
 
@@ -498,13 +499,18 @@ const OSCILLOSCOPE_PINS: PinPosition[] = [
 ];
 
 // ── Registry ──
+const catalogBoardPinRegistry = Object.fromEntries(
+  BOARD_CATALOG.map((boardItem) => [boardItem.type, createBoardPins(boardItem.footprint)]),
+);
+
 export const boardPinRegistry: Record<string, PinPosition[]> = {
+  ...catalogBoardPinRegistry,
+
   ARDUINO_UNO: ARDUINO_UNO_PINS,
   ARDUINO_MEGA: ARDUINO_MEGA_PINS,
   ARDUINO_NANO: ARDUINO_NANO_PINS,
   ESP32: ESP32_PINS,
   ESP32_S3: ESP32_PINS,
-  ESP8266: ESP32_PINS.slice(0, 20),
 
   // Passives
   RESISTOR: RESISTOR_PINS,

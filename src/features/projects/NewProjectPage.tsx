@@ -6,9 +6,12 @@ import { useTranslation } from 'react-i18next'
 import { projectApi } from '../../api/services'
 import { Topbar } from '../../components/layout'
 import { Box, Button, FieldShell, SelectField, TextInput, Textarea, Toggle } from '../../components/ui'
+import { BOARD_CATALOG } from '../canvas/boardCatalog'
+import { generateDefaultCode } from '../../utils/codeTemplates'
 import type { BoardType } from '../../types/domain'
 
-const boardOptions: BoardType[] = ['ARDUINO_UNO', 'ARDUINO_MEGA', 'ARDUINO_NANO', 'ESP32', 'ESP32_S3', 'ESP8266']
+const boardOptions = BOARD_CATALOG
+const boardFamilies = Array.from(new Set(boardOptions.map((board) => board.family)))
 
 export function NewProjectPage() {
   const navigate = useNavigate()
@@ -27,7 +30,7 @@ export function NewProjectPage() {
         isPublic,
         codeFiles: [
           {
-            content: 'void setup() {\n  Serial.begin(9600);\n}\n\nvoid loop() {\n}\n',
+            content: generateDefaultCode(boardType, name),
             filename: 'main.ino',
             language: 'cpp',
             sortOrder: 0,
@@ -54,10 +57,16 @@ export function NewProjectPage() {
             </FieldShell>
             <FieldShell label={t("Development board")}>
               <SelectField value={boardType} onChange={(event) => setBoardType(event.target.value as BoardType)}>
-                {boardOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt.replace('_', ' ')}
-                  </option>
+                {boardFamilies.map((family) => (
+                  <optgroup key={family} label={family}>
+                    {boardOptions
+                      .filter((board) => board.family === family)
+                      .map((board) => (
+                        <option key={board.type} value={board.type}>
+                          {board.name}
+                        </option>
+                      ))}
+                  </optgroup>
                 ))}
               </SelectField>
             </FieldShell>

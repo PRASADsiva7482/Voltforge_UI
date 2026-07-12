@@ -1,4 +1,5 @@
 import type { CanvasNode, PinPosition, Wire } from '../../types/domain';
+import { getBoardLogicVoltage, isBoardComponentType } from './boardCatalog';
 
 export interface NetlistPinRef {
   nodeId: string;
@@ -70,7 +71,7 @@ class UnionFind {
 const pinKey = (nodeId: string, pinId: string) => `${nodeId}:${pinId}`;
 
 function isBoard(type: string) {
-  return type.startsWith('ARDUINO') || type.startsWith('ESP') || type.startsWith('RASPBERRY');
+  return isBoardComponentType(type);
 }
 
 function isGroundLabel(pin: { pinName?: string; name?: string; pinId?: string; id?: string }) {
@@ -367,21 +368,44 @@ function findPinByRole(nodes: CanvasNode[], nodeId: string, roles: string[]): Pi
   }) || null;
 }
 
+function pinLabel(pin: Pick<NetlistPinRef, 'pinId' | 'pinName'>): string {
+  return `${pin.pinId || ''} ${pin.pinName || ''}`.toUpperCase();
+}
+
+function hasPinToken(label: string, tokenPattern: string): boolean {
+  return new RegExp(`(^|[^A-Z0-9])(${tokenPattern})([^A-Z0-9]|$)`, 'i').test(label);
+}
+
+function isBoardPowerPin(pin: NetlistPinRef): boolean {
+  const label = pinLabel(pin);
+  if (hasPinToken(label, 'RESET|RST|RUN|EN|BOOT|AREF|VREF|ADC_VREF')) return false;
+  return pin.pinType === 'power'
+    || hasPinToken(label, '5V|3V|3V3|3\\.3V|VIN|VBUS|VSYS|VCC|VDD|BAT|USB');
+}
+
+function isBoardGpioPin(pin: NetlistPinRef): boolean {
+  if (!isBoard(pin.nodeType) || pin.pinType === 'power' || pin.pinType === 'ground') return false;
+
+  const label = pinLabel(pin);
+  if (hasPinToken(label, 'GND|GROUND|5V|3V|3V3|3\\.3V|VIN|VBUS|VSYS|VCC|VDD|BAT|USB')) return false;
+  if (hasPinToken(label, 'RESET|RST|RUN|EN|BOOT|AREF|VREF|ADC_VREF|XTAL1|XTAL2')) return false;
+
+  return hasPinToken(
+    label,
+    'D\\d+|A\\d+|GPIO\\d+|GP\\d+|P\\d+|P[89]_\\d+|P[A-K]\\d+|SDA\\d*|SCL\\d*|SCK|MOSI|MISO|RX\\d*|TX\\d*'
+  );
+}
+
 function netHasVoltageSource(net?: NetlistNode): boolean {
   return !!net?.pins.some((pin) => {
-    const label = pin.pinName.toUpperCase();
     const pinId = pin.pinId.toLowerCase();
     if (isBoard(pin.nodeType)) {
-      return label === '5V'
-        || label === '3.3V'
-        || label === '3V3'
-        || label === 'VIN'
-        || /^D\d+/.test(label);
+      return isBoardPowerPin(pin) || isBoardGpioPin(pin);
     }
     if (pin.nodeType === 'POWER_SUPPLY' || pin.nodeType === 'BATTERY_9V') {
       return pin.pinType === 'power' || /(^|\W)(\+|POS|POSITIVE|VCC|VIN)(\W|$)/i.test(`${pin.pinId} ${pin.pinName}`);
     }
-    return pin.nodeType === 'VOLTAGE_REGULATOR_7805' && (pinId === 'vout' || label === '5V');
+    return pin.nodeType === 'VOLTAGE_REGULATOR_7805' && (pinId === 'vout' || pinLabel(pin) === '5V');
   });
 }
 
@@ -396,15 +420,36 @@ function netHasGround(net?: NetlistNode): boolean {
 }
 
 function netHasMcuGpio(net?: NetlistNode): boolean {
-  return !!net?.pins.some((pin) => isBoard(pin.nodeType) && /^D\d+$/i.test(pin.pinName));
+  return !!net?.pins.some((pin) => isBoardGpioPin(pin));
 }
 
 function netVoltage(net?: NetlistNode): number {
   if (!net) return 0;
-  if (net.pins.some((pin) => isBoard(pin.nodeType) && /^(3\.3V|3V3)$/i.test(pin.pinName))) return 3.3;
-  if (net.pins.some((pin) => isBoard(pin.nodeType) && pin.pinName.toUpperCase() === 'VIN')) return 7;
-  if (netHasVoltageSource(net)) return 5;
-  return 0;
+  let voltage = 0;
+
+  for (const pin of net.pins) {
+    const label = pinLabel(pin);
+    const pinId = pin.pinId.toLowerCase();
+
+    if (isBoard(pin.nodeType)) {
+      if (hasPinToken(label, '3V|3V3|3\\.3V')) voltage = Math.max(voltage, 3.3);
+      else if (hasPinToken(label, '5V|VBUS|USB|VCC|VDD')) voltage = Math.max(voltage, 5);
+      else if (hasPinToken(label, 'VIN')) voltage = Math.max(voltage, 7);
+      else if (hasPinToken(label, 'VSYS|BAT')) voltage = Math.max(voltage, 3.7);
+      else if (isBoardGpioPin(pin)) voltage = Math.max(voltage, getBoardLogicVoltage(pin.nodeType));
+      continue;
+    }
+
+    if (pin.nodeType === 'BATTERY_9V' && (pin.pinType === 'power' || pinId.includes('pos'))) {
+      voltage = Math.max(voltage, 9);
+    } else if (pin.nodeType === 'POWER_SUPPLY' && pin.pinType === 'power') {
+      voltage = Math.max(voltage, 5);
+    } else if (pin.nodeType === 'VOLTAGE_REGULATOR_7805' && (pinId === 'vout' || label === '5V')) {
+      voltage = Math.max(voltage, 5);
+    }
+  }
+
+  return voltage;
 }
 
 function parseMilliAmps(value: unknown, fallback: number): number {
@@ -569,4 +614,3 @@ function checkI2cConflicts(netlist: CircuitNetlist, issues: CircuitSafetyIssue[]
     }
   }
 }
-

@@ -2,6 +2,32 @@ import { useCanvasStore, WIRE_COLORS } from '../../store/canvasStore';
 import { Trash2 } from 'lucide-react';
 import type { Wire } from '../../types/domain';
 import { FloatingPanel } from '../../components/ui/FloatingPanel';
+import { isBoardComponentType } from '../canvas/boardCatalog';
+
+/** Properties that are hardware metadata or simulation state — never user-editable. */
+const HIDDEN_KEYS = new Set(['svgData', 'locked']);
+
+/** Keys that are read-only when the component is a board. */
+const BOARD_READONLY_KEYS = new Set([
+  'family', 'logicVoltage', 'clockSpeed', 'compilerSupport', 'features',
+  'footprint', 'pinProfile', 'compiler', 'clock', 'sortOrder',
+]);
+
+/** Simulation state keys — always read-only on every component. */
+const SIM_STATE_KEYS = new Set([
+  'isBlown', 'faultMessage', 'isLit', 'currentMa', 'isSpinning',
+]);
+
+function isReadonly(key: string, nodeType: string): boolean {
+  if (SIM_STATE_KEYS.has(key)) return true;
+  if (isBoardComponentType(nodeType) && BOARD_READONLY_KEYS.has(key)) return true;
+  return false;
+}
+
+function formatValue(val: unknown): string {
+  if (Array.isArray(val)) return val.join(', ');
+  return String(val ?? '');
+}
 
 export default function PropertyEditor() {
   const selectedNodeId = useCanvasStore((s) => s.selectedNodeId);
@@ -82,47 +108,50 @@ export default function PropertyEditor() {
             </div>
 
             {Object.keys(selectedNode.properties || {}).filter(
-              k => !['svgData', 'locked'].includes(k)
+              k => !HIDDEN_KEYS.has(k)
             ).length > 0 && (
-              <>
-                <div className="vf-prop-editor__divider" />
-                <h4 className="vf-prop-editor__subtitle">Properties</h4>
-                {Object.keys(selectedNode.properties || {})
-                  .filter(k => !['svgData', 'locked'].includes(k))
-                  .map((key) => {
-                    const val = selectedNode.properties[key];
-                    const isBoolean = typeof val === 'boolean';
-                    const isNumber = typeof val === 'number';
-                    return (
-                      <div key={key} className="vf-prop-editor__section">
-                        <label className="vf-prop-editor__label">{key}</label>
-                        {isBoolean ? (
-                          <button
-                            className={`vf-prop-editor__toggle ${val ? 'is-on' : ''}`}
-                            onClick={() => updateNode(selectedNode.id, {
-                              properties: { ...selectedNode.properties, [key]: !val }
-                            })}
-                          >
-                            {val ? 'ON' : 'OFF'}
-                          </button>
-                        ) : (
-                          <input
-                            className="vf-prop-editor__input"
-                            type={isNumber ? 'number' : 'text'}
-                            value={String(val ?? '')}
-                            onChange={(e) => updateNode(selectedNode.id, {
-                              properties: {
-                                ...selectedNode.properties,
-                                [key]: isNumber ? Number(e.target.value) : e.target.value
-                              }
-                            })}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-              </>
-            )}
+                <>
+                  <div className="vf-prop-editor__divider" />
+                  <h4 className="vf-prop-editor__subtitle">Properties</h4>
+                  {Object.keys(selectedNode.properties || {})
+                    .filter(k => !HIDDEN_KEYS.has(k))
+                    .map((key) => {
+                      const val = selectedNode.properties[key];
+                      const readonly = isReadonly(key, selectedNode.type);
+                      const isBoolean = typeof val === 'boolean';
+                      const isNumber = typeof val === 'number';
+                      return (
+                        <div key={key} className="vf-prop-editor__section">
+                          <label className="vf-prop-editor__label">{key}</label>
+                          {readonly ? (
+                            <span className="vf-prop-editor__readonly">{formatValue(val)}</span>
+                          ) : isBoolean ? (
+                            <button
+                              className={`vf-prop-editor__toggle ${val ? 'is-on' : ''}`}
+                              onClick={() => updateNode(selectedNode.id, {
+                                properties: { ...selectedNode.properties, [key]: !val }
+                              })}
+                            >
+                              {val ? 'ON' : 'OFF'}
+                            </button>
+                          ) : (
+                            <input
+                              className="vf-prop-editor__input"
+                              type={isNumber ? 'number' : 'text'}
+                              value={String(val ?? '')}
+                              onChange={(e) => updateNode(selectedNode.id, {
+                                properties: {
+                                  ...selectedNode.properties,
+                                  [key]: isNumber ? Number(e.target.value) : e.target.value
+                                }
+                              })}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                </>
+              )}
 
             <div className="vf-prop-editor__divider" />
             <h4 className="vf-prop-editor__subtitle">Pins ({selectedNode.pins.length})</h4>

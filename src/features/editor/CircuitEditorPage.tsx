@@ -38,6 +38,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useCollaboration } from '../../hooks/useCollaboration'
 
 import { analyzeCircuitSafety } from '../canvas/pinRegistry'
+import { isBoardComponentType } from '../canvas/boardCatalog'
 import { SimulationEngine } from '../simulator/SimulationEngine'
 import { LogicRegistry } from '../simulator/logic/LogicRegistry'
 
@@ -418,7 +419,7 @@ export default function CircuitEditorPage() {
         const targetNode = nodes.find((n) => n.id === targetNodeId)
         if (
           targetNode &&
-          (targetNode.type.startsWith('ARDUINO') || targetNode.type.startsWith('ESP'))
+          isBoardComponentType(targetNode.type)
         ) {
           const mcuPin = targetNode.pins?.find((p) => p.id === targetPinId)
           if (mcuPin) {

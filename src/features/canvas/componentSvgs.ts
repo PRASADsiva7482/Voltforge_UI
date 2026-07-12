@@ -3,10 +3,86 @@
 // Maps component TYPE from DB seed to inline SVG data URIs
 // ═══════════════════════════════════════════════════════════════════════════
 
+import { BOARD_CATALOG, BOARD_FOOTPRINT_DIMENSIONS } from './boardCatalog';
+
 const svg = (vb: string, body: string) =>
   `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}">${body}</svg>`;
 
+const svgText = (value: string) => encodeURIComponent(value);
+
+const familyPalette: Record<string, { body: string; accent: string; text: string }> = {
+  Arduino: { body: '0d6ebd', accent: 'e5f6fb', text: 'ffffff' },
+  ESP8266: { body: '1f2937', accent: 'f59e0b', text: 'd1fae5' },
+  ESP32: { body: '111827', accent: '10b981', text: 'd1fae5' },
+  'Raspberry Pi Pico': { body: '047857', accent: 'f8fafc', text: 'ecfdf5' },
+  'Raspberry Pi SBC': { body: 'be123c', accent: 'facc15', text: 'ffffff' },
+  STM32: { body: '1d4ed8', accent: 'dbeafe', text: 'ffffff' },
+  Teensy: { body: '7c3aed', accent: 'fef3c7', text: 'ffffff' },
+  'BBC micro:bit': { body: '111827', accent: 'fbbf24', text: 'ffffff' },
+  'Seeed XIAO': { body: '0f766e', accent: 'ccfbf1', text: 'ffffff' },
+  'Adafruit Feather': { body: 'b91c1c', accent: 'fde68a', text: 'ffffff' },
+  'SparkFun Thing Plus': { body: 'c2410c', accent: 'fed7aa', text: 'ffffff' },
+  Particle: { body: '0284c7', accent: 'e0f2fe', text: 'ffffff' },
+  BeagleBone: { body: '334155', accent: 'fbbf24', text: 'ffffff' },
+  ODROID: { body: '991b1b', accent: 'bfdbfe', text: 'ffffff' },
+  'Orange Pi': { body: 'ea580c', accent: 'ffedd5', text: 'ffffff' },
+  'Banana Pi': { body: 'ca8a04', accent: 'fef3c7', text: '111827' },
+  NanoPi: { body: '475569', accent: 'bae6fd', text: 'ffffff' },
+  Jetson: { body: '166534', accent: 'bbf7d0', text: 'ffffff' },
+  Coral: { body: '0e7490', accent: 'cffafe', text: 'ffffff' },
+  Intel: { body: '1e40af', accent: 'dbeafe', text: 'ffffff' },
+  'Texas Instruments': { body: 'b91c1c', accent: 'fecaca', text: 'ffffff' },
+  NXP: { body: '0f766e', accent: 'ccfbf1', text: 'ffffff' },
+  Microchip: { body: '7f1d1d', accent: 'fee2e2', text: 'ffffff' },
+  'Atmel AVR': { body: '374151', accent: 'facc15', text: 'ffffff' },
+  Nordic: { body: '1d4ed8', accent: 'bfdbfe', text: 'ffffff' },
+  'Silicon Labs': { body: '0f172a', accent: '93c5fd', text: 'ffffff' },
+  Infineon: { body: '0369a1', accent: 'bae6fd', text: 'ffffff' },
+  Renesas: { body: '4338ca', accent: 'ddd6fe', text: 'ffffff' },
+  CH32: { body: '155e75', accent: 'a5f3fc', text: 'ffffff' },
+  'RISC-V': { body: '7c2d12', accent: 'fed7aa', text: 'ffffff' },
+};
+
+const boardSvg = (type: string, name: string, family: string, footprint: string) => {
+  const dim = BOARD_FOOTPRINT_DIMENSIONS[footprint as keyof typeof BOARD_FOOTPRINT_DIMENSIONS] || { w: 120, h: 80 };
+  const palette = familyPalette[family] || { body: '334155', accent: 'e2e8f0', text: 'ffffff' };
+  const label = svgText(name.length > 26 ? name.replace(/\b(Arduino|Raspberry Pi|Adafruit|SparkFun|NVIDIA|Google)\b/g, '').trim() : name);
+  const familyLabel = svgText(family);
+  const typeLabel = svgText(type.replace(/_/g, ' '));
+  const headerH = Math.max(16, Math.round(dim.h * 0.18));
+  const pinRailH = Math.max(7, Math.round(dim.h * 0.06));
+  const moduleW = Math.max(28, Math.round(dim.w * 0.35));
+  const moduleH = Math.max(20, Math.round(dim.h * 0.25));
+
+  return svg(`0 0 ${dim.w} ${dim.h}`,
+    `<rect width="${dim.w}" height="${dim.h}" rx="6" fill="%23${palette.body}"/>` +
+    `<rect x="5" y="5" width="${dim.w - 10}" height="${headerH}" rx="3" fill="%23${palette.accent}" opacity="0.22"/>` +
+    `<rect x="${Math.round((dim.w - moduleW) / 2)}" y="${headerH + 12}" width="${moduleW}" height="${moduleH}" rx="3" fill="%230f172a" opacity="0.68"/>` +
+    `<rect x="6" y="${dim.h - pinRailH - 5}" width="${dim.w - 12}" height="${pinRailH}" rx="2" fill="%230f172a" opacity="0.72"/>` +
+    `<circle cx="14" cy="14" r="3" fill="%23${palette.accent}" opacity="0.85"/><circle cx="${dim.w - 14}" cy="${dim.h - 14}" r="3" fill="%23${palette.accent}" opacity="0.85"/>` +
+    `<text x="${dim.w / 2}" y="${headerH + moduleH + 30}" font-size="${Math.max(8, Math.min(14, dim.w / 10))}" fill="%23${palette.text}" font-weight="bold" text-anchor="middle" font-family="Arial">${label}</text>` +
+    `<text x="${dim.w / 2}" y="${headerH + moduleH + 43}" font-size="${Math.max(6, Math.min(9, dim.w / 16))}" fill="%23${palette.accent}" text-anchor="middle" font-family="Arial">${familyLabel}</text>` +
+    `<text x="${dim.w / 2}" y="${dim.h - 10}" font-size="${Math.max(5, Math.min(7, dim.w / 24))}" fill="%23${palette.accent}" text-anchor="middle" font-family="Arial">${typeLabel}</text>`
+  );
+};
+
+const boardComponentSvgs = Object.fromEntries(
+  BOARD_CATALOG.map((boardItem) => [
+    boardItem.type,
+    boardSvg(boardItem.type, boardItem.name, boardItem.family, boardItem.footprint),
+  ]),
+);
+
+const boardComponentDimensions = Object.fromEntries(
+  BOARD_CATALOG.map((boardItem) => [
+    boardItem.type,
+    BOARD_FOOTPRINT_DIMENSIONS[boardItem.footprint],
+  ]),
+);
+
 export const componentSvgs: Record<string, string> = {
+  ...boardComponentSvgs,
+
   // ── Boards ──
   ARDUINO_UNO: svg('0 0 200 150',
     '<rect width="200" height="150" rx="8" fill="%230d6ebd"/>' +
@@ -501,6 +577,8 @@ export const componentSvgs: Record<string, string> = {
 // Default dimensions for each component type (width x height)
 // These MUST match the SVG viewBox and pin coordinates in pinRegistry.ts
 export const componentDimensions: Record<string, { w: number; h: number }> = {
+  ...boardComponentDimensions,
+
   // Boards (match SVG viewBox exactly)
   ARDUINO_UNO: { w: 200, h: 150 },
   ARDUINO_MEGA: { w: 280, h: 120 },

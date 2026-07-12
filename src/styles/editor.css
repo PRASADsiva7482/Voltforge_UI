@@ -498,6 +498,21 @@
   color: var(--vf-text-muted, #68736f);
   font-family: 'JetBrains Mono', monospace;
 }
+.vf-prop-editor__readonly {
+  display: block;
+  font-size: 11px;
+  color: var(--vf-text-muted, #68736f);
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(0,0,0,0.03);
+  border: 1px solid var(--vf-border, #dce5de);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: default;
+  user-select: text;
+}
+:root.dark .vf-prop-editor__readonly {
+  background: rgba(255,255,255,0.04);
+}
 
 .vf-prop-editor__grid {
   display: grid;
@@ -1296,6 +1311,74 @@
   flex-direction: column;
   gap: 18px;
 }
+
+/* Board search input */
+.vf-settings-board-search {
+  position: relative;
+  margin-bottom: 10px;
+}
+.vf-settings-board-search__icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--vf-text-muted);
+  pointer-events: none;
+}
+.vf-settings-board-search__input {
+  width: 100%;
+  padding: 8px 10px 8px 32px;
+  border: 1px solid var(--vf-border);
+  border-radius: 8px;
+  background: var(--vf-surface);
+  color: var(--vf-text);
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.vf-settings-board-search__input:focus {
+  border-color: var(--vf-teal);
+}
+
+/* Family filter chips */
+.vf-settings-board-families {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+  max-height: 80px;
+  overflow-y: auto;
+}
+.vf-settings-family-chip {
+  padding: 4px 10px;
+  border: 1px solid var(--vf-border);
+  border-radius: 20px;
+  background: var(--vf-surface);
+  color: var(--vf-text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.vf-settings-family-chip:hover {
+  background: rgba(0,0,0,0.03);
+  color: var(--vf-text);
+}
+.vf-settings-family-chip.is-active {
+  border-color: var(--vf-teal);
+  background: var(--vf-teal-soft);
+  color: var(--vf-teal);
+}
+
+/* Scrollable board grid wrapper */
+.vf-settings-board-scroll {
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--vf-border);
+  border-radius: 10px;
+  padding: 8px;
+}
 .vf-settings-board-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -1322,6 +1405,13 @@
   border-color: var(--vf-teal);
   background: var(--vf-teal-soft);
   color: var(--vf-teal);
+}
+.vf-settings-board-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 24px 12px;
+  color: var(--vf-text-muted);
+  font-size: 12px;
 }
 .vf-settings-visibility-row {
   display: flex;

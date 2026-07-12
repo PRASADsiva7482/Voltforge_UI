@@ -6,6 +6,7 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import { useCanvasStore } from '../../../store/canvasStore';
 import { getPinAbsPos, snapToRoutingGuides } from '../../../utils/wireRouting';
 import { componentSvgs } from '../componentSvgs';
+import { isBoardComponentType } from '../boardCatalog';
 import PinDot from './PinDot';
 import type { CanvasNode } from '../canvasTypes';
 
@@ -530,7 +531,7 @@ const ComponentNode = ({
       node.properties?.isActive);
   const isButton = node.type === 'PUSH_BUTTON' || node.type === 'BUTTON';
   const isSwitch = node.type === 'SWITCH_SPST';
-  const isBoard = node.type.startsWith('ARDUINO') || node.type.startsWith('ESP') || node.type.startsWith('RASPBERRY');
+  const isBoard = isBoardComponentType(node.type);
   const isServo = node.type === 'SERVO_MOTOR' || node.type === 'MOTOR_SERVO';
   const isDcMotor = node.type === 'MOTOR_DC';
   const isStepper = node.type === 'MOTOR_STEPPER' || node.type === 'STEPPER_MOTOR';
@@ -985,7 +986,7 @@ const ComponentNode = ({
             const line2 = (node.properties?.lcdLine2 as string) || '';
             const hasText = line1.trim() || line2.trim();
             // Check if board is powered
-            const boardNode = useCanvasStore.getState().nodes.find(n => n.type.startsWith('ARDUINO') || n.type.startsWith('ESP') || n.type.startsWith('RASPBERRY'));
+            const boardNode = useCanvasStore.getState().nodes.find(n => isBoardComponentType(n.type));
             const isBoardPwr = boardNode ? Boolean(boardNode.properties?.boardPowered) : false;
             const backlight = isBoardPwr && node.properties?.lcdBacklight !== false;
             const screen = node.type === 'DISPLAY_LCD_I2C' ? LCD_I2C_SCREEN : LCD_16X2_SCREEN;
@@ -1046,7 +1047,7 @@ const ComponentNode = ({
             const line2 = (node.properties?.lcdLine2 as string) || '';
             const hasText = line1.trim() || line2.trim();
             // Check if board is powered
-            const boardNode = useCanvasStore.getState().nodes.find(n => n.type.startsWith('ARDUINO') || n.type.startsWith('ESP') || n.type.startsWith('RASPBERRY'));
+            const boardNode = useCanvasStore.getState().nodes.find(n => isBoardComponentType(n.type));
             const isBoardPwr = boardNode ? Boolean(boardNode.properties?.boardPowered) : false;
             const backlight = isBoardPwr && node.properties?.lcdBacklight !== false;
             const fontSize = Math.max(7, Math.min(9, OLED_SCREEN.width / 12));

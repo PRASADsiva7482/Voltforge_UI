@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Settings, Globe, Lock, Save, Trash2, Cpu } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { Settings, Globe, Lock, Save, Trash2, Cpu, Search } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { projectApi } from '../../api/services'
 import { useProjectStore } from '../../store/projectStore'
@@ -7,6 +7,7 @@ import { Modal } from '../../components/ui/Modal'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { FieldShell, TextInput, Textarea } from '../../components/ui/Field'
 import { Button } from '../../components/ui/Button'
+import { BOARD_CATALOG } from '../canvas/boardCatalog'
 import type { BoardType } from '../../types/domain'
 
 interface Props {
@@ -14,14 +15,12 @@ interface Props {
   onClose: () => void
 }
 
-const BOARDS: BoardType[] = [
-  'ARDUINO_UNO',
-  'ARDUINO_MEGA',
-  'ARDUINO_NANO',
-  'ESP32',
-  'ESP32_S3',
-  'ESP8266',
-]
+/** Unique family names from the catalog, in sort order. */
+const BOARD_FAMILIES = Array.from(
+  new Map(BOARD_CATALOG.map((b) => [b.family, b.sortOrder])),
+)
+  .sort((a, b) => a[1] - b[1])
+  .map(([family]) => family)
 
 export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
   const { currentProject, setCurrentProject } = useProjectStore()
@@ -34,6 +33,10 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
   const [tags, setTags] = useState('')
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
+  // Board selector filter state
+  const [boardSearch, setBoardSearch] = useState('')
+  const [selectedFamily, setSelectedFamily] = useState<string>('All')
+
   useEffect(() => {
     if (currentProject) {
       setName(currentProject.name || '')
@@ -43,6 +46,28 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
       setTags(currentProject.tags || '')
     }
   }, [currentProject, isOpen])
+
+  // Reset filters when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setBoardSearch('')
+      setSelectedFamily('All')
+    }
+  }, [isOpen])
+
+  const filteredBoards = useMemo(() => {
+    const query = boardSearch.toLowerCase().trim()
+    return BOARD_CATALOG.filter((board) => {
+      if (selectedFamily !== 'All' && board.family !== selectedFamily) return false
+      if (!query) return true
+      return (
+        board.name.toLowerCase().includes(query) ||
+        board.type.toLowerCase().includes(query) ||
+        board.family.toLowerCase().includes(query) ||
+        board.features.some((f) => f.toLowerCase().includes(query))
+      )
+    })
+  }, [boardSearch, selectedFamily])
 
   const updateMutation = useMutation({
     mutationFn: () =>
@@ -125,21 +150,61 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
             />
           </FieldShell>
 
-          <FieldShell label="Board Platform">
-            <div className="vf-settings-board-grid">
-              {BOARDS.map((b) => (
+          <FieldShell label={`Board Platform (${filteredBoards.length})`}>
+            {/* Search input */}
+            <div className="vf-settings-board-search">
+              <Search size={14} className="vf-settings-board-search__icon" />
+              <input
+                className="vf-settings-board-search__input"
+                type="text"
+                placeholder="Search boards…"
+                value={boardSearch}
+                onChange={(e) => setBoardSearch(e.target.value)}
+              />
+            </div>
+
+            {/* Family filter chips */}
+            <div className="vf-settings-board-families">
+              <button
+                type="button"
+                className={`vf-settings-family-chip ${selectedFamily === 'All' ? 'is-active' : ''}`}
+                onClick={() => setSelectedFamily('All')}
+              >
+                All
+              </button>
+              {BOARD_FAMILIES.map((family) => (
                 <button
-                  key={b}
+                  key={family}
                   type="button"
-                  onClick={() => setBoardType(b)}
-                  className={`vf-settings-board-card ${
-                    boardType === b ? 'is-selected' : ''
-                  }`}
+                  className={`vf-settings-family-chip ${selectedFamily === family ? 'is-active' : ''}`}
+                  onClick={() => setSelectedFamily(selectedFamily === family ? 'All' : family)}
                 >
-                  <Cpu size={14} />
-                  <span>{b.replace(/_/g, ' ')}</span>
+                  {family}
                 </button>
               ))}
+            </div>
+
+            {/* Scrollable board grid */}
+            <div className="vf-settings-board-scroll">
+              <div className="vf-settings-board-grid">
+                {filteredBoards.map((board) => (
+                  <button
+                    key={board.type}
+                    type="button"
+                    onClick={() => setBoardType(board.type)}
+                    className={`vf-settings-board-card ${
+                      boardType === board.type ? 'is-selected' : ''
+                    }`}
+                    title={`${board.family} — ${board.features.join(', ')}\nLogic: ${board.logicVoltage}V · Clock: ${board.clock}`}
+                  >
+                    <Cpu size={14} />
+                    <span>{board.name}</span>
+                  </button>
+                ))}
+                {filteredBoards.length === 0 && (
+                  <div className="vf-settings-board-empty">No boards match your search.</div>
+                )}
+              </div>
             </div>
           </FieldShell>
 
@@ -196,3 +261,4 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
   )
 }
 export { ProjectSettingsModal }
+

@@ -6,6 +6,7 @@
 
 import type { CanvasNode, Wire } from '../../types/domain';
 import type { MNAElement } from './MNASolver';
+import { getBoardLogicVoltage, isBoardComponentType } from '../canvas/boardCatalog';
 
 // ── Intermediate types ──────────────────────────────────────────────────
 
@@ -60,11 +61,11 @@ const pinKey = (nodeId: string, pinId: string) => `${nodeId}:${pinId}`;
 // ── Helper: check if a component type is a board / MCU ──────────────────
 
 function isBoard(type: string): boolean {
-  return type.startsWith('ARDUINO') || type.startsWith('ESP') || type.startsWith('RASPBERRY');
+  return isBoardComponentType(type);
 }
 
 function boardLogicVoltage(type: string): number {
-  return type.startsWith('ESP') || type.startsWith('RASPBERRY') ? 3.3 : 5;
+  return getBoardLogicVoltage(type);
 }
 
 function isBoardGroundPin(pin: { id: string; name: string }): boolean {

@@ -3,6 +3,7 @@ import { useProjectStore } from '../../store/projectStore';
 import { useCanvasStore } from '../../store/canvasStore';
 import { Loader2, Maximize2, Minimize2, AlignLeft, Eye, EyeOff } from 'lucide-react';
 import type { OnMount } from '@monaco-editor/react';
+import { getBoardProfile } from '../canvas/boardCatalog';
 
 const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.default })));
 
@@ -32,11 +33,13 @@ function generateFullCode(userCode: string, boardType?: string): string {
 
   // Determine board-specific includes
   const board = boardType || 'ARDUINO_UNO';
-  const isEsp = board.startsWith('ESP');
+  const boardProfile = getBoardProfile(board);
+  const boardLabel = boardProfile?.name || board.replace(/_/g, ' ');
+  const hasWifi = board.startsWith('ESP') || Boolean(boardProfile?.features.some((feature) => feature.toLowerCase().includes('wi-fi')));
 
   const includes = [
     '#include <Arduino.h>',
-    ...(isEsp ? ['#include <WiFi.h>'] : []),
+    ...(hasWifi ? ['#include <WiFi.h>'] : []),
     ...(nodes.some(n => n.type.includes('SERVO')) ? ['#include <Servo.h>'] : []),
     ...(nodes.some(n => n.type.includes('LCD') || n.type.includes('OLED')) ? ['#include <Wire.h>'] : []),
     ...(nodes.some(n => n.type.includes('LCD_I2C') || n.type === 'DISPLAY_LCD_I2C') ? ['#include <LiquidCrystal_I2C.h>'] : []),
@@ -48,7 +51,7 @@ function generateFullCode(userCode: string, boardType?: string): string {
   const header = [
     '// ═══════════════════════════════════════════════════════════',
     `// VoltForge — Auto-generated Full Sketch`,
-    `// Board: ${board.replace(/_/g, ' ')}`,
+    `// Board: ${boardLabel}`,
     `// Components: ${nodes.map(n => n.name).join(', ') || 'None'}`,
     '// ═══════════════════════════════════════════════════════════',
     '',

@@ -12,6 +12,7 @@ import type { WorkerInMessage, WorkerResultMessage, WorkerOscilloscopeMessage } 
 import { LogicRegistry } from './logic/LogicRegistry';
 import { evaluateNumericExpression } from './ExpressionEvaluator';
 import { AudioEngine } from './AudioEngine';
+import { getBoardLogicVoltage, isBoardComponentType } from '../canvas/boardCatalog';
 
 export type PinState = 'HIGH' | 'LOW' | 'INPUT' | 'OUTPUT' | 'PWM';
 
@@ -292,7 +293,7 @@ export class SimulationEngine {
       const updates: Record<string, any> = {};
       let changed = false;
 
-      if (node.type.startsWith('ARDUINO') || node.type.startsWith('ESP') || node.type.startsWith('RASPBERRY')) {
+      if (isBoardComponentType(node.type)) {
         updates.boardPowered = true;
         updates.builtInLedLit = false;
         changed = true;
@@ -528,7 +529,7 @@ export class SimulationEngine {
 
         const currentNodes = useCanvasStore.getState().nodes;
         const mcuNode = currentNodes.find(n =>
-          n.type.startsWith('ARDUINO') || n.type.startsWith('ESP') || n.type.startsWith('RASPBERRY')
+          isBoardComponentType(n.type)
         );
         const isPowered = mcuNode ? mcuNode.properties?.boardPowered !== false : true;
 
@@ -554,7 +555,7 @@ export class SimulationEngine {
           while (this.isRunning && !this.avrCpu) {
             const freshNodes = useCanvasStore.getState().nodes;
             const freshMcuNode = freshNodes.find(n =>
-              n.type.startsWith('ARDUINO') || n.type.startsWith('ESP') || n.type.startsWith('RASPBERRY')
+              isBoardComponentType(n.type)
             );
             const isPowered = freshMcuNode ? freshMcuNode.properties?.boardPowered !== false : true;
 
@@ -1526,7 +1527,7 @@ export class SimulationEngine {
   private propagatePinState(pin: string, state: PinState, nodes: CanvasNode[], wires: Wire[], value = 0) {
     // Find MCU node
     const mcuNode = nodes.find(n =>
-      n.type.startsWith('ARDUINO') || n.type.startsWith('ESP') || n.type.startsWith('RASPBERRY')
+      isBoardComponentType(n.type)
     );
     if (!mcuNode) return;
 
@@ -1732,7 +1733,7 @@ export class SimulationEngine {
       if (label === '5V' || label === 'VCC') return 5;
       if (label === 'VIN') return 7;
 
-      if (node.type.startsWith('ARDUINO') || node.type.startsWith('ESP')) {
+      if (isBoardComponentType(node.type)) {
         const pinNumber = this.pinNumberFromBoardPin(pin);
         if (!pinNumber) continue;
         const pinInfo = this.pins[pinNumber];
@@ -1914,7 +1915,7 @@ export class SimulationEngine {
 
           // Find MCU node
           const mcuNode = useCanvasStore.getState().nodes.find(n =>
-            n.type.startsWith('ARDUINO') || n.type.startsWith('ESP') || n.type.startsWith('RASPBERRY')
+            isBoardComponentType(n.type)
           );
           if (mcuNode) {
             const isPowered = mcuNode.properties?.boardPowered !== false;
@@ -1951,7 +1952,7 @@ export class SimulationEngine {
 
       const currentNodes = useCanvasStore.getState().nodes;
       const mcuNode = currentNodes.find(n =>
-        n.type.startsWith('ARDUINO') || n.type.startsWith('ESP') || n.type.startsWith('RASPBERRY')
+        isBoardComponentType(n.type)
       );
       const isPowered = mcuNode ? mcuNode.properties?.boardPowered !== false : true;
 
@@ -2051,7 +2052,7 @@ export class SimulationEngine {
       const updates: Record<string, any> = {};
       let changed = false;
 
-      if (node.type.startsWith('ARDUINO') || node.type.startsWith('ESP') || node.type.startsWith('RASPBERRY')) {
+      if (isBoardComponentType(node.type)) {
         updates.boardPowered = false;
         updates.builtInLedLit = false;
         changed = true;
@@ -2134,7 +2135,7 @@ export class SimulationEngine {
 
       const boardPoweredMap: Record<string, boolean> = {};
       nodes.forEach(node => {
-        if (node.type.startsWith('ARDUINO') || node.type.startsWith('ESP') || node.type.startsWith('RASPBERRY')) {
+        if (isBoardComponentType(node.type)) {
           boardPoweredMap[node.id] = node.properties?.boardPowered !== false;
         }
       });
@@ -2219,7 +2220,7 @@ export class SimulationEngine {
     const canonical = this.canonicalPin(pin);
     const nodes = useCanvasStore.getState().nodes;
     const mcuNode = nodes.find(n =>
-      n.type.startsWith('ARDUINO') || n.type.startsWith('ESP') || n.type.startsWith('RASPBERRY')
+      isBoardComponentType(n.type)
     );
     if (!mcuNode) return;
     const boundedVoltage = Math.max(0, Math.min(this.boardLogicVoltage(mcuNode.type), voltage));
@@ -2243,7 +2244,7 @@ export class SimulationEngine {
     const canonical = this.canonicalPin(pin);
     const nodes = useCanvasStore.getState().nodes;
     const mcuNode = nodes.find(n =>
-      n.type.startsWith('ARDUINO') || n.type.startsWith('ESP') || n.type.startsWith('RASPBERRY')
+      isBoardComponentType(n.type)
     );
     if (!mcuNode) return;
 
@@ -2266,7 +2267,7 @@ export class SimulationEngine {
   }
 
   private boardLogicVoltage(type: string): number {
-    return type.startsWith('ESP') || type.startsWith('RASPBERRY') ? 3.3 : 5;
+    return getBoardLogicVoltage(type);
   }
 
   /**
@@ -2349,7 +2350,7 @@ export class SimulationEngine {
 
     // ── MCU Board Input Feedback ──
     const mcuNode = nodes.find(n =>
-      n.type.startsWith('ARDUINO') || n.type.startsWith('ESP') || n.type.startsWith('RASPBERRY')
+      isBoardComponentType(n.type)
     );
     if (mcuNode) {
       const logicVoltage = this.boardLogicVoltage(mcuNode.type);
