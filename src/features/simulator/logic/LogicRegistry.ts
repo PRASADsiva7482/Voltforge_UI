@@ -595,6 +595,28 @@ export class SoilMoistureLogic implements IComponentLogic {
 }
 
 /**
+ * Generic logic for powered communication/auxiliary modules.
+ * Tracks whether the module is powered (VCC above threshold) and updates the canvas.
+ */
+export class PoweredModuleLogic implements IComponentLogic {
+  onPinStateChange(componentId: string, pinId: string, state: PinState, value?: number): void {
+    const { updateNode, nodes } = useCanvasStore.getState();
+    const node = nodes.find(n => n.id === componentId);
+    if (!node) return;
+
+    // Interpret VCC pin voltage as power indication
+    if (/vcc|3v3/i.test(pinId)) {
+      const powered = state === 'HIGH' || (value !== undefined && value > 2.5);
+      if (node.properties?.powered !== powered) {
+        updateNode(componentId, {
+          properties: { ...node.properties, powered },
+        });
+      }
+    }
+  }
+}
+
+/**
  * Global Registry
  */
 export class LogicRegistry {
@@ -645,6 +667,11 @@ export class LogicRegistry {
     'SENSOR_LDR': new SensorLDRLogic(),
     'SENSOR_IMU': new SensorIMULogic(),
     'SOIL_MOISTURE': new SoilMoistureLogic(),
+    // Communication & powered modules
+    'BLUETOOTH_MODULE': new PoweredModuleLogic(),
+    'WIFI_MODULE': new PoweredModuleLogic(),
+    'IR_RECEIVER': new PoweredModuleLogic(),
+    'RC_RECEIVER': new PoweredModuleLogic(),
   };
 
   public static dispatch(componentType: string, componentId: string, pinId: string, state: PinState, value?: number) {

@@ -1011,7 +1011,7 @@ export function buildMNACircuit(
       elements.push({
         id: signalId,
         type: 'RESISTOR',
-        nodeA: nodeFor(node.id, 'signal'),
+        nodeA: nodeFor(node.id, 'sig'),
         nodeB: gndNode,
         value: 100_000,
       });
@@ -1332,6 +1332,235 @@ export function buildMNACircuit(
           value: 1000000,
         });
         elementToComponent.set(rId, node.id);
+      }
+      continue;
+    }
+
+    // ── Soil Moisture Sensor (powered sensor with analog output) ──
+    if (node.type === 'SOIL_MOISTURE') {
+      const vccPin = node.pins?.find(p => /vcc/i.test(p.id));
+      const gndPin = node.pins?.find(p => /gnd/i.test(p.id));
+      const sigPin = node.pins?.find(p => /sig/i.test(p.id));
+      if (vccPin && gndPin) {
+        const idDraw = `r_power_draw_${node.id}`;
+        elements.push({
+          id: idDraw,
+          type: 'RESISTOR',
+          nodeA: nodeFor(node.id, vccPin.id),
+          nodeB: nodeFor(node.id, gndPin.id),
+          value: 10000,
+        });
+        elementToComponent.set(idDraw, node.id);
+
+        if (sigPin) {
+          const moisture = Number(props.moistureLevel ?? 50) / 100;
+          const internalNode = nextExtraNode++;
+          const srcId = `vs_soil_${node.id}`;
+          elements.push({
+            id: srcId,
+            type: 'VOLTAGE_SOURCE',
+            nodeA: internalNode,
+            nodeB: nodeFor(node.id, gndPin.id),
+            value: moisture * 5,
+          });
+          elementToComponent.set(srcId, node.id);
+          vsCounter++;
+
+          const outR = `r_soil_out_${node.id}`;
+          elements.push({
+            id: outR,
+            type: 'RESISTOR',
+            nodeA: internalNode,
+            nodeB: nodeFor(node.id, sigPin.id),
+            value: 1000,
+          });
+          elementToComponent.set(outR, node.id);
+        }
+      }
+      continue;
+    }
+
+    // ── Bluetooth Module (powered communication module) ──
+    if (node.type === 'BLUETOOTH_MODULE') {
+      const vccPin = node.pins?.find(p => /vcc/i.test(p.id));
+      const gndPin = node.pins?.find(p => /gnd/i.test(p.id));
+      if (vccPin && gndPin) {
+        const idDraw = `r_power_draw_${node.id}`;
+        elements.push({
+          id: idDraw,
+          type: 'RESISTOR',
+          nodeA: nodeFor(node.id, vccPin.id),
+          nodeB: nodeFor(node.id, gndPin.id),
+          value: 500,
+        });
+        elementToComponent.set(idDraw, node.id);
+
+        for (const dataPin of ['tx', 'rx', 'en', 'state']) {
+          if (!node.pins?.some(p => p.id === dataPin)) continue;
+          const rId = `r_bt_${dataPin}_${node.id}`;
+          elements.push({
+            id: rId,
+            type: 'RESISTOR',
+            nodeA: nodeFor(node.id, dataPin),
+            nodeB: nodeFor(node.id, gndPin.id),
+            value: 100_000,
+          });
+          elementToComponent.set(rId, node.id);
+        }
+      }
+      continue;
+    }
+
+    // ── WiFi Module (powered communication module) ──
+    if (node.type === 'WIFI_MODULE') {
+      const vccPin = node.pins?.find(p => /vcc|3v3/i.test(p.id));
+      const gndPin = node.pins?.find(p => /gnd/i.test(p.id));
+      if (vccPin && gndPin) {
+        const idDraw = `r_power_draw_${node.id}`;
+        elements.push({
+          id: idDraw,
+          type: 'RESISTOR',
+          nodeA: nodeFor(node.id, vccPin.id),
+          nodeB: nodeFor(node.id, gndPin.id),
+          value: 300,
+        });
+        elementToComponent.set(idDraw, node.id);
+
+        for (const dataPin of ['tx', 'rx', 'rst', 'ch_pd']) {
+          if (!node.pins?.some(p => p.id === dataPin)) continue;
+          const rId = `r_wifi_${dataPin}_${node.id}`;
+          elements.push({
+            id: rId,
+            type: 'RESISTOR',
+            nodeA: nodeFor(node.id, dataPin),
+            nodeB: nodeFor(node.id, gndPin.id),
+            value: 100_000,
+          });
+          elementToComponent.set(rId, node.id);
+        }
+      }
+      continue;
+    }
+
+    // ── IR Receiver (powered sensor with digital output) ──
+    if (node.type === 'IR_RECEIVER') {
+      const vccPin = node.pins?.find(p => /vcc/i.test(p.id));
+      const gndPin = node.pins?.find(p => /gnd/i.test(p.id));
+      if (vccPin && gndPin) {
+        const idDraw = `r_power_draw_${node.id}`;
+        elements.push({
+          id: idDraw,
+          type: 'RESISTOR',
+          nodeA: nodeFor(node.id, vccPin.id),
+          nodeB: nodeFor(node.id, gndPin.id),
+          value: 5000,
+        });
+        elementToComponent.set(idDraw, node.id);
+
+        const outPin = node.pins?.find(p => /out/i.test(p.id));
+        if (outPin) {
+          const rOut = `r_ir_out_${node.id}`;
+          elements.push({
+            id: rOut,
+            type: 'RESISTOR',
+            nodeA: nodeFor(node.id, outPin.id),
+            nodeB: nodeFor(node.id, vccPin.id),
+            value: 10_000,
+          });
+          elementToComponent.set(rOut, node.id);
+        }
+      }
+      continue;
+    }
+
+    // ── ESC Module (powered speed controller) ──
+    if (node.type === 'ESC_MODULE') {
+      const vccPin = node.pins?.find(p => /vcc/i.test(p.id));
+      const gndPin = node.pins?.find(p => /gnd/i.test(p.id));
+      if (vccPin && gndPin) {
+        const idDraw = `r_power_draw_${node.id}`;
+        elements.push({
+          id: idDraw,
+          type: 'RESISTOR',
+          nodeA: nodeFor(node.id, vccPin.id),
+          nodeB: nodeFor(node.id, gndPin.id),
+          value: 100,
+        });
+        elementToComponent.set(idDraw, node.id);
+
+        const sigPin = node.pins?.find(p => /sig/i.test(p.id));
+        if (sigPin) {
+          const rSig = `r_esc_signal_${node.id}`;
+          elements.push({
+            id: rSig,
+            type: 'RESISTOR',
+            nodeA: nodeFor(node.id, sigPin.id),
+            nodeB: nodeFor(node.id, gndPin.id),
+            value: 100_000,
+          });
+          elementToComponent.set(rSig, node.id);
+        }
+
+        for (const phasePin of ['phase_a', 'phase_b', 'phase_c']) {
+          if (!node.pins?.some(p => p.id === phasePin)) continue;
+          const rPhase = `r_esc_phase_${phasePin}_${node.id}`;
+          elements.push({
+            id: rPhase,
+            type: 'RESISTOR',
+            nodeA: nodeFor(node.id, phasePin),
+            nodeB: nodeFor(node.id, gndPin.id),
+            value: 1_000,
+          });
+          elementToComponent.set(rPhase, node.id);
+        }
+      }
+      continue;
+    }
+
+    // ── BLDC Motor (3-phase motor load) ──
+    if (node.type === 'MOTOR_BLDC') {
+      for (const [pinA, pinB] of [['phase_a', 'phase_b'], ['phase_b', 'phase_c']]) {
+        if (!node.pins?.some(p => p.id === pinA) || !node.pins?.some(p => p.id === pinB)) continue;
+        const rCoil = `r_bldc_coil_${pinA}_${pinB}_${node.id}`;
+        elements.push({
+          id: rCoil,
+          type: 'RESISTOR',
+          nodeA: nodeFor(node.id, pinA),
+          nodeB: nodeFor(node.id, pinB),
+          value: 5,
+        });
+        elementToComponent.set(rCoil, node.id);
+      }
+      continue;
+    }
+
+    // ── RC Receiver (powered module with signal output) ──
+    if (node.type === 'RC_RECEIVER') {
+      const vccPin = node.pins?.find(p => /vcc/i.test(p.id));
+      const gndPin = node.pins?.find(p => /gnd/i.test(p.id));
+      if (vccPin && gndPin) {
+        const idDraw = `r_power_draw_${node.id}`;
+        elements.push({
+          id: idDraw,
+          type: 'RESISTOR',
+          nodeA: nodeFor(node.id, vccPin.id),
+          nodeB: nodeFor(node.id, gndPin.id),
+          value: 2000,
+        });
+        elementToComponent.set(idDraw, node.id);
+
+        const ppmPin = node.pins?.find(p => /ppm/i.test(p.id));
+        if (ppmPin) {
+          const rPpm = `r_rc_ppm_${node.id}`;
+          elements.push({
+            id: rPpm,
+            type: 'RESISTOR',
+            nodeA: nodeFor(node.id, ppmPin.id),
+            nodeB: nodeFor(node.id, gndPin.id),
+            value: 100_000,
+          });
+          elementToComponent.set(rPpm, node.id);
+        }
       }
       continue;
     }

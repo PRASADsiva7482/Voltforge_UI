@@ -16,7 +16,7 @@ const categoryIcons: Record<string, React.FC<{ size?: number }>> = {
 
 const categoryOrder = ['BOARD', 'PASSIVE', 'LED', 'SENSOR', 'DISPLAY', 'MOTOR', 'RELAY', 'COMMUNICATION', 'POWER', 'INSTRUMENT'];
 
-export default function ComponentPanel() {
+export default function ComponentPanel({ readOnly }: { readOnly?: boolean }) {
   const { setComponentLibrary } = useCanvasStore();
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -50,6 +50,7 @@ export default function ComponentPanel() {
   );
 
   const addToCanvas = (component: ElectronicComponent) => {
+    if (readOnly) return;
     const dim = componentDimensions[component.type] || {
       w: Number(component.defaultProperties?.width || 120),
       h: Number(component.defaultProperties?.height || 90),
@@ -85,14 +86,16 @@ export default function ComponentPanel() {
       <CustomComponentStudio isOpen={studioOpen} onClose={() => setStudioOpen(false)} />
       <div className="vf-component-panel__header">
         <h3 className="vf-component-panel__title">Components</h3>
-        <button
-          onClick={() => setStudioOpen(true)}
-          className="vf-panel-header__btn"
-          title="Create custom component"
-          type="button"
-        >
-          <Plus size={14} />
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => setStudioOpen(true)}
+            className="vf-panel-header__btn"
+            title="Create custom component"
+            type="button"
+          >
+            <Plus size={14} />
+          </button>
+        )}
       </div>
       <div className="vf-component-panel__search">
 
@@ -127,7 +130,9 @@ export default function ComponentPanel() {
                     <button
                       key={comp.id}
                       onClick={() => addToCanvas(comp)}
+                      disabled={readOnly}
                       className="vf-component-panel__item"
+                      style={readOnly ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
                     >
                       <div className="vf-component-panel__item-icon">
                         <Cpu size={12} />

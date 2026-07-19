@@ -150,13 +150,12 @@ export default function CircuitEditorPage() {
   const { theme, toggleTheme } = useThemeStore()
   const updateNode = useCanvasStore((s) => s.updateNode)
 
-  // Check ownership
   const isPreset = projectId === 'preset-smart-device'
-  const isOwner =
-    !currentProject ||
-    !user ||
-    currentProject.owner?.keycloakId === user.keycloakId ||
-    isPreset
+  const isOwner = Boolean(
+    currentProject &&
+    user &&
+    currentProject.owner?.keycloakId === user.keycloakId
+  )
 
   // Collaboration integration
   const { isConnected: isLiveSyncConnected, broadcastCanvasSync, broadcastCursorMove: _broadcastCursorMove } =
@@ -169,12 +168,12 @@ export default function CircuitEditorPage() {
       const r = await projectApi.getById(projectId!)
       return r.data.data
     },
-    enabled: !!projectId && !isPreset,
+    enabled: !!projectId,
   })
 
   // Set project layout and codes
   useEffect(() => {
-    const project = isPreset ? SMART_DEVICE_PRESET : fetchedProject
+    const project = fetchedProject || (isPreset ? SMART_DEVICE_PRESET : null)
     if (project) {
       setCurrentProject(project as Project)
       if (project.canvasLayout) {
@@ -521,11 +520,13 @@ export default function CircuitEditorPage() {
     { label: 'Export Gerber PCB', icon: <Package size={12} />, onClick: handleExportGerber },
   ]
 
-  const contextMenuItems = [
-    { label: 'Undo', icon: <Undo2 size={12} />, onClick: undo },
-    { label: 'Redo', icon: <Redo2 size={12} />, onClick: redo },
-    { label: 'Clear Workspace', icon: <Trash2 size={12} style={{ color: '#be3b3b' }} />, destructive: true, onClick: clearCanvas },
-  ]
+  const contextMenuItems = !isOwner
+    ? []
+    : [
+        { label: 'Undo', icon: <Undo2 size={12} />, onClick: undo },
+        { label: 'Redo', icon: <Redo2 size={12} />, onClick: redo },
+        { label: 'Clear Workspace', icon: <Trash2 size={12} style={{ color: '#be3b3b' }} />, destructive: true, onClick: clearCanvas },
+      ]
 
   return (
     <div className="vf-editor">
@@ -539,13 +540,32 @@ export default function CircuitEditorPage() {
           >
             <ArrowLeft size={16} />
           </button>
-          <div className="vf-editor__project-info">
-            <h1 className="vf-editor__project-name">{projectName}</h1>
-            {isDirty && <span className="vf-editor__dirty-dot" />}
-            {isLiveSyncConnected && (
-              <span className="vf-status-badge">
-                <span className="vf-status-badge__dot" />
-                <span>Live Sync</span>
+          <div className="vf-editor__project-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h1 className="vf-editor__project-name">{projectName}</h1>
+              {isDirty && <span className="vf-editor__dirty-dot" />}
+              {isLiveSyncConnected && (
+                <span className="vf-status-badge">
+                  <span className="vf-status-badge__dot" />
+                  <span>Live Sync</span>
+                </span>
+              )}
+            </div>
+            {currentProject?.forkedFromId && currentProject?.forkedFromName && (
+              <span className="vf-editor__forked-from" style={{ fontSize: '10px', color: 'rgba(255,255,255,0.45)', lineHeight: '1' }}>
+                forked from{' '}
+                <a
+                  href={`/editor/${currentProject.forkedFromId}`}
+                  style={{ color: '#818cf8', textDecoration: 'none', fontWeight: 500 }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate(`/editor/${currentProject.forkedFromId}`);
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                  onMouseOut={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                >
+                  {currentProject.forkedFromName}
+                </a>
               </span>
             )}
           </div>
@@ -677,13 +697,15 @@ export default function CircuitEditorPage() {
             items={exportDropdownItems}
           />
 
-          <button
-            className="vf-editor__tool-btn"
-            onClick={() => setShowSettings(true)}
-            title="Project settings"
-          >
-            <Settings size={15} />
-          </button>
+          {isOwner && (
+            <button
+              className="vf-editor__tool-btn"
+              onClick={() => setShowSettings(true)}
+              title="Project settings"
+            >
+              <Settings size={15} />
+            </button>
+          )}
 
           <span className="vf-editor__divider" />
 
@@ -696,6 +718,18 @@ export default function CircuitEditorPage() {
             >
               <Save size={14} />
               {isSaving ? 'Saving...' : 'Save'}
+            </button>
+          ) : currentProject?.userForkId ? (
+            <button
+              className="vf-editor__save-btn"
+              style={{
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                borderColor: '#10b981',
+              }}
+              onClick={() => navigate(`/editor/${currentProject.userForkId}`)}
+            >
+              <GitFork size={14} />
+              Go to your Fork
             </button>
           ) : (
             <button
@@ -719,7 +753,7 @@ export default function CircuitEditorPage() {
         {/* Left panel — Component library */}
         {leftPanelOpen && viewMode !== 'code' && (
           <aside className="vf-editor__left-panel">
-            <ComponentPanel />
+            <ComponentPanel readOnly={!isOwner} />
           </aside>
         )}
 
@@ -735,12 +769,13 @@ export default function CircuitEditorPage() {
                       height={canvasSize.height}
                       isSimulating={isSimulating}
                       onComponentInteraction={handleComponentInteraction}
+                      readOnly={!isOwner}
                     />
                   </div>
                 }
                 right={
                   <div className="vf-editor__code-area is-split">
-                    <CodeEditor />
+                    <CodeEditor readOnly={!isOwner} />
                   </div>
                 }
               />
@@ -753,12 +788,13 @@ export default function CircuitEditorPage() {
                       height={canvasSize.height}
                       isSimulating={isSimulating}
                       onComponentInteraction={handleComponentInteraction}
+                      readOnly={!isOwner}
                     />
                   </div>
                 )}
                 {viewMode === 'code' && (
                   <div className="vf-editor__code-area">
-                    <CodeEditor />
+                    <CodeEditor readOnly={!isOwner} />
                   </div>
                 )}
               </>
@@ -776,7 +812,7 @@ export default function CircuitEditorPage() {
               isOpen={showAiChat}
               onClose={() => setShowAiChat(false)}
               projectContext={projectName}
-              onApplyCode={(code) => {
+              onApplyCode={!isOwner ? undefined : (code) => {
                 if (activeCodeFile) {
                   updateCodeFileContent(activeCodeFile.id, code)
                   addToast('Generated code applied to editor!', 'success')
@@ -786,7 +822,7 @@ export default function CircuitEditorPage() {
               }}
             />
             <AiValidatorPanel isOpen={showAiValidator} onClose={() => setShowAiValidator(false)} />
-            <PropertyEditor />
+            <PropertyEditor readOnly={!isOwner} />
           </div>
 
           {/* Serial monitor / Oscilloscope Trace splits */}

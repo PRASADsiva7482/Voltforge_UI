@@ -158,6 +158,8 @@ export type Project = {
   description?: string
   forkCount: number
   forkedFromId?: string
+  forkedFromName?: string
+  userForkId?: string
   id: string
   isPublic: boolean
   name: string

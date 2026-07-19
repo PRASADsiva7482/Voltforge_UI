@@ -29,7 +29,7 @@ function formatValue(val: unknown): string {
   return String(val ?? '');
 }
 
-export default function PropertyEditor() {
+export default function PropertyEditor({ readOnly }: { readOnly?: boolean }) {
   const selectedNodeId = useCanvasStore((s) => s.selectedNodeId);
   const selectedWireId = useCanvasStore((s) => s.selectedWireId);
   const nodes = useCanvasStore((s) => s.nodes);
@@ -69,6 +69,7 @@ export default function PropertyEditor() {
                 className="vf-prop-editor__input"
                 value={selectedNode.name}
                 onChange={(e) => updateNode(selectedNode.id, { name: e.target.value })}
+                disabled={readOnly}
               />
             </div>
 
@@ -85,6 +86,7 @@ export default function PropertyEditor() {
                   type="number"
                   value={Math.round(selectedNode.x)}
                   onChange={(e) => updateNode(selectedNode.id, { x: Number(e.target.value) })}
+                  disabled={readOnly}
                 />
               </div>
               <div>
@@ -94,6 +96,7 @@ export default function PropertyEditor() {
                   type="number"
                   value={Math.round(selectedNode.y)}
                   onChange={(e) => updateNode(selectedNode.id, { y: Number(e.target.value) })}
+                  disabled={readOnly}
                 />
               </div>
               <div>
@@ -103,6 +106,7 @@ export default function PropertyEditor() {
                   type="number"
                   value={selectedNode.rotation}
                   onChange={(e) => updateNode(selectedNode.id, { rotation: Number(e.target.value) })}
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -131,6 +135,7 @@ export default function PropertyEditor() {
                               onClick={() => updateNode(selectedNode.id, {
                                 properties: { ...selectedNode.properties, [key]: !val }
                               })}
+                              disabled={readOnly}
                             >
                               {val ? 'ON' : 'OFF'}
                             </button>
@@ -145,6 +150,7 @@ export default function PropertyEditor() {
                                   [key]: isNumber ? Number(e.target.value) : e.target.value
                                 }
                               })}
+                              disabled={readOnly}
                             />
                           )}
                         </div>
@@ -195,6 +201,7 @@ export default function PropertyEditor() {
                           className={`vf-wire-swatch ${selectedWire.color === c ? 'is-active' : ''}`}
                           style={{ backgroundColor: c }}
                           onClick={() => updateWire(selectedWire.id, { color: c })}
+                          disabled={readOnly}
                         />
                       ))}
                     </div>
@@ -206,6 +213,7 @@ export default function PropertyEditor() {
                       className="vf-prop-editor__input"
                       value={selectedWire.routingMode}
                       onChange={(e) => updateWire(selectedWire.id, { routingMode: e.target.value as Wire['routingMode'] })}
+                      disabled={readOnly}
                     >
                       {modes.map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
@@ -218,6 +226,7 @@ export default function PropertyEditor() {
                       value={selectedWire.label || ''}
                       placeholder="Optional wire label"
                       onChange={(e) => updateWire(selectedWire.id, { label: e.target.value || undefined })}
+                      disabled={readOnly}
                     />
                   </div>
                 </>
@@ -226,40 +235,42 @@ export default function PropertyEditor() {
           </>
         )}
 
-        <button
-          className="vf-btn vf-btn--danger"
-          onClick={() => {
-            if (selectedNode) {
-              removeNode(selectedNode.id);
-              selectNode(null);
-            } else if (selectedWire) {
-              removeWire(selectedWire.id);
-              selectWire(null);
-            }
-          }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-            width: '100%',
-            padding: '8px',
-            marginTop: '16px',
-            borderRadius: '6px',
-            border: 'none',
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            color: '#ef4444',
-            fontWeight: 600,
-            fontSize: '12px',
-            cursor: 'pointer',
-            transition: 'background 0.2s',
-          }}
-          onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)')}
-          onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)')}
-        >
-          <Trash2 size={14} />
-          Delete {selectedNode ? 'Component' : 'Wire'}
-        </button>
+        {!readOnly && (
+          <button
+            className="vf-btn vf-btn--danger"
+            onClick={() => {
+              if (selectedNode) {
+                removeNode(selectedNode.id);
+                selectNode(null);
+              } else if (selectedWire) {
+                removeWire(selectedWire.id);
+                selectWire(null);
+              }
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              width: '100%',
+              padding: '8px',
+              marginTop: '16px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              color: '#ef4444',
+              fontWeight: 600,
+              fontSize: '12px',
+              cursor: 'pointer',
+              transition: 'background 0.2s',
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)')}
+            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)')}
+          >
+            <Trash2 size={14} />
+            Delete {selectedNode ? 'Component' : 'Wire'}
+          </button>
+        )}
       </div>
     </FloatingPanel>
   );

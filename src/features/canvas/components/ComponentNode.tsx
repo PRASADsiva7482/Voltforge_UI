@@ -989,12 +989,13 @@ const ComponentNode = ({
             const boardNode = useCanvasStore.getState().nodes.find(n => isBoardComponentType(n.type));
             const isBoardPwr = boardNode ? Boolean(boardNode.properties?.boardPowered) : false;
             const backlight = isBoardPwr && node.properties?.lcdBacklight !== false;
+            const displayActive = isBoardPwr && (backlight || hasText);
             const screen = node.type === 'DISPLAY_LCD_I2C' ? LCD_I2C_SCREEN : LCD_16X2_SCREEN;
             const fontSize = Math.max(7, Math.min(11, screen.width / 18));
             const lineH = screen.height / 2;
 
-            const bgFill = backlight ? LCD_BACKLIGHT_ON : '#1e293b';
-            const textFill = backlight ? LCD_TEXT_BACKLIGHT_ON : 'transparent';
+            const bgFill = backlight ? LCD_BACKLIGHT_ON : displayActive ? LCD_BACKLIGHT_OFF : '#1e293b';
+            const textFill = backlight ? LCD_TEXT_BACKLIGHT_ON : displayActive ? LCD_TEXT_BACKLIGHT_OFF : 'transparent';
 
             return (
               <>
@@ -1010,7 +1011,7 @@ const ComponentNode = ({
                   opacity={backlight ? 0.95 : 0.7}
                   listening={false}
                 />
-                {backlight && (
+                {displayActive && (
                   <>
                     <Text
                       x={screen.x + 3}
@@ -1046,15 +1047,15 @@ const ComponentNode = ({
             const line1 = (node.properties?.lcdLine1 as string) || '';
             const line2 = (node.properties?.lcdLine2 as string) || '';
             const hasText = line1.trim() || line2.trim();
-            // Check if board is powered
+            // Check if board is powered — OLED is self-emissive, always shows text when powered
             const boardNode = useCanvasStore.getState().nodes.find(n => isBoardComponentType(n.type));
             const isBoardPwr = boardNode ? Boolean(boardNode.properties?.boardPowered) : false;
-            const backlight = isBoardPwr && node.properties?.lcdBacklight !== false;
+            const oledActive = isBoardPwr;
             const fontSize = Math.max(7, Math.min(9, OLED_SCREEN.width / 12));
             const lineH = OLED_SCREEN.height / 2;
 
-            const bgFill = backlight ? OLED_BG : '#1e293b';
-            const textFill = backlight ? OLED_TEXT_COLOR : 'transparent';
+            const bgFill = oledActive ? OLED_BG : '#1e293b';
+            const textFill = oledActive ? OLED_TEXT_COLOR : 'transparent';
 
             return (
               <>
@@ -1065,10 +1066,10 @@ const ComponentNode = ({
                   height={OLED_SCREEN.height}
                   cornerRadius={2}
                   fill={bgFill}
-                  opacity={backlight ? 0.95 : 0.7}
+                  opacity={oledActive ? 0.95 : 0.7}
                   listening={false}
                 />
-                {backlight && (
+                {oledActive && (
                   <>
                     <Text
                       x={OLED_SCREEN.x + 3}
@@ -1602,6 +1603,41 @@ const ComponentNode = ({
                 );
               })}
             </>
+          );
+        })()}
+
+        {/* Powered module indicators (BT, WiFi, IR, RC, ESC) */}
+        {(node.type === 'BLUETOOTH_MODULE' || node.type === 'WIFI_MODULE' ||
+          node.type === 'IR_RECEIVER' || node.type === 'RC_RECEIVER' ||
+          node.type === 'ESC_MODULE') && isSimulating && (() => {
+          const powered = Boolean(node.properties?.powered);
+          const labelMap: Record<string, string> = {
+            'BLUETOOTH_MODULE': 'BT',
+            'WIFI_MODULE': 'WiFi',
+            'IR_RECEIVER': 'IR',
+            'RC_RECEIVER': 'RC',
+            'ESC_MODULE': 'ESC',
+          };
+          return (
+            <Group listening={false}>
+              {/* Power LED */}
+              <Circle
+                x={node.width - 8} y={8}
+                radius={3}
+                fill={powered ? '#22c55e' : '#374151'}
+                stroke={powered ? '#22c55e' : '#6b7280'}
+                strokeWidth={0.5}
+                shadowColor={powered ? '#22c55e' : undefined}
+                shadowBlur={powered ? 6 : 0}
+              />
+              {/* Status label */}
+              <Rect x={2} y={2} width={22} height={10}
+                cornerRadius={2} fill={SENSOR_OVERLAY_BG} />
+              <Text text={labelMap[node.type] || ''}
+                x={4} y={3} fontSize={6}
+                fontFamily={SENSOR_OVERLAY_FONT} fontStyle="700"
+                fill={powered ? '#22c55e' : '#6b7280'} />
+            </Group>
           );
         })()}
 

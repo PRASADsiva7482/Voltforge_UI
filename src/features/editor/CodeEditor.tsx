@@ -67,7 +67,7 @@ function generateFullCode(userCode: string, boardType?: string): string {
   return header + userCode;
 }
 
-export default function CodeEditor() {
+export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
   const activeCodeFile = useProjectStore((s) => s.activeCodeFile);
   const codeFiles = useProjectStore((s) => s.currentProject?.codeFiles || []);
   const updateCodeFileContent = useProjectStore((s) => s.updateCodeFileContent);
@@ -141,7 +141,8 @@ export default function CodeEditor() {
             <button
               className="vf-code-editor__action-btn"
               onClick={handleFormatCode}
-              title="Format Code (Auto-indent)"
+              disabled={readOnly}
+              title={readOnly ? "Format Code (Disabled in Read-only)" : "Format Code (Auto-indent)"}
             >
               <AlignLeft size={13} />
             </button>
@@ -194,7 +195,7 @@ export default function CodeEditor() {
               value={displayedContent}
               onMount={handleEditorMount}
               onChange={(value) => {
-                if (showFullCode || ignoreChange.current) return;
+                if (readOnly || showFullCode || ignoreChange.current) return;
                 if (value === undefined) return;
 
                 // Protect content integrity
@@ -214,7 +215,7 @@ export default function CodeEditor() {
                 wordWrap: 'on',
                 bracketPairColorization: { enabled: true },
                 padding: { top: 12 },
-                readOnly: showFullCode,
+                readOnly: showFullCode || readOnly,
               }}
             />
           </Suspense>

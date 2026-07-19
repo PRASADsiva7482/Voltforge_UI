@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { Bot, Code2, Send, Sparkles, User } from 'lucide-react'
 import { useMutation } from '@tanstack/react-query'
+import { useCanvasStore } from '../../store/canvasStore'
+import { useProjectStore } from '../../store/projectStore'
 import { aiApi } from '../../api/services'
 import { Textarea } from '../../components/ui/Field'
 import { SuggestionsList } from '../../components/ui/SuggestionsList'
@@ -27,14 +29,31 @@ export default function AiChatPanel({
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
+  
+  const { nodes, wires } = useCanvasStore()
+  const { currentProject, activeCodeFile } = useProjectStore()
 
   const chatMutation = useMutation({
-    mutationFn: (message: string) =>
-      aiApi.chat({
+    mutationFn: (message: string) => {
+      const richContext = JSON.stringify({
+        projectName: currentProject?.name || projectContext,
+        boardType: currentProject?.boardType || 'ARDUINO_UNO',
+        components: nodes.map((n) => ({ id: n.id, type: n.type, name: n.name })),
+        wires: wires.map((w) => ({
+          fromComponent: w.fromNodeId,
+          fromPin: w.fromPinId,
+          toComponent: w.toNodeId,
+          toPin: w.toPinId,
+        })),
+        code: activeCodeFile?.content || currentProject?.codeFiles?.[0]?.content || ""
+      })
+      
+      return aiApi.chat({
         message,
-        context: projectContext,
+        context: richContext,
         history: messages.slice(-10),
-      }),
+      })
+    },
     onSuccess: (res) => {
       const data = res.data.data
       setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }])

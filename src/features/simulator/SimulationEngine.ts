@@ -200,6 +200,9 @@ class LcdTWIEventHandler {
  */
 export class SimulationEngine {
   private isRunning = false;
+  private isBatching = false;
+  private accumulatedUpdates: Map<string, Record<string, any>> = new Map();
+  private originalUpdateNode: any = null;
   private intervalId: number | null = null;
   private callbacks: SimulationCallbacks;
   private pins: Record<string, PinInfo> = {};
@@ -231,6 +234,8 @@ export class SimulationEngine {
   private lcdBacklight = true;
   private lcdInitialized = false;
   private lcdNodes: CanvasNode[] = [];  // display nodes on canvas
+  private lastLcdPushTime = 0;           // throttle LCD canvas updates
+  private lcdPushPending = false;        // deferred LCD push scheduled
 
   // ── ESC / BLDC Motor state ──
   private escNodes: CanvasNode[] = [];   // ESC modules on canvas
@@ -273,6 +278,8 @@ export class SimulationEngine {
     this.lcdCursorCol = 0;
     this.lcdBacklight = true;
     this.lcdInitialized = false;
+    this.lastLcdPushTime = 0;
+    this.lcdPushPending = false;
     // Find display nodes on the canvas
     this.lcdNodes = nodes.filter(n =>
       n.type === 'DISPLAY_LCD_I2C' || n.type === 'LCD_16X2' ||
@@ -490,6 +497,17 @@ export class SimulationEngine {
             }
           }
         }
+
+        // 7. Soil Moisture level change → update MNA analog output
+        if (node.type === 'SOIL_MOISTURE' && props.moistureLevel !== prevProps.moistureLevel) {
+          const moisture = Number(props.moistureLevel ?? 50) / 100;
+          this.solverWorker?.postMessage({
+            type: 'UPDATE_PIN',
+            elementId: `vs_soil_${node.id}`,
+            voltage: moisture * 5,
+          });
+        }
+
       });
     });
 
@@ -522,25 +540,26 @@ export class SimulationEngine {
       this.intervalId = window.setInterval(() => {
         if (!this.isRunning) return;
 
-        const inputs = useSimulationStore.getState().drainSerialInput();
-        if (inputs.length > 0) {
-          this.localSerialBuffer += inputs.join('');
-        }
+        this.runBatched(() => {
+          const inputs = useSimulationStore.getState().drainSerialInput();
+          if (inputs.length > 0) {
+            this.localSerialBuffer += inputs.join('');
+          }
 
-        const currentNodes = useCanvasStore.getState().nodes;
-        const mcuNode = currentNodes.find(n =>
-          isBoardComponentType(n.type)
-        );
-        const isPowered = mcuNode ? mcuNode.properties?.boardPowered !== false : true;
+          const currentNodes = useCanvasStore.getState().nodes;
+          const mcuNode = currentNodes.find(n =>
+            isBoardComponentType(n.type)
+          );
+          const isPowered = mcuNode ? mcuNode.properties?.boardPowered !== false : true;
 
-        if (!isPowered) return;
+          if (!isPowered) return;
 
-        this.updateDiagnosticProbes(currentNodes, wires);
-        this.pushLcdToCanvas(currentNodes);
-        this.updateBldcMotorAnimation();
-        this.updateDcMotorAnimation();
-        this.emitDebugSnapshot(false);
-        this.tick += 100;
+          this.updateDiagnosticProbes(currentNodes, wires);
+          this.updateBldcMotorAnimation();
+          this.updateDcMotorAnimation();
+          this.emitDebugSnapshot(false);
+          this.tick += 100;
+        });
       }, 100);
 
       // Run interpreter loop asynchronously in background
@@ -1012,6 +1031,19 @@ export class SimulationEngine {
       replaced = replaced.replace(match[0], String(val10));
     }
 
+    // pulseIn(pin, HIGH/LOW) — for ultrasonic ECHO pin, returns duration proportional to distance
+    const pulseMatches = Array.from(replaced.matchAll(/pulseIn\s*\(\s*(\w+)\s*,\s*(\w+)\s*(?:,\s*\w+\s*)?\)/g));
+    for (const match of pulseMatches) {
+      const nodes = useCanvasStore.getState().nodes;
+      const sensor = nodes.find(n => n.type === 'SENSOR_ULTRASONIC' || n.type === 'ULTRASONIC_SENSOR');
+      let duration = 0;
+      if (sensor) {
+        const dist = Number(sensor.properties?.distance ?? 100);
+        duration = Math.round(dist * 58.2); // µs round-trip time for sound at 343 m/s
+      }
+      replaced = replaced.replace(match[0], String(duration));
+    }
+
     replaced = replaced
       .replace(/\bmillis\s*\(\s*\)/g, String(this.tick))
       .replace(/\bmicros\s*\(\s*\)/g, String(this.tick * 1000));
@@ -1314,6 +1346,12 @@ export class SimulationEngine {
         // I2C / Wire.h commands — silently consume so they don't cause errors
         if (/Wire\.|lcd\.|dht\.|servo\.|esc\.|myservo\./i.test(codeText)) continue;
 
+        // C++ class constructors (e.g., LiquidCrystal_I2C lcd(...), Servo myservo, DHT dht(...))
+        if (/^(?:LiquidCrystal|Servo|DHT|NewPing|Adafruit_|Wire|SoftwareSerial|ESP|IRrecv)\w*\s+\w+/i.test(codeText)) continue;
+
+        // #include directives
+        if (/^#\s*include\b/.test(codeText)) continue;
+
         const unaryUpdate = codeText.match(/^(?:\+\+|--)?\s*([a-zA-Z_]\w*)\s*(?:\+\+|--)\s*$/);
         if (unaryUpdate) {
           const op = codeText.includes('--') ? -1 : 1;
@@ -1363,15 +1401,23 @@ export class SimulationEngine {
 
   /**
    * Parse and execute LCD-related statements.
-   * Handles: lcd.init(), lcd.begin(), lcd.backlight(), lcd.noBacklight(),
-   *          lcd.clear(), lcd.setCursor(col, row), lcd.print("text")
+   * Uses simple string matching — no regex escaping issues.
+   * Supports any object name: lcd, display, oled, myLcd, etc.
    */
   private handleLcdStatement(stmt: string, nodes: CanvasNode[]): boolean {
     const s = stmt.trim();
-    const displayObject = String.raw`(?:lcd|display|oled)\w*`;
+    const dotIdx = s.indexOf('.');
+    if (dotIdx < 1) return false;
+    const objName = s.substring(0, dotIdx).trim().toLowerCase();
+    if (objName.indexOf('lcd') < 0 && objName.indexOf('display') < 0 && objName.indexOf('oled') < 0) return false;
+    const afterDot = s.substring(dotIdx + 1);
+    const parenIdx = afterDot.indexOf('(');
+    if (parenIdx < 0) return false;
+    const method = afterDot.substring(0, parenIdx).trim().toLowerCase();
+    const lastParen = afterDot.lastIndexOf(')');
+    const args = lastParen > parenIdx ? afterDot.substring(parenIdx + 1, lastParen).trim() : '';
 
-    // lcd.init() / lcd.begin()
-    if (new RegExp(`${displayObject}\\.(init|begin)\\s*\\(`, 'i').test(s)) {
+    if (method === 'init' || method === 'begin') {
       this.lcdInitialized = true;
       this.lcdBuffer = Array.from({ length: this.lcdRows }, () => Array(this.lcdCols).fill(' '));
       this.lcdCursorRow = 0;
@@ -1379,58 +1425,51 @@ export class SimulationEngine {
       this.pushLcdToCanvas(nodes);
       return true;
     }
-
-    // lcd.backlight()
-    if (new RegExp(`${displayObject}\\.backlight\\s*\\(`, 'i').test(s)) {
+    if (method === 'backlight') {
       this.lcdBacklight = true;
       this.pushLcdToCanvas(nodes);
       return true;
     }
-
-    // lcd.noBacklight()
-    if (new RegExp(`${displayObject}\\.noBacklight\\s*\\(`, 'i').test(s)) {
+    if (method === 'nobacklight') {
       this.lcdBacklight = false;
       this.pushLcdToCanvas(nodes);
       return true;
     }
-
-    // lcd.clear() / display.clearDisplay()
-    if (new RegExp(`${displayObject}\\.(clear|clearDisplay)\\s*\\(`, 'i').test(s)) {
+    if (method === 'clear' || method === 'cleardisplay') {
       this.lcdBuffer = Array.from({ length: this.lcdRows }, () => Array(this.lcdCols).fill(' '));
       this.lcdCursorRow = 0;
       this.lcdCursorCol = 0;
       this.pushLcdToCanvas(nodes);
       return true;
     }
-
-    if (new RegExp(`${displayObject}\\.display\\s*\\(`, 'i').test(s)) {
+    if (method === 'display') {
       this.pushLcdToCanvas(nodes);
       return true;
     }
-
-    // lcd.setCursor(col, row)
-    const cursorMatch = s.match(new RegExp(`${displayObject}\\.setCursor\\s*\\(\\s*(\\w+)\\s*,\\s*(\\w+)\\s*\\)`, 'i'));
-    if (cursorMatch) {
-      this.lcdCursorCol = Math.max(0, Math.min(this.lcdCols - 1, parseInt(this.resolveValue(cursorMatch[1])) || 0));
-      this.lcdCursorRow = Math.max(0, Math.min(this.lcdRows - 1, parseInt(this.resolveValue(cursorMatch[2])) || 0));
+    if (method === 'setcursor') {
+      const parts = args.split(',').map(p => p.trim());
+      if (parts.length >= 2) {
+        this.lcdCursorCol = Math.max(0, Math.min(this.lcdCols - 1, parseInt(this.resolveValue(parts[0])) || 0));
+        this.lcdCursorRow = Math.max(0, Math.min(this.lcdRows - 1, parseInt(this.resolveValue(parts[1])) || 0));
+      }
       return true;
     }
-
-    // lcd.print("text") / display.println(variable)
-    const printMatch = s.match(new RegExp(`${displayObject}\\.(print|println)\\s*\\(\\s*(.*?)\\s*\\)$`, 'i'));
-    if (printMatch) {
-      const text = this.resolveSerialArgument(printMatch[2]);
+    if (method === 'print' || method === 'println') {
+      const text = this.resolveSerialArgument(args);
       this.lcdWriteText(text);
-      if (/println/i.test(printMatch[1])) {
+      if (method === 'println') {
         this.lcdCursorCol = 0;
         this.lcdCursorRow = Math.min(this.lcdRows - 1, this.lcdCursorRow + 1);
       }
       this.pushLcdToCanvas(nodes);
       return true;
     }
-
+    // Silently consume other known LCD/OLED library commands
+    const known = 'settextsize,settextcolor,setrotation,drawpixel,drawline,drawrect,fillrect,drawcircle,fillcircle,home,nocursor,cursor,noblink,blink,nodisplay,scrolldisplayleft,scrolldisplayright,autoscroll,noautoscroll,createchar,write,setcursorposition';
+    if (known.split(',').indexOf(method) >= 0) return true;
     return false;
   }
+
 
   /** Write text into the LCD buffer at the current cursor position. */
   private lcdWriteText(text: string) {
@@ -1445,21 +1484,36 @@ export class SimulationEngine {
     }
   }
 
-  /** Push the current LCD buffer text to canvas display nodes. */
+  /** Push the current LCD buffer text to canvas display nodes. Throttled to 5fps. */
   private pushLcdToCanvas(_nodes: CanvasNode[]) {
+    const now = Date.now();
+    if (now - this.lastLcdPushTime < 200) {
+      // Schedule a deferred push if one isn't already pending
+      if (!this.lcdPushPending) {
+        this.lcdPushPending = true;
+        setTimeout(() => {
+          this.lcdPushPending = false;
+          if (this.isRunning) this.pushLcdToCanvasImmediate();
+        }, 200);
+      }
+      return;
+    }
+    this.lastLcdPushTime = now;
+    this.pushLcdToCanvasImmediate();
+  }
+
+  private pushLcdToCanvasImmediate() {
     (globalThis as any).__voltforgeLcdState = (globalThis as any).__voltforgeLcdState || {};
 
     this.lcdNodes.forEach(lcdNode => {
-      const powered = this.isNodePowered(lcdNode.id);
-      const line1 = powered ? (this.lcdBuffer[0]?.join('') || '') : '';
-      const line2 = powered ? (this.lcdBuffer[1]?.join('') || '') : '';
-      const backlight = powered ? this.lcdBacklight : false;
+      const line1 = this.lcdBuffer[0]?.join('') || '';
+      const line2 = this.lcdBuffer[1]?.join('') || '';
 
       (globalThis as any).__voltforgeLcdState[lcdNode.id] = {
-        line1, line2, backlight
+        line1, line2, backlight: this.lcdBacklight,
       };
 
-      // Trigger update
+      // Trigger LogicRegistry to push properties to canvas store
       this.callbacks.onPinStateChange(lcdNode.id, '__lcd_display__', 'HIGH', 0);
     });
   }
@@ -1622,7 +1676,7 @@ export class SimulationEngine {
       (node) => node.type === 'SERVO_MOTOR' || node.type === 'MOTOR_SERVO'
     );
     servoNodes.forEach((servoNode) => {
-      const signalPin = servoNode.pins?.find((pin) => pin.id === 'signal');
+      const signalPin = servoNode.pins?.find((pin) => pin.id === 'sig' || pin.id === 'signal');
       if (signalPin) {
         this.callbacks.onPinStateChange(servoNode.id, signalPin.id, 'PWM', pwmValue);
       }
@@ -1941,32 +1995,35 @@ export class SimulationEngine {
     this.callbacks.onSerialOutput('> AVR8js CPU Started');
     this.intervalId = window.setInterval(() => {
       if (!this.isRunning || !this.avrCpu) return;
+      const cpu = this.avrCpu;
 
-      const inputs = useSimulationStore.getState().drainSerialInput();
-      if (inputs.length > 0) {
-        const str = inputs.join('');
-        for (let i = 0; i < str.length; i++) {
-          this.avrUsart?.writeByte(str.charCodeAt(i));
+      this.runBatched(() => {
+        const inputs = useSimulationStore.getState().drainSerialInput();
+        if (inputs.length > 0) {
+          const str = inputs.join('');
+          for (let i = 0; i < str.length; i++) {
+            this.avrUsart?.writeByte(str.charCodeAt(i));
+          }
         }
-      }
 
-      const currentNodes = useCanvasStore.getState().nodes;
-      const mcuNode = currentNodes.find(n =>
-        isBoardComponentType(n.type)
-      );
-      const isPowered = mcuNode ? mcuNode.properties?.boardPowered !== false : true;
+        const currentNodes = useCanvasStore.getState().nodes;
+        const mcuNode = currentNodes.find(n =>
+          isBoardComponentType(n.type)
+        );
+        const isPowered = mcuNode ? mcuNode.properties?.boardPowered !== false : true;
 
-      if (isPowered) {
-        for (let i = 0; i < 25000; i += 1) {
-          avrInstruction(this.avrCpu);
-          this.avrCpu.tick();
+        if (isPowered) {
+          for (let i = 0; i < 25000; i += 1) {
+            avrInstruction(cpu);
+            cpu.tick();
+          }
         }
-      }
-      this.updateBldcMotorAnimation();
-      this.updateDcMotorAnimation();
-      this.pushLcdToCanvas(currentNodes);
-      this.updateDiagnosticProbes(currentNodes, wires);
-      this.emitDebugSnapshot(false);
+        this.updateBldcMotorAnimation();
+        this.updateDcMotorAnimation();
+        this.pushLcdToCanvas(currentNodes);
+        this.updateDiagnosticProbes(currentNodes, wires);
+        this.emitDebugSnapshot(false);
+      });
     }, 16);
   }
 
@@ -2029,6 +2086,82 @@ export class SimulationEngine {
     });
   }
 
+  private runBatched(fn: () => void) {
+    if (this.isBatching) {
+      fn();
+      return;
+    }
+
+    this.isBatching = true;
+    this.accumulatedUpdates.clear();
+
+    const store = useCanvasStore.getState() as any;
+    this.originalUpdateNode = store.updateNode;
+
+    store.updateNode = (id: string, updates: Partial<CanvasNode>) => {
+      const hasGeometry = Object.keys(updates).some(k =>
+        k === 'x' || k === 'y' || k === 'width' || k === 'height' || k === 'rotation' || k === 'pins'
+      );
+      if (hasGeometry) {
+        this.originalUpdateNode.call(store, id, updates);
+        return;
+      }
+
+      let existing = this.accumulatedUpdates.get(id);
+      if (!existing) {
+        existing = {};
+        this.accumulatedUpdates.set(id, existing);
+      }
+      if (updates.properties) {
+        existing.properties = {
+          ...existing.properties,
+          ...updates.properties
+        };
+      }
+      Object.entries(updates).forEach(([key, val]) => {
+        if (key !== 'properties') {
+          existing![key] = val;
+        }
+      });
+    };
+
+    try {
+      fn();
+    } finally {
+      this.isBatching = false;
+      if (this.originalUpdateNode) {
+        store.updateNode = this.originalUpdateNode;
+        this.originalUpdateNode = null;
+      }
+
+      if (this.accumulatedUpdates.size > 0) {
+        const batch: Array<{ id: string; changes: Partial<CanvasNode> }> = [];
+
+        this.accumulatedUpdates.forEach((changes, id) => {
+          const node = store.nodes.find((n: any) => n.id === id);
+          if (node) {
+            const mergedProperties = changes.properties
+              ? { ...node.properties, ...changes.properties }
+              : node.properties;
+
+            batch.push({
+              id,
+              changes: {
+                ...changes,
+                properties: mergedProperties
+              }
+            });
+          }
+        });
+
+        if (batch.length > 0) {
+          store.batchUpdateNodes(batch);
+        }
+        this.accumulatedUpdates.clear();
+      }
+    }
+  }
+
   public stop() {
     this.isRunning = false;
     if (this.intervalId) {
@@ -2047,73 +2180,75 @@ export class SimulationEngine {
       this.storeUnsubscribe = null;
     }
     // Turn off board LEDs & reset all component states to unpowered/inactive
-    const { updateNode, nodes } = useCanvasStore.getState();
-    nodes.forEach(node => {
-      const updates: Record<string, any> = {};
-      let changed = false;
+    this.runBatched(() => {
+      const { updateNode, nodes } = useCanvasStore.getState();
+      nodes.forEach(node => {
+        const updates: Record<string, any> = {};
+        let changed = false;
 
-      if (isBoardComponentType(node.type)) {
-        updates.boardPowered = false;
-        updates.builtInLedLit = false;
-        changed = true;
-      } else if (node.type.includes('LED')) {
-        updates.isLit = false;
-        updates.rgbRed = 0;
-        updates.rgbGreen = 0;
-        updates.rgbBlue = 0;
-        changed = true;
-      } else if (node.type === 'DISPLAY_LCD_I2C' || node.type === 'LCD_16X2' || node.type === 'DISPLAY_OLED' || node.type === 'OLED_DISPLAY') {
-        updates.lcdBacklight = false;
-        updates.lcdLine1 = '';
-        updates.lcdLine2 = '';
-        changed = true;
-      } else if (node.type === 'DISPLAY_7SEG') {
-        updates.isActive = false;
-        updates.segments = {};
-        updates.displayDigit = '';
-        changed = true;
-      } else if (node.type === 'MOTOR_DC') {
-        updates.isSpinning = false;
-        updates.rpm = 0;
-        updates.motorTick = 0;
-        changed = true;
-      } else if (node.type === 'MOTOR_BLDC') {
-        updates.bldcRpm = 0;
-        updates.bldcRotation = 0;
-        updates.isSpinning = false;
-        changed = true;
-      } else if (node.type === 'MOTOR_STEPPER' || node.type === 'STEPPER_MOTOR') {
-        updates.isSpinning = false;
-        updates.stepperRotation = 0;
-        updates.stepperSteps = 0;
-        changed = true;
-      } else if (node.type === 'BUZZER') {
-        updates.isBeeping = false;
-        changed = true;
-      } else if (node.type.startsWith('RELAY_')) {
-        updates.isActive = false;
-        updates.isSwitched = false;
-        Object.keys(node.properties || {}).forEach(k => {
-          if (k.startsWith('isSwitched_')) {
-            updates[k] = false;
-          }
-        });
-        changed = true;
-      } else if (node.type === 'MULTIMETER' || node.type === 'AMMETER' || node.type === 'OSCILLOSCOPE') {
-        updates.displayValue = node.type === 'MULTIMETER' ? '0.00V' : node.type === 'AMMETER' ? '0.00 mA' : 'SCOPE';
-        updates.measuredVoltage = 0;
-        updates.measuredCurrent = 0;
-        changed = true;
-      }
+        if (isBoardComponentType(node.type)) {
+          updates.boardPowered = false;
+          updates.builtInLedLit = false;
+          changed = true;
+        } else if (node.type.includes('LED')) {
+          updates.isLit = false;
+          updates.rgbRed = 0;
+          updates.rgbGreen = 0;
+          updates.rgbBlue = 0;
+          changed = true;
+        } else if (node.type === 'DISPLAY_LCD_I2C' || node.type === 'LCD_16X2' || node.type === 'DISPLAY_OLED' || node.type === 'OLED_DISPLAY') {
+          updates.lcdBacklight = false;
+          updates.lcdLine1 = '';
+          updates.lcdLine2 = '';
+          changed = true;
+        } else if (node.type === 'DISPLAY_7SEG') {
+          updates.isActive = false;
+          updates.segments = {};
+          updates.displayDigit = '';
+          changed = true;
+        } else if (node.type === 'MOTOR_DC') {
+          updates.isSpinning = false;
+          updates.rpm = 0;
+          updates.motorTick = 0;
+          changed = true;
+        } else if (node.type === 'MOTOR_BLDC') {
+          updates.bldcRpm = 0;
+          updates.bldcRotation = 0;
+          updates.isSpinning = false;
+          changed = true;
+        } else if (node.type === 'MOTOR_STEPPER' || node.type === 'STEPPER_MOTOR') {
+          updates.isSpinning = false;
+          updates.stepperRotation = 0;
+          updates.stepperSteps = 0;
+          changed = true;
+        } else if (node.type === 'BUZZER') {
+          updates.isBeeping = false;
+          changed = true;
+        } else if (node.type.startsWith('RELAY_')) {
+          updates.isActive = false;
+          updates.isSwitched = false;
+          Object.keys(node.properties || {}).forEach(k => {
+            if (k.startsWith('isSwitched_')) {
+              updates[k] = false;
+            }
+          });
+          changed = true;
+        } else if (node.type === 'MULTIMETER' || node.type === 'AMMETER' || node.type === 'OSCILLOSCOPE') {
+          updates.displayValue = node.type === 'MULTIMETER' ? '0.00V' : node.type === 'AMMETER' ? '0.00 mA' : 'SCOPE';
+          updates.measuredVoltage = 0;
+          updates.measuredCurrent = 0;
+          changed = true;
+        }
 
-      if (changed) {
-        updateNode(node.id, {
-          properties: {
-            ...node.properties,
-            ...updates,
-          }
-        });
-      }
+        if (changed) {
+          updateNode(node.id, {
+            properties: {
+              ...node.properties,
+              ...updates,
+            }
+          });
+        }
+      });
     });
 
     this.emitDebugSnapshot(false);
@@ -2302,8 +2437,10 @@ export class SimulationEngine {
 
   private handleSolverResult(result: WorkerResultMessage, _nodes: CanvasNode[]) {
     if (!this.mnaCircuit) return;
+    const circuit = this.mnaCircuit;
 
-    const { elementToComponent, pinToMNANode } = this.mnaCircuit;
+    this.runBatched(() => {
+      const { elementToComponent, pinToMNANode } = circuit;
     const nodes = useCanvasStore.getState().nodes;
 
     // Build component-level voltage and current maps
@@ -2655,6 +2792,60 @@ export class SimulationEngine {
         }
       }
 
+      // Communication & powered modules: check power and set powered flag
+      if (node.type === 'BLUETOOTH_MODULE' || node.type === 'WIFI_MODULE' ||
+          node.type === 'IR_RECEIVER' || node.type === 'ESC_MODULE' ||
+          node.type === 'RC_RECEIVER') {
+        const vccPin = node.pins?.find(p => /vcc|3v3/i.test(p.id));
+        const gndPin = node.pins?.find(p => /gnd/i.test(p.id));
+        if (vccPin && gndPin) {
+          const vccNode = pinToMNANode.get(`${node.id}:${vccPin.id}`) ?? 0;
+          const gndNode = pinToMNANode.get(`${node.id}:${gndPin.id}`) ?? 0;
+          const supplyVoltage = (result.nodeVoltages[vccNode] ?? 0) - (result.nodeVoltages[gndNode] ?? 0);
+          const powered = supplyVoltage >= 2.5;
+          if (node.properties?.powered !== powered) {
+            useCanvasStore.getState().updateNode(node.id, {
+              properties: { ...node.properties, powered },
+            });
+          }
+        }
+      }
+
+      // Soil Moisture: update analog output voltage based on moistureLevel
+      if (node.type === 'SOIL_MOISTURE') {
+        const vccPin = node.pins?.find(p => /vcc/i.test(p.id));
+        const gndPin = node.pins?.find(p => /gnd/i.test(p.id));
+        if (vccPin && gndPin) {
+          const vccNode = pinToMNANode.get(`${node.id}:${vccPin.id}`) ?? 0;
+          const gndNode = pinToMNANode.get(`${node.id}:${gndPin.id}`) ?? 0;
+          const supplyVoltage = (result.nodeVoltages[vccNode] ?? 0) - (result.nodeVoltages[gndNode] ?? 0);
+          const powered = supplyVoltage >= 2.5;
+          const moisture = Number(node.properties?.moistureLevel ?? 50) / 100;
+
+          this.solverWorker?.postMessage({
+            type: 'UPDATE_PIN',
+            elementId: `vs_soil_${node.id}`,
+            voltage: powered ? moisture * 5 : 0,
+          });
+
+          if (node.properties?.powered !== powered) {
+            useCanvasStore.getState().updateNode(node.id, {
+              properties: { ...node.properties, powered },
+            });
+          }
+        }
+      }
+
+      // SWITCH_SPST: sync solver resistance when toggled
+      if (node.type === 'SWITCH_SPST') {
+        const isClosed = Boolean(node.properties?.isClosed);
+        this.solverWorker?.postMessage({
+          type: 'UPDATE_PIN',
+          elementId: `r_sw_${node.id}`,
+          voltage: isClosed ? 0.01 : 1e8,
+        });
+      }
+
       // Bare bipolar stepper: derive motion from winding currents.
       if (node.type === 'STEPPER_MOTOR') {
         const curA = Math.abs(result.branchCurrents[`r_coil_a_${node.id}`] ?? 0);
@@ -2978,7 +3169,8 @@ export class SimulationEngine {
       }
     });
 
-    this.pushLcdToCanvas(nodes);
+      this.pushLcdToCanvas(nodes);
+    });
   }
 
   /**
