@@ -230,8 +230,12 @@ export type CustomComponentRequest = {
 
 export type AiGenerateRequest = {
   boardType?: BoardType
+  code?: string
+  components?: unknown[]
   componentTypes?: string[]
+  context?: string
   prompt: string
+  wires?: unknown[]
 }
 
 export type AiWireSuggestion = {
@@ -243,11 +247,39 @@ export type AiWireSuggestion = {
   toPin: string
 }
 
+export type AiCitation = {
+  snippet?: string
+  title: string
+  url?: string
+}
+
+export type AiAction = {
+  between?: string[]
+  componentType?: string
+  reason?: string
+  type: string
+  value?: string
+  wireId?: string
+}
+
+export type AiCodeFix = {
+  description?: string
+  from?: string
+  line?: number
+  to?: string
+  type: string
+}
+
 export type AiGenerateResponse = {
+  additions?: AiAction[]
   canvasLayout?: Record<string, unknown>
+  citations?: AiCitation[]
+  codeFixes?: AiCodeFix[]
   componentConfig?: Record<string, unknown>
+  confidence?: number
   generatedCode?: string
   message: string
+  removals?: AiAction[]
   status: string
   wireSuggestions?: AiWireSuggestion[]
 }
@@ -259,9 +291,30 @@ export type AiChatRequest = {
 }
 
 export type AiChatResponse = {
+  citations?: AiCitation[]
+  confidence?: number
   generatedCode?: string
   hasCode: boolean
   reply: string
+}
+
+export type AiValidationIssue = {
+  componentId: string
+  message: string
+  severity: 'CRITICAL' | 'WARNING' | 'INFO' | string
+  suggestedFix?: string
+}
+
+export type AiValidationResponse = {
+  additions?: AiAction[]
+  codeFixes?: AiCodeFix[]
+  confidence?: number
+  generalFeedback: string
+  isValid: boolean
+  issues?: AiValidationIssue[]
+  removals?: AiAction[]
+  safetyScore: number
+  wireSuggestions?: AiWireSuggestion[]
 }
 
 export type FirmwareCompileRequest = {

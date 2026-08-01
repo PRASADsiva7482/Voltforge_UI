@@ -624,7 +624,7 @@ export default function CircuitEditorPage() {
           <button
             className={`vf-editor__tool-btn ${showAiChat ? 'is-active' : ''}`}
             onClick={() => setShowAiChat(!showAiChat)}
-            title="VoltForge Gemma Assistant"
+            title="VoltForge AI Assistant"
           >
             <Sparkles size={15} />
           </button>

@@ -1614,6 +1614,16 @@
   border-radius: 4px; transition: background 0.15s;
 }
 .vf-ai-chat__apply-btn:hover { background: rgba(8,127,131,0.1); }
+.vf-ai-chat__meta {
+  margin-top: 6px; font-size: 9px; color: var(--vf-text-muted); font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.vf-ai-chat__citations { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.vf-ai-chat__citation {
+  font-size: 10px; color: var(--vf-teal); text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.vf-ai-chat__citation:hover { text-decoration: underline; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    AI Validator Panel — extends floating panel
@@ -1628,10 +1638,22 @@
 .vf-validator__score-value.is-good { color: #16a34a; }
 .vf-validator__score-value.is-medium { color: #d97706; }
 .vf-validator__score-value.is-bad { color: #dc2626; }
+.vf-validator__confidence {
+  margin-top: 8px; font-size: 9px; color: var(--vf-text-muted); font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
 .vf-validator__issues { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
 .vf-validator__issues-title {
   font-size: 10px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.06em; color: var(--vf-text-muted); margin-bottom: 4px;
+}
+.vf-ai-action {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center;
+  padding: 8px 10px; border: 1px solid var(--vf-border); border-radius: 8px; background: var(--vf-sidebar);
+}
+.vf-ai-action span {
+  min-width: 0; font-size: 10px; line-height: 1.35; color: var(--vf-text);
+  overflow-wrap: anywhere;
 }
 .vf-validator__start-btn {
   display: flex; align-items: center; justify-content: center; gap: 6px;

@@ -4,9 +4,11 @@ import { useMutation } from '@tanstack/react-query'
 import { useCanvasStore } from '../../store/canvasStore'
 import { useProjectStore } from '../../store/projectStore'
 import { aiApi } from '../../api/services'
+import { buildCircuitNetlist } from '../canvas/netlist'
 import { Textarea } from '../../components/ui/Field'
 import { SuggestionsList } from '../../components/ui/SuggestionsList'
 import { CodeBlock } from '../../components/ui/CodeBlock'
+import type { AiCitation } from '../../types/domain'
 
 interface Props {
   isOpen: boolean
@@ -16,7 +18,9 @@ interface Props {
 }
 
 interface Message {
+  citations?: AiCitation[]
   content: string
+  confidence?: number
   role: 'user' | 'assistant'
 }
 
@@ -30,21 +34,50 @@ export default function AiChatPanel({
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   
-  const { nodes, wires } = useCanvasStore()
+  const { nodes, wires, selectedNodeId, selectedWireId, viewport } = useCanvasStore()
   const { currentProject, activeCodeFile } = useProjectStore()
 
   const chatMutation = useMutation({
     mutationFn: (message: string) => {
+      const netlist = buildCircuitNetlist(nodes, wires)
       const richContext = JSON.stringify({
         projectName: currentProject?.name || projectContext,
         boardType: currentProject?.boardType || 'ARDUINO_UNO',
-        components: nodes.map((n) => ({ id: n.id, type: n.type, name: n.name })),
+        selectedNodeId,
+        selectedWireId,
+        viewport,
+        activeFile: activeCodeFile
+          ? {
+              filename: activeCodeFile.filename,
+              language: activeCodeFile.language,
+            }
+          : null,
+        components: nodes.map((n) => ({
+          height: n.height,
+          id: n.id,
+          name: n.name,
+          pins: n.pins,
+          properties: n.properties,
+          rotation: n.rotation,
+          type: n.type,
+          width: n.width,
+          x: n.x,
+          y: n.y,
+        })),
         wires: wires.map((w) => ({
+          color: w.color,
+          id: w.id,
           fromComponent: w.fromNodeId,
           fromPin: w.fromPinId,
           toComponent: w.toNodeId,
           toPin: w.toPinId,
         })),
+        netlist: {
+          nets: netlist.nodes.map((net) => ({
+            id: net.id,
+            pins: net.pins.map((pin) => `${pin.nodeId}/${pin.pinId}`),
+          })),
+        },
         code: activeCodeFile?.content || currentProject?.codeFiles?.[0]?.content || ""
       })
       
@@ -56,7 +89,15 @@ export default function AiChatPanel({
     },
     onSuccess: (res) => {
       const data = res.data.data
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }])
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: data.reply,
+          confidence: data.confidence,
+          citations: data.citations,
+        },
+      ])
     },
     onError: () => {
       setMessages((prev) => [
@@ -129,7 +170,7 @@ export default function AiChatPanel({
           </div>
           <div>
             <h3 className="vf-ai-chat__brand-name">VoltForge AI</h3>
-            <span className="vf-ai-chat__brand-sub">Powered by Gemma</span>
+            <span className="vf-ai-chat__brand-sub">Project-aware local AI</span>
           </div>
         </div>
         <button
@@ -174,6 +215,26 @@ export default function AiChatPanel({
             </div>
             <div className="vf-ai-chat__msg-body">
               {renderMessageContent(msg.content)}
+              {msg.role === 'assistant' && typeof msg.confidence === 'number' && (
+                <div className="vf-ai-chat__meta">
+                  Confidence {Math.round(msg.confidence * 100)}%
+                </div>
+              )}
+              {msg.role === 'assistant' && msg.citations && msg.citations.length > 0 && (
+                <div className="vf-ai-chat__citations">
+                  {msg.citations.slice(0, 2).map((citation, citationIndex) => (
+                    <a
+                      key={`${citation.url || citation.title}-${citationIndex}`}
+                      href={citation.url || '#'}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="vf-ai-chat__citation"
+                    >
+                      {citation.title}
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}

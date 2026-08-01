@@ -4,6 +4,7 @@ import type {
   AiChatResponse,
   AiGenerateRequest,
   AiGenerateResponse,
+  AiValidationResponse,
   ApiResponse,
   CreateProjectRequest,
   CustomComponentRequest,
@@ -62,7 +63,8 @@ export const aiApi = {
   schematicToCode: (data: { additionalInstructions?: string; boardType?: string; components?: unknown[]; wires?: unknown[] }) =>
     api.post<ApiResponse<AiGenerateResponse>>('/ai/schematic-to-code', data),
   suggestWiring: (data: AiGenerateRequest) => api.post<ApiResponse<AiGenerateResponse>>('/ai/suggest-wiring', data),
-  validateCircuit: (data: { boardType?: string; components?: unknown[]; wires?: unknown[] }) => api.post<ApiResponse<unknown>>('/ai/validate-circuit', data),
+  validateCircuit: (data: { boardType?: string; code?: string; components?: unknown[]; context?: string; wires?: unknown[] }) =>
+    api.post<ApiResponse<AiValidationResponse>>('/ai/validate-circuit', data),
 }
 
 export const adminApi = {
