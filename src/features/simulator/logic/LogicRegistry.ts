@@ -120,11 +120,10 @@ export class ServoLogic implements IComponentLogic {
     const { updateNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
-    if (node.properties?.powered === false) return;
 
     const pin = node.pins?.find(p => p.id === pinId);
     const pinLabel = `${pinId} ${pin?.name || ''}`.toLowerCase();
-    if (!pinLabel.includes('sig') && !pinLabel.includes('signal')) return;
+    if (!pinLabel.includes('sig') && !pinLabel.includes('signal') && !pinLabel.includes('1') && !pinLabel.includes('p1')) return;
 
     const pwm = state === 'PWM' ? Math.max(0, Math.min(255, value ?? 0)) : state === 'HIGH' ? 255 : 0;
     const angle = Math.round((pwm / 255) * 180);
@@ -154,9 +153,13 @@ export class StepperLogic implements IComponentLogic {
 
     const pin = node.pins?.find(p => p.id === pinId);
     const pinLabel = `${pinId} ${pin?.name || ''}`.toLowerCase();
+    const isStepPin = pinLabel.includes('a') || pinLabel.includes('b') ||
+                      pinLabel.includes('in') || pinLabel.includes('step') ||
+                      pinLabel.includes('coil') || pinLabel.includes('p1') ||
+                      pinLabel.includes('p2') || pinLabel.includes('p3') || pinLabel.includes('p4');
 
     // Accept any coil pin going HIGH as a step pulse
-    if (state === 'HIGH' && (pinLabel.includes('a') || pinLabel.includes('b'))) {
+    if (state === 'HIGH' && isStepPin) {
       const currentSteps = Number(node.properties?.stepperSteps) || 0;
       const stepsPerRev = 200; // Standard 1.8° stepper
       const newSteps = currentSteps + 1;
@@ -173,7 +176,7 @@ export class StepperLogic implements IComponentLogic {
       // Check if all coil pins are LOW
       const allLow = node.pins?.every(p => {
         const lbl = `${p.id} ${p.name}`.toLowerCase();
-        if (lbl.includes('a') || lbl.includes('b')) {
+        if (lbl.includes('a') || lbl.includes('b') || lbl.includes('in')) {
           return p.id === pinId; // This one is going LOW
         }
         return true;
@@ -191,13 +194,22 @@ export class StepperLogic implements IComponentLogic {
  * Logic for Buzzers
  */
 export class BuzzerLogic implements IComponentLogic {
-  onPinStateChange(componentId: string, pinId: string, state: PinState): void {
+  onPinStateChange(componentId: string, pinId: string, state: PinState, value?: number): void {
     const { updateNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
-    if (pinId.toLowerCase().includes('pos') || pinId === '1') {
-      updateNode(componentId, { properties: { ...node.properties, isBeeping: state === 'HIGH' } });
+    const pinLabel = pinId.toLowerCase();
+    if (pinLabel.includes('pos') || pinLabel.includes('p1') || pinLabel.includes('+') || pinLabel === '1' || pinLabel.includes('sig') || pinLabel.includes('in')) {
+      const isBeeping = state === 'HIGH' || state === 'PWM';
+      const freq = value && value > 0 ? value : 440;
+      updateNode(componentId, { properties: { ...node.properties, isBeeping, frequency: freq } });
+
+      if (isBeeping) {
+        AudioEngine.playTone(freq);
+      } else {
+        AudioEngine.stopTone();
+      }
     }
   }
 }
@@ -238,9 +250,13 @@ export class RelayLogic implements IComponentLogic {
     if (channelMatch) {
       const ch = channelMatch[1];
       props[`isSwitched_${ch}`] = state === 'HIGH';
+      if (ch === '1') {
+        props.isSwitched = state === 'HIGH';
+      }
     } else {
       // Single relay — no channel number
       props.isSwitched = state === 'HIGH';
+      props.isSwitched_1 = state === 'HIGH';
     }
 
     // Overall active state — any channel switched
@@ -261,9 +277,9 @@ export class SevenSegLogic implements IComponentLogic {
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
-    // Segment pins are named a–g
-    const segmentId = pinId.toLowerCase();
-    if (!'abcdefg'.includes(segmentId)) return;
+    // Segment pins are named a–g or dp (clean pinId)
+    const segmentId = pinId.toLowerCase().replace(/^(seg|pin)_?/i, '');
+    if (!'abcdefg'.includes(segmentId) && segmentId !== 'dp') return;
 
     const props = { ...(node.properties || {}) };
     if (!props.segments) props.segments = {};

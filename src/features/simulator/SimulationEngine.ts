@@ -1044,6 +1044,21 @@ export class SimulationEngine {
       replaced = replaced.replace(match[0], String(duration));
     }
 
+    // dht.readTemperature() & dht.readHumidity() inline replacement
+    const dhtTempMatches = Array.from(replaced.matchAll(/dht\.readTemperature\s*\([^)]*\)/gi));
+    for (const match of dhtTempMatches) {
+      const sensor = useCanvasStore.getState().nodes.find(n => n.type === 'TEMP_SENSOR' || n.type === 'SENSOR_DHT11' || n.type === 'SENSOR_DHT22');
+      const temp = sensor ? Number(sensor.properties?.temperature ?? 25) : 25;
+      replaced = replaced.replace(match[0], String(temp));
+    }
+
+    const dhtHumMatches = Array.from(replaced.matchAll(/dht\.readHumidity\s*\([^)]*\)/gi));
+    for (const match of dhtHumMatches) {
+      const sensor = useCanvasStore.getState().nodes.find(n => n.type === 'TEMP_SENSOR' || n.type === 'SENSOR_DHT11' || n.type === 'SENSOR_DHT22');
+      const hum = sensor ? Number(sensor.properties?.humidity ?? 60) : 60;
+      replaced = replaced.replace(match[0], String(hum));
+    }
+
     replaced = replaced
       .replace(/\bmillis\s*\(\s*\)/g, String(this.tick))
       .replace(/\bmicros\s*\(\s*\)/g, String(this.tick * 1000));
@@ -1237,6 +1252,36 @@ export class SimulationEngine {
           this.updateMNAPinMode(pin, 'PWM');
           this.propagatePinState(pin, 'PWM', nodes, wires, value);
           this.updateMNAPinVoltage(pin, (value / 255) * 5);
+          continue;
+        }
+
+        // tone(pin, frequency, duration)
+        const toneMatch = codeText.match(/tone\s*\(\s*([^,)]+)\s*,\s*([^,)]+)(?:\s*,\s*([^,)]+))?\s*\)/i);
+        if (toneMatch) {
+          const pin = this.canonicalPin(toneMatch[1].trim());
+          const freqExpr = toneMatch[2].trim();
+          const freq = Math.max(1, this.evaluateExpression(this.preprocessExpression(freqExpr)) || 440);
+
+          if (!this.pins[pin]) this.pins[pin] = { mode: 'PWM', state: 'PWM', value: 255 };
+          this.pins[pin].state = 'PWM';
+          this.pins[pin].value = 255;
+          this.propagatePinState(pin, 'PWM', nodes, wires, freq);
+          this.updateMNAPinVoltage(pin, 2.5);
+          AudioEngine.playTone(freq);
+          continue;
+        }
+
+        // noTone(pin)
+        const noToneMatch = codeText.match(/noTone\s*\(\s*([^,)]+)\s*\)/i);
+        if (noToneMatch) {
+          const pin = this.canonicalPin(noToneMatch[1].trim());
+          if (this.pins[pin]) {
+            this.pins[pin].state = 'LOW';
+            this.pins[pin].value = 0;
+          }
+          this.propagatePinState(pin, 'LOW', nodes, wires, 0);
+          this.updateMNAPinVoltage(pin, 0);
+          AudioEngine.stopTone();
           continue;
         }
 

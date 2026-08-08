@@ -105,13 +105,24 @@ function addLegacyPinAliases(node: CanvasNode, uf: UnionFind) {
     join('m2', ['negative', 'neg', 'minus']);
   }
 
-  if (node.type === 'DISPLAY_7SEG') {
-    join('com', ['common']);
+  if (node.type === 'SERVO_MOTOR' || node.type === 'MOTOR_SERVO') {
+    join('sig', ['signal', 'p1', '1']);
+    join('vcc', ['5v', 'p2', '2', 'power']);
+    join('gnd', ['ground', 'p3', '3']);
   }
 
-  if (node.type === 'RELAY_SINGLE') {
-    join('in', ['coil1']);
-    join('gnd', ['coil2']);
+  if (node.type === 'BUZZER') {
+    join('pos', ['p1', 'positive', 'plus', '+', '1', 'sig', 'signal']);
+    join('neg', ['p2', 'negative', 'minus', '-', '2', 'gnd']);
+  }
+
+  if (node.type === 'DISPLAY_7SEG') {
+    join('com', ['common', 'gnd', 'ground', 'com1', 'com2']);
+  }
+
+  if (node.type === 'RELAY_SINGLE' || node.type === 'RELAY_SPDT') {
+    join('in', ['coil1', 'in1', 'sig', 'signal']);
+    join('gnd', ['coil2', 'ground', '-']);
   }
 
   if (node.type === 'RELAY_2CH' || node.type === 'RELAY_4CH') {
