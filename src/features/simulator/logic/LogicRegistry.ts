@@ -4,6 +4,7 @@
 
 import type { PinState } from '../SimulationEngine';
 import { useCanvasStore } from '../../../store/canvasStore';
+import { AudioEngine } from './AudioEngine';
 
 export interface IComponentLogic {
   onPinStateChange(componentId: string, pinId: string, state: PinState, value?: number): void;
