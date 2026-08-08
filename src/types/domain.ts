@@ -255,7 +255,10 @@ export type AiCitation = {
 
 export type AiAction = {
   between?: string[]
+  componentId?: string
   componentType?: string
+  newValue?: unknown
+  property?: string
   reason?: string
   type: string
   value?: string
@@ -285,17 +288,29 @@ export type AiGenerateResponse = {
 }
 
 export type AiChatRequest = {
+  boardType?: BoardType | string
+  canvasData?: Record<string, unknown>
+  code?: string
+  components?: unknown[]
   context?: string
   history?: { content: string; role: 'user' | 'assistant' }[]
   message: string
+  netlist?: Record<string, unknown>
+  simulationState?: Record<string, unknown>
+  wires?: unknown[]
 }
 
 export type AiChatResponse = {
+  additions?: AiAction[]
   citations?: AiCitation[]
+  codeFixes?: AiCodeFix[]
   confidence?: number
   generatedCode?: string
   hasCode: boolean
   reply: string
+  removals?: AiAction[]
+  valueChanges?: AiAction[]
+  wireSuggestions?: AiWireSuggestion[]
 }
 
 export type AiValidationIssue = {
@@ -314,6 +329,7 @@ export type AiValidationResponse = {
   issues?: AiValidationIssue[]
   removals?: AiAction[]
   safetyScore: number
+  valueChanges?: AiAction[]
   wireSuggestions?: AiWireSuggestion[]
 }
 

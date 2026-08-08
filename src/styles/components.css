@@ -1614,6 +1614,12 @@
   border-radius: 4px; transition: background 0.15s;
 }
 .vf-ai-chat__apply-btn:hover { background: rgba(8,127,131,0.1); }
+.vf-ai-chat__actions {
+  display: flex; flex-direction: column; gap: 6px; margin-top: 8px;
+}
+.vf-ai-chat__actions .vf-ai-action {
+  padding: 6px 8px; background: rgba(255,255,255,0.62);
+}
 .vf-ai-chat__meta {
   margin-top: 6px; font-size: 9px; color: var(--vf-text-muted); font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.04em;

@@ -27,6 +27,13 @@ function resistanceValue(value?: string) {
   return Number.isFinite(numeric) && numeric > 0 ? numeric : 220
 }
 
+function parseActionValue(value: unknown) {
+  if (typeof value === 'number' || typeof value === 'boolean') return value
+  const text = String(value ?? '').trim()
+  const numeric = Number(text.replace(/[^0-9.+-]/g, ''))
+  return Number.isFinite(numeric) && /[0-9]/.test(text) ? numeric : text
+}
+
 function hasWire(wires: Wire[], fromNodeId: string, fromPinId: string, toNodeId: string, toPinId: string) {
   return wires.some((wire) =>
     (wire.fromNodeId === fromNodeId && wire.fromPinId === fromPinId && wire.toNodeId === toNodeId && wire.toPinId === toPinId) ||
@@ -48,7 +55,7 @@ function makeWire(suggestion: AiWireSuggestion): Wire {
 }
 
 export default function AiValidatorPanel({ isOpen, onClose }: Props) {
-  const { addNode, addWire, nodes, removeWire, wires } = useCanvasStore()
+  const { addNode, addWire, nodes, removeWire, updateNode, wires } = useCanvasStore()
   const { activeCodeFile, currentProject, updateCodeFileContent } = useProjectStore()
   const addToast = useToastStore((s) => s.addToast)
   const [isValidating, setIsValidating] = useState(false)
@@ -172,6 +179,25 @@ export default function AiValidatorPanel({ isOpen, onClose }: Props) {
       toPinId: second.pinId,
     })
     addToast('AI resistor addition applied.', 'success')
+  }
+
+  const applyValueChange = (action: AiAction) => {
+    if (!action.componentId || !action.property) {
+      addToast('This value change is missing a target property.', 'error')
+      return
+    }
+    const node = nodes.find((item) => item.id === action.componentId)
+    if (!node) {
+      addToast('Could not find the target component.', 'error')
+      return
+    }
+    updateNode(action.componentId, {
+      properties: {
+        ...node.properties,
+        [action.property]: parseActionValue(action.newValue ?? action.value),
+      },
+    })
+    addToast('AI value change applied.', 'success')
   }
 
   const applyCodeFix = (fix: AiCodeFix) => {
@@ -326,6 +352,20 @@ export default function AiValidatorPanel({ isOpen, onClose }: Props) {
                     <span>{suggestion.description}</span>
                     <Button size="sm" variant="secondary" icon={<Zap size={12} />} onClick={() => applyWireSuggestion(suggestion)}>
                       Wire
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {validationResult.valueChanges && validationResult.valueChanges.length > 0 && (
+              <div className="vf-validator__issues">
+                <h5 className="vf-validator__issues-title">Value Changes</h5>
+                {validationResult.valueChanges.map((action, i) => (
+                  <div key={`value-${i}`} className="vf-ai-action">
+                    <span>{action.reason || `${action.componentId}.${action.property} -> ${String(action.newValue ?? action.value ?? '')}`}</span>
+                    <Button size="sm" variant="secondary" icon={<Wrench size={12} />} onClick={() => applyValueChange(action)}>
+                      Change
                     </Button>
                   </div>
                 ))}

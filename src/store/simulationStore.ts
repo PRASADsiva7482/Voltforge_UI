@@ -6,6 +6,7 @@ interface SerialWriteOptions {
 }
 
 interface SimulationState {
+  isSimulating: boolean;
   serialLogs: string[];
   serialPanelOpen: boolean;
   baudRate: number;
@@ -22,6 +23,7 @@ interface SimulationState {
   solverConverged: boolean;
 
   writeSerial: (text: string, options?: SerialWriteOptions) => void;
+  setSimulating: (isSimulating: boolean) => void;
   sendSerialInput: (text: string) => void;
   drainSerialInput: () => string[];
   setDebugSnapshot: (snapshot: Partial<DebugSnapshot>) => void;
@@ -47,6 +49,7 @@ export const BAUD_RATES = [9600, 19200, 38400, 57600, 115200];
 const MAX_SCOPE_SAMPLES = 2048;
 
 export const useSimulationStore = create<SimulationState>((set) => ({
+  isSimulating: false,
   serialLogs: [],
   serialPanelOpen: false,
   baudRate: 9600,
@@ -61,6 +64,8 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   oscilloscopeData: {},
   oscilloscopePanelOpen: false,
   solverConverged: true,
+
+  setSimulating: (isSimulating) => set({ isSimulating }),
 
   writeSerial: (text, options) => {
     const newline = options?.newline ?? true;

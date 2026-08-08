@@ -144,6 +144,7 @@ export default function CircuitEditorPage() {
     setBaudRate,
     setDebugSnapshot,
     setSerialPanelOpen,
+    setSimulating,
     oscilloscopePanelOpen,
     setOscilloscopePanelOpen,
   } = useSimulationStore()
@@ -435,6 +436,7 @@ export default function CircuitEditorPage() {
   const toggleSimulation = async () => {
     if (!isSimulating) {
       setIsSimulating(true)
+      setSimulating(true)
       clearSerial()
       setSerialPanelOpen(true)
       writeSerial(`> Simulation started at ${new Date().toLocaleTimeString()}`)
@@ -473,6 +475,7 @@ export default function CircuitEditorPage() {
       await engineRef.current?.start(bundledCode, nodes, wires, compiledHex)
     } else {
       setIsSimulating(false)
+      setSimulating(false)
       engineRef.current?.stop()
       writeSerial('> Simulation stopped')
       nodes.forEach((n) =>
