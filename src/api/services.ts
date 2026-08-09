@@ -1,4 +1,5 @@
 import api from './client'
+import keycloak from '../auth/keycloak'
 import type {
   AiChatRequest,
   AiChatResponse,
@@ -19,6 +20,21 @@ import type {
   UpdateProjectRequest,
   User,
 } from '../types/domain'
+
+/** Base URL for direct fetch() calls (SSE streaming bypasses Axios). */
+function getStreamBaseURL(): string {
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL
+  }
+  if (import.meta.env.DEV) {
+    return 'http://localhost:2001/voltForge-app/api/v1'
+  }
+  const pathParts = window.location.pathname.split('/')
+  if (pathParts[1] && pathParts[1].toLowerCase().includes('voltforge')) {
+    return `/${pathParts[1]}/api/v1`
+  }
+  return '/voltForge-app/api/v1'
+}
 
 export const authApi = {
   getCurrentUser: () => api.get<ApiResponse<User>>('/auth/me'),
@@ -57,6 +73,22 @@ export const componentApi = {
 
 export const aiApi = {
   chat: (data: AiChatRequest) => api.post<ApiResponse<AiChatResponse>>('/ai/chat', data),
+  /** SSE streaming chat — returns a raw fetch Response for ReadableStream consumption. */
+  chatStream: async (data: Record<string, unknown>): Promise<Response> => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (keycloak.token) {
+      headers['Authorization'] = `Bearer ${keycloak.token}`
+    }
+    const response = await fetch(`${getStreamBaseURL()}/ai/chat/stream`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data),
+    })
+    if (!response.ok) {
+      throw new Error(`Stream request failed: ${response.status}`)
+    }
+    return response
+  },
   generateCircuit: (data: AiGenerateRequest) => api.post<ApiResponse<AiGenerateResponse>>('/ai/generate-circuit', data),
   generateCode: (data: AiGenerateRequest) => api.post<ApiResponse<AiGenerateResponse>>('/ai/generate-code', data),
   reviewCode: (data: { boardType?: string; code: string; componentTypes?: string[] }) => api.post<ApiResponse<unknown>>('/ai/review-code', data),

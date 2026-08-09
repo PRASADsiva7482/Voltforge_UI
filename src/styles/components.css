@@ -1631,6 +1631,55 @@
 }
 .vf-ai-chat__citation:hover { text-decoration: underline; }
 
+.vf-ai-chat__thinking {
+  margin-bottom: 8px;
+  background: rgba(168, 85, 247, 0.06);
+  border: 1px solid rgba(168, 85, 247, 0.18);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 11px;
+}
+.vf-ai-chat__thinking-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  color: #a855f7;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+}
+.vf-ai-chat__thinking-summary:hover {
+  background: rgba(168, 85, 247, 0.08);
+}
+.vf-ai-chat__thinking-content {
+  padding: 4px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px dashed rgba(168, 85, 247, 0.15);
+}
+.vf-ai-chat__thinking-step {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 10.5px;
+  color: var(--vf-text-muted);
+  line-height: 1.4;
+  word-break: break-word;
+}
+.vf-ai-chat__cursor {
+  display: inline-block;
+  font-weight: 900;
+  color: #a855f7;
+  animation: vf-cursor-blink 0.7s infinite alternate;
+  margin-left: 2px;
+}
+@keyframes vf-cursor-blink {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    AI Validator Panel — extends floating panel
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -1750,6 +1799,8 @@
 :root.dark .vf-ai-chat__input-area { background: var(--vf-sidebar); border-color: var(--vf-border); }
 :root.dark .vf-ai-chat__textarea { background: var(--vf-surface); border-color: var(--vf-border); color: var(--vf-text); }
 :root.dark .vf-ai-chat__msg--assistant .vf-ai-chat__msg-body { background: var(--vf-sidebar); border-color: var(--vf-border); }
+:root.dark .vf-ai-chat__thinking { background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.25); }
+:root.dark .vf-ai-chat__thinking-step { color: #c4b5fd; }
 :root.dark .vf-toast--info { background: var(--vf-surface); color: var(--vf-text); border: 1px solid var(--vf-border); }
 :root.dark .vf-panel-header { background: var(--vf-sidebar); border-color: var(--vf-border); }
 :root.dark .vf-select-inline { background: var(--vf-surface); border-color: var(--vf-border); color: var(--vf-text); }

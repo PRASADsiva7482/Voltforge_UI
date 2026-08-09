@@ -1,6 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
-import { Bot, Code2, Plus, Send, Sparkles, Trash2, User, Wrench, Zap } from 'lucide-react'
-import { useMutation } from '@tanstack/react-query'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Bot, Brain, Code2, Plus, Send, Sparkles, Trash2, User, Wrench, Zap } from 'lucide-react'
 import { useCanvasStore } from '../../store/canvasStore'
 import { useProjectStore } from '../../store/projectStore'
 import { useSimulationStore } from '../../store/simulationStore'
@@ -26,8 +25,10 @@ interface Message {
   codeFixes?: AiCodeFix[]
   content: string
   confidence?: number
+  isStreaming?: boolean
   removals?: AiAction[]
   role: 'user' | 'assistant'
+  thought?: string
   valueChanges?: AiAction[]
   wireSuggestions?: AiWireSuggestion[]
 }
@@ -77,7 +78,9 @@ export default function AiChatPanel({
 }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
+  const [isStreaming, setIsStreaming] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
   
   const { addNode, addWire, nodes, removeWire, selectedNodeId, selectedWireId, updateNode, viewport, wires } = useCanvasStore()
   const { currentProject, activeCodeFile, updateCodeFileContent } = useProjectStore()
@@ -91,133 +94,216 @@ export default function AiChatPanel({
   const oscilloscopeData = useSimulationStore((s) => s.oscilloscopeData)
   const solverConverged = useSimulationStore((s) => s.solverConverged)
 
-  const chatMutation = useMutation({
-    mutationFn: (message: string) => {
-      const netlist = buildCircuitNetlist(nodes, wires)
-      const components = nodes.map((n) => ({
-        height: n.height,
-        id: n.id,
-        name: n.name,
-        pins: n.pins,
-        properties: n.properties,
-        rotation: n.rotation,
-        type: n.type,
-        width: n.width,
-        x: n.x,
-        y: n.y,
-      }))
-      const serializedWires = wires.map((w) => ({
-        color: w.color,
-        id: w.id,
-        fromComponent: w.fromNodeId,
-        fromPin: w.fromPinId,
-        toComponent: w.toNodeId,
-        toPin: w.toPinId,
-      }))
-      const netlistPayload = {
-        components: netlist.components,
-        nets: netlist.nodes.map((net) => ({
-          id: net.id,
-          pins: net.pins.map((pin) => `${pin.nodeId}/${pin.pinId}`),
-        })),
-        pinToNet: netlist.pinToNet,
+  const buildPayload = useCallback(() => {
+    const netlist = buildCircuitNetlist(nodes, wires)
+    const components = nodes.map((n) => ({
+      height: n.height,
+      id: n.id,
+      name: n.name,
+      pins: n.pins,
+      properties: n.properties,
+      rotation: n.rotation,
+      type: n.type,
+      width: n.width,
+      x: n.x,
+      y: n.y,
+    }))
+    const serializedWires = wires.map((w) => ({
+      color: w.color,
+      id: w.id,
+      fromComponent: w.fromNodeId,
+      fromPin: w.fromPinId,
+      toComponent: w.toNodeId,
+      toPin: w.toPinId,
+    }))
+    const netlistPayload = {
+      components: netlist.components,
+      nets: netlist.nodes.map((net) => ({
+        id: net.id,
+        pins: net.pins.map((pin) => `${pin.nodeId}/${pin.pinId}`),
+      })),
+      pinToNet: netlist.pinToNet,
+    }
+    const code = activeCodeFile?.content || currentProject?.codeFiles?.[0]?.content || ''
+    const simulationState = {
+      isSimulating,
+      solverConverged,
+      pinStates: debugSnapshot.pins,
+      debugSnapshot,
+      nodeVoltages,
+      branchCurrents,
+      componentPower,
+      multimeter: { nodeVoltages, branchCurrents, componentPower },
+      oscilloscope: Object.fromEntries(
+        Object.entries(oscilloscopeData).map(([nodeId, samples]) => [
+          nodeId,
+          { latest: samples[samples.length - 1] ?? null, samples: samples.slice(-32) },
+        ])
+      ),
+      serialBuffer: serialLogs.slice(-10),
+    }
+    const richContext = JSON.stringify({
+      projectName: currentProject?.name || projectContext,
+      boardType: currentProject?.boardType || 'ARDUINO_UNO',
+      selectedNodeId,
+      selectedWireId,
+      viewport,
+      activeFile: activeCodeFile
+        ? { filename: activeCodeFile.filename, language: activeCodeFile.language }
+        : null,
+      components,
+      wires: serializedWires,
+      netlist: netlistPayload,
+      code,
+      simulationState,
+    })
+    return {
+      boardType: currentProject?.boardType || 'ARDUINO_UNO',
+      components,
+      wires: serializedWires,
+      netlist: netlistPayload,
+      code,
+      canvasData: { components, wires: serializedWires, netlist: netlistPayload },
+      simulationState,
+      context: richContext,
+      history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })),
+    }
+  }, [nodes, wires, activeCodeFile, currentProject, projectContext, selectedNodeId, selectedWireId, viewport, isSimulating, solverConverged, debugSnapshot, nodeVoltages, branchCurrents, componentPower, oscilloscopeData, serialLogs, messages])
+
+  const handleSendStream = useCallback(async (userMessage: string) => {
+    const payload = buildPayload()
+
+    // Add user message and empty assistant placeholder
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', content: userMessage },
+      { role: 'assistant', content: '', thought: '', isStreaming: true },
+    ])
+    setIsStreaming(true)
+
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    try {
+      const response = await aiApi.chatStream({
+        message: userMessage,
+        ...payload,
+      })
+
+      if (!response.body) {
+        throw new Error('No response body')
       }
-      const code = activeCodeFile?.content || currentProject?.codeFiles?.[0]?.content || ''
-      const simulationState = {
-        isSimulating,
-        solverConverged,
-        pinStates: debugSnapshot.pins,
-        debugSnapshot,
-        nodeVoltages,
-        branchCurrents,
-        componentPower,
-        multimeter: {
-          nodeVoltages,
-          branchCurrents,
-          componentPower,
-        },
-        oscilloscope: Object.fromEntries(
-          Object.entries(oscilloscopeData).map(([nodeId, samples]) => [
-            nodeId,
-            {
-              latest: samples[samples.length - 1] ?? null,
-              samples: samples.slice(-32),
-            },
-          ])
-        ),
-        serialBuffer: serialLogs.slice(-10),
-      }
-      const canvasData = {
-        components,
-        wires: serializedWires,
-        netlist: netlistPayload,
-      }
-      const richContext = JSON.stringify({
-        projectName: currentProject?.name || projectContext,
-        boardType: currentProject?.boardType || 'ARDUINO_UNO',
-        selectedNodeId,
-        selectedWireId,
-        viewport,
-        activeFile: activeCodeFile
-          ? {
-              filename: activeCodeFile.filename,
-              language: activeCodeFile.language,
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        if (controller.signal.aborted) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          let trimmed = line.trim()
+          if (!trimmed) continue
+
+          while (trimmed.startsWith('data:')) {
+            trimmed = trimmed.replace(/^data:\s*/, '')
+          }
+          if (!trimmed || trimmed === '[DONE]') continue
+
+          try {
+            const event = JSON.parse(trimmed)
+            const eventType = event.type
+
+            if (eventType === 'thought') {
+              // Append to thinking section
+              setMessages((prev) => {
+                const updated = [...prev]
+                const last = updated[updated.length - 1]
+                if (last?.role === 'assistant') {
+                  updated[updated.length - 1] = {
+                    ...last,
+                    thought: (last.thought || '') + event.content + '\n',
+                  }
+                }
+                return updated
+              })
+            } else if (eventType === 'token') {
+              // Append to main response content
+              setMessages((prev) => {
+                const updated = [...prev]
+                const last = updated[updated.length - 1]
+                if (last?.role === 'assistant') {
+                  updated[updated.length - 1] = {
+                    ...last,
+                    content: (last.content || '') + event.content,
+                  }
+                }
+                return updated
+              })
+            } else if (eventType === 'done') {
+              // Finalize with metadata
+              setMessages((prev) => {
+                const updated = [...prev]
+                const last = updated[updated.length - 1]
+                if (last?.role === 'assistant') {
+                  updated[updated.length - 1] = {
+                    ...last,
+                    isStreaming: false,
+                    content: last.content || (event.error ? `Error: ${event.error}` : last.content),
+                    confidence: event.confidence,
+                    citations: event.citations,
+                    wireSuggestions: event.wireSuggestions,
+                    additions: event.additions,
+                    removals: event.removals,
+                    valueChanges: event.valueChanges,
+                    codeFixes: event.codeFixes,
+                  }
+                }
+                return updated
+              })
             }
-          : null,
-        components,
-        wires: serializedWires,
-        netlist: netlistPayload,
-        code,
-        simulationState,
-      })
-      
-      return aiApi.chat({
-        message,
-        boardType: currentProject?.boardType || 'ARDUINO_UNO',
-        components,
-        wires: serializedWires,
-        netlist: netlistPayload,
-        code,
-        canvasData,
-        simulationState,
-        context: richContext,
-        history: messages.slice(-10),
-      })
-    },
-    onSuccess: (res) => {
-      const data = res.data.data
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: data.reply,
-          confidence: data.confidence,
-          citations: data.citations,
-          additions: data.additions,
-          removals: data.removals,
-          valueChanges: data.valueChanges,
-          wireSuggestions: data.wireSuggestions,
-          codeFixes: data.codeFixes,
-        },
-      ])
-    },
-    onError: () => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: 'Sorry, I encountered an error. Please try again.',
-        },
-      ])
-    },
-  })
+          } catch (jsonErr) {
+            console.debug('Failed to parse SSE JSON chunk:', trimmed, jsonErr)
+          }
+        }
+      }
+    } catch (err) {
+      if (!controller.signal.aborted) {
+        console.error('Stream error:', err)
+        setMessages((prev) => {
+          const updated = [...prev]
+          const last = updated[updated.length - 1]
+          if (last?.role === 'assistant' && last.isStreaming) {
+            updated[updated.length - 1] = {
+              ...last,
+              content: last.content || 'Sorry, I encountered an error. Please try again.',
+              isStreaming: false,
+            }
+          }
+          return updated
+        })
+      }
+    } finally {
+      setIsStreaming(false)
+      abortRef.current = null
+      // Mark streaming as complete for any remaining messages
+      setMessages((prev) =>
+        prev.map((m) => (m.isStreaming ? { ...m, isStreaming: false } : m))
+      )
+    }
+  }, [buildPayload])
 
   const handleSend = () => {
     const msg = input.trim()
-    if (!msg || chatMutation.isPending) return
-    setMessages((prev) => [...prev, { role: 'user', content: msg }])
+    if (!msg || isStreaming) return
     setInput('')
-    chatMutation.mutate(msg)
+    handleSendStream(msg)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -231,7 +317,14 @@ export default function AiChatPanel({
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [messages, chatMutation.isPending])
+  }, [messages, isStreaming])
+
+  // Cleanup abort controller on unmount
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort()
+    }
+  }, [])
 
   const applyWireSuggestion = (suggestion: AiWireSuggestion) => {
     if (hasWire(wires, suggestion.fromComponentId, suggestion.fromPin, suggestion.toComponentId, suggestion.toPin)) {
@@ -375,7 +468,7 @@ export default function AiChatPanel({
   }
 
   const renderMessageActions = (msg: Message) => {
-    if (msg.role !== 'assistant') return null
+    if (msg.role !== 'assistant' || msg.isStreaming) return null
     const hasActions = Boolean(
       msg.wireSuggestions?.length ||
       msg.additions?.length ||
@@ -496,14 +589,37 @@ export default function AiChatPanel({
               {msg.role === 'user' ? <User size={12} /> : <Bot size={12} />}
             </div>
             <div className="vf-ai-chat__msg-body">
-              {renderMessageContent(msg.content)}
+              {/* Thinking box */}
+              {msg.role === 'assistant' && msg.thought && (
+                <details className="vf-ai-chat__thinking" open={msg.isStreaming && !msg.content}>
+                  <summary className="vf-ai-chat__thinking-summary">
+                    <Brain size={12} />
+                    <span>{msg.isStreaming && !msg.content ? 'Thinking...' : 'Thought process'}</span>
+                  </summary>
+                  <div className="vf-ai-chat__thinking-content">
+                    {msg.thought.split('\n').filter(Boolean).map((step, si) => (
+                      <div key={si} className="vf-ai-chat__thinking-step">{step}</div>
+                    ))}
+                  </div>
+                </details>
+              )}
+
+              {/* Main response content */}
+              {msg.content && renderMessageContent(msg.content)}
+              {msg.isStreaming && <span className="vf-ai-chat__cursor">|</span>}
+
+              {/* Action buttons */}
               {renderMessageActions(msg)}
-              {msg.role === 'assistant' && typeof msg.confidence === 'number' && (
+
+              {/* Confidence badge */}
+              {msg.role === 'assistant' && !msg.isStreaming && typeof msg.confidence === 'number' && (
                 <div className="vf-ai-chat__meta">
                   Confidence {Math.round(msg.confidence * 100)}%
                 </div>
               )}
-              {msg.role === 'assistant' && msg.citations && msg.citations.length > 0 && (
+
+              {/* Citation links */}
+              {msg.role === 'assistant' && !msg.isStreaming && msg.citations && msg.citations.length > 0 && (
                 <div className="vf-ai-chat__citations">
                   {msg.citations.slice(0, 2).map((citation, citationIndex) => (
                     <a
@@ -522,7 +638,7 @@ export default function AiChatPanel({
           </div>
         ))}
 
-        {chatMutation.isPending && (
+        {isStreaming && messages.length > 0 && !messages[messages.length - 1]?.thought && !messages[messages.length - 1]?.content && (
           <div className="vf-ai-chat__msg vf-ai-chat__msg--assistant">
             <div className="vf-ai-chat__msg-avatar">
               <Bot size={12} />
@@ -551,7 +667,7 @@ export default function AiChatPanel({
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || chatMutation.isPending}
+            disabled={!input.trim() || isStreaming}
             className="vf-ai-chat__send"
             type="button"
           >
