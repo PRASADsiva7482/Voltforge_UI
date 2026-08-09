@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Cpu, Zap, Thermometer, Monitor, Power, Settings2, Search, Radio, BatteryCharging, Plus, ChevronDown, ChevronRight, Gauge } from 'lucide-react';
 import { componentApi } from '../../api/services';
 import { useCanvasStore } from '../../store/canvasStore';
+import { BOARD_CATALOG } from '../canvas/boardCatalog';
 import { componentDimensions } from '../canvas/componentSvgs';
 import { getPinsForComponent } from '../canvas/pinRegistry';
 import type { ElectronicComponent, CanvasNode } from '../../types/domain';
@@ -16,6 +17,33 @@ const categoryIcons: Record<string, React.FC<{ size?: number }>> = {
 
 const categoryOrder = ['BOARD', 'PASSIVE', 'LED', 'SENSOR', 'DISPLAY', 'MOTOR', 'RELAY', 'COMMUNICATION', 'POWER', 'INSTRUMENT'];
 
+const catalogBoardComponents: ElectronicComponent[] = BOARD_CATALOG.map((board) => ({
+  category: 'BOARD',
+  createdAt: '',
+  defaultProperties: {
+    clockSpeed: board.clock,
+    compilerSupport: board.compiler,
+    family: board.family,
+    features: board.features,
+    logicVoltage: board.logicVoltage,
+  },
+  description: `${board.family} board with ${board.features.join(', ')}.`,
+  id: `catalog_${board.type}`,
+  isPremium: false,
+  name: board.name,
+  pinConfig: { footprint: board.footprint, pinProfile: board.type },
+  sortOrder: board.sortOrder,
+  type: board.type,
+  updatedAt: '',
+}));
+
+function mergeComponentLibrary(apiComponents: ElectronicComponent[] = []) {
+  const byType = new Map<string, ElectronicComponent>();
+  catalogBoardComponents.forEach((component) => byType.set(component.type, component));
+  apiComponents.forEach((component) => byType.set(component.type, component));
+  return Array.from(byType.values());
+}
+
 export default function ComponentPanel({ readOnly }: { readOnly?: boolean }) {
   const { setComponentLibrary } = useCanvasStore();
   const [search, setSearch] = useState('');
@@ -27,9 +55,11 @@ export default function ComponentPanel({ readOnly }: { readOnly?: boolean }) {
     queryFn: async () => { const r = await componentApi.getAll(); return r.data.data; }
   });
 
-  useEffect(() => { if (data) setComponentLibrary(data); }, [data, setComponentLibrary]);
+  const componentLibrary = useMemo(() => mergeComponentLibrary(data || []), [data]);
 
-  const filtered = [...(data || [])]
+  useEffect(() => { setComponentLibrary(componentLibrary); }, [componentLibrary, setComponentLibrary]);
+
+  const filtered = [...componentLibrary]
     .sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name))
     .filter(c =>
       !search ||
