@@ -23,18 +23,13 @@ import type {
 
 /** Base URL for direct fetch() calls (SSE streaming bypasses Axios). */
 function getStreamBaseURL(): string {
-  if (import.meta.env.VITE_API_BASE_URL) {
-    return import.meta.env.VITE_API_BASE_URL
+  let url = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:2001/voltForge-app/api/v1' : '/voltForge-app/api/v1')
+  if (!url.endsWith('/api/v1')) {
+    url = url.replace(/\/+$/, '') + '/api/v1'
   }
-  if (import.meta.env.DEV) {
-    return 'http://localhost:2001/voltForge-app/api/v1'
-  }
-  const pathParts = window.location.pathname.split('/')
-  if (pathParts[1] && pathParts[1].toLowerCase().includes('voltforge')) {
-    return `/${pathParts[1]}/api/v1`
-  }
-  return '/voltForge-app/api/v1'
+  return url
 }
+
 
 export const authApi = {
   getCurrentUser: () => api.get<ApiResponse<User>>('/auth/me'),

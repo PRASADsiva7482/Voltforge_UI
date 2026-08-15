@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import type { CanvasNode, Wire, ElectronicComponent, WireBendPoint, PinPosition } from '../types/domain';
-import { rerouteAutoWires, routeWireBetweenNodes } from '../utils/wireRouting';
+import { rerouteAutoWires, routeWireBetweenNodes, getWireAutoColor } from '../utils/wireRouting';
 import { getPinsForComponent } from '../features/canvas/pinRegistry';
+
 
 /**
  * Resolve a pin reference that doesn't match any pin.id on the node.
@@ -99,12 +100,14 @@ interface CanvasState {
   setComponentLibrary: (components: ElectronicComponent[]) => void;
   clearCanvas: () => void;
   loadCanvas: (nodes: CanvasNode[], wires: Wire[]) => void;
+  autoArrangeLayout: () => void;
 
   // History Actions
   pushHistory: () => void;
   undo: () => void;
   redo: () => void;
 }
+
 
 const WIRE_COLORS = ['#22c55e', '#ef4444', '#3b82f6', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4', '#f97316'];
 
@@ -262,16 +265,19 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         return;
       }
       get().pushHistory();
+      const autoColor = getWireAutoColor(wiringFrom.pinId, pinId);
+      const chosenColor = (wiringColor === '#22c55e' || !wiringColor) ? autoColor : wiringColor;
       const wire: Wire = {
         id: `wire_${++wireCounter}_${Date.now()}`,
         fromNodeId: wiringFrom.nodeId,
         fromPinId: wiringFrom.pinId,
         toNodeId: nodeId,
         toPinId: pinId,
-        color: wiringColor,
+        color: chosenColor,
         bendPoints: [],
         routingMode: wiringMode,
       };
+
       if (wire.routingMode === 'auto') {
         wire.bendPoints = routeWireBetweenNodes(wire, get().nodes);
       }
@@ -395,7 +401,76 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     });
   },
 
+  autoArrangeLayout: () => {
+    const { nodes, wires, pushHistory } = get();
+    if (!nodes || nodes.length === 0) return;
+    pushHistory();
+
+    const mcuNodes: CanvasNode[] = [];
+    const powerNodes: CanvasNode[] = [];
+    const sensorNodes: CanvasNode[] = [];
+    const outputNodes: CanvasNode[] = [];
+    const passiveNodes: CanvasNode[] = [];
+
+    for (const n of nodes) {
+      const t = (n.type || '').toUpperCase();
+      if (t.includes('ARDUINO') || t.includes('ESP32') || t.includes('PICO') || t.includes('STM32') || t.includes('MCU')) {
+        mcuNodes.push(n);
+      } else if (t.includes('BATTERY') || t.includes('POWER') || t.includes('REGULATOR') || t.includes('7805') || t.includes('VCC') || t.includes('GND')) {
+        powerNodes.push(n);
+      } else if (t.includes('SENSOR') || t.includes('DHT') || t.includes('BME') || t.includes('MPU') || t.includes('LDR') || t.includes('BUTTON') || t.includes('POT') || t.includes('ENCODER') || t.includes('ULTRASONIC') || t.includes('HC_SR04')) {
+        sensorNodes.push(n);
+      } else if (t.includes('DISPLAY') || t.includes('OLED') || t.includes('LCD') || t.includes('SERVO') || t.includes('RELAY') || t.includes('MOTOR') || t.includes('LED') || t.includes('BUZZER') || t.includes('MATRIX')) {
+        outputNodes.push(n);
+      } else {
+        passiveNodes.push(n);
+      }
+    }
+
+    const arranged: CanvasNode[] = [];
+
+    // Place MCU
+    mcuNodes.forEach((n, idx) => {
+      arranged.push({ ...n, x: 440 + idx * 300, y: 260 });
+    });
+
+    // Place Power top-left
+    powerNodes.forEach((n, idx) => {
+      arranged.push({ ...n, x: 120 + idx * 160, y: 120 });
+    });
+
+    // Place Sensors left column
+    sensorNodes.forEach((n, idx) => {
+      arranged.push({ ...n, x: 120, y: 260 + idx * 150 });
+    });
+
+    // Place Outputs right column
+    outputNodes.forEach((n, idx) => {
+      arranged.push({ ...n, x: 840, y: 180 + idx * 150 });
+    });
+
+    // Place Passives bottom
+    passiveNodes.forEach((n, idx) => {
+      arranged.push({ ...n, x: 380 + (idx % 3) * 160, y: 560 + Math.floor(idx / 3) * 100 });
+    });
+
+    // Snap to 20px grid
+    const finalNodes = arranged.map(n => ({
+      ...n,
+      x: Math.round(n.x / 20) * 20,
+      y: Math.round(n.y / 20) * 20,
+    }));
+
+    const finalWires = rerouteAutoWires(finalNodes, wires);
+    set({
+      nodes: finalNodes,
+      nodesById: buildNodesMap(finalNodes),
+      wires: finalWires,
+    });
+  },
+
   undo: () => {
+
     const { history, historyIndex } = get();
     if (historyIndex < 0) return;
     const prevState = history[historyIndex];

@@ -3,8 +3,9 @@ import { useShallow } from 'zustand/react/shallow';
 import { Stage, Layer, Rect, Group, Text, Circle, Line, Shape } from 'react-konva';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
-import { Download, Layers } from 'lucide-react';
+import { Download, Layers, LayoutGrid } from 'lucide-react';
 import { useCanvasStore, WIRE_COLORS } from '../../store/canvasStore';
+
 import { useThemeStore } from '../../store/themeStore';
 import { getPinAbsPos, getWireRenderPoints, snapToRoutingGuides } from '../../utils/wireRouting';
 import {
@@ -521,12 +522,23 @@ export default function CircuitCanvas({
         PNG
       </button>
 
+      <button
+        onClick={() => useCanvasStore.getState().autoArrangeLayout()}
+        className="vf-canvas-overlay-btn"
+        style={{ left: 80 }}
+        title="Auto-arrange component layout with orthogonal routing"
+      >
+        <LayoutGrid size={14} />
+        Auto-Arrange
+      </button>
+
       {viewMode === 'pcb' && (
-        <div className="vf-canvas-overlay-btn" style={{ left: 80 }}>
+        <div className="vf-canvas-overlay-btn" style={{ left: 200 }}>
           <Layers size={14} />
           2-layer PCB traces
         </div>
       )}
+
 
       {/* Zoom indicator */}
       <div className="vf-canvas-zoom">
