@@ -1,24 +1,53 @@
 import { create } from 'zustand';
 import type { CanvasNode, Wire, ElectronicComponent, WireBendPoint, PinPosition } from '../types/domain';
 import { rerouteAutoWires, routeWireBetweenNodes, getWireAutoColor } from '../utils/wireRouting';
-import { getPinsForComponent } from '../features/canvas/pinRegistry';
+import { hydrateCanvasNode, type CanvasNodeSeed } from '../features/canvas/componentFactory';
 
 
-/**
- * Resolve a pin reference that doesn't match any pin.id on the node.
- * Tries: name match, trailing-index match, partial-ID match.
- */
-function resolvePin(pins: PinPosition[], refId: string): PinPosition | null {
+/** Compatibility aliases for pin IDs used by older saved diagrams. These are
+ * electrical names, not positional guesses; a wire must never be moved to a
+ * different terminal merely because its ID ends in a number. */
+const PIN_ID_ALIASES: Record<string, Record<string, string>> = {
+  RELAY_SINGLE: {
+    coil1: 'in',
+    coil2: 'gnd',
+  },
+  MOTOR_DC: {
+    positive: 'm1',
+    pos: 'm1',
+    plus: 'm1',
+    negative: 'm2',
+    neg: 'm2',
+    minus: 'm2',
+  },
+  RESISTOR: {
+    pin1: 'p1',
+    pin2: 'p2',
+  },
+};
+
+/** Resolve a pin reference that doesn't match any pin.id on the node. */
+function resolvePin(pins: PinPosition[], refId: string, componentType: string): PinPosition | null {
   const lower = refId.toLowerCase();
   // By name
   const byName = pins.find(p => p.name.toLowerCase() === lower);
   if (byName) return byName;
-  // By trailing index (e.g., 'esp32_pin_3' → index 3)
-  const idxMatch = refId.match(/(\d+)$/);
-  if (idxMatch) {
-    const idx = parseInt(idxMatch[1], 10);
+
+  const alias = PIN_ID_ALIASES[componentType]?.[lower];
+  if (alias) {
+    const aliasedPin = pins.find((pin) => pin.id.toLowerCase() === alias);
+    if (aliasedPin) return aliasedPin;
+  }
+
+  // Only accept an explicit terminal-number convention as a last resort.
+  // IDs such as coil1 are deliberately excluded: their suffix is part of the
+  // electrical name and must not be interpreted as an array position.
+  const terminalMatch = refId.match(/^(?:terminal|pin)[_-]?(\d+)$/i);
+  if (terminalMatch) {
+    const idx = Number(terminalMatch[1]) - 1;
     if (idx >= 0 && idx < pins.length) return pins[idx];
   }
+
   // By partial string inclusion
   const byPartial = pins.find(p =>
     p.id.toLowerCase().includes(lower) || lower.includes(p.id.toLowerCase())
@@ -99,7 +128,7 @@ interface CanvasState {
   setViewport: (viewport: { x: number; y: number; scale: number }) => void;
   setComponentLibrary: (components: ElectronicComponent[]) => void;
   clearCanvas: () => void;
-  loadCanvas: (nodes: CanvasNode[], wires: Wire[]) => void;
+  loadCanvas: (nodes: CanvasNodeSeed[], wires: Wire[]) => void;
   autoArrangeLayout: () => void;
 
   // History Actions
@@ -341,16 +370,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   loadCanvas: (nodes, wires) => {
-    // Populate missing or empty pin arrays for nodes
-    const populatedNodes = nodes.map(n => {
-      if (!n.pins || n.pins.length === 0) {
-        return {
-          ...n,
-          pins: getPinsForComponent(n.type, undefined, n.width, n.height)
-        };
-      }
-      return n;
-    });
+    const componentLibrary = get().componentLibrary;
+    const populatedNodes = nodes.map((node) => hydrateCanvasNode(node, componentLibrary));
 
     // ── Pin-ID reconciliation: patch wire pinIds to match node pin IDs ──
     const nodeMap = new Map(populatedNodes.map(n => [n.id, n]));
@@ -359,13 +380,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       // Fix fromPinId
       const fromNode = nodeMap.get(w.fromNodeId);
       if (fromNode && fromNode.pins?.length && !fromNode.pins.some(p => p.id === w.fromPinId)) {
-        const resolved = resolvePin(fromNode.pins, w.fromPinId);
+        const resolved = resolvePin(fromNode.pins, w.fromPinId, fromNode.type);
         if (resolved) patched.fromPinId = resolved.id;
       }
       // Fix toPinId
       const toNode = nodeMap.get(w.toNodeId);
       if (toNode && toNode.pins?.length && !toNode.pins.some(p => p.id === w.toPinId)) {
-        const resolved = resolvePin(toNode.pins, w.toPinId);
+        const resolved = resolvePin(toNode.pins, w.toPinId, toNode.type);
         if (resolved) patched.toPinId = resolved.id;
       }
       return patched;

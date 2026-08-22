@@ -1,10 +1,11 @@
-import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
+import { useCallback, useRef, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Stage, Layer, Rect, Group, Text, Circle, Line, Shape } from 'react-konva';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
-import { Download, Layers, LayoutGrid } from 'lucide-react';
+import { Download, Layers, LayoutGrid, Zap } from 'lucide-react';
 import { useCanvasStore, WIRE_COLORS } from '../../store/canvasStore';
+import { useSimulationStore } from '../../store/simulationStore';
 
 import { useThemeStore } from '../../store/themeStore';
 import { getPinAbsPos, getWireRenderPoints, snapToRoutingGuides } from '../../utils/wireRouting';
@@ -13,6 +14,7 @@ import {
   WiringPreview,
   ComponentNode,
   CanvasErrorBoundary,
+  CurrentFlowLayer,
 } from './components';
 import {
   MAT_GRID_MINOR,
@@ -28,7 +30,7 @@ import {
   COLLABORATOR_CURSOR_RADIUS,
   COLLABORATOR_DEFAULT_COLOR,
 } from './canvasConstants';
-import type { Collaborator, ActiveBendPoint, CanvasNode, Wire } from './canvasTypes';
+import type { Collaborator, ActiveBendPoint, Wire } from './canvasTypes';
 
 interface Props {
   width: number;
@@ -37,6 +39,7 @@ interface Props {
   collaborators?: Record<string, Collaborator>;
   onComponentInteraction?: (nodeId: string, event: 'press' | 'release') => void;
   onCursorMove?: (x: number, y: number) => void;
+  onProbeToggle?: (target: { nodeId: string; pinId: string; x: number; y: number }) => void;
   readOnly?: boolean;
   isProbeMode?: boolean;
   isSimulating?: boolean;
@@ -70,7 +73,7 @@ const CanvasMat = ({
       />
       <Shape
         listening={false}
-        sceneFunc={(context, shape) => {
+        sceneFunc={(context) => {
           const pad = 200;
           const minX = Math.floor((-viewport.x / scale - pad) / MAT_GRID_MINOR) * MAT_GRID_MINOR;
           const minY = Math.floor((-viewport.y / scale - pad) / MAT_GRID_MINOR) * MAT_GRID_MINOR;
@@ -230,6 +233,7 @@ const ComponentNodeWrapper = ({
   id,
   isDark,
   onComponentInteraction,
+  onProbeToggle,
   readOnly,
   isProbeMode,
   isSimulating,
@@ -237,6 +241,7 @@ const ComponentNodeWrapper = ({
   id: string;
   isDark: boolean;
   onComponentInteraction?: (nodeId: string, event: 'press' | 'release') => void;
+  onProbeToggle?: (target: { nodeId: string; pinId: string; x: number; y: number }) => void;
   readOnly?: boolean;
   isProbeMode?: boolean;
   isSimulating?: boolean;
@@ -266,6 +271,7 @@ const ComponentNodeWrapper = ({
       startWiring={readOnly ? () => {} : startWiring}
       finishWiring={readOnly ? () => {} : finishWiring}
       onInteraction={onComponentInteraction}
+      onProbeToggle={onProbeToggle}
       readOnly={readOnly}
       isProbeMode={isProbeMode}
       isSimulating={isSimulating}
@@ -280,6 +286,7 @@ export default function CircuitCanvas({
   viewMode = 'breadboard',
   collaborators = {},
   onComponentInteraction,
+  onProbeToggle,
   onCursorMove,
   readOnly,
   isProbeMode,
@@ -297,8 +304,6 @@ export default function CircuitCanvas({
   const selectWire = useCanvasStore((state) => state.selectWire);
   const isWiring = useCanvasStore((state) => state.isWiring);
   const wiringFrom = useCanvasStore((state) => state.wiringFrom);
-  const startWiring = useCanvasStore((state) => state.startWiring);
-  const finishWiring = useCanvasStore((state) => state.finishWiring);
   const cancelWiring = useCanvasStore((state) => state.cancelWiring);
   const setViewport = useCanvasStore((state) => state.setViewport);
   const addBendPoint = useCanvasStore((state) => state.addBendPoint);
@@ -407,7 +412,7 @@ export default function CircuitCanvas({
               if (isWiring) cancelWiring();
             }
           }}
-          onMouseMove={(e: KonvaEventObject<MouseEvent>) => {
+          onMouseMove={() => {
             const stage = stageRef.current;
             if (!stage) return;
             const pos = stage.getRelativePointerPosition();
@@ -456,6 +461,7 @@ export default function CircuitCanvas({
                 id={id}
                 isDark={isDark}
                 onComponentInteraction={onComponentInteraction}
+                onProbeToggle={onProbeToggle}
                 readOnly={readOnly}
                 isProbeMode={isProbeMode}
                 isSimulating={isSimulating}
@@ -482,6 +488,9 @@ export default function CircuitCanvas({
               <WiringPreview fromPos={getWiringFromPos()} mousePos={mousePos} />
             )}
           </Layer>
+
+          {/* Animated Current Flow Layer (renders particles on active wires) */}
+          <CurrentFlowLayer />
 
           <Layer listening={false}>
             {Object.values(collaborators).map((user) => (
@@ -532,8 +541,27 @@ export default function CircuitCanvas({
         Auto-Arrange
       </button>
 
+      <button
+        onClick={() => useSimulationStore.getState().setShowCurrentFlow(!useSimulationStore.getState().showCurrentFlow)}
+        className="vf-canvas-overlay-btn"
+        style={{ left: 195, color: useSimulationStore((s) => s.showCurrentFlow) ? '#38bdf8' : 'inherit' }}
+        title="Toggle animated current flow particles on wires"
+      >
+        <Zap size={14} />
+        Current Flow
+      </button>
+
+      <button
+        onClick={() => useSimulationStore.getState().setThermalHeatmapEnabled(!useSimulationStore.getState().thermalHeatmapEnabled)}
+        className="vf-canvas-overlay-btn"
+        style={{ left: 310, color: useSimulationStore((s) => s.thermalHeatmapEnabled) ? '#f97316' : 'inherit' }}
+        title="Toggle live component power and thermal stress heat map"
+      >
+        Thermal Map
+      </button>
+
       {viewMode === 'pcb' && (
-        <div className="vf-canvas-overlay-btn" style={{ left: 200 }}>
+        <div className="vf-canvas-overlay-btn" style={{ left: 410 }}>
           <Layers size={14} />
           2-layer PCB traces
         </div>

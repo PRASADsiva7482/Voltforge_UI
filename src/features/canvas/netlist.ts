@@ -1,5 +1,12 @@
 import type { CanvasNode, PinPosition, Wire } from '../../types/domain';
 import { getBoardLogicVoltage, isBoardComponentType } from './boardCatalog';
+import {
+  isStandaloneSourceType,
+  ledForwardVoltage,
+  ledMaximumCurrent_mA,
+  numericProperty,
+  sourceDefinition,
+} from '../simulator/simulationModels';
 
 export interface NetlistPinRef {
   nodeId: string;
@@ -8,6 +15,7 @@ export interface NetlistPinRef {
   nodeName: string;
   pinName: string;
   pinType: PinPosition['type'];
+  properties?: Record<string, unknown>;
 }
 
 export interface NetlistNode {
@@ -126,13 +134,14 @@ export function buildCircuitNetlist(nodes: CanvasNode[], wires: Wire[]): Circuit
     node.pins?.forEach((pin) => {
       const key = pinKey(node.id, pin.id);
       unionFind.add(key);
-      pinRefs.set(key, {
+        pinRefs.set(key, {
         nodeId: node.id,
         pinId: pin.id,
         nodeType: node.type,
         nodeName: node.name,
         pinName: pin.name,
-        pinType: pin.type,
+          pinType: pin.type,
+          properties: node.properties,
       });
     });
 
@@ -249,7 +258,7 @@ export function analyzeCircuitSafety(nodes: CanvasNode[], wires: Wire[]): Circui
     }
 
     if (resistorCurrent !== null) {
-      const maxCurrent = parseMilliAmps(component.properties.maxCurrent, 20);
+      const maxCurrent = parseMilliAmps(component.properties.maxCurrent, ledMaximumCurrent_mA());
       if (resistorCurrent > maxCurrent) {
         const issue: CircuitSafetyIssue = {
           id: `${component.id}:led-overcurrent`,
@@ -336,14 +345,15 @@ function estimateSeriesResistorCurrent(
   netlist: CircuitNetlist,
   netById: Map<string, NetlistNode>,
 ): number | null {
-  const forwardVoltage = Number(led.properties.forwardVoltage || 2);
-  const supplyVoltage = Math.max(netVoltage(netById.get(sourceNet)), sourceNet ? 5 : 0);
+  const forwardVoltage = ledForwardVoltage('red', led.properties);
+  const supplyVoltage = netVoltage(netById.get(sourceNet));
 
   for (const resistor of netlist.components.filter((component) => component.type === 'RESISTOR')) {
     const resistorNets = Object.values(resistor.pins).filter(Boolean);
     if (resistorNets.length < 2) continue;
     const [a, b] = resistorNets;
-    const resistance = Math.max(1, Number(resistor.properties.resistance || 220));
+    const resistance = numericProperty(resistor.properties.resistance, Number.POSITIVE_INFINITY);
+    if (!Number.isFinite(resistance) || resistance <= 0) continue;
 
     const sourceThroughResistor = b === sourceNet && netHasVoltageSource(netById.get(a))
       || a === sourceNet && netHasVoltageSource(netById.get(b));
@@ -402,8 +412,10 @@ function netHasVoltageSource(net?: NetlistNode): boolean {
     if (isBoard(pin.nodeType)) {
       return isBoardPowerPin(pin) || isBoardGpioPin(pin);
     }
-    if (pin.nodeType === 'POWER_SUPPLY' || pin.nodeType === 'BATTERY_9V') {
-      return pin.pinType === 'power' || /(^|\W)(\+|POS|POSITIVE|VCC|VIN)(\W|$)/i.test(`${pin.pinId} ${pin.pinName}`);
+    if (isStandaloneSourceType(pin.nodeType)) {
+      const source = sourceDefinition(pin.nodeType, pin.properties);
+      return source.enabled && (source.voltage > 0 || (source.isAc && (source.amplitude > 0 || source.offset !== 0)))
+        && (pin.pinType === 'power' || /(^|\W)(\+|POS|POSITIVE|VCC|VIN)(\W|$)/i.test(`${pin.pinId} ${pin.pinName}`));
     }
     return pin.nodeType === 'VOLTAGE_REGULATOR_7805' && (pinId === 'vout' || pinLabel(pin) === '5V');
   });
@@ -412,7 +424,7 @@ function netHasVoltageSource(net?: NetlistNode): boolean {
 function netHasGround(net?: NetlistNode): boolean {
   return !!net?.pins.some((pin) => {
     if (isBoard(pin.nodeType)) return isGroundLabel(pin);
-    if (pin.nodeType === 'POWER_SUPPLY' || pin.nodeType === 'BATTERY_9V') {
+    if (isStandaloneSourceType(pin.nodeType) || pin.nodeType === 'GROUND') {
       return pin.pinType === 'ground' || /(^|\W)(-|NEG|NEGATIVE|GND|GROUND)(\W|$)/i.test(`${pin.pinId} ${pin.pinName}`);
     }
     return false;
@@ -440,10 +452,9 @@ function netVoltage(net?: NetlistNode): number {
       continue;
     }
 
-    if (pin.nodeType === 'BATTERY_9V' && (pin.pinType === 'power' || pinId.includes('pos'))) {
-      voltage = Math.max(voltage, 9);
-    } else if (pin.nodeType === 'POWER_SUPPLY' && pin.pinType === 'power') {
-      voltage = Math.max(voltage, 5);
+    if (isStandaloneSourceType(pin.nodeType) && (pin.pinType === 'power' || pinId.includes('pos'))) {
+      const source = sourceDefinition(pin.nodeType, pin.properties);
+      voltage = Math.max(voltage, source.voltage);
     } else if (pin.nodeType === 'VOLTAGE_REGULATOR_7805' && (pinId === 'vout' || label === '5V')) {
       voltage = Math.max(voltage, 5);
     }

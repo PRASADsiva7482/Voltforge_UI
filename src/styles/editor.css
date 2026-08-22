@@ -1454,3 +1454,661 @@
   display: flex;
   gap: 8px;
 }
+
+/* PCB layout editor */
+.vf-pcb-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #090d16;
+}
+
+.vf-pcb-toolbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  padding: 6px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+  overflow-x: auto;
+}
+
+.vf-pcb-toolbar__label {
+  flex-shrink: 0;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.vf-pcb-toolbar__divider {
+  flex-shrink: 0;
+  width: 1px;
+  height: 20px;
+  background: rgba(148, 163, 184, 0.24);
+}
+
+.vf-pcb-segment,
+.vf-pcb-chip-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vf-pcb-segment {
+  padding: 2px;
+  border-radius: 6px;
+  background: #111827;
+}
+
+.vf-pcb-segment__item,
+.vf-pcb-chip,
+.vf-pcb-tool-btn {
+  border: 0;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.vf-pcb-segment__item {
+  min-height: 24px;
+  padding: 0 8px;
+  background: transparent;
+  color: #cbd5e1;
+}
+
+.vf-pcb-segment__item--top.is-active {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.vf-pcb-segment__item--bottom.is-active {
+  background: #38bdf8;
+  color: #082f49;
+}
+
+.vf-pcb-chip {
+  min-height: 22px;
+  padding: 0 7px;
+  background: #1e293b;
+  color: #94a3b8;
+}
+
+.vf-pcb-chip.is-active {
+  background: #22c55e;
+  color: #052e16;
+}
+
+.vf-pcb-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 0 9px;
+}
+
+.vf-pcb-tool-btn--warning {
+  color: #facc15;
+  background: rgba(250, 204, 21, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(250, 204, 21, 0.35);
+}
+
+.vf-pcb-tool-btn--primary {
+  color: #ffffff;
+  background: #0284c7;
+}
+
+.vf-pcb-export {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+  color: var(--vf-text, #26302d);
+  font-size: 12px;
+}
+
+.vf-pcb-export__summary,
+.vf-pcb-export__section {
+  border: 1px solid var(--vf-border, #dce5de);
+  border-radius: 8px;
+  background: var(--vf-surface, #ffffff);
+}
+
+.vf-pcb-export__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+}
+
+.vf-pcb-export__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+.vf-pcb-export__title {
+  color: var(--vf-text-strong, #111816);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.vf-pcb-export__hint,
+.vf-pcb-export__violation-message {
+  color: var(--vf-text-muted, #68736f);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.vf-pcb-export__section-title {
+  color: var(--vf-text-muted, #68736f);
+  font-size: 10px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.vf-pcb-export__pass,
+.vf-pcb-export__error,
+.vf-pcb-export__violation {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-radius: 7px;
+  padding: 9px 10px;
+}
+
+.vf-pcb-export__pass {
+  align-items: center;
+  color: var(--vf-green, #16a34a);
+  background: var(--vf-green-soft, #dcfce7);
+  box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.22);
+}
+
+.vf-pcb-export__error {
+  color: var(--vf-red, #be3b3b);
+  background: var(--vf-red-soft, #ffe4e2);
+}
+
+.vf-pcb-export__violations {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.vf-pcb-export__violation.is-error {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.25);
+}
+
+.vf-pcb-export__violation.is-warning {
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.28);
+}
+
+.vf-pcb-export__violation-title {
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.vf-pcb-export__download {
+  width: 100%;
+}
+
+.vf-pcb-export__download:disabled,
+.vf-pcb-export__summary .vf-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Interactive labs */
+.vf-labs-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 100%;
+  padding: 28px;
+}
+
+.vf-labs-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 760px;
+}
+
+.vf-labs-hero h1 {
+  margin: 0 0 6px;
+  color: var(--vf-text-strong);
+  font-size: 28px;
+  font-weight: 820;
+  letter-spacing: 0;
+}
+
+.vf-labs-hero p {
+  margin: 0;
+  color: var(--vf-text-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.vf-labs-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.vf-labs-filter__item {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--vf-border);
+  border-radius: 8px;
+  background: var(--vf-surface);
+  color: var(--vf-text-muted);
+  font-size: 12px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.vf-labs-filter__item.is-active {
+  border-color: var(--vf-teal);
+  background: var(--vf-teal-soft);
+  color: var(--vf-teal-dark);
+}
+
+.vf-labs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.vf-lab-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 320px;
+  padding: 16px;
+  border: 1px solid var(--vf-border);
+  border-radius: 8px;
+  background: var(--vf-surface);
+  box-shadow: var(--vf-shadow);
+}
+
+.vf-lab-card__meta,
+.vf-lab-card__time,
+.vf-lab-card__objective {
+  display: flex;
+  align-items: center;
+}
+
+.vf-lab-card__meta {
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.vf-lab-card__difficulty {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 780;
+}
+
+.vf-lab-card__difficulty.is-beginner {
+  background: var(--vf-green-soft);
+  color: var(--vf-green);
+}
+
+.vf-lab-card__difficulty.is-intermediate {
+  background: var(--vf-amber-soft);
+  color: var(--vf-amber);
+}
+
+.vf-lab-card__difficulty.is-advanced {
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+}
+
+.vf-lab-card__time {
+  gap: 5px;
+  color: var(--vf-text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.vf-lab-card h2 {
+  margin: 0 0 8px;
+  color: var(--vf-text-strong);
+  font-size: 16px;
+  font-weight: 780;
+}
+
+.vf-lab-card p {
+  margin: 0;
+  color: var(--vf-text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.vf-lab-card__objectives {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 10px;
+  border: 1px solid var(--vf-border);
+  border-radius: 8px;
+  background: var(--vf-surface-inset);
+}
+
+.vf-lab-card__objectives-title {
+  color: var(--vf-text-muted);
+  font-size: 10px;
+  font-weight: 780;
+  text-transform: uppercase;
+}
+
+.vf-lab-card__objective {
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.vf-lab-card__objective span {
+  width: 6px;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--vf-teal);
+  flex-shrink: 0;
+}
+
+.vf-lab-card__start {
+  width: 100%;
+}
+
+.vf-lab-runner,
+.vf-lab-missing {
+  background: var(--vf-bg);
+  color: var(--vf-text);
+}
+
+.vf-lab-runner {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.vf-lab-missing {
+  display: grid;
+  place-items: center;
+  gap: 16px;
+  min-height: 100vh;
+}
+
+.vf-lab-runner__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 60px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--vf-border);
+  background: var(--vf-surface);
+}
+
+.vf-lab-runner__header-left,
+.vf-lab-runner__actions,
+.vf-lab-runner__title > div {
+  display: flex;
+  align-items: center;
+}
+
+.vf-lab-runner__header-left {
+  gap: 12px;
+  min-width: 0;
+}
+
+.vf-lab-runner__actions {
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.vf-lab-runner__title {
+  min-width: 0;
+}
+
+.vf-lab-runner__title > div {
+  gap: 8px;
+}
+
+.vf-lab-runner__title h1 {
+  margin: 0;
+  max-width: 540px;
+  overflow: hidden;
+  color: var(--vf-text-strong);
+  font-size: 15px;
+  font-weight: 820;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vf-lab-runner__title p {
+  margin: 2px 0 0;
+  max-width: 720px;
+  overflow: hidden;
+  color: var(--vf-text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vf-lab-objectives {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--vf-border);
+  background: var(--vf-sidebar);
+  overflow-x: auto;
+}
+
+.vf-lab-objectives__label {
+  color: var(--vf-text-muted);
+  font-size: 11px;
+  font-weight: 780;
+  text-transform: uppercase;
+}
+
+.vf-lab-objective {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--vf-border);
+  border-radius: 7px;
+  background: var(--vf-surface);
+  color: var(--vf-text-muted);
+  white-space: nowrap;
+}
+
+.vf-lab-objective.is-passed {
+  border-color: rgba(22, 163, 74, 0.3);
+  background: var(--vf-green-soft);
+  color: var(--vf-green);
+}
+
+.vf-lab-objective span {
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.vf-lab-objective small {
+  color: var(--vf-text-muted);
+  font-size: 10px;
+}
+
+.vf-lab-runner__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.vf-lab-runner__left-panel {
+  width: 224px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--vf-border);
+  overflow: hidden;
+}
+
+.vf-lab-runner__workspace {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vf-lab-runner__canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.vf-lab-dialog {
+  width: min(520px, 92vw);
+}
+
+.vf-lab-dialog .vf-modal__header h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vf-lab-dialog__body {
+  display: grid;
+  gap: 10px;
+}
+
+.vf-lab-hint {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--vf-border);
+  border-radius: 8px;
+  background: var(--vf-surface-inset);
+}
+
+.vf-lab-hint strong {
+  color: var(--vf-text-strong);
+  font-size: 12px;
+}
+
+.vf-lab-hint span,
+.vf-lab-dialog__empty {
+  color: var(--vf-text-muted);
+  font-size: 13px;
+}
+
+.vf-lab-complete {
+  align-items: center;
+  gap: 14px;
+  width: min(560px, 92vw);
+  padding: 28px;
+  text-align: center;
+}
+
+.vf-lab-complete__icon {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: var(--vf-green-soft);
+  color: var(--vf-green);
+}
+
+.vf-lab-complete h2 {
+  margin: 0;
+  color: var(--vf-text-strong);
+  font-size: 24px;
+}
+
+.vf-lab-complete > p {
+  margin: 0;
+  color: var(--vf-text-muted);
+}
+
+.vf-lab-complete__theory {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--vf-border);
+  border-radius: 8px;
+  background: var(--vf-surface-inset);
+  text-align: left;
+}
+
+.vf-lab-complete__theory > div,
+.vf-lab-complete__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vf-lab-complete__theory > div {
+  color: var(--vf-teal);
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.vf-lab-complete__theory p {
+  margin: 0;
+  color: var(--vf-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.vf-lab-complete__actions {
+  justify-content: center;
+}
+
+@media (max-width: 860px) {
+  .vf-labs-page {
+    padding: 18px;
+  }
+
+  .vf-lab-runner__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .vf-lab-runner__actions {
+    justify-content: flex-start;
+  }
+
+  .vf-lab-runner__left-panel {
+    display: none;
+  }
+}

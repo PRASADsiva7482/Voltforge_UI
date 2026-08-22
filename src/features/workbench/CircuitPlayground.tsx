@@ -13,7 +13,6 @@ import {
   RotateCcw,
   Save,
   Settings2,
-  Sparkles,
   Zap,
 } from 'lucide-react'
 import { PropertyGrid } from '../../components/product'

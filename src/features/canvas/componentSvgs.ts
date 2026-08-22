@@ -80,8 +80,70 @@ const boardComponentDimensions = Object.fromEntries(
   ]),
 );
 
+const additionalComponentSvgs: Record<string, string> = {
+  INDUCTOR: svg('0 0 90 24',
+    '<path d="M8 12c4-12 8 12 12 0s8 12 12 0 8 12 12 0 8 12 12 0 8 12 12 0" fill="none" stroke="%2338bdf8" stroke-width="3"/>' +
+    '<path d="M0 12h8M68 12h22" stroke="%2394a3b8" stroke-width="2"/>'
+  ),
+  TRANSFORMER: svg('0 0 100 70',
+    '<path d="M0 18h28m0 34H0M72 18h28m-28 34h28" stroke="%2394a3b8" stroke-width="2"/>' +
+    '<path d="M28 10v16c0 8 12 8 12 0V10c0-8 12-8 12 0v16c0 8 12 8 12 0V10" fill="none" stroke="%2338bdf8" stroke-width="2"/>' +
+    '<path d="M28 44v16c0 8 12 8 12 0V44c0-8 12-8 12 0v16c0 8 12 8 12 0V44" fill="none" stroke="%23f59e0b" stroke-width="2"/>' +
+    '<path d="M49 5v60" stroke="%2364758b" stroke-width="2" stroke-dasharray="3 3"/>'
+  ),
+  ZENER_DIODE: svg('0 0 72 28',
+    '<path d="M0 14h20m32 0h20" stroke="%2394a3b8" stroke-width="2"/>' +
+    '<path d="M20 4l10 10-10 10z" fill="%23f8fafc" stroke="%2338bdf8" stroke-width="2"/>' +
+    '<path d="M42 4l-4 5m4 10-4 5" stroke="%23f59e0b" stroke-width="2"/>'
+  ),
+  SCHOTTKY_DIODE: svg('0 0 72 28',
+    '<path d="M0 14h20m32 0h20" stroke="%2394a3b8" stroke-width="2"/>' +
+    '<path d="M20 4l10 10-10 10z" fill="%23f8fafc" stroke="%2338bdf8" stroke-width="2"/>' +
+    '<path d="M42 4v20m5-20v20" stroke="%23fbbf24" stroke-width="2"/>'
+  ),
+  NMOS: svg('0 0 56 70',
+    '<path d="M28 0v18m0 34v18M0 35h17m22 0h17" stroke="%2394a3b8" stroke-width="2"/>' +
+    '<path d="M22 18v34m12-34v34M18 22h4m-4 10h4m-4 10h4m12-20h4m-4 10h4m-4 10h4" stroke="%2338bdf8" stroke-width="3"/>' +
+    '<path d="M8 35h10" stroke="%23f59e0b" stroke-width="2"/>'
+  ),
+  PMOS: svg('0 0 56 70',
+    '<path d="M28 0v18m0 34v18M0 35h17m22 0h17" stroke="%2394a3b8" stroke-width="2"/>' +
+    '<path d="M22 18v34m12-34v34M18 22h4m-4 10h4m-4 10h4m12-20h4m-4 10h4m-4 10h4" stroke="%23f472b6" stroke-width="3"/>' +
+    '<circle cx="18" cy="35" r="4" fill="none" stroke="%23fbbf24" stroke-width="2"/>'
+  ),
+  OPAMP_IDEAL: svg('0 0 70 70',
+    '<path d="M0 20h17m-17 30h17M35 0v15m0 40v15M53 35h17" stroke="%2394a3b8" stroke-width="2"/>' +
+    '<path d="M17 8l0 54 36-27z" fill="%231e293b" stroke="%2338bdf8" stroke-width="2"/>' +
+    '<text x="22" y="26" font-size="10" fill="white">+</text><text x="22" y="49" font-size="10" fill="white">−</text>'
+  ),
+  OPAMP_LM358: svg('0 0 70 70',
+    '<path d="M0 20h17m-17 30h17M35 0v15m0 40v15M53 35h17" stroke="%2394a3b8" stroke-width="2"/>' +
+    '<path d="M17 8l0 54 36-27z" fill="%230f766e" stroke="%232dd4bf" stroke-width="2"/>' +
+    '<text x="21" y="27" font-size="9" fill="white">+</text><text x="21" y="49" font-size="9" fill="white">−</text>'
+  ),
+  BRIDGE_RECTIFIER: svg('0 0 70 60',
+    '<rect x="10" y="8" width="50" height="44" rx="4" fill="%231e293b" stroke="%2338bdf8" stroke-width="2"/>' +
+    '<path d="M20 20l12 10-12 10m30-20L38 30l12 10M32 30h6" fill="none" stroke="%23f8fafc" stroke-width="2"/>' +
+    '<text x="16" y="7" font-size="8" fill="%23fbbf24">~</text><text x="52" y="7" font-size="8" fill="%23fbbf24">+</text>'
+  ),
+  THERMISTOR_NTC: svg('0 0 90 24',
+    '<path d="M0 12h12m54 0h24" stroke="%2394a3b8" stroke-width="2"/>' +
+    '<path d="M12 12h8l5-8 10 16 10-16 10 16 5-8h8" fill="none" stroke="%23f97316" stroke-width="2"/>' +
+    '<path d="M39 2l12 20" stroke="%23f8fafc" stroke-width="2"/>'
+  ),
+  VARIABLE_CAPACITOR: svg('0 0 44 60',
+    '<path d="M22 0v18m0 24v18M8 18h28M8 42h28" stroke="%2394a3b8" stroke-width="2"/>' +
+    '<path d="M14 18v24m16-24v24M32 8l8-8" stroke="%2338bdf8" stroke-width="2"/>'
+  ),
+  THERMISTOR: svg('0 0 90 24',
+    '<path d="M0 12h12m54 0h24" stroke="%2394a3b8" stroke-width="2"/>' +
+    '<path d="M12 12h8l5-8 10 16 10-16 10 16 5-8h8" fill="none" stroke="%23f97316" stroke-width="2"/>'
+  ),
+};
+
 export const componentSvgs: Record<string, string> = {
   ...boardComponentSvgs,
+  ...additionalComponentSvgs,
 
   // ── Boards ──
   ARDUINO_UNO: svg('0 0 200 150',
@@ -464,7 +526,31 @@ export const componentSvgs: Record<string, string> = {
     '<rect x="12" y="6" width="96" height="38" rx="4" fill="%23111827" stroke="%23374151" stroke-width="2"/>' +
     '<circle cx="60" cy="6" r="3" fill="%23374151"/>' +
     '<text x="60" y="29" font-size="12" fill="%23e5e7eb" text-anchor="middle" font-family="Arial" font-weight="bold">74HC595</text>' +
-    '<path d="M7 11h8M7 17h8M7 23h8M7 29h8M7 35h8M105 11h8M105 17h8M105 23h8M105 29h8M105 35h8" stroke="%23cbd5e1" stroke-width="3"/>'
+    '<path d="M7 11h8M7 17h8M7 23h8M7 29h8M7 35h8M7 41h8M7 47h8M105 11h8M105 17h8M105 23h8M105 29h8M105 35h8M105 41h8M105 47h8" stroke="%23cbd5e1" stroke-width="2.5"/>'
+  ),
+  IC_74HC165: svg('0 0 120 55',
+    '<rect x="12" y="4" width="96" height="47" rx="4" fill="%23111827" stroke="%23374151" stroke-width="2"/>' +
+    '<circle cx="60" cy="4" r="3" fill="%23374151"/>' +
+    '<text x="60" y="30" font-size="11" fill="%2338bdf8" text-anchor="middle" font-family="Arial" font-weight="bold">74HC165 PISO</text>' +
+    '<path d="M7 8h8M7 14h8M7 20h8M7 26h8M7 32h8M7 38h8M7 44h8M7 50h8M105 8h8M105 14h8M105 20h8M105 26h8M105 32h8M105 38h8M105 44h8M105 50h8" stroke="%23cbd5e1" stroke-width="2.5"/>'
+  ),
+  IC_74HC138: svg('0 0 120 55',
+    '<rect x="12" y="4" width="96" height="47" rx="4" fill="%23111827" stroke="%23374151" stroke-width="2"/>' +
+    '<circle cx="60" cy="4" r="3" fill="%23374151"/>' +
+    '<text x="60" y="30" font-size="11" fill="%234ade80" text-anchor="middle" font-family="Arial" font-weight="bold">74HC138 3-to-8</text>' +
+    '<path d="M7 8h8M7 14h8M7 20h8M7 26h8M7 32h8M7 38h8M7 44h8M7 50h8M105 8h8M105 14h8M105 20h8M105 26h8M105 32h8M105 38h8M105 44h8M105 50h8" stroke="%23cbd5e1" stroke-width="2.5"/>'
+  ),
+  IC_74HC151: svg('0 0 120 55',
+    '<rect x="12" y="4" width="96" height="47" rx="4" fill="%23111827" stroke="%23374151" stroke-width="2"/>' +
+    '<circle cx="60" cy="4" r="3" fill="%23374151"/>' +
+    '<text x="60" y="30" font-size="11" fill="%23facc15" text-anchor="middle" font-family="Arial" font-weight="bold">74HC151 MUX</text>' +
+    '<path d="M7 8h8M7 14h8M7 20h8M7 26h8M7 32h8M7 38h8M7 44h8M7 50h8M105 8h8M105 14h8M105 20h8M105 26h8M105 32h8M105 38h8M105 44h8M105 50h8" stroke="%23cbd5e1" stroke-width="2.5"/>'
+  ),
+  IC_CD4017: svg('0 0 120 55',
+    '<rect x="12" y="4" width="96" height="47" rx="4" fill="%23111827" stroke="%23374151" stroke-width="2"/>' +
+    '<circle cx="60" cy="4" r="3" fill="%23374151"/>' +
+    '<text x="60" y="30" font-size="11" fill="%23f472b6" text-anchor="middle" font-family="Arial" font-weight="bold">CD4017 Decade</text>' +
+    '<path d="M7 8h8M7 14h8M7 20h8M7 26h8M7 32h8M7 38h8M7 44h8M7 50h8M105 8h8M105 14h8M105 20h8M105 26h8M105 32h8M105 38h8M105 44h8M105 50h8" stroke="%23cbd5e1" stroke-width="2.5"/>'
   ),
 
   // ── Drone / ESC ──
@@ -556,6 +642,48 @@ export const componentSvgs: Record<string, string> = {
     '<circle cx="24" cy="64" r="3" fill="%23ef4444"/>' +
     '<circle cx="66" cy="64" r="3" fill="%23111827"/>'
   ),
+  BATTERY_9V: svg('0 0 70 80',
+    '<rect x="18" y="6" width="34" height="58" rx="6" fill="%23334155" stroke="%2394a3b8" stroke-width="2"/>' +
+    '<rect x="27" y="0" width="7" height="8" rx="2" fill="%23ef4444"/><rect x="36" y="0" width="7" height="8" rx="2" fill="%23111827"/>' +
+    '<text x="35" y="36" font-size="12" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">9V</text>' +
+    '<text x="35" y="52" font-size="7" fill="%23cbd5e1" text-anchor="middle" font-family="Arial">BATTERY</text>'
+  ),
+  BATTERY_AA: svg('0 0 50 80',
+    '<rect x="12" y="8" width="26" height="60" rx="10" fill="%23eab308" stroke="%23a16207" stroke-width="2"/>' +
+    '<rect x="20" y="2" width="10" height="8" rx="2" fill="%23ef4444"/>' +
+    '<text x="25" y="38" font-size="12" fill="%23111827" text-anchor="middle" font-family="Arial" font-weight="bold">AA</text>' +
+    '<text x="25" y="52" font-size="7" fill="%237c2d12" text-anchor="middle" font-family="Arial">1.5V</text>'
+  ),
+  DC_SOURCE_3V3: svg('0 0 80 60',
+    '<rect x="4" y="6" width="72" height="44" rx="5" fill="%230f766e" stroke="%232dd4bf" stroke-width="1.5"/>' +
+    '<text x="40" y="28" font-size="12" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">DC</text>' +
+    '<text x="40" y="42" font-size="9" fill="%23ccfbf1" text-anchor="middle" font-family="Arial">3.3V</text>'
+  ),
+  DC_SOURCE_5V: svg('0 0 80 60',
+    '<rect x="4" y="6" width="72" height="44" rx="5" fill="%230369a1" stroke="%2338bdf8" stroke-width="1.5"/>' +
+    '<text x="40" y="28" font-size="12" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">DC</text>' +
+    '<text x="40" y="42" font-size="9" fill="%23e0f2fe" text-anchor="middle" font-family="Arial">5V</text>'
+  ),
+  DC_SOURCE_12V: svg('0 0 80 60',
+    '<rect x="4" y="6" width="72" height="44" rx="5" fill="%237c2d12" stroke="%23fb923c" stroke-width="1.5"/>' +
+    '<text x="40" y="28" font-size="12" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">DC</text>' +
+    '<text x="40" y="42" font-size="9" fill="%23fed7aa" text-anchor="middle" font-family="Arial">12V</text>'
+  ),
+  POWER_SUPPLY: svg('0 0 90 60',
+    '<rect x="4" y="6" width="82" height="44" rx="5" fill="%23374151" stroke="%2394a3b8" stroke-width="1.5"/>' +
+    '<circle cx="24" cy="28" r="8" fill="%23111827" stroke="%2322c55e"/><text x="24" y="32" font-size="10" fill="%2322c55e" text-anchor="middle" font-family="Arial">+</text>' +
+    '<text x="57" y="28" font-size="10" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">DC SUPPLY</text>' +
+    '<text x="57" y="41" font-size="8" fill="%23cbd5e1" text-anchor="middle" font-family="Arial">CONFIGURABLE</text>'
+  ),
+  AC_FUNCTION_GENERATOR: svg('0 0 100 60',
+    '<rect x="4" y="6" width="92" height="44" rx="5" fill="%234c1d95" stroke="%23a78bfa" stroke-width="1.5"/>' +
+    '<path d="M12 29 Q18 16 24 29 T36 29 T48 29" stroke="%23fef08a" stroke-width="2" fill="none"/>' +
+    '<text x="72" y="28" font-size="10" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">AC GEN</text>' +
+    '<text x="72" y="41" font-size="7" fill="%23ddd6fe" text-anchor="middle" font-family="Arial">WAVEFORM</text>'
+  ),
+  GROUND: svg('0 0 40 30',
+    '<path d="M20 2v12M8 16h24M12 21h16M16 26h8" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round"/>'
+  ),
   OSCILLOSCOPE: svg('0 0 100 80',
     '<rect width="100" height="80" rx="6" fill="%23111827" stroke="%23334155" stroke-width="2"/>' +
     '<rect x="8" y="8" width="84" height="50" rx="3" fill="%230a0f1e" stroke="%23334155" stroke-width="1"/>' +
@@ -590,11 +718,23 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
   // Passives (match SVG viewBox)
   RESISTOR: { w: 90, h: 24 },
   CAPACITOR: { w: 44, h: 60 },
+  VARIABLE_CAPACITOR: { w: 44, h: 60 },
   CERAMIC_CAPACITOR: { w: 44, h: 60 },
   ELECTROLYTIC_CAPACITOR: { w: 46, h: 70 },
   DIODE: { w: 72, h: 28 },
+  INDUCTOR: { w: 90, h: 24 },
+  TRANSFORMER: { w: 100, h: 70 },
+  ZENER_DIODE: { w: 72, h: 28 },
+  SCHOTTKY_DIODE: { w: 72, h: 28 },
   NPN_TRANSISTOR: { w: 56, h: 70 },
   PNP_TRANSISTOR: { w: 56, h: 70 },
+  NMOS: { w: 56, h: 70 },
+  PMOS: { w: 56, h: 70 },
+  OPAMP_IDEAL: { w: 70, h: 70 },
+  OPAMP_LM358: { w: 70, h: 70 },
+  BRIDGE_RECTIFIER: { w: 70, h: 60 },
+  THERMISTOR: { w: 90, h: 24 },
+  THERMISTOR_NTC: { w: 90, h: 24 },
   POTENTIOMETER: { w: 50, h: 50 },
   MULTIMETER: { w: 90, h: 70 },
   IC_555_TIMER: { w: 90, h: 50 },
@@ -604,6 +744,14 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
   LED_STANDARD: { w: 40, h: 80 },
   LED_RGB: { w: 50, h: 80 },
   LED_NEOPIXEL: { w: 60, h: 20 },
+  BATTERY_9V: { w: 70, h: 80 },
+  BATTERY_AA: { w: 50, h: 80 },
+  DC_SOURCE_3V3: { w: 80, h: 60 },
+  DC_SOURCE_5V: { w: 80, h: 60 },
+  DC_SOURCE_12V: { w: 80, h: 60 },
+  POWER_SUPPLY: { w: 90, h: 60 },
+  AC_FUNCTION_GENERATOR: { w: 100, h: 60 },
+  GROUND: { w: 40, h: 30 },
 
   // Input
   PUSH_BUTTON: { w: 40, h: 40 },

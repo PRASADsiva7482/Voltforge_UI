@@ -118,6 +118,19 @@ const RESISTOR_PINS: PinPosition[] = [
   pin('p2', 'Pin 2', 90, 12, 'bidirectional'),
 ];
 
+const INDUCTOR_PINS: PinPosition[] = [
+  pin('p1', 'Pin 1', 0, 12, 'bidirectional'),
+  pin('p2', 'Pin 2', 90, 12, 'bidirectional'),
+];
+
+// TRANSFORMER: isolated primary and secondary winding terminals
+const TRANSFORMER_PINS: PinPosition[] = [
+  pin('primary1', 'P1', 0, 18, 'bidirectional'),
+  pin('primary2', 'P2', 0, 52, 'bidirectional'),
+  pin('secondary1', 'S1', 100, 18, 'bidirectional'),
+  pin('secondary2', 'S2', 100, 52, 'bidirectional'),
+];
+
 // CAPACITOR: SVG viewBox 40×50
 const CAPACITOR_PINS: PinPosition[] = [
   pin('pos', '+', 20, 0, 'bidirectional'),
@@ -314,6 +327,27 @@ const STEPPER_MOTOR_PINS: PinPosition[] = [
   pin('b2', 'B−', 55, 70, 'input'),
 ];
 
+const MOSFET_PINS: PinPosition[] = [
+  pin('gate', 'G', 0, 35, 'input'),
+  pin('drain', 'D', 28, 0, 'bidirectional'),
+  pin('source', 'S', 28, 70, 'bidirectional'),
+];
+
+const OPAMP_PINS: PinPosition[] = [
+  pin('in_plus', '+', 0, 20, 'input'),
+  pin('in_minus', '−', 0, 50, 'input'),
+  pin('out', 'OUT', 70, 35, 'output'),
+  pin('vcc', 'VCC', 35, 0, 'power'),
+  pin('gnd', 'GND', 35, 70, 'ground'),
+];
+
+const BRIDGE_RECTIFIER_PINS: PinPosition[] = [
+  pin('ac1', '~', 0, 15, 'bidirectional'),
+  pin('ac2', '~', 0, 45, 'bidirectional'),
+  pin('positive', '+', 70, 15, 'power'),
+  pin('negative', '−', 70, 45, 'ground'),
+];
+
 // IC_555: SVG viewBox 90×50, leads: left at x=8 (y=12,20,28,36), right at x=82 (y=12,20,28,36)
 const IC_555_PINS: PinPosition[] = [
   pin('gnd', 'GND', 8, 36, 'ground'),
@@ -326,7 +360,7 @@ const IC_555_PINS: PinPosition[] = [
   pin('vcc', 'VCC', 82, 36, 'power'),
 ];
 
-// IC_74HC595: SVG viewBox 120×50, leads: left at x=7 (y=11,17,23,29,35), right at x=113
+// IC_74HC595: SVG viewBox 120×50
 const IC_74HC595_PINS: PinPosition[] = [
   pin('qb', 'QB', 7, 11, 'output'),
   pin('qc', 'QC', 7, 17, 'output'),
@@ -344,7 +378,85 @@ const IC_74HC595_PINS: PinPosition[] = [
   pin('vcc', 'VCC', 7, 47, 'power'),
 ];
 
-// ── Additional missing component pins ──
+// IC_74HC165: 8-bit PISO Shift Register (DIP-16)
+const IC_74HC165_PINS: PinPosition[] = [
+  pin('pl', 'PL', 7, 8, 'input'),
+  pin('clk', 'CLK', 7, 14, 'input'),
+  pin('d4', 'D4', 7, 20, 'input'),
+  pin('d5', 'D5', 7, 26, 'input'),
+  pin('d6', 'D6', 7, 32, 'input'),
+  pin('d7', 'D7', 7, 38, 'input'),
+  pin('q7_bar', 'Q7_BAR', 7, 44, 'output'),
+  pin('gnd', 'GND', 7, 50, 'ground'),
+  pin('q7', 'Q7', 113, 8, 'output'),
+  pin('ser', 'SER', 113, 14, 'input'),
+  pin('d0', 'D0', 113, 20, 'input'),
+  pin('d1', 'D1', 113, 26, 'input'),
+  pin('d2', 'D2', 113, 32, 'input'),
+  pin('d3', 'D3', 113, 38, 'input'),
+  pin('ce', 'CE', 113, 44, 'input'),
+  pin('vcc', 'VCC', 113, 50, 'power'),
+];
+
+// IC_74HC138: 3-to-8 Line Decoder/Demux (DIP-16)
+const IC_74HC138_PINS: PinPosition[] = [
+  pin('a0', 'A0', 7, 8, 'input'),
+  pin('a1', 'A1', 7, 14, 'input'),
+  pin('a2', 'A2', 7, 20, 'input'),
+  pin('e1_bar', 'E1_BAR', 7, 26, 'input'),
+  pin('e2_bar', 'E2_BAR', 7, 32, 'input'),
+  pin('e3', 'E3', 7, 38, 'input'),
+  pin('y7', 'Y7', 7, 44, 'output'),
+  pin('gnd', 'GND', 7, 50, 'ground'),
+  pin('y6', 'Y6', 113, 8, 'output'),
+  pin('y5', 'Y5', 113, 14, 'output'),
+  pin('y4', 'Y4', 113, 20, 'output'),
+  pin('y3', 'Y3', 113, 26, 'output'),
+  pin('y2', 'Y2', 113, 32, 'output'),
+  pin('y1', 'Y1', 113, 38, 'output'),
+  pin('y0', 'Y0', 113, 44, 'output'),
+  pin('vcc', 'VCC', 113, 50, 'power'),
+];
+
+// IC_74HC151: 8-to-1 Multiplexer (DIP-16)
+const IC_74HC151_PINS: PinPosition[] = [
+  pin('d3', 'D3', 7, 8, 'input'),
+  pin('d2', 'D2', 7, 14, 'input'),
+  pin('d1', 'D1', 7, 20, 'input'),
+  pin('d0', 'D0', 7, 26, 'input'),
+  pin('y', 'Y', 7, 32, 'output'),
+  pin('w', 'W', 7, 38, 'output'),
+  pin('e_bar', 'E_BAR', 7, 44, 'input'),
+  pin('gnd', 'GND', 7, 50, 'ground'),
+  pin('c', 'C', 113, 8, 'input'),
+  pin('b', 'B', 113, 14, 'input'),
+  pin('a', 'A', 113, 20, 'input'),
+  pin('d7', 'D7', 113, 26, 'input'),
+  pin('d6', 'D6', 113, 32, 'input'),
+  pin('d5', 'D5', 113, 38, 'input'),
+  pin('d4', 'D4', 113, 44, 'input'),
+  pin('vcc', 'VCC', 113, 50, 'power'),
+];
+
+// IC_CD4017: Johnson Decade Counter (DIP-16)
+const IC_CD4017_PINS: PinPosition[] = [
+  pin('q5', 'Q5', 7, 8, 'output'),
+  pin('q1', 'Q1', 7, 14, 'output'),
+  pin('q0', 'Q0', 7, 20, 'output'),
+  pin('q2', 'Q2', 7, 26, 'output'),
+  pin('q6', 'Q6', 7, 32, 'output'),
+  pin('q7', 'Q7', 7, 38, 'output'),
+  pin('q3', 'Q3', 7, 44, 'output'),
+  pin('gnd', 'GND', 7, 50, 'ground'),
+  pin('q8', 'Q8', 113, 8, 'output'),
+  pin('q4', 'Q4', 113, 14, 'output'),
+  pin('q9', 'Q9', 113, 20, 'output'),
+  pin('co', 'CO', 113, 26, 'output'),
+  pin('clk_inh', 'CLK_INH', 113, 32, 'input'),
+  pin('clk', 'CLK', 113, 38, 'input'),
+  pin('reset', 'RESET', 113, 44, 'input'),
+  pin('vcc', 'VDD', 113, 50, 'power'),
+];
 
 // LED_NEOPIXEL: SVG viewBox 60×20
 const NEOPIXEL_PINS: PinPosition[] = [
@@ -491,11 +603,28 @@ const AMMETER_PINS: PinPosition[] = [
   pin('out', 'OUT (−)', 66, 70, 'output'),
 ];
 
-// OSCILLOSCOPE: SVG viewBox 100×80, 2 channels + GND
+// Standalone power sources and ground symbols
+const POWER_SOURCE_PINS: PinPosition[] = [
+  pin('positive', '+', 15, 60, 'power'),
+  pin('negative', '−', 45, 60, 'ground'),
+];
+
+const GROUND_PINS: PinPosition[] = [
+  pin('gnd', 'GND', 20, 24, 'ground'),
+];
+
+// OSCILLOSCOPE: up to eight digital channels + GND. CH1/CH2 retain the
+// original analog probe positions for backwards-compatible saved diagrams.
 const OSCILLOSCOPE_PINS: PinPosition[] = [
   pin('ch1', 'CH1', 20, 80, 'input'),
   pin('ch2', 'CH2', 50, 80, 'input'),
-  pin('gnd', 'GND', 80, 80, 'ground'),
+  pin('ch3', 'CH3', 20, 10, 'input'),
+  pin('ch4', 'CH4', 35, 10, 'input'),
+  pin('ch5', 'CH5', 50, 10, 'input'),
+  pin('ch6', 'CH6', 65, 10, 'input'),
+  pin('ch7', 'CH7', 80, 10, 'input'),
+  pin('ch8', 'CH8', 95, 10, 'input'),
+  pin('gnd', 'GND', 95, 80, 'ground'),
 ];
 
 // ── Registry ──
@@ -512,20 +641,51 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
   ESP32: ESP32_PINS,
   ESP32_S3: ESP32_PINS,
 
-  // Passives
+  // Passives & Discrete
   RESISTOR: RESISTOR_PINS,
+  INDUCTOR: INDUCTOR_PINS,
+  TRANSFORMER: TRANSFORMER_PINS,
   CAPACITOR: CAPACITOR_PINS,
+  VARIABLE_CAPACITOR: CAPACITOR_PINS,
   CERAMIC_CAPACITOR: CERAMIC_CAPACITOR_PINS,
   ELECTROLYTIC_CAPACITOR: ELECTROLYTIC_CAPACITOR_PINS,
   DIODE: DIODE_PINS,
+  ZENER_DIODE: DIODE_PINS,
+  SCHOTTKY_DIODE: DIODE_PINS,
   NPN_TRANSISTOR: NPN_TRANSISTOR_PINS,
   PNP_TRANSISTOR: PNP_TRANSISTOR_PINS,
+  NMOS: MOSFET_PINS,
+  PMOS: MOSFET_PINS,
+  OPAMP_IDEAL: OPAMP_PINS,
+  OPAMP_LM358: OPAMP_PINS,
+  BRIDGE_RECTIFIER: BRIDGE_RECTIFIER_PINS,
+  THERMISTOR: RESISTOR_PINS,
+  THERMISTOR_NTC: RESISTOR_PINS,
   MULTIMETER: MULTIMETER_PINS,
   IC_555_TIMER: IC_555_PINS,
+
+  // Digital Logic ICs (74xx / CD4000)
   IC_74HC595: IC_74HC595_PINS,
+  '74HC595': IC_74HC595_PINS,
+  IC_74HC165: IC_74HC165_PINS,
+  '74HC165': IC_74HC165_PINS,
+  IC_74HC138: IC_74HC138_PINS,
+  '74HC138': IC_74HC138_PINS,
+  IC_74HC151: IC_74HC151_PINS,
+  '74HC151': IC_74HC151_PINS,
+  IC_CD4017: IC_CD4017_PINS,
+  'CD4017': IC_CD4017_PINS,
 
   // Power
   VOLTAGE_REGULATOR_7805: VOLTAGE_REGULATOR_PINS,
+  BATTERY_9V: POWER_SOURCE_PINS,
+  BATTERY_AA: POWER_SOURCE_PINS,
+  POWER_SUPPLY: POWER_SOURCE_PINS,
+  DC_SOURCE_3V3: POWER_SOURCE_PINS,
+  DC_SOURCE_5V: POWER_SOURCE_PINS,
+  DC_SOURCE_12V: POWER_SOURCE_PINS,
+  AC_FUNCTION_GENERATOR: POWER_SOURCE_PINS,
+  GROUND: GROUND_PINS,
 
   // LEDs
   LED_STANDARD: LED_PINS,
@@ -538,7 +698,7 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
   SWITCH_SPST: SWITCH_SPST_PINS,
   POTENTIOMETER: POTENTIOMETER_PINS,
 
-  // Output
+  // Output / Actuators
   BUZZER: BUZZER_PINS,
   SERVO_MOTOR: SERVO_PINS,
   MOTOR_SERVO: SERVO_PINS,

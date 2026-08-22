@@ -7,6 +7,8 @@ import {
   Undo2,
   Redo2,
   Play,
+  Pause,
+  StepForward,
   Square,
   Code2,
   Layout,
@@ -26,6 +28,8 @@ import {
   GitFork,
   FileText,
   Trash2,
+  Wifi,
+  Layers,
 } from 'lucide-react'
 
 import { projectApi, simulationApi, projectExportApi } from '../../api/services'
@@ -43,17 +47,19 @@ import { SimulationEngine } from '../simulator/SimulationEngine'
 import { LogicRegistry } from '../simulator/logic/LogicRegistry'
 
 import CircuitCanvas from '../canvas/CircuitCanvas'
+import PcbCanvas from '../pcb/PcbCanvas'
 import ComponentPanel from './ComponentPanel'
 import PropertyEditor from './PropertyEditor'
 import SerialMonitor from './SerialMonitor'
 import CodeEditor from './CodeEditor'
 
-// Import missing migrated feature panels
+// Import feature panels
 import MultimeterPanel from './MultimeterPanel'
 import OscilloscopePanel from './OscilloscopePanel'
 import BomPanel from './BomPanel'
 import AiChatPanel from '../ai/AiChatPanel'
 import AiValidatorPanel from './AiValidatorPanel'
+import IotInspectorPanel from './IotInspectorPanel'
 import ProjectSettingsModal from './ProjectSettingsModal'
 
 import { ContextMenu } from '../../components/ui/ContextMenu'
@@ -61,7 +67,7 @@ import { Dropdown } from '../../components/ui/Dropdown'
 import { SplitPane } from '../../components/ui/SplitPane'
 import type { Project, CodeFile } from '../../types/domain'
 
-type ViewMode = 'canvas' | 'code' | 'split'
+type ViewMode = 'canvas' | 'code' | 'split' | 'pcb'
 
 function bundleCodeFiles(activeFile: CodeFile | null, files: CodeFile[]): string {
   if (!activeFile) return ''
@@ -119,6 +125,7 @@ export default function CircuitEditorPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('split')
   const [leftPanelOpen, setLeftPanelOpen] = useState(true)
   const [isSimulating, setIsSimulating] = useState(false)
+  const [isSimulationPaused, setIsSimulationPaused] = useState(false)
   const canvasContainerRef = useRef<HTMLDivElement>(null)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
   const engineRef = useRef<SimulationEngine | null>(null)
@@ -128,6 +135,7 @@ export default function CircuitEditorPage() {
   const [showBom, setShowBom] = useState(false)
   const [showAiChat, setShowAiChat] = useState(false)
   const [showAiValidator, setShowAiValidator] = useState(false)
+  const [showIotInspector, setShowIotInspector] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
 
   // Right-click context menu state
@@ -137,17 +145,16 @@ export default function CircuitEditorPage() {
     y: number
   }>({ isOpen: false, x: 0, y: 0 })
 
-  // Simulation store triggers
-  const {
-    writeSerial,
-    clearSerial,
-    setBaudRate,
-    setDebugSnapshot,
-    setSerialPanelOpen,
-    setSimulating,
-    oscilloscopePanelOpen,
-    setOscilloscopePanelOpen,
-  } = useSimulationStore()
+  // Simulation store triggers (individual atomic selectors to prevent 60fps re-render thrashing)
+  const writeSerial = useSimulationStore((s) => s.writeSerial)
+  const clearSerial = useSimulationStore((s) => s.clearSerial)
+  const setBaudRate = useSimulationStore((s) => s.setBaudRate)
+  const setDebugSnapshot = useSimulationStore((s) => s.setDebugSnapshot)
+  const setSerialPanelOpen = useSimulationStore((s) => s.setSerialPanelOpen)
+  const setSimulating = useSimulationStore((s) => s.setSimulating)
+  const toggleMeterProbe = useSimulationStore((s) => s.toggleMeterProbe)
+  const oscilloscopePanelOpen = useSimulationStore((s) => s.oscilloscopePanelOpen)
+  const setOscilloscopePanelOpen = useSimulationStore((s) => s.setOscilloscopePanelOpen)
   const { theme, toggleTheme } = useThemeStore()
   const updateNode = useCanvasStore((s) => s.updateNode)
 
@@ -159,7 +166,12 @@ export default function CircuitEditorPage() {
   )
 
   // Collaboration integration
-  const { isConnected: isLiveSyncConnected, broadcastCanvasSync, broadcastCursorMove: _broadcastCursorMove } =
+  const {
+    activeUsers,
+    isConnected: isLiveSyncConnected,
+    broadcastCanvasSync,
+    broadcastCursorMove,
+  } =
     useCollaboration(projectId || '')
 
   // ── Load project ──
@@ -208,7 +220,7 @@ export default function CircuitEditorPage() {
     if (isLiveSyncConnected) {
       broadcastCanvasSync(nodes, wires)
     }
-  }, [nodes, wires, isLiveSyncConnected])
+  }, [broadcastCanvasSync, nodes, wires, isLiveSyncConnected])
 
   // ── Save mutation ──
   const saveMutation = useMutation({
@@ -436,6 +448,7 @@ export default function CircuitEditorPage() {
   const toggleSimulation = async () => {
     if (!isSimulating) {
       setIsSimulating(true)
+      setIsSimulationPaused(false)
       setSimulating(true)
       clearSerial()
       setSerialPanelOpen(true)
@@ -453,28 +466,41 @@ export default function CircuitEditorPage() {
       }
 
       const bundledCode = bundleCodeFiles(activeCodeFile, currentProject?.codeFiles || [])
-      let compiledHex: string | undefined = undefined
+      const customHex = useSimulationStore.getState().customHex;
+      let compiledHex: string | undefined = customHex || undefined
 
-      try {
-        const compile = await simulationApi.compileFirmware({
-          source: bundledCode,
-          boardType: currentProject?.boardType,
-          sketchName: currentProject?.name || 'VoltForgeSketch',
-        })
-        const result = compile.data.data
-        compiledHex = result.success ? result.hex : undefined
-        writeSerial(
-          result.success
-            ? `> Firmware compiled by ${result.compiler} (${result.hex?.length || 0} HEX chars)`
-            : `> Firmware compile failed: ${result.stderr || result.diagnostics?.[0] || 'unknown compiler error'}`
-        )
-      } catch (err: any) {
-        writeSerial(`> Firmware compiler unavailable: ${err?.message || 'request failed'}`)
+      if (customHex) {
+        writeSerial(`> Running custom Intel HEX on AVR8js ATmega328P emulator (${customHex.length} chars)`);
+        useSimulationStore.getState().setExecutionMode('avr8js');
+      } else {
+        try {
+          const compile = await simulationApi.compileFirmware({
+            source: bundledCode,
+            boardType: currentProject?.boardType,
+            sketchName: currentProject?.name || 'VoltForgeSketch',
+          })
+          const result = compile.data.data
+          compiledHex = result.success ? result.hex : undefined
+          if (compiledHex) {
+            useSimulationStore.getState().setExecutionMode('avr8js');
+          } else {
+            useSimulationStore.getState().setExecutionMode('interpreter');
+          }
+          writeSerial(
+            result.success
+              ? `> Firmware compiled by ${result.compiler} (${result.hex?.length || 0} HEX chars)`
+              : `> Firmware compile failed: ${result.stderr || result.diagnostics?.[0] || 'unknown compiler error'}`
+          )
+        } catch (err: any) {
+          useSimulationStore.getState().setExecutionMode('interpreter');
+          writeSerial(`> Firmware compiler unavailable: ${err?.message || 'request failed'}`)
+        }
       }
 
       await engineRef.current?.start(bundledCode, nodes, wires, compiledHex)
     } else {
       setIsSimulating(false)
+      setIsSimulationPaused(false)
       setSimulating(false)
       engineRef.current?.stop()
       writeSerial('> Simulation stopped')
@@ -598,6 +624,13 @@ export default function CircuitEditorPage() {
             >
               <Code2 size={14} />
             </button>
+            <button
+              className={`vf-editor__view-btn ${viewMode === 'pcb' ? 'is-active' : ''}`}
+              onClick={() => setViewMode('pcb')}
+              title="2-Layer PCB Layout view"
+            >
+              <Layers size={14} />
+            </button>
           </div>
 
           <span className="vf-editor__divider" />
@@ -638,6 +671,13 @@ export default function CircuitEditorPage() {
           >
             <ShieldAlert size={15} />
           </button>
+          <button
+            className={`vf-editor__tool-btn ${showIotInspector ? 'is-active' : ''}`}
+            onClick={() => setShowIotInspector(!showIotInspector)}
+            title="IoT & Cloud Telemetry Inspector (WiFi / MQTT)"
+          >
+            <Wifi size={15} />
+          </button>
 
           <span className="vf-editor__divider" />
 
@@ -657,6 +697,33 @@ export default function CircuitEditorPage() {
             {isSimulating ? <Square size={14} /> : <Play size={14} />}
             {isSimulating ? 'Stop' : 'Simulate'}
           </button>
+          {isSimulating && (
+            <>
+              <button
+                className="vf-editor__tool-btn"
+                onClick={() => {
+                  if (isSimulationPaused) {
+                    engineRef.current?.resume()
+                    setIsSimulationPaused(false)
+                  } else {
+                    engineRef.current?.pause()
+                    setIsSimulationPaused(true)
+                  }
+                }}
+                title={isSimulationPaused ? 'Resume simulation' : 'Pause simulation'}
+              >
+                {isSimulationPaused ? <Play size={14} /> : <Pause size={14} />}
+              </button>
+              <button
+                className="vf-editor__tool-btn"
+                onClick={() => engineRef.current?.step()}
+                disabled={!isSimulationPaused}
+                title="Advance one simulation step"
+              >
+                <StepForward size={14} />
+              </button>
+            </>
+          )}
         </div>
 
         <div className="vf-editor__toolbar-right">
@@ -771,7 +838,11 @@ export default function CircuitEditorPage() {
                       width={canvasSize.width}
                       height={canvasSize.height}
                       isSimulating={isSimulating}
+                      isProbeMode={showMultimeter}
+                      onProbeToggle={toggleMeterProbe}
+                      collaborators={activeUsers}
                       onComponentInteraction={handleComponentInteraction}
+                      onCursorMove={broadcastCursorMove}
                       readOnly={!isOwner}
                     />
                   </div>
@@ -790,7 +861,11 @@ export default function CircuitEditorPage() {
                       width={canvasSize.width}
                       height={canvasSize.height}
                       isSimulating={isSimulating}
+                      isProbeMode={showMultimeter}
+                      onProbeToggle={toggleMeterProbe}
+                      collaborators={activeUsers}
                       onComponentInteraction={handleComponentInteraction}
+                      onCursorMove={broadcastCursorMove}
                       readOnly={!isOwner}
                     />
                   </div>
@@ -800,6 +875,15 @@ export default function CircuitEditorPage() {
                     <CodeEditor readOnly={!isOwner} />
                   </div>
                 )}
+                {viewMode === 'pcb' && (
+                  <div ref={canvasContainerRef} className="vf-editor__canvas-area">
+                    <PcbCanvas
+                      width={canvasSize.width}
+                      height={canvasSize.height}
+                      projectName={projectName}
+                    />
+                  </div>
+                )}
               </>
             )}
 
@@ -807,8 +891,6 @@ export default function CircuitEditorPage() {
             <MultimeterPanel
               isOpen={showMultimeter}
               onClose={() => setShowMultimeter(false)}
-              voltage={isSimulating ? 5 : 0}
-              current={isSimulating ? 20 : 0}
             />
             <BomPanel isOpen={showBom} onClose={() => setShowBom(false)} />
             <AiChatPanel
@@ -825,13 +907,25 @@ export default function CircuitEditorPage() {
               }}
             />
             <AiValidatorPanel isOpen={showAiValidator} onClose={() => setShowAiValidator(false)} />
+            <IotInspectorPanel isOpen={showIotInspector} onClose={() => setShowIotInspector(false)} />
             <PropertyEditor readOnly={!isOwner} />
           </div>
 
           {/* Serial monitor / Oscilloscope Trace splits */}
           <div className="vf-editor-bottom-pane">
             <SerialMonitor />
-            <OscilloscopePanel />
+            <OscilloscopePanel
+              simulationPaused={isSimulationPaused}
+              onPause={() => {
+                engineRef.current?.pause()
+                setIsSimulationPaused(true)
+              }}
+              onResume={() => {
+                engineRef.current?.resume()
+                setIsSimulationPaused(false)
+              }}
+              onStep={() => engineRef.current?.step()}
+            />
           </div>
         </div>
       </div>

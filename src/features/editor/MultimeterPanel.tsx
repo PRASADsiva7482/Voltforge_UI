@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { Gauge, Volume2, VolumeX, Disc, RefreshCw } from 'lucide-react'
+import { Gauge, Volume2, VolumeX } from 'lucide-react'
 import { FloatingPanel } from '../../components/ui/FloatingPanel'
-import { DigitalDisplay } from '../../components/ui/DigitalDisplay'
 import { Tabs } from '../../components/ui/Tabs'
+
+import { useSimulationStore } from '../../store/simulationStore'
 
 interface Props {
   current?: number
@@ -10,6 +11,7 @@ interface Props {
   onClose: () => void
   resistance?: number
   voltage?: number
+  acVoltage?: number
   redProbePin?: string
   blackProbePin?: string
 }
@@ -17,14 +19,22 @@ interface Props {
 type MeterMode = 'V_DC' | 'V_AC' | 'mA' | 'OHM' | 'CONT'
 
 export default function MultimeterPanel({
-  current = 0,
+  current: propCurrent,
   isOpen,
   onClose,
-  resistance = 0,
-  voltage = 0,
-  redProbePin = 'Probe (+)',
-  blackProbePin = 'Probe (-)',
+  resistance: propResistance,
+  voltage: propVoltage,
+  acVoltage: propAcVoltage,
+  redProbePin: propRedPin,
+  blackProbePin: propBlackPin,
 }: Props) {
+  const storeLiveMeter = useSimulationStore((s) => s.liveMeter)
+  const voltage = propVoltage !== undefined ? propVoltage : storeLiveMeter.voltage
+  const acVoltage = propAcVoltage !== undefined ? propAcVoltage : storeLiveMeter.acVoltage
+  const current = propCurrent !== undefined ? propCurrent : storeLiveMeter.current_mA
+  const resistance = propResistance !== undefined ? propResistance : storeLiveMeter.resistance_ohm
+  const redProbePin = propRedPin || storeLiveMeter.positiveLabel || 'Probe (+)'
+  const blackProbePin = propBlackPin || storeLiveMeter.negativeLabel || 'Probe (-)'
   const [mode, setMode] = useState<MeterMode>('V_DC')
   const [isHold, setIsHold] = useState(false)
   const [holdValue, setHoldValue] = useState<number | null>(null)
@@ -65,7 +75,7 @@ export default function MultimeterPanel({
     rawReading = voltage
     unit = 'V DC'
   } else if (mode === 'V_AC') {
-    rawReading = Math.abs(voltage * 0.707) // RMS approximation
+    rawReading = acVoltage
     unit = 'V AC'
   } else if (mode === 'mA') {
     rawReading = current

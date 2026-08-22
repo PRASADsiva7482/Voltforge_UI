@@ -85,16 +85,9 @@ export default function AiChatPanel({
   const { addNode, addWire, nodes, removeWire, selectedNodeId, selectedWireId, updateNode, viewport, wires } = useCanvasStore()
   const { currentProject, activeCodeFile, updateCodeFileContent } = useProjectStore()
   const addToast = useToastStore((s) => s.addToast)
-  const isSimulating = useSimulationStore((s) => s.isSimulating)
-  const serialLogs = useSimulationStore((s) => s.serialLogs)
-  const debugSnapshot = useSimulationStore((s) => s.debugSnapshot)
-  const nodeVoltages = useSimulationStore((s) => s.nodeVoltages)
-  const branchCurrents = useSimulationStore((s) => s.branchCurrents)
-  const componentPower = useSimulationStore((s) => s.componentPower)
-  const oscilloscopeData = useSimulationStore((s) => s.oscilloscopeData)
-  const solverConverged = useSimulationStore((s) => s.solverConverged)
 
   const buildPayload = useCallback(() => {
+    const simState = useSimulationStore.getState()
     const netlist = buildCircuitNetlist(nodes, wires)
     const components = nodes.map((n) => ({
       height: n.height,
@@ -126,21 +119,20 @@ export default function AiChatPanel({
     }
     const code = activeCodeFile?.content || currentProject?.codeFiles?.[0]?.content || ''
     const simulationState = {
-      isSimulating,
-      solverConverged,
-      pinStates: debugSnapshot.pins,
-      debugSnapshot,
-      nodeVoltages,
-      branchCurrents,
-      componentPower,
-      multimeter: { nodeVoltages, branchCurrents, componentPower },
+      isSimulating: simState.isSimulating,
+      solverConverged: simState.solverConverged,
+      pinStates: simState.debugSnapshot.pins,
+      debugSnapshot: simState.debugSnapshot,
+      nodeVoltages: simState.nodeVoltages,
+      branchCurrents: simState.branchCurrents,
+      componentPower: simState.componentPower,
       oscilloscope: Object.fromEntries(
-        Object.entries(oscilloscopeData).map(([nodeId, samples]) => [
+        Object.entries(simState.oscilloscopeData).map(([nodeId, samples]) => [
           nodeId,
           { latest: samples[samples.length - 1] ?? null, samples: samples.slice(-32) },
         ])
       ),
-      serialBuffer: serialLogs.slice(-10),
+      serialBuffer: simState.serialLogs.slice(-10),
     }
     const richContext = JSON.stringify({
       projectName: currentProject?.name || projectContext,
@@ -168,7 +160,7 @@ export default function AiChatPanel({
       context: richContext,
       history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })),
     }
-  }, [nodes, wires, activeCodeFile, currentProject, projectContext, selectedNodeId, selectedWireId, viewport, isSimulating, solverConverged, debugSnapshot, nodeVoltages, branchCurrents, componentPower, oscilloscopeData, serialLogs, messages])
+  }, [nodes, wires, activeCodeFile, currentProject, projectContext, selectedNodeId, selectedWireId, viewport, messages])
 
   const handleSendStream = useCallback(async (userMessage: string) => {
     const payload = buildPayload()

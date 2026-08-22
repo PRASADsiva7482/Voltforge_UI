@@ -20,6 +20,7 @@ import type {
   UpdateProjectRequest,
   User,
 } from '../types/domain'
+import type { DrcViolation, PcbFootprint, PcbTrace, PcbVia } from '../store/pcbStore'
 
 /** Base URL for direct fetch() calls (SSE streaming bypasses Axios). */
 function getStreamBaseURL(): string {
@@ -103,6 +104,32 @@ export const projectExportApi = {
   exportZip: (projectId: string) => api.get(`/projects/${projectId}/export`, { responseType: 'blob' }),
   getBom: (projectId: string) => api.get<ApiResponse<unknown[]>>(`/projects/${projectId}/bom`),
   getStats: (projectId: string) => api.get<ApiResponse<unknown>>(`/projects/${projectId}/stats`),
+}
+
+export type PcbManufacturingPayload = {
+  boardWidth_mm: number
+  boardHeight_mm: number
+  footprints: PcbFootprint[]
+  projectName?: string
+  traces: PcbTrace[]
+  vias: PcbVia[]
+  wires?: unknown[]
+}
+
+export type PcbDrcResponse = {
+  errors: number
+  passed: boolean
+  rulesChecked: string[]
+  totalViolations: number
+  violations: DrcViolation[]
+  warnings: number
+}
+
+export const pcbManufacturingApi = {
+  exportGerber: (data: PcbManufacturingPayload) =>
+    api.post('/ai/circuit/export-gerber', data, { responseType: 'blob' }),
+  runDrc: (data: PcbManufacturingPayload) =>
+    api.post<ApiResponse<PcbDrcResponse>>('/ai/circuit/drc-check', data),
 }
 
 export const simulationApi = {
