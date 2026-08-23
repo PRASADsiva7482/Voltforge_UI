@@ -4,7 +4,14 @@
 
 import type { PinState } from '../SimulationEngine';
 import { useCanvasStore } from '../../../store/canvasStore';
-import { AudioEngine } from './AudioEngine';
+import { SIMULATION_MODELS, numericProperty } from '../simulationModels';
+import {
+  ShiftRegister595Logic,
+  ShiftRegister165Logic,
+  Decoder138Logic,
+  Multiplexer151Logic,
+  DecadeCounter4017Logic,
+} from './DigitalLogicChips';
 
 export interface IComponentLogic {
   onPinStateChange(componentId: string, pinId: string, state: PinState, value?: number): void;
@@ -25,7 +32,7 @@ export class LedLogic implements IComponentLogic {
 
     // HIGH on anode means lit
     if (pinLabel.includes('anode') || pinLabel.includes('+') || pinLabel.includes('pos')) {
-      updateNode(componentId, { properties: { ...node.properties, isLit: state === 'HIGH' } });
+      updateNode(componentId, { properties: { ...node.properties, requestedOn: state === 'HIGH' } });
     }
   }
 }
@@ -59,8 +66,8 @@ export class RgbLedLogic implements IComponentLogic {
     const isLit = r > 0 || g > 0 || b > 0;
     const hexColor = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 
-    props.isLit = isLit;
-    props.ledColor = hexColor;
+    props.requestedColor = hexColor;
+    props.requestedOn = isLit;
     updateNode(componentId, { properties: props });
   }
 }
@@ -91,9 +98,9 @@ export class NeoPixelLogic implements IComponentLogic {
     updateNode(componentId, {
       properties: {
         ...node.properties,
-        isLit,
+        requestedOn: isLit,
+        requestedColor: hexColor,
         neoPixelBrightness: pwm,
-        ledColor: hexColor,
       },
     });
   }
@@ -111,7 +118,7 @@ export class MotorLogic implements IComponentLogic {
     const pin = node.pins?.find(p => p.id === pinId);
     const pinLabel = `${pinId} ${pin?.name || ''}`.toLowerCase();
     if (pinLabel.includes('pin') || pinLabel.includes('m+') || pinLabel.includes('signal')) {
-      updateNode(componentId, { properties: { ...node.properties, isSpinning: state === 'HIGH' } });
+      updateNode(componentId, { properties: { ...node.properties, requestedOn: state === 'HIGH' } });
     }
   }
 }
@@ -121,6 +128,7 @@ export class ServoLogic implements IComponentLogic {
     const { updateNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
+    if (node.properties?.powered !== true) return;
 
     const pin = node.pins?.find(p => p.id === pinId);
     const pinLabel = `${pinId} ${pin?.name || ''}`.toLowerCase();
@@ -162,7 +170,10 @@ export class StepperLogic implements IComponentLogic {
     // Accept any coil pin going HIGH as a step pulse
     if (state === 'HIGH' && isStepPin) {
       const currentSteps = Number(node.properties?.stepperSteps) || 0;
-      const stepsPerRev = 200; // Standard 1.8° stepper
+      const stepsPerRev = Math.max(
+        1,
+        Math.round(numericProperty(node.properties?.stepsPerRevolution, SIMULATION_MODELS.stepper.stepsPerRevolution)),
+      );
       const newSteps = currentSteps + 1;
       const rotation = ((newSteps % stepsPerRev) / stepsPerRev) * 360;
       updateNode(componentId, {
@@ -203,14 +214,9 @@ export class BuzzerLogic implements IComponentLogic {
     const pinLabel = pinId.toLowerCase();
     if (pinLabel.includes('pos') || pinLabel.includes('p1') || pinLabel.includes('+') || pinLabel === '1' || pinLabel.includes('sig') || pinLabel.includes('in')) {
       const isBeeping = state === 'HIGH' || state === 'PWM';
-      const freq = value && value > 0 ? value : 440;
+      const freq = value && value > 0 ? value : SIMULATION_MODELS.audio.buzzerFrequencyHz;
       updateNode(componentId, { properties: { ...node.properties, isBeeping, frequency: freq } });
 
-      if (isBeeping) {
-        AudioEngine.playTone(freq);
-      } else {
-        AudioEngine.stopTone();
-      }
     }
   }
 }
@@ -382,7 +388,11 @@ export class ESCLogic implements IComponentLogic {
     // In real ESC: 1000µs = 0%, 1500µs = 50%, 2000µs = 100%
     const pwm = state === 'PWM' ? Math.max(0, Math.min(255, value ?? 0)) : state === 'HIGH' ? 255 : 0;
     const throttlePercent = Math.round((pwm / 255) * 100);
-    const rpm = Math.round((pwm / 255) * 12000); // Max ~12000 RPM for a 2204 motor
+    const maximumRpm = Math.max(
+      0,
+      numericProperty(node.properties?.maximumRpm, SIMULATION_MODELS.bldc.maximumRpm),
+    );
+    const rpm = Math.round((pwm / 255) * maximumRpm);
 
     updateNode(componentId, {
       properties: {
@@ -689,6 +699,17 @@ export class LogicRegistry {
     'WIFI_MODULE': new PoweredModuleLogic(),
     'IR_RECEIVER': new PoweredModuleLogic(),
     'RC_RECEIVER': new PoweredModuleLogic(),
+    // Digital Logic ICs (74xx / CD4000)
+    'IC_74HC595': new ShiftRegister595Logic(),
+    '74HC595': new ShiftRegister595Logic(),
+    'IC_74HC165': new ShiftRegister165Logic(),
+    '74HC165': new ShiftRegister165Logic(),
+    'IC_74HC138': new Decoder138Logic(),
+    '74HC138': new Decoder138Logic(),
+    'IC_74HC151': new Multiplexer151Logic(),
+    '74HC151': new Multiplexer151Logic(),
+    'IC_CD4017': new DecadeCounter4017Logic(),
+    'CD4017': new DecadeCounter4017Logic(),
   };
 
   public static dispatch(componentType: string, componentId: string, pinId: string, state: PinState, value?: number) {

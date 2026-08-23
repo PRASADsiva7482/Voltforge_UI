@@ -261,13 +261,22 @@ export default function AiValidatorPanel({ isOpen, onClose }: Props) {
 
         {validationResult && !isValidating && (
           <div className="vf-validator-results">
-            <Callout
-              type={validationResult.isValid ? 'success' : 'error'}
-              title={validationResult.isValid ? 'Circuit looks safe!' : 'Circuit validation failed'}
-              className="vf-validator-callout"
-            >
-              {validationResult.generalFeedback}
-            </Callout>
+            {(() => {
+              const isCircuitValid = Boolean(
+                validationResult.isValid ??
+                (validationResult as Record<string, unknown>).valid ??
+                (validationResult.safetyScore >= 75 && !validationResult.issues?.some((i) => i.severity === 'CRITICAL'))
+              )
+              return (
+                <Callout
+                  type={isCircuitValid ? 'success' : 'error'}
+                  title={isCircuitValid ? 'Circuit looks safe!' : 'Circuit validation failed'}
+                  className="vf-validator-callout"
+                >
+                  {validationResult.generalFeedback}
+                </Callout>
+              )
+            })()}
 
             <div className="vf-validator__score">
               <span className="vf-validator__score-label">Safety Score</span>
@@ -275,6 +284,8 @@ export default function AiValidatorPanel({ isOpen, onClose }: Props) {
                 {validationResult.safetyScore}/100
               </span>
             </div>
+
+
 
             {typeof validationResult.confidence === 'number' && (
               <div className="vf-validator__confidence">

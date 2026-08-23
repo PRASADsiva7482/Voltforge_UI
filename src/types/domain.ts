@@ -62,6 +62,7 @@ export type ComponentCategory =
   | 'COMMUNICATION'
   | 'POWER'
   | 'INSTRUMENT'
+  | 'LOGIC'
 
 export type ApiResponse<T> = {
   data: T

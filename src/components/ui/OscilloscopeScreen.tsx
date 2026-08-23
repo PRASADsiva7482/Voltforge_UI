@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useMemo } from 'react'
 
 const GRID_COLS = 10
 const GRID_ROWS = 8
@@ -15,26 +15,28 @@ export interface OscilloscopeScreenProps {
   paused: boolean
   timePerDiv: number
   voltsPerDiv: number
+  samplePeriodMs: number
 }
 
 export function OscilloscopeScreen({
-  colors = {},
+  colors,
   data,
   paused,
   timePerDiv,
   voltsPerDiv,
+  samplePeriodMs,
 }: OscilloscopeScreenProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animFrameRef = useRef(0)
 
-  const c = {
+  const c = useMemo(() => ({
     background: '#0a0f1e',
     ch1: '#22c55e',
     ch2: '#38bdf8',
     grid: 'rgba(34,197,94,0.12)',
     gridMajor: 'rgba(34,197,94,0.25)',
-    ...colors,
-  }
+    ...(colors || {}),
+  }), [colors])
 
   const channelKeys = Object.keys(data)
 
@@ -92,9 +94,11 @@ export function OscilloscopeScreen({
         ctx.shadowColor = color
         ctx.shadowBlur = 4
 
-        const centerVoltage = 2.5
+        const visibleMinimum = Math.min(...samples)
+        const visibleMaximum = Math.max(...samples)
+        const centerVoltage = (visibleMinimum + visibleMaximum) / 2
         const totalVolts = voltsPerDiv * GRID_ROWS
-        const samplesPerDiv = Math.max(10, Math.floor(100 / timePerDiv))
+        const samplesPerDiv = Math.max(1, Math.ceil((timePerDiv * 1e-3) / Math.max(samplePeriodMs * 1e-3, Number.EPSILON)))
         const totalSamples = samplesPerDiv * GRID_COLS
         const startIdx = Math.max(0, samples.length - totalSamples)
         const visibleSamples = samples.slice(startIdx)
@@ -129,7 +133,7 @@ export function OscilloscopeScreen({
 
     draw()
     return () => cancelAnimationFrame(animFrameRef.current)
-  }, [data, voltsPerDiv, timePerDiv, paused, c, channelKeys])
+  }, [data, voltsPerDiv, timePerDiv, samplePeriodMs, paused, c, channelKeys])
 
   return <canvas ref={canvasRef} className="vf-oscilloscope-screen" />
 }

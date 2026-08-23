@@ -85,16 +85,9 @@ export default function AiChatPanel({
   const { addNode, addWire, nodes, removeWire, selectedNodeId, selectedWireId, updateNode, viewport, wires } = useCanvasStore()
   const { currentProject, activeCodeFile, updateCodeFileContent } = useProjectStore()
   const addToast = useToastStore((s) => s.addToast)
-  const isSimulating = useSimulationStore((s) => s.isSimulating)
-  const serialLogs = useSimulationStore((s) => s.serialLogs)
-  const debugSnapshot = useSimulationStore((s) => s.debugSnapshot)
-  const nodeVoltages = useSimulationStore((s) => s.nodeVoltages)
-  const branchCurrents = useSimulationStore((s) => s.branchCurrents)
-  const componentPower = useSimulationStore((s) => s.componentPower)
-  const oscilloscopeData = useSimulationStore((s) => s.oscilloscopeData)
-  const solverConverged = useSimulationStore((s) => s.solverConverged)
 
   const buildPayload = useCallback(() => {
+    const simState = useSimulationStore.getState()
     const netlist = buildCircuitNetlist(nodes, wires)
     const components = nodes.map((n) => ({
       height: n.height,
@@ -126,21 +119,20 @@ export default function AiChatPanel({
     }
     const code = activeCodeFile?.content || currentProject?.codeFiles?.[0]?.content || ''
     const simulationState = {
-      isSimulating,
-      solverConverged,
-      pinStates: debugSnapshot.pins,
-      debugSnapshot,
-      nodeVoltages,
-      branchCurrents,
-      componentPower,
-      multimeter: { nodeVoltages, branchCurrents, componentPower },
+      isSimulating: simState.isSimulating,
+      solverConverged: simState.solverConverged,
+      pinStates: simState.debugSnapshot.pins,
+      debugSnapshot: simState.debugSnapshot,
+      nodeVoltages: simState.nodeVoltages,
+      branchCurrents: simState.branchCurrents,
+      componentPower: simState.componentPower,
       oscilloscope: Object.fromEntries(
-        Object.entries(oscilloscopeData).map(([nodeId, samples]) => [
+        Object.entries(simState.oscilloscopeData).map(([nodeId, samples]) => [
           nodeId,
           { latest: samples[samples.length - 1] ?? null, samples: samples.slice(-32) },
         ])
       ),
-      serialBuffer: serialLogs.slice(-10),
+      serialBuffer: simState.serialLogs.slice(-10),
     }
     const richContext = JSON.stringify({
       projectName: currentProject?.name || projectContext,
@@ -168,7 +160,7 @@ export default function AiChatPanel({
       context: richContext,
       history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })),
     }
-  }, [nodes, wires, activeCodeFile, currentProject, projectContext, selectedNodeId, selectedWireId, viewport, isSimulating, solverConverged, debugSnapshot, nodeVoltages, branchCurrents, componentPower, oscilloscopeData, serialLogs, messages])
+  }, [nodes, wires, activeCodeFile, currentProject, projectContext, selectedNodeId, selectedWireId, viewport, messages])
 
   const handleSendStream = useCallback(async (userMessage: string) => {
     const payload = buildPayload()
@@ -197,57 +189,75 @@ export default function AiChatPanel({
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      let currentEventType = ''
 
       while (true) {
+
         const { done, value } = await reader.read()
         if (done) break
         if (controller.signal.aborted) break
 
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
-        buffer = lines.pop() || '' // Keep incomplete line in buffer
+        buffer = lines.pop() || '' // Retain only incomplete trailing chunk
 
         for (const line of lines) {
           let trimmed = line.trim()
           if (!trimmed) continue
 
-          while (trimmed.startsWith('data:')) {
-            trimmed = trimmed.replace(/^data:\s*/, '')
+          if (trimmed.startsWith('event:')) {
+            currentEventType = trimmed.replace(/^event:\s*/, '').trim()
+            continue
           }
-          if (!trimmed || trimmed === '[DONE]') continue
+
+          if (trimmed.startsWith('data:')) {
+            trimmed = trimmed.replace(/^data:\s*/, '').trim()
+          }
+
+          if (trimmed === '[DONE]') {
+            setIsStreaming(false)
+            continue
+          }
 
           try {
             const event = JSON.parse(trimmed)
-            const eventType = event.type
+            const eventType = currentEventType || event.type || ''
 
             if (eventType === 'thought') {
-              // Append to thinking section
-              setMessages((prev) => {
-                const updated = [...prev]
-                const last = updated[updated.length - 1]
-                if (last?.role === 'assistant') {
-                  updated[updated.length - 1] = {
-                    ...last,
-                    thought: (last.thought || '') + event.content + '\n',
+              const thoughtText = event.step || event.content || ''
+              if (thoughtText) {
+                setMessages((prev) => {
+                  const updated = [...prev]
+                  const last = updated[updated.length - 1]
+                  if (last?.role === 'assistant') {
+                    const existingThought = last.thought || ''
+                    if (!existingThought.includes(thoughtText)) {
+                      updated[updated.length - 1] = {
+                        ...last,
+                        thought: existingThought + thoughtText + '\n',
+                      }
+                    }
                   }
-                }
-                return updated
-              })
+                  return updated
+                })
+              }
             } else if (eventType === 'token') {
-              // Append to main response content
-              setMessages((prev) => {
-                const updated = [...prev]
-                const last = updated[updated.length - 1]
-                if (last?.role === 'assistant') {
-                  updated[updated.length - 1] = {
-                    ...last,
-                    content: (last.content || '') + event.content,
+              const tokenText = event.token || event.content || ''
+              if (tokenText) {
+                setMessages((prev) => {
+                  const updated = [...prev]
+                  const last = updated[updated.length - 1]
+                  if (last?.role === 'assistant') {
+                    updated[updated.length - 1] = {
+                      ...last,
+                      content: (last.content || '') + tokenText,
+                    }
                   }
-                }
-                return updated
-              })
-            } else if (eventType === 'done') {
-              // Finalize with metadata
+                  return updated
+                })
+              }
+            } else if (eventType === 'metadata' || eventType === 'done' || event.reply) {
+              setIsStreaming(false)
               setMessages((prev) => {
                 const updated = [...prev]
                 const last = updated[updated.length - 1]
@@ -255,24 +265,26 @@ export default function AiChatPanel({
                   updated[updated.length - 1] = {
                     ...last,
                     isStreaming: false,
-                    content: last.content || (event.error ? `Error: ${event.error}` : last.content),
-                    confidence: event.confidence,
-                    citations: event.citations,
-                    wireSuggestions: event.wireSuggestions,
-                    additions: event.additions,
-                    removals: event.removals,
-                    valueChanges: event.valueChanges,
-                    codeFixes: event.codeFixes,
+                    content: event.reply || last.content || (event.error ? `Error: ${event.error}` : last.content),
+                    confidence: typeof event.confidence === 'number' ? event.confidence : last.confidence,
+                    citations: event.citations || last.citations,
+                    wireSuggestions: event.wireSuggestions || last.wireSuggestions,
+                    additions: event.additions || last.additions,
+                    removals: event.removals || last.removals,
+                    valueChanges: event.valueChanges || last.valueChanges,
+                    codeFixes: event.codeFixes || last.codeFixes,
                   }
                 }
                 return updated
               })
             }
-          } catch (jsonErr) {
-            console.debug('Failed to parse SSE JSON chunk:', trimmed, jsonErr)
+          } catch {
+            // Non-JSON line or partial chunk — ignore
           }
         }
       }
+
+
     } catch (err) {
       if (!controller.signal.aborted) {
         console.error('Stream error:', err)
@@ -440,6 +452,150 @@ export default function AiChatPanel({
     addToast('AI code fix applied.', 'success')
   }
 
+  // Inline Markdown parser (bold, italic, code, links)
+  const renderInline = (text: string): React.ReactNode[] => {
+    if (!text) return []
+    const tokens = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/g)
+    return tokens.map((token, idx) => {
+      if (token.startsWith('`') && token.endsWith('`') && token.length > 2) {
+        return <code key={idx} className="vf-ai-inline-code">{token.slice(1, -1)}</code>
+      }
+      if (token.startsWith('**') && token.endsWith('**') && token.length > 4) {
+        return <strong key={idx} className="vf-ai-bold">{token.slice(2, -2)}</strong>
+      }
+      if (token.startsWith('*') && token.endsWith('*') && token.length > 2) {
+        return <em key={idx} className="vf-ai-italic">{token.slice(1, -1)}</em>
+      }
+      const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
+      if (linkMatch) {
+        return (
+          <a key={idx} href={linkMatch[2]} target="_blank" rel="noreferrer" className="vf-ai-link">
+            {linkMatch[1]}
+          </a>
+        )
+      }
+      return token
+    })
+  }
+
+  // Block-level Markdown parser (headers, bullet lists, numbered lists, tables, paragraphs)
+  const renderMarkdownBlock = (blockText: string, blockKey: string | number) => {
+    const lines = blockText.split('\n')
+    const elements: React.ReactNode[] = []
+    let i = 0
+
+    while (i < lines.length) {
+      const line = lines[i]
+      const trimmed = line.trim()
+
+      if (!trimmed) {
+        i++
+        continue
+      }
+
+      // 1. Table Detection
+      if (trimmed.startsWith('|') && trimmed.endsWith('|') && lines[i + 1]?.trim().startsWith('|')) {
+        const tableLines: string[] = []
+        while (i < lines.length && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
+          tableLines.push(lines[i].trim())
+          i++
+        }
+        if (tableLines.length >= 2) {
+          const headerCells = tableLines[0].split('|').slice(1, -1).map(c => c.trim())
+          const rowLines = tableLines.slice(tableLines[1]?.includes('---') ? 2 : 1)
+          elements.push(
+            <div key={`tbl-${blockKey}-${i}`} className="vf-ai-table-wrap">
+              <table className="vf-ai-table">
+                <thead>
+                  <tr>
+                    {headerCells.map((h, hi) => (
+                      <th key={hi}>{renderInline(h)}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rowLines.map((row, ri) => {
+                    const cells = row.split('|').slice(1, -1).map(c => c.trim())
+                    return (
+                      <tr key={ri}>
+                        {cells.map((cell, ci) => (
+                          <td key={ci}>{renderInline(cell)}</td>
+                        ))}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+          continue
+        }
+      }
+
+      // 2. Headers
+      const headerMatch = trimmed.match(/^(#{1,4})\s+(.*)$/)
+      if (headerMatch) {
+        const level = headerMatch[1].length
+        const text = headerMatch[2]
+        elements.push(
+          <div key={`h-${blockKey}-${i}`} className={`vf-ai-h vf-ai-h${level}`}>
+            {renderInline(text)}
+          </div>
+        )
+        i++
+        continue
+      }
+
+      // 3. Unordered Lists (- or * or •)
+      if (/^[-*•]\s+/.test(trimmed)) {
+        const listItems: string[] = []
+        while (i < lines.length && /^[-*•]\s+/.test(lines[i].trim())) {
+          listItems.push(lines[i].trim().replace(/^[-*•]\s+/, ''))
+          i++
+        }
+        elements.push(
+          <ul key={`ul-${blockKey}-${i}`} className="vf-ai-ul">
+            {listItems.map((item, liIdx) => (
+              <li key={liIdx} className="vf-ai-li">
+                {renderInline(item)}
+              </li>
+            ))}
+          </ul>
+        )
+        continue
+      }
+
+      // 4. Ordered Lists (1. 2. etc)
+      if (/^\d+\.\s+/.test(trimmed)) {
+        const listItems: string[] = []
+        while (i < lines.length && /^\d+\.\s+/.test(lines[i].trim())) {
+          listItems.push(lines[i].trim().replace(/^\d+\.\s+/, ''))
+          i++
+        }
+        elements.push(
+          <ol key={`ol-${blockKey}-${i}`} className="vf-ai-ol">
+            {listItems.map((item, liIdx) => (
+              <li key={liIdx} className="vf-ai-li">
+                {renderInline(item)}
+              </li>
+            ))}
+          </ol>
+        )
+        continue
+      }
+
+      // 5. Standard Paragraph
+      elements.push(
+        <p key={`p-${blockKey}-${i}`} className="vf-ai-p">
+          {renderInline(trimmed)}
+        </p>
+      )
+      i++
+    }
+
+    return elements
+  }
+
   // Extract code blocks from message and render
   const renderMessageContent = (content: string) => {
     const parts = content.split(/(```[\s\S]*?```)/g)
@@ -463,9 +619,14 @@ export default function AiChatPanel({
           </div>
         )
       }
-      return <span key={i} className="vf-ai-chat__text-segment">{part}</span>
+      return (
+        <div key={i} className="vf-ai-chat__markdown-block">
+          {renderMarkdownBlock(part, i)}
+        </div>
+      )
     })
   }
+
 
   const renderMessageActions = (msg: Message) => {
     if (msg.role !== 'assistant' || msg.isStreaming) return null

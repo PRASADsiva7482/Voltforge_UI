@@ -1,7 +1,9 @@
 import { lazy, Suspense, useEffect, useRef, useState, useMemo } from 'react';
 import { useProjectStore } from '../../store/projectStore';
 import { useCanvasStore } from '../../store/canvasStore';
-import { Loader2, Maximize2, Minimize2, AlignLeft, Eye, EyeOff } from 'lucide-react';
+import { useSimulationStore } from '../../store/simulationStore';
+import { useToastStore } from '../../store/useToastStore';
+import { Loader2, Maximize2, Minimize2, AlignLeft, Eye, EyeOff, Cpu, Upload, X } from 'lucide-react';
 import type { OnMount } from '@monaco-editor/react';
 import { getBoardProfile } from '../canvas/boardCatalog';
 
@@ -93,7 +95,7 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
   const fullCode = useMemo(() => {
     if (!activeCodeFile || !showFullCode) return null;
     return generateFullCode(activeCodeFile.content, boardType);
-  }, [activeCodeFile?.content, showFullCode, boardType]);
+  }, [activeCodeFile, showFullCode, boardType]);
 
   const displayedContent = showFullCode && fullCode ? fullCode : activeCodeFile?.content || '';
 
@@ -114,27 +116,110 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
   const ext = activeCodeFile?.filename.split('.').pop() || 'cpp';
   const lang = languageMap[ext] || activeCodeFile?.language || 'cpp';
 
+  const customHex = useSimulationStore((s) => s.customHex);
+  const setCustomHex = useSimulationStore((s) => s.setCustomHex);
+  const addToast = useToastStore((s) => s.addToast);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleHexUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content && content.includes(':')) {
+        setCustomHex(content);
+        addToast(`Loaded Intel HEX (${file.name}, ${content.length} chars) into AVR8js engine`, 'success');
+      } else {
+        addToast('Invalid Intel HEX file format (must start with :)', 'error');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   return (
     <div className={`vf-code-editor ${isFullscreen ? 'is-fullscreen' : ''}`}>
-      {/* Tabs / Toolbar bar */}
-      <div className="vf-code-editor__tabs">
-        <div className="vf-code-editor__tabs-list">
-          {codeFiles.map(file => (
+      {/* Hidden file input for .hex loading */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept=".hex"
+        style={{ display: 'none' }}
+        onChange={handleHexUpload}
+      />
+
+      {/* Editor Header */}
+      <div className="vf-code-editor__header">
+        <div className="vf-code-editor__tabs">
+          {codeFiles.map((file) => (
             <button
               key={file.id}
-              className={`vf-code-editor__tab ${activeCodeFile?.id === file.id ? 'is-active' : ''}`}
+              className={`vf-code-editor__tab ${file.id === activeCodeFile?.id ? 'is-active' : ''}`}
               onClick={() => {
                 setActiveCodeFile(file);
                 setShowFullCode(false);
               }}
             >
-              {file.filename}
+              <span>{file.filename}</span>
             </button>
           ))}
         </div>
 
         {activeCodeFile && (
           <div className="vf-code-editor__actions">
+            {/* Custom HEX / AVR8js Execution Mode Badge */}
+            {customHex ? (
+              <div
+                className="vf-code-editor__action-btn"
+                style={{
+                  backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                  borderColor: '#38bdf8',
+                  color: '#38bdf8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                }}
+                title="Custom Intel HEX firmware loaded into AVR8js emulator"
+              >
+                <Cpu size={12} />
+                <span>AVR8js: Custom HEX</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCustomHex(null);
+                    addToast('Cleared custom HEX, using source compiler/interpreter', 'info');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    color: '#94a3b8',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                  title="Clear custom HEX"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ) : (
+              <button
+                className="vf-code-editor__action-btn"
+                onClick={() => fileInputRef.current?.click()}
+                title="Upload compiled Intel HEX file to run directly on AVR8js ATmega328P emulator"
+                style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                <Upload size={12} />
+                <span>Load .hex</span>
+              </button>
+            )}
+
             <span className="vf-code-editor__lang-badge">{lang}</span>
 
             {/* Format code button */}

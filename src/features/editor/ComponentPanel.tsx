@@ -1,48 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Cpu, Zap, Thermometer, Monitor, Power, Settings2, Search, Radio, BatteryCharging, Plus, ChevronDown, ChevronRight, Gauge } from 'lucide-react';
+import { Cpu, Zap, Thermometer, Monitor, Power, Settings2, Search, Radio, BatteryCharging, Plus, ChevronDown, ChevronRight, Gauge, Binary } from 'lucide-react';
 import { componentApi } from '../../api/services';
 import { useCanvasStore } from '../../store/canvasStore';
-import { BOARD_CATALOG } from '../canvas/boardCatalog';
-import { componentDimensions } from '../canvas/componentSvgs';
-import { getPinsForComponent } from '../canvas/pinRegistry';
-import type { ElectronicComponent, CanvasNode } from '../../types/domain';
+import { createCanvasNodeFromComponent } from '../canvas/componentFactory';
+import { mergeComponentLibrary } from '../canvas/componentCatalog';
+import type { ElectronicComponent } from '../../types/domain';
 import CustomComponentStudio from '../components/CustomComponentStudio';
 
 const categoryIcons: Record<string, React.FC<{ size?: number }>> = {
-  BOARD: Cpu, LED: Zap, SENSOR: Thermometer, DISPLAY: Monitor,
+  BOARD: Cpu, LOGIC: Binary, LED: Zap, SENSOR: Thermometer, DISPLAY: Monitor,
   RELAY: Power, MOTOR: Settings2, PASSIVE: Settings2,
   COMMUNICATION: Radio, POWER: BatteryCharging, INSTRUMENT: Gauge,
 };
 
-const categoryOrder = ['BOARD', 'PASSIVE', 'LED', 'SENSOR', 'DISPLAY', 'MOTOR', 'RELAY', 'COMMUNICATION', 'POWER', 'INSTRUMENT'];
-
-const catalogBoardComponents: ElectronicComponent[] = BOARD_CATALOG.map((board) => ({
-  category: 'BOARD',
-  createdAt: '',
-  defaultProperties: {
-    clockSpeed: board.clock,
-    compilerSupport: board.compiler,
-    family: board.family,
-    features: board.features,
-    logicVoltage: board.logicVoltage,
-  },
-  description: `${board.family} board with ${board.features.join(', ')}.`,
-  id: `catalog_${board.type}`,
-  isPremium: false,
-  name: board.name,
-  pinConfig: { footprint: board.footprint, pinProfile: board.type },
-  sortOrder: board.sortOrder,
-  type: board.type,
-  updatedAt: '',
-}));
-
-function mergeComponentLibrary(apiComponents: ElectronicComponent[] = []) {
-  const byType = new Map<string, ElectronicComponent>();
-  catalogBoardComponents.forEach((component) => byType.set(component.type, component));
-  apiComponents.forEach((component) => byType.set(component.type, component));
-  return Array.from(byType.values());
-}
+const categoryOrder = ['BOARD', 'PASSIVE', 'LOGIC', 'LED', 'SENSOR', 'DISPLAY', 'MOTOR', 'RELAY', 'COMMUNICATION', 'POWER', 'INSTRUMENT'];
 
 export default function ComponentPanel({ readOnly }: { readOnly?: boolean }) {
   const { setComponentLibrary } = useCanvasStore();
@@ -81,29 +53,11 @@ export default function ComponentPanel({ readOnly }: { readOnly?: boolean }) {
 
   const addToCanvas = (component: ElectronicComponent) => {
     if (readOnly) return;
-    const dim = componentDimensions[component.type] || {
-      w: Number(component.defaultProperties?.width || 120),
-      h: Number(component.defaultProperties?.height || 90),
-    };
-
-    const pins = getPinsForComponent(component.type, component.pinConfig as Record<string, unknown>, dim.w, dim.h);
-
     const { viewport } = useCanvasStore.getState();
     const spawnX = (300 - viewport.x) / viewport.scale;
     const spawnY = (250 - viewport.y) / viewport.scale;
 
-    const node: CanvasNode = {
-      id: `node_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      componentId: component.id,
-      type: component.type,
-      name: component.name,
-      x: spawnX,
-      y: spawnY,
-      width: dim.w, height: dim.h,
-      rotation: 0,
-      properties: { ...(component.defaultProperties || {}), svgData: component.svgData },
-      pins,
-    };
+    const node = createCanvasNodeFromComponent(component, { x: spawnX, y: spawnY });
     useCanvasStore.getState().addNode(node);
   };
 

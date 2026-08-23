@@ -200,6 +200,8 @@ class LcdTWIEventHandler {
  */
 export class SimulationEngine {
   private isRunning = false;
+  private isPaused = false;
+  private simulationSpeed = 1;
   private isBatching = false;
   private accumulatedUpdates: Map<string, Record<string, any>> = new Map();
   private originalUpdateNode: any = null;
@@ -248,6 +250,9 @@ export class SimulationEngine {
   private mnaCircuit: MNACircuit | null = null;
   private mcuPinVoltages: Record<string, number> = {};  // pin number → voltage
   private storeUnsubscribe: (() => void) | null = null;
+  private lastResultTime = 0;
+  private pendingResult: WorkerResultMessage | null = null;
+  private resultRafId: number | null = null;
   private localSerialBuffer = '';
   private sensorAutoIntervalId: number | null = null;
   private sensorStartTime = 0;
@@ -1361,7 +1366,7 @@ export class SimulationEngine {
                   clearInterval(checkInterval);
                   resolve();
                 }
-              }, 5);
+              }, 25);
             });
           }
           continue;
@@ -2342,11 +2347,30 @@ export class SimulationEngine {
         { type: 'module' }
       );
 
-      // Handle messages from the worker
+      // Handle messages from the worker — throttle RESULT to ~15fps to avoid
+      // starving the main-thread event loop with Zustand dispatches + React
+      // reconciliation on every 16ms solver tick.
       this.solverWorker.onmessage = (event: MessageEvent) => {
         const msg = event.data;
         if (msg.type === 'RESULT') {
-          this.handleSolverResult(msg as WorkerResultMessage, nodes);
+          this.pendingResult = msg as WorkerResultMessage;
+          const now = performance.now();
+          if (now - this.lastResultTime >= 66) {
+            // Enough time has passed — process immediately
+            this.lastResultTime = now;
+            this.handleSolverResult(this.pendingResult!, nodes);
+            this.pendingResult = null;
+          } else if (!this.resultRafId) {
+            // Schedule deferred processing on the next animation frame
+            this.resultRafId = requestAnimationFrame(() => {
+              this.resultRafId = null;
+              if (this.pendingResult) {
+                this.lastResultTime = performance.now();
+                this.handleSolverResult(this.pendingResult!, nodes);
+                this.pendingResult = null;
+              }
+            });
+          }
         } else if (msg.type === 'OSCILLOSCOPE') {
           this.handleOscilloscopeData(msg as WorkerOscilloscopeMessage);
         }
@@ -2386,10 +2410,47 @@ export class SimulationEngine {
     }
     this.mnaCircuit = null;
     this.mcuPinVoltages = {};
+    this.pendingResult = null;
+    if (this.resultRafId) {
+      cancelAnimationFrame(this.resultRafId);
+      this.resultRafId = null;
+    }
 
     // Clear solver state in store
-    useSimulationStore.getState().setCircuitState({}, {}, {}, true);
+    useSimulationStore.getState().setCircuitState({}, {}, {}, {}, true);
     useSimulationStore.getState().clearOscilloscopeData();
+  }
+
+  /** Pause all simulation-time work while retaining the solved circuit state. */
+  public pause() {
+    if (!this.isRunning || this.isPaused) return;
+    this.isPaused = true;
+    AudioEngine.stopTone();
+    this.solverWorker?.postMessage({ type: 'PAUSE' } as WorkerInMessage);
+    this.emitDebugSnapshot(true);
+  }
+
+  /** Resume the simulation from its current transient state. */
+  public resume() {
+    if (!this.isRunning || !this.isPaused) return;
+    this.isPaused = false;
+    this.solverWorker?.postMessage({ type: 'RESUME' } as WorkerInMessage);
+    this.emitDebugSnapshot(false);
+  }
+
+  /** Advance exactly one MNA transient step while paused. */
+  public step() {
+    if (!this.isRunning || !this.isPaused) return;
+    this.solverWorker?.postMessage({ type: 'STEP' } as WorkerInMessage);
+  }
+
+  /** Set simulation playback speed without changing the physical time step. */
+  public setSpeed(nextSpeed: number) {
+    this.simulationSpeed = Math.max(0.05, Math.min(20, Number.isFinite(nextSpeed) ? nextSpeed : 1));
+    this.solverWorker?.postMessage({
+      type: 'SET_SPEED',
+      speed: this.simulationSpeed,
+    } as WorkerInMessage);
   }
 
   /**
@@ -2480,6 +2541,50 @@ export class SimulationEngine {
     return Math.abs(vccVolt - gndVolt) > 3.0;
   }
 
+  private solvedWireCurrents(
+    result: WorkerResultMessage,
+    nodes: CanvasNode[],
+    wires: Wire[],
+    circuit: MNACircuit,
+  ): Record<string, number> {
+    const terminalCurrents = new Map<string, number>();
+    const nodesById = new Map(nodes.map((node) => [node.id, node]));
+
+    const addTerminalCurrent = (componentId: string, mnaNode: number, current: number) => {
+      if (!Number.isFinite(current) || Math.abs(current) < Number.EPSILON) return;
+      const component = nodesById.get(componentId);
+      if (!component) return;
+      for (const pin of component.pins || []) {
+        const pinNode = circuit.pinToMNANode.get(`${componentId}:${pin.id}`);
+        if (pinNode !== mnaNode) continue;
+        const key = `${componentId}:${pin.id}`;
+        terminalCurrents.set(key, (terminalCurrents.get(key) || 0) + Math.abs(current));
+      }
+    };
+
+    for (const element of circuit.elements) {
+      const componentId = circuit.elementToComponent.get(element.id);
+      if (!componentId) continue;
+      const current = result.branchCurrents[element.id];
+      if (current === undefined) continue;
+      addTerminalCurrent(componentId, element.nodeA, current);
+      addTerminalCurrent(componentId, element.nodeB, current);
+    }
+
+    const wireCurrents: Record<string, number> = {};
+    for (const wire of wires) {
+      const endpointCurrents = [
+        terminalCurrents.get(`${wire.fromNodeId}:${wire.fromPinId}`) || 0,
+        terminalCurrents.get(`${wire.toNodeId}:${wire.toPinId}`) || 0,
+      ].filter((current) => current > 1e-9);
+
+      wireCurrents[wire.id] = endpointCurrents.length > 1
+        ? Math.min(...endpointCurrents)
+        : endpointCurrents[0] || 0;
+    }
+    return wireCurrents;
+  }
+
   private handleSolverResult(result: WorkerResultMessage, _nodes: CanvasNode[]) {
     if (!this.mnaCircuit) return;
     const circuit = this.mnaCircuit;
@@ -2489,7 +2594,6 @@ export class SimulationEngine {
     const nodes = useCanvasStore.getState().nodes;
 
     // Build component-level voltage and current maps
-    const componentVoltages: Record<string, number> = {};
     const componentCurrents: Record<string, number> = {};
     const componentPower: Record<string, number> = {};
 
@@ -2523,8 +2627,10 @@ export class SimulationEngine {
     (globalThis as any).__voltforgePinVoltages = pinVoltages;
 
     // Update store with solver state
+    const wireCurrents = this.solvedWireCurrents(result, nodes, useCanvasStore.getState().wires, circuit);
     useSimulationStore.getState().setCircuitState(
       nodeVoltageMap,
+      wireCurrents,
       componentCurrents,
       componentPower,
       result.converged

@@ -12,6 +12,8 @@ import { LandingPage } from './features/landing/LandingPage'
 import { NewProjectPage } from './features/projects/NewProjectPage'
 import { ProjectsPage } from './features/projects/ProjectsPage'
 import { SettingsPage } from './features/settings/SettingsPage'
+import { LabExplorerPage } from './features/labs/LabExplorerPage'
+import { LabChallengeRunner } from './features/labs/LabChallengeRunner'
 import { useThemeStore } from './store/themeStore'
 import { ToastContainer } from './components/layout/ToastContainer'
 import './App.css'
@@ -56,11 +58,13 @@ function App() {
                 <Route element={<ProjectsPage />} path="/projects" />
                 <Route element={<NewProjectPage />} path="/projects/new" />
                 <Route element={<ExplorePage />} path="/explore" />
+                <Route element={<LabExplorerPage />} path="/labs" />
                 <Route element={<SettingsPage />} path="/settings" />
                 <Route element={<AdminPage />} path="/admin" />
               </Route>
-              {/* Editor is full-screen (no sidebar) */}
+              {/* Full-screen editors */}
               <Route element={<CircuitEditorPage />} path="/editor/:projectId" />
+              <Route element={<LabChallengeRunner />} path="/labs/:labId" />
             </Route>
 
             <Route element={<Navigate replace to="/" />} path="*" />

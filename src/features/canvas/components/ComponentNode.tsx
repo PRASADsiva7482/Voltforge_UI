@@ -4,9 +4,11 @@ import Konva from 'konva';
 
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { useCanvasStore } from '../../../store/canvasStore';
+import { useSimulationStore } from '../../../store/simulationStore';
 import { getPinAbsPos, snapToRoutingGuides } from '../../../utils/wireRouting';
 import { componentSvgs } from '../componentSvgs';
 import { isBoardComponentType } from '../boardCatalog';
+import { SIMULATION_MODELS } from '../../simulator/simulationModels';
 import PinDot from './PinDot';
 import type { CanvasNode } from '../canvasTypes';
 
@@ -346,6 +348,7 @@ interface ComponentNodeProps {
   startWiring: (nodeId: string, pinId: string) => void;
   finishWiring: (nodeId: string, pinId: string) => void;
   onInteraction?: (nodeId: string, event: 'press' | 'release') => void;
+  onProbeToggle?: (target: { nodeId: string; pinId: string; x: number; y: number }) => void;
   readOnly?: boolean;
   isProbeMode?: boolean;
   isSimulating?: boolean;
@@ -364,6 +367,7 @@ const ComponentNode = ({
   startWiring,
   finishWiring,
   onInteraction,
+  onProbeToggle,
   readOnly,
   isProbeMode,
   isSimulating,
@@ -386,6 +390,8 @@ const ComponentNode = ({
   const prevPressedRef = useRef(false);
   const prevClosedRef = useRef<boolean | undefined>(undefined);
   const prevRelayActiveRef = useRef(false);
+  const thermalHeatmapEnabled = useSimulationStore((state) => state.thermalHeatmapEnabled);
+  const livePowerWatts = useSimulationStore((state) => state.thermalHeatmapEnabled ? (state.componentPower[node.id] ?? 0) : 0);
 
   const handleDialMouseDown = (e: KonvaEventObject<MouseEvent>) => {
     if (readOnly) return;
@@ -496,6 +502,25 @@ const ComponentNode = ({
   };
 
   let svgData = (node.properties?.svgData as string | undefined) || componentSvgs[node.type];
+  const isBlown = Boolean(node.properties?.isBlown);
+  const ratedPowerWatts = Number(node.properties?.maxPowerWatts ?? node.properties?.maxPower)
+    || (node.type === 'RESISTOR' ? SIMULATION_MODELS.thermal.defaultResistorPower_W : 0);
+  const thermalRatio = ratedPowerWatts > 0 ? Math.max(0, livePowerWatts / ratedPowerWatts) : 0;
+  const thermalColor = thermalRatio >= SIMULATION_MODELS.thermal.criticalRatio
+    ? '#ef4444'
+    : thermalRatio >= SIMULATION_MODELS.thermal.dangerRatio
+      ? '#f97316'
+      : thermalRatio >= SIMULATION_MODELS.thermal.warningRatio
+        ? '#eab308'
+        : '#22c55e';
+  const isActive =
+    Boolean(isSimulating) &&
+    !isBlown &&
+    (node.properties?.isLit ||
+      node.properties?.isSpinning ||
+      node.properties?.isBeeping ||
+      node.properties?.isActive);
+  const ledIsOn = Boolean(isSimulating) && !isBlown && Boolean(node.properties?.isLit);
 
   // ── Memoize LED color resolution ──
   const ledColor = useMemo(() => {
@@ -516,19 +541,21 @@ const ComponentNode = ({
     if (!svgData || !node.type.includes('LED')) return svgData;
     const rawColor = ledColor.replace('#', '');
     const encodedColor = `%23${rawColor}`;
-    return svgData.replace(/%23ef4444/gi, encodedColor).replace(/%23991b1b/gi, '%23334155');
-  }, [svgData, node.type, ledColor]);
+    const recolored = svgData
+      .replace(/%23ef4444/gi, ledIsOn ? encodedColor : '%23334155')
+      .replace(/%23991b1b/gi, '%23334155');
+
+    // Component artwork is reused in both states. Dim the emissive colors when
+    // the solved LED branch is off so the image cannot imply power by itself.
+    if (ledIsOn) return recolored;
+    return recolored
+      .replace(/%2322c55e/gi, '%23334155')
+      .replace(/%233b82f6/gi, '%23334155')
+      .replace(/stop-color="white"/gi, 'stop-color="%23475569"');
+  }, [svgData, node.type, ledColor, ledIsOn]);
 
   const image = useImage(processedSvgData || '');
 
-  const isBlown = Boolean(node.properties?.isBlown);
-  const isActive =
-    Boolean(isSimulating) &&
-    !isBlown &&
-    (node.properties?.isLit ||
-      node.properties?.isSpinning ||
-      node.properties?.isBeeping ||
-      node.properties?.isActive);
   const isButton = node.type === 'PUSH_BUTTON' || node.type === 'BUTTON';
   const isSwitch = node.type === 'SWITCH_SPST';
   const isBoard = isBoardComponentType(node.type);
@@ -551,11 +578,12 @@ const ComponentNode = ({
     if (!isActive) return;
     let animId: number;
     let angle = 0;
+    const directionSign = node.properties?.direction === 'reverse' ? -1 : 1;
     const tickAnim = () => {
       let needsDraw = false;
       if (isDcMotor && dcMotorShaftRef.current) {
-        const rpm = Number(node.properties?.rpm) || 3000;
-        const delta = (rpm / 60) * 360 * (16.7 / 1000);
+        const rpm = Number(node.properties?.rpm) || 0;
+        const delta = directionSign * (rpm / 60) * 360 * (16.7 / 1000);
         angle = (angle + delta) % 360;
         dcMotorShaftRef.current.rotation(angle);
         needsDraw = true;
@@ -574,7 +602,7 @@ const ComponentNode = ({
     };
     animId = requestAnimationFrame(tickAnim);
     return () => cancelAnimationFrame(animId);
-  }, [isActive, isDcMotor, node.type, node.properties?.rpm, node.properties?.bldcRpm]);
+  }, [isActive, isDcMotor, node.type, node.properties?.rpm, node.properties?.bldcRpm, node.properties?.direction]);
 
   // ── Board TX/RX blink simulation (ref-based, no React state) ──
   useEffect(() => {
@@ -743,6 +771,21 @@ const ComponentNode = ({
             fill="rgba(34,197,94,0.15)"
             shadowColor={ACTIVE_GLOW_COLOR}
             shadowBlur={ACTIVE_GLOW_SHADOW_BLUR}
+            listening={false}
+          />
+        )}
+
+        {thermalHeatmapEnabled && isSimulating && ratedPowerWatts > 0 && livePowerWatts > 0 && (
+          <Rect
+            x={-4}
+            y={-4}
+            width={node.width + 8}
+            height={node.height + 8}
+            cornerRadius={8}
+            fill={thermalColor}
+            opacity={Math.min(0.42, 0.08 + thermalRatio * 0.28)}
+            shadowColor={thermalColor}
+            shadowBlur={Math.min(24, 6 + thermalRatio * 16)}
             listening={false}
           />
         )}
@@ -987,7 +1030,9 @@ const ComponentNode = ({
             const hasText = line1.trim() || line2.trim();
             // Check if board is powered
             const boardNode = useCanvasStore.getState().nodes.find(n => isBoardComponentType(n.type));
-            const isBoardPwr = boardNode ? Boolean(boardNode.properties?.boardPowered) : false;
+            const isBoardPwr = node.properties?.powered !== undefined
+              ? Boolean(node.properties.powered)
+              : boardNode ? Boolean(boardNode.properties?.boardPowered) : false;
             const backlight = isBoardPwr && node.properties?.lcdBacklight !== false;
             const displayActive = isBoardPwr && (backlight || hasText);
             const screen = node.type === 'DISPLAY_LCD_I2C' ? LCD_I2C_SCREEN : LCD_16X2_SCREEN;
@@ -1049,7 +1094,9 @@ const ComponentNode = ({
             const hasText = line1.trim() || line2.trim();
             // Check if board is powered — OLED is self-emissive, always shows text when powered
             const boardNode = useCanvasStore.getState().nodes.find(n => isBoardComponentType(n.type));
-            const isBoardPwr = boardNode ? Boolean(boardNode.properties?.boardPowered) : false;
+            const isBoardPwr = node.properties?.powered !== undefined
+              ? Boolean(node.properties.powered)
+              : boardNode ? Boolean(boardNode.properties?.boardPowered) : false;
             const oledActive = isBoardPwr;
             const fontSize = Math.max(7, Math.min(9, OLED_SCREEN.width / 12));
             const lineH = OLED_SCREEN.height / 2;
@@ -1174,7 +1221,7 @@ const ComponentNode = ({
                     <Circle
                       x={node.width / 2} y={MOTOR_BELL_CENTER_Y} radius={MOTOR_SPIN_GLOW_RADIUS}
                       fill="transparent" stroke={ACTIVE_GLOW_COLOR} strokeWidth={1.5}
-                      opacity={Math.min(0.6, rpm / 12000)}
+                      opacity={Math.min(0.6, rpm / SIMULATION_MODELS.bldc.maximumRpm)}
                       shadowColor={ACTIVE_GLOW_COLOR} shadowBlur={12} shadowOpacity={0.4} listening={false}
                     />
                     <Circle
@@ -1228,7 +1275,6 @@ const ComponentNode = ({
 
         {/* DC Motor — animated rotating propeller */}
         {isDcMotor && (() => {
-          const tick = Number(node.properties?.motorTick) || 0;
           const isSpinning = isActive;
           return (
             <>
@@ -1248,7 +1294,7 @@ const ComponentNode = ({
                   />
                 </>
               )}
-              <Group ref={dcMotorShaftRef} x={30} y={25} rotation={tick} listening={false}>
+              <Group ref={dcMotorShaftRef} x={30} y={25} listening={false}>
                 {/* Blade 1 */}
                 <Group rotation={0}>
                   <Rect x={-4} y={-25} width={8} height={25} cornerRadius={3} fill="#ef4444" opacity={isActive ? 1 : 0.4} />
@@ -2318,6 +2364,7 @@ const ComponentNode = ({
             startWiring={startWiring}
             finishWiring={finishWiring}
             isProbeMode={isProbeMode}
+            onProbeToggle={onProbeToggle}
           />
         ))}
 

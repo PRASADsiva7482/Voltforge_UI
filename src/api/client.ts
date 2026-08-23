@@ -6,20 +6,13 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
 }
 
 const getBaseURL = () => {
-  if (import.meta.env.VITE_API_BASE_URL) {
-    return import.meta.env.VITE_API_BASE_URL;
+  let url = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:2001/voltForge-app/api/v1' : '/voltForge-app/api/v1');
+  if (!url.endsWith('/api/v1')) {
+    url = url.replace(/\/+$/, '') + '/api/v1';
   }
-  // Target Spring Boot backend directly on port 2001 in development
-  if (import.meta.env.DEV) {
-    return 'http://localhost:2001/voltForge-app/api/v1';
-  }
-  // In production, fallback to context path
-  const pathParts = window.location.pathname.split('/');
-  if (pathParts[1] && pathParts[1].toLowerCase().includes('voltforge')) {
-    return `/${pathParts[1]}/api/v1`;
-  }
-  return '/voltForge-app/api/v1';
+  return url;
 };
+
 
 const api = axios.create({
   baseURL: getBaseURL(),

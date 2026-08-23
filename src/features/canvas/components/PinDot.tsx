@@ -28,6 +28,7 @@ interface PinDotProps {
   startWiring: (nodeId: string, pinId: string) => void;
   finishWiring: (nodeId: string, pinId: string) => void;
   isProbeMode?: boolean;
+  onProbeToggle?: (target: { nodeId: string; pinId: string; x: number; y: number }) => void;
 }
 
 function resolvePinColors(type: PinPosition['type']) {
@@ -103,6 +104,7 @@ const PinDot = memo(function PinDot({
   startWiring,
   finishWiring,
   isProbeMode,
+  onProbeToggle,
 }: PinDotProps) {
   const [hovered, setHovered] = useState(false);
   const isValidTarget = isWiring && wiringFromNodeId !== nodeId;
@@ -174,6 +176,10 @@ const PinDot = memo(function PinDot({
         hitStrokeWidth={PIN_HIT_STROKE_WIDTH}
         onClick={(e: KonvaEventObject<MouseEvent>) => {
           e.cancelBubble = true;
+          if (isProbeMode) {
+            onProbeToggle?.({ nodeId, pinId: pin.id, x: pin.x, y: pin.y });
+            return;
+          }
           if (isWiring) {
             if (wiringFromNodeId === nodeId) return;
             finishWiring(nodeId, pin.id);

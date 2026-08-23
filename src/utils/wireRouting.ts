@@ -93,10 +93,6 @@ export function getPinAbsPos(node: CanvasNode, pinId: string): Point | null {
 }
 
 export function routeWireBetweenNodes(wire: Wire, nodes: CanvasNode[]): WireBendPoint[] {
-  if (wire.routingMode === 'auto') {
-    return [];
-  }
-
   const from = nodes.find((node) => node.id === wire.fromNodeId);
   const to = nodes.find((node) => node.id === wire.toNodeId);
   if (!from || !to) return wire.bendPoints || [];
@@ -114,6 +110,7 @@ export function rerouteAutoWires(nodes: CanvasNode[], wires: Wire[]): Wire[] {
     return { ...wire, bendPoints: routeWireBetweenNodes(wire, nodes) };
   });
 }
+
 
 export function snapToRoutingGuides(point: Point, anchors: Point[], threshold = 6): Point {
   let x = point.x;
@@ -558,4 +555,55 @@ export function distToSegment(
   t = Math.max(0, Math.min(1, t));
   return Math.hypot(px - (p1.x + t * dx), py - (p1.y + t * dy));
 }
+
+/**
+ * Auto-assigns wire color based on electrical net type and pin role.
+ */
+export function getWireAutoColor(fromPinName: string = '', toPinName: string = ''): string {
+  const combined = `${fromPinName} ${toPinName}`.toLowerCase();
+  if (combined.includes('vcc') || combined.includes('5v') || combined.includes('3v3') || combined.includes('3.3v') || combined.includes('vin') || combined.includes('power')) {
+    return '#ef4444'; // Red
+  }
+  if (combined.includes('gnd') || combined.includes('ground') || combined.includes('0v')) {
+    return '#111827'; // Black
+  }
+  if (combined.includes('sda') || combined.includes('data') || combined.includes('mosi') || combined.includes('rx') || combined.includes('in')) {
+    return '#3b82f6'; // Blue
+  }
+  if (combined.includes('scl') || combined.includes('clock') || combined.includes('sck') || combined.includes('tx') || combined.includes('clk')) {
+    return '#eab308'; // Yellow
+  }
+  if (combined.includes('pwm') || combined.includes('out') || combined.includes('analog') || combined.includes('a0') || combined.includes('a1')) {
+    return '#10b981'; // Green
+  }
+  return '#22c55e'; // Default Voltforge emerald
+}
+
+/**
+ * Detects magnetic pin snapping target within radius.
+ */
+export function findNearestMagneticPin(
+  nodes: CanvasNode[],
+  mousePos: Point,
+  maxRadius: number = 14
+): { node: CanvasNode; pinId: string; pos: Point } | null {
+  let closest: { node: CanvasNode; pinId: string; pos: Point } | null = null;
+  let minDist = maxRadius;
+
+  for (const node of nodes) {
+    if (!node.pins) continue;
+    for (const pin of node.pins) {
+      const pinPos = getPinAbsPos(node, pin.id);
+      if (!pinPos) continue;
+      const dist = Math.hypot(mousePos.x - pinPos.x, mousePos.y - pinPos.y);
+      if (dist < minDist) {
+        minDist = dist;
+        closest = { node, pinId: pin.id, pos: pinPos };
+      }
+    }
+  }
+
+  return closest;
+}
+
 

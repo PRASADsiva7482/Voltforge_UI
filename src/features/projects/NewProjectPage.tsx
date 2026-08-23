@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { ArrowLeft, CircuitBoard, Lock, Unlock } from 'lucide-react'
+import { ArrowLeft, Lock, Unlock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { projectApi } from '../../api/services'

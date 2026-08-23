@@ -1,0 +1,210 @@
+[
+  {
+    "id": "lab-voltage-divider",
+    "title": "Design a 3.3V Voltage Divider",
+    "category": "Basics & Analog",
+    "difficulty": "Beginner",
+    "estimatedMinutes": 10,
+    "description": "Convert a 5.0V source down to exactly 3.3V (+/-5%) using a two-resistor divider network to safely power 3.3V logic.",
+    "theoryExplanation": "Using the voltage divider formula Vout = Vin * (R2 / (R1 + R2)), when Vin = 5.0V, selecting R1 = 1.8kOhm and R2 = 3.3kOhm yields Vout = 5.0 * (3.3 / 5.1) = 3.235V, well within the 3.3V logic threshold.",
+    "objectives": [
+      {
+        "id": "obj-vout",
+        "description": "Measure an output voltage between 3.15V and 3.45V at the midpoint node.",
+        "targetVoltage": 3.3,
+        "voltageTolerance": 0.15
+      },
+      {
+        "id": "obj-current",
+        "description": "Keep total quiescent current below 10 mA.",
+        "maxCurrent_mA": 10
+      }
+    ],
+    "hints": [
+      "Remember the divider formula: Vout = Vin * (R2 / (R1 + R2)).",
+      "Try standard resistor values: R1 = 1.8kOhm (or 1.7kOhm) and R2 = 3.3kOhm.",
+      "Connect a Multimeter in voltage mode across R2 and start the simulation."
+    ],
+    "initialCircuit": {
+      "nodes": [
+        {
+          "id": "src_1",
+          "type": "VOLTAGE_REGULATOR_7805",
+          "name": "5V Supply",
+          "x": 80,
+          "y": 140,
+          "properties": { "voltage": 5.0 }
+        },
+        {
+          "id": "r1",
+          "type": "RESISTOR",
+          "name": "R1",
+          "x": 220,
+          "y": 120,
+          "properties": { "resistance": 1000 }
+        },
+        {
+          "id": "r2",
+          "type": "RESISTOR",
+          "name": "R2",
+          "x": 220,
+          "y": 240,
+          "properties": { "resistance": 1000 }
+        }
+      ],
+      "wires": []
+    }
+  },
+  {
+    "id": "lab-led-resistor-sizing",
+    "title": "Current-Limiting Resistor for LED",
+    "category": "Basics & Analog",
+    "difficulty": "Beginner",
+    "estimatedMinutes": 8,
+    "description": "Calculate and insert the correct series resistor to safely drive a red LED from a 5V supply at 15-20mA without burning out the diode.",
+    "theoryExplanation": "With forward voltage Vf approx 2.0V and target current If = 20mA (0.02A), Ohm's Law gives R = (Vin - Vf) / If = (5.0 - 2.0) / 0.02 = 150Ohm to 220Ohm.",
+    "objectives": [
+      {
+        "id": "obj-led-lit",
+        "description": "The LED is successfully powered and illuminated.",
+        "requireLedLit": true
+      },
+      {
+        "id": "obj-led-current",
+        "description": "Branch current through LED is between 12mA and 25mA.",
+        "targetCurrent_mA": 18,
+        "currentTolerance_mA": 6
+      }
+    ],
+    "hints": [
+      "Use Ohm's Law: R = (Vsupply - Vled) / Iled.",
+      "For a standard red LED: Vf approx 2.0V, so resistor drops 3.0V.",
+      "A 150Ohm to 220Ohm resistor will provide the ideal 15-20mA current."
+    ],
+    "initialCircuit": {
+      "nodes": [
+        {
+          "id": "uno_1",
+          "type": "ARDUINO_UNO",
+          "name": "Arduino Uno",
+          "x": 80,
+          "y": 100,
+          "properties": {}
+        },
+        {
+          "id": "led_1",
+          "type": "LED_STANDARD",
+          "name": "Red LED",
+          "x": 340,
+          "y": 140,
+          "properties": { "ledColor": "red" }
+        },
+        {
+          "id": "res_1",
+          "type": "RESISTOR",
+          "name": "R_limit",
+          "x": 240,
+          "y": 140,
+          "properties": { "resistance": 10 }
+        }
+      ],
+      "wires": []
+    }
+  },
+  {
+    "id": "lab-74hc595-shift-register",
+    "title": "8-Bit Serial Expander with 74HC595",
+    "category": "Digital Logic",
+    "difficulty": "Intermediate",
+    "estimatedMinutes": 15,
+    "description": "Drive a 74HC595 shift register using SER (Data), SRCLK (Shift Clock), and RCLK (Latch Clock) to light up an 8-bit binary pattern.",
+    "theoryExplanation": "The 74HC595 contains an internal 8-bit shift register and an 8-bit storage register. Pulsing SRCLK shifts data bit-by-bit; pulsing RCLK latches all 8 bits simultaneously onto parallel outputs QA-QH.",
+    "objectives": [
+      {
+        "id": "obj-shift-active",
+        "description": "74HC595 output register contains non-zero shifted data.",
+        "requireShiftData": true
+      },
+      {
+        "id": "obj-leds-driven",
+        "description": "At least 3 LEDs connected to parallel outputs are actively lit.",
+        "minLedsLit": 3
+      }
+    ],
+    "hints": [
+      "Connect Arduino D2 to SER (Data), D3 to SRCLK (Shift Clock), and D4 to RCLK (Latch).",
+      "Use `shiftOut(dataPin, clockPin, MSBFIRST, 0b10101010);` in Arduino code.",
+      "Toggle the latch pin LOW before shiftOut and HIGH after to latch outputs."
+    ],
+    "initialCircuit": {
+      "nodes": [
+        {
+          "id": "mcu_1",
+          "type": "ARDUINO_UNO",
+          "name": "Arduino Uno",
+          "x": 60,
+          "y": 80,
+          "properties": {}
+        },
+        {
+          "id": "sr_1",
+          "type": "IC_74HC595",
+          "name": "74HC595",
+          "x": 300,
+          "y": 120,
+          "properties": {}
+        }
+      ],
+      "wires": []
+    }
+  },
+  {
+    "id": "lab-555-astable-oscillator",
+    "title": "1 kHz Square Wave Generator (NE555)",
+    "category": "Timers & Oscillators",
+    "difficulty": "Advanced",
+    "estimatedMinutes": 20,
+    "description": "Configure an NE555 timer in astable multivibrator mode to generate a continuous 1.0 kHz (+/-10%) square wave output.",
+    "theoryExplanation": "In astable mode, oscillation frequency f = 1.44 / ((R1 + 2*R2) * C1). Selecting C1 = 100nF (0.1uF), R1 = 1kOhm, R2 = 6.8kOhm produces f approx 1.44 / ((1000 + 13600) * 1e-7) approx 986 Hz, close to 1 kHz.",
+    "objectives": [
+      {
+        "id": "obj-freq",
+        "description": "Oscilloscope detects oscillating output frequency of 1000 Hz +/- 100 Hz.",
+        "targetFrequency_hz": 1000,
+        "frequencyTolerance_hz": 100
+      },
+      {
+        "id": "obj-duty-cycle",
+        "description": "Duty cycle is between 50% and 75%.",
+        "minDuty": 0.50,
+        "maxDuty": 0.75
+      }
+    ],
+    "hints": [
+      "Wire Pin 2 (TRIG) to Pin 6 (THRESH).",
+      "Connect R1 between VCC and Pin 7 (DISCH), and R2 between Pin 7 and Pin 6/2.",
+      "Connect timing capacitor C1 between Pin 6/2 and GND."
+    ],
+    "initialCircuit": {
+      "nodes": [
+        {
+          "id": "timer_1",
+          "type": "IC_555_TIMER",
+          "name": "NE555",
+          "x": 200,
+          "y": 120,
+          "properties": {}
+        },
+        {
+          "id": "cap_1",
+          "type": "CAPACITOR",
+          "name": "C1 (100nF)",
+          "x": 340,
+          "y": 140,
+          "properties": { "capacitance": 0.0000001 }
+        }
+      ],
+      "wires": []
+    }
+  }
+]
