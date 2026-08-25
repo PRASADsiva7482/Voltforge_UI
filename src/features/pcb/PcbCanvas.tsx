@@ -13,6 +13,7 @@ import { TraceRouter } from './TraceRouter';
 interface Props {
   height: number;
   projectName?: string;
+  readOnly?: boolean;
   width: number;
 }
 
@@ -20,7 +21,7 @@ const BOARD_OFFSET_PX = 40;
 const SCALE_MM_TO_PX = 4;
 const TRACE_WIDTH_OPTIONS = [6, 8, 10, 12, 24];
 
-export default function PcbCanvas({ width, height, projectName }: Props) {
+export default function PcbCanvas({ width, height, projectName, readOnly = false }: Props) {
   const {
     activeLayer,
     activeRoute,
@@ -34,6 +35,7 @@ export default function PcbCanvas({ width, height, projectName }: Props) {
     traces,
     vias,
     visibleLayers,
+    viewport,
     addVia,
     cancelRouting,
     finishRouting,
@@ -43,6 +45,8 @@ export default function PcbCanvas({ width, height, projectName }: Props) {
     setFootprints,
     setRatlines,
     setTraceWidth,
+    setViewport,
+    toggleLayerVisibility,
     startRouting,
     updateActiveRoute,
     updateFootprintPosition,
@@ -69,6 +73,10 @@ export default function PcbCanvas({ width, height, projectName }: Props) {
         height: 1.4,
         shape: 'rect' as const,
         drillDiameter: 0.8,
+        netId: wires.find((wire) =>
+          (wire.fromNodeId === node.id && wire.fromPinId === pin.id) ||
+          (wire.toNodeId === node.id && wire.toPinId === pin.id)
+        )?.id,
       }));
 
       return {
@@ -77,7 +85,7 @@ export default function PcbCanvas({ width, height, projectName }: Props) {
         componentType: node.type,
         height: 10,
         name: node.name,
-        packageType: 'DIP',
+        packageType: String(node.properties?.footprint || (node.pins.length > 20 ? 'QFP' : 'DIP')),
         pads,
         rotation: 0,
         width: Math.max(12, pads.length * 2.54 + 4),
@@ -87,7 +95,7 @@ export default function PcbCanvas({ width, height, projectName }: Props) {
     });
 
     setFootprints(generated);
-  }, [footprints.length, nodes, setFootprints]);
+  }, [footprints.length, nodes, setFootprints, wires]);
 
   useEffect(() => {
     if (footprints.length === 0) return;
@@ -108,12 +116,29 @@ export default function PcbCanvas({ width, height, projectName }: Props) {
   };
 
   const addCenteredVia = () => {
+    if (readOnly) return;
     addVia({
       id: `via_${Date.now()}`,
       x: boardWidth_mm / 2,
       y: boardHeight_mm / 2,
       drill_mm: 0.3,
       pad_mm: 0.6,
+    });
+  };
+
+  const handleWheel = (e: KonvaEventObject<WheelEvent>) => {
+    e.evt.preventDefault();
+    const stage = stageRef.current;
+    if (!stage) return;
+    const pointer = stage.getPointerPosition();
+    const oldScale = viewport.scale;
+    const direction = e.evt.deltaY > 0 ? -1 : 1;
+    const nextScale = Math.max(0.5, Math.min(2.5, direction > 0 ? oldScale * 1.1 : oldScale / 1.1));
+    const local = stage.getRelativePointerPosition() || { x: 0, y: 0 };
+    setViewport({
+      scale: nextScale,
+      x: (pointer?.x || 0) - local.x * nextScale,
+      y: (pointer?.y || 0) - local.y * nextScale,
     });
   };
 
@@ -126,6 +151,7 @@ export default function PcbCanvas({ width, height, projectName }: Props) {
             type="button"
             className={`vf-pcb-segment__item vf-pcb-segment__item--top ${activeLayer === 'F.Cu' ? 'is-active' : ''}`}
             onClick={() => setActiveLayer('F.Cu')}
+            disabled={readOnly}
           >
             F.Cu
           </button>
@@ -133,9 +159,27 @@ export default function PcbCanvas({ width, height, projectName }: Props) {
             type="button"
             className={`vf-pcb-segment__item vf-pcb-segment__item--bottom ${activeLayer === 'B.Cu' ? 'is-active' : ''}`}
             onClick={() => setActiveLayer('B.Cu')}
+            disabled={readOnly}
           >
             B.Cu
           </button>
+        </div>
+
+        <span className="vf-pcb-toolbar__divider" />
+
+        <span className="vf-pcb-toolbar__label">Layers</span>
+        <div className="vf-pcb-chip-group">
+          {(['F.Cu', 'B.Cu', 'F.Silk', 'B.Silk', 'Edge.Cuts'] as const).map((layer) => (
+            <button
+              key={layer}
+              type="button"
+              className={`vf-pcb-chip ${visibleLayers[layer] ? 'is-active' : ''}`}
+              onClick={() => toggleLayerVisibility(layer)}
+              title={`${visibleLayers[layer] ? 'Hide' : 'Show'} ${layer}`}
+            >
+              {layer}
+            </button>
+          ))}
         </div>
 
         <span className="vf-pcb-toolbar__divider" />
@@ -148,6 +192,7 @@ export default function PcbCanvas({ width, height, projectName }: Props) {
               type="button"
               className={`vf-pcb-chip ${traceWidth_mil === mil ? 'is-active' : ''}`}
               onClick={() => setTraceWidth(mil)}
+              disabled={readOnly}
             >
               {mil} mil
             </button>
@@ -156,7 +201,7 @@ export default function PcbCanvas({ width, height, projectName }: Props) {
 
         <span className="vf-pcb-toolbar__divider" />
 
-        <button type="button" className="vf-pcb-tool-btn vf-pcb-tool-btn--warning" onClick={addCenteredVia}>
+        <button type="button" className="vf-pcb-tool-btn vf-pcb-tool-btn--warning" onClick={addCenteredVia} disabled={readOnly}>
           <Plus size={12} />
           <span>Via</span>
         </button>
@@ -176,6 +221,14 @@ export default function PcbCanvas({ width, height, projectName }: Props) {
         width={width}
         height={height}
         draggable
+        x={viewport.x}
+        y={viewport.y}
+        scaleX={viewport.scale}
+        scaleY={viewport.scale}
+        onWheel={handleWheel}
+        onDragEnd={(e: KonvaEventObject<DragEvent>) => {
+          setViewport({ ...viewport, x: e.target.x(), y: e.target.y() });
+        }}
         onMouseMove={handleStageMouseMove}
         onClick={(e: KonvaEventObject<MouseEvent>) => {
           if (e.target === e.target.getStage()) {
@@ -187,6 +240,7 @@ export default function PcbCanvas({ width, height, projectName }: Props) {
       >
         <Layer>
           <Rect
+            visible={visibleLayers['Edge.Cuts']}
             x={BOARD_OFFSET_PX}
             y={BOARD_OFFSET_PX}
             width={boardWidth_mm * SCALE_MM_TO_PX}
@@ -273,7 +327,7 @@ export default function PcbCanvas({ width, height, projectName }: Props) {
               key={via.id}
               x={via.x * SCALE_MM_TO_PX + BOARD_OFFSET_PX}
               y={via.y * SCALE_MM_TO_PX + BOARD_OFFSET_PX}
-              draggable
+              draggable={!readOnly}
               onDragEnd={(e: KonvaEventObject<DragEvent>) => {
                 updateViaPosition(
                   via.id,
@@ -288,16 +342,20 @@ export default function PcbCanvas({ width, height, projectName }: Props) {
           ))}
         </Layer>
 
-        <Layer>
+        <Layer visible={visibleLayers['F.Silk']}>
           {footprints.map((footprint) => (
             <Group key={footprint.id} x={BOARD_OFFSET_PX} y={BOARD_OFFSET_PX}>
               <PcbFootprintRenderer
                 footprint={footprint}
                 isSelected={footprint.id === selectedFootprintId}
                 scaleMmToPx={SCALE_MM_TO_PX}
+                showCopper={visibleLayers['F.Cu']}
+                showSilk={visibleLayers['F.Silk']}
+                readOnly={readOnly}
                 onSelect={() => selectFootprint(footprint.id)}
                 onDragEnd={(x_mm, y_mm) => updateFootprintPosition(footprint.id, x_mm, y_mm)}
                 onPadClick={(padId, padX_mm, padY_mm) => {
+                  if (readOnly) return;
                   if (!isRoutingTrace) {
                     startRouting({
                       componentId: footprint.componentId,
@@ -312,7 +370,11 @@ export default function PcbCanvas({ width, height, projectName }: Props) {
                       padId,
                       x: padX_mm,
                       y: padY_mm,
-                    });
+                      netId: footprint.pads.find((pad) => pad.id === padId)?.netId,
+                    }, TraceRouter.route45Degree(
+                      activeRoute?.startPad ? { x: activeRoute.startPad.x, y: activeRoute.startPad.y } : { x: padX_mm, y: padY_mm },
+                      { x: padX_mm, y: padY_mm },
+                    ));
                   }
                 }}
               />

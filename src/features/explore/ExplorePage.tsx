@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Search } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { projectApi } from '../../api/services'
 import { EmptyState, ErrorState, LoadingState } from '../../components/data'
@@ -11,7 +11,8 @@ import { TextInput } from '../../components/ui'
 
 export function ExplorePage() {
   const navigate = useNavigate()
-  const [query, setQuery] = useState('')
+  const [searchParams] = useSearchParams()
+  const [query, setQuery] = useState(() => searchParams.get('query') || '')
   const { t } = useTranslation()
 
   const publicProjects = useQuery({

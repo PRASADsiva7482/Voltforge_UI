@@ -78,6 +78,8 @@ interface CanvasState {
   // Undo/Redo History
   history: { nodes: CanvasNode[]; wires: Wire[] }[];
   historyIndex: number;
+  /** Snapshots captured while walking forward through previously undone edits. */
+  redoHistory: { nodes: CanvasNode[]; wires: Wire[] }[];
 
   // Actions
   addNode: (node: CanvasNode) => void;
@@ -94,6 +96,8 @@ interface CanvasState {
    *    reference is preserved entirely — no rerouting, no downstream re-renders.
    */
   updateNode: (id: string, updates: Partial<CanvasNode>) => void;
+  /** Apply a user-authored property/geometry edit as one undoable operation. */
+  commitNodeUpdate: (id: string, updates: Partial<CanvasNode>) => void;
 
   /**
    * updateNodeDragEnd — call this from onDragEnd / onTransformEnd only.
@@ -128,7 +132,8 @@ interface CanvasState {
   setViewport: (viewport: { x: number; y: number; scale: number }) => void;
   setComponentLibrary: (components: ElectronicComponent[]) => void;
   clearCanvas: () => void;
-  loadCanvas: (nodes: CanvasNodeSeed[], wires: Wire[]) => void;
+  resetCanvas: () => void;
+  loadCanvas: (nodes: CanvasNodeSeed[], wires: Wire[], viewport?: { x: number; y: number; scale: number }) => void;
   autoArrangeLayout: () => void;
 
   // History Actions
@@ -172,6 +177,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   componentLibrary: [],
   history: [],
   historyIndex: -1,
+  redoHistory: [],
 
   addNode: (node) => {
     get().pushHistory();
@@ -203,9 +209,25 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       };
     }),
 
+  commitNodeUpdate: (id, updates) => {
+    get().pushHistory();
+    set((state) => {
+      const nodes = state.nodes.map((n) => (n.id === id ? { ...n, ...updates } : n));
+      const updatedNode = nodes.find((n) => n.id === id);
+      return {
+        nodes,
+        nodesById: updatedNode
+          ? new Map(state.nodesById).set(id, updatedNode)
+          : state.nodesById,
+        wires: Object.keys(updates).some((key) => GEOMETRY_KEYS.has(key))
+          ? rerouteAutoWires(nodes, state.wires)
+          : state.wires,
+      };
+    });
+  },
+
   // ── DragEnd commit: push history + full global reroute ───────────────────
   updateNodeDragEnd: (id, updates) => {
-    get().pushHistory();
     set((state) => {
       const nodes = state.nodes.map((n) => (n.id === id ? { ...n, ...updates } : n));
       return {
@@ -258,7 +280,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     });
   },
 
-  updateWire: (id, updates) =>
+  updateWire: (id, updates) => {
+    get().pushHistory();
     set((state) => ({
       wires: state.wires.map((w) => {
         if (w.id !== id) return w;
@@ -267,7 +290,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
           ? { ...next, bendPoints: routeWireBetweenNodes(next, state.nodes) }
           : next;
       }),
-    })),
+    }));
+  },
 
   removeWire: (id) => {
     get().pushHistory();
@@ -369,7 +393,21 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({ nodes: [], nodesById: new Map(), wires: [], selectedNodeId: null, selectedWireId: null });
   },
 
-  loadCanvas: (nodes, wires) => {
+  resetCanvas: () => set({
+    nodes: [],
+    nodesById: new Map(),
+    wires: [],
+    selectedNodeId: null,
+    selectedWireId: null,
+    isWiring: false,
+    wiringFrom: null,
+    viewport: { x: 0, y: 0, scale: 1 },
+    history: [],
+    historyIndex: -1,
+    redoHistory: [],
+  }),
+
+  loadCanvas: (nodes, wires, viewport = { x: 0, y: 0, scale: 1 }) => {
     const componentLibrary = get().componentLibrary;
     const populatedNodes = nodes.map((node) => hydrateCanvasNode(node, componentLibrary));
 
@@ -404,7 +442,23 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       };
     });
     const finalNodes = populatedNodes;
-    set({ nodes: finalNodes, nodesById: buildNodesMap(finalNodes), wires: rerouteAutoWires(finalNodes, migratedWires) });
+    set({
+      nodes: finalNodes,
+      nodesById: buildNodesMap(finalNodes),
+      wires: rerouteAutoWires(finalNodes, migratedWires),
+      selectedNodeId: null,
+      selectedWireId: null,
+      isWiring: false,
+      wiringFrom: null,
+      viewport: {
+        x: Number.isFinite(viewport.x) ? viewport.x : 0,
+        y: Number.isFinite(viewport.y) ? viewport.y : 0,
+        scale: Math.max(0.2, Math.min(3, Number.isFinite(viewport.scale) ? viewport.scale : 1)),
+      },
+      history: [],
+      historyIndex: -1,
+      redoHistory: [],
+    });
   },
 
   // History Implementation
@@ -418,7 +472,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
     set({
       history: newHistory,
-      historyIndex: newHistory.length - 1
+      historyIndex: newHistory.length - 1,
+      redoHistory: [],
     });
   },
 
@@ -492,27 +547,28 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   undo: () => {
 
-    const { history, historyIndex } = get();
+    const { history, historyIndex, nodes, wires, redoHistory } = get();
     if (historyIndex < 0) return;
     const prevState = history[historyIndex];
     set({
       nodes: prevState.nodes,
       nodesById: buildNodesMap(prevState.nodes),
       wires: prevState.wires,
-      historyIndex: historyIndex - 1
+      historyIndex: historyIndex - 1,
+      redoHistory: [...redoHistory, { nodes: JSON.parse(JSON.stringify(nodes)), wires: JSON.parse(JSON.stringify(wires)) }],
     });
   },
 
   redo: () => {
-    const { history, historyIndex } = get();
-    if (historyIndex >= history.length - 1) return;
-    const nextIndex = historyIndex + 1;
-    const nextState = history[nextIndex];
+    const { history, historyIndex, redoHistory } = get();
+    if (redoHistory.length === 0) return;
+    const nextState = redoHistory[redoHistory.length - 1];
     set({
       nodes: nextState.nodes,
       nodesById: buildNodesMap(nextState.nodes),
       wires: nextState.wires,
-      historyIndex: nextIndex
+      historyIndex: Math.min(history.length - 1, historyIndex + 1),
+      redoHistory: redoHistory.slice(0, -1),
     });
   }
 }));

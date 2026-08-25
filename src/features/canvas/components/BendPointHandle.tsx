@@ -16,10 +16,11 @@ interface BendPointHandleProps {
   wireId: string;
   index: number;
   point: WireBendPoint;
+  readOnly?: boolean;
 }
 
 /** Draggable circle handle for wire bend points. */
-const BendPointHandle = ({ wireId, index, point }: BendPointHandleProps) => {
+const BendPointHandle = ({ wireId, index, point, readOnly }: BendPointHandleProps) => {
   const { updateBendPoint, removeBendPoint } = useCanvasStore();
   const [hovered, setHovered] = useState(false);
 
@@ -33,8 +34,15 @@ const BendPointHandle = ({ wireId, index, point }: BendPointHandleProps) => {
       strokeWidth={2}
       shadowColor={BEND_POINT_STROKE}
       shadowBlur={hovered ? 10 : 4}
-      draggable
+      draggable={!readOnly}
+      onDragStart={() => {
+        if (readOnly) return;
+        // updateBendPoint runs for every drag frame; capture one undo state
+        // before the gesture instead of adding dozens of history entries.
+        useCanvasStore.getState().pushHistory();
+      }}
       onDragMove={(e: KonvaEventObject<DragEvent>) => {
+        if (readOnly) return;
         const state = useCanvasStore.getState();
         const anchors = state.nodes.flatMap((node) =>
           node.pins
@@ -48,6 +56,7 @@ const BendPointHandle = ({ wireId, index, point }: BendPointHandleProps) => {
         updateBendPoint(wireId, index, snapped);
       }}
       onDblClick={(e: KonvaEventObject<MouseEvent>) => {
+        if (readOnly) return;
         e.cancelBubble = true;
         removeBendPoint(wireId, index);
       }}

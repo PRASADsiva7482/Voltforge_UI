@@ -265,6 +265,9 @@ const ComponentNodeWrapper = ({
       isDark={isDark}
       onSelect={() => selectNode(node.id)}
       onChange={(a) => updateNode(node.id, a)}
+      onGestureStart={() => {
+        if (!readOnly) useCanvasStore.getState().pushHistory();
+      }}
       onDragEnd={(a) => useCanvasStore.getState().updateNodeDragEnd(node.id, a)}
       isWiring={isWiring}
       wiringFromNodeId={wiringFromNodeId}
@@ -404,6 +407,9 @@ export default function CircuitCanvas({
           y={viewport.y}
           scaleX={viewport.scale}
           scaleY={viewport.scale}
+          onDragEnd={(e: KonvaEventObject<DragEvent>) => {
+            setViewport({ ...viewport, x: e.target.x(), y: e.target.y() });
+          }}
           onWheel={handleWheel}
           onClick={(e: KonvaEventObject<MouseEvent>) => {
             if (e.target === e.target.getStage()) {
@@ -437,7 +443,7 @@ export default function CircuitCanvas({
             }
           }}
           onMouseUp={() => {
-            if (activeNewBendPoint) {
+            if (activeNewBendPoint && !readOnly) {
               addBendPoint(activeNewBendPoint.wireId, activeNewBendPoint.index, {
                 x: activeNewBendPoint.x,
                 y: activeNewBendPoint.y,
@@ -481,6 +487,7 @@ export default function CircuitCanvas({
                 onSelect={() => selectWire(w.id)}
                 onWireDragStart={handleWireDragStart}
                 activeNewBendPoint={activeNewBendPoint}
+                readOnly={readOnly}
                 isProbeMode={isProbeMode}
               />
             ))}
@@ -533,6 +540,7 @@ export default function CircuitCanvas({
 
       <button
         onClick={() => useCanvasStore.getState().autoArrangeLayout()}
+        disabled={readOnly}
         className="vf-canvas-overlay-btn"
         style={{ left: 80 }}
         title="Auto-arrange component layout with orthogonal routing"

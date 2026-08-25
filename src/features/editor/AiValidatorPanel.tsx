@@ -14,6 +14,7 @@ import type { AiAction, AiCodeFix, AiValidationResponse, AiWireSuggestion, Canva
 
 interface Props {
   isOpen: boolean
+  readOnly?: boolean
   onClose: () => void
 }
 
@@ -41,6 +42,16 @@ function hasWire(wires: Wire[], fromNodeId: string, fromPinId: string, toNodeId:
   )
 }
 
+function hasValidConnection(nodes: CanvasNode[], suggestion: AiWireSuggestion) {
+  const from = nodes.find((node) => node.id === suggestion.fromComponentId)
+  const to = nodes.find((node) => node.id === suggestion.toComponentId)
+  return Boolean(
+    from?.pins.some((pin) => pin.id === suggestion.fromPin || pin.name === suggestion.fromPin) &&
+    to?.pins.some((pin) => pin.id === suggestion.toPin || pin.name === suggestion.toPin) &&
+    from.id !== to.id,
+  )
+}
+
 function makeWire(suggestion: AiWireSuggestion): Wire {
   return {
     bendPoints: [],
@@ -54,8 +65,8 @@ function makeWire(suggestion: AiWireSuggestion): Wire {
   }
 }
 
-export default function AiValidatorPanel({ isOpen, onClose }: Props) {
-  const { addNode, addWire, nodes, removeWire, updateNode, wires } = useCanvasStore()
+export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: Props) {
+  const { addNode, addWire, nodes, removeWire, commitNodeUpdate, wires } = useCanvasStore()
   const { activeCodeFile, currentProject, updateCodeFileContent } = useProjectStore()
   const addToast = useToastStore((s) => s.addToast)
   const [isValidating, setIsValidating] = useState(false)
@@ -110,6 +121,11 @@ export default function AiValidatorPanel({ isOpen, onClose }: Props) {
   }
 
   const applyWireSuggestion = (suggestion: AiWireSuggestion) => {
+    if (readOnly) return
+    if (!hasValidConnection(nodes, suggestion)) {
+      addToast('AI suggested a pin that is not present on this canvas.', 'error')
+      return
+    }
     if (hasWire(wires, suggestion.fromComponentId, suggestion.fromPin, suggestion.toComponentId, suggestion.toPin)) {
       addToast('Wire already exists.', 'info')
       return
@@ -119,6 +135,7 @@ export default function AiValidatorPanel({ isOpen, onClose }: Props) {
   }
 
   const applyRemoval = (action: AiAction) => {
+    if (readOnly) return
     if (!action.wireId) {
       addToast('This removal does not reference a specific wire.', 'error')
       return
@@ -128,6 +145,7 @@ export default function AiValidatorPanel({ isOpen, onClose }: Props) {
   }
 
   const applyAddition = (action: AiAction) => {
+    if (readOnly) return
     if (String(action.componentType || '').toUpperCase() !== 'RESISTOR' || !action.between || action.between.length < 2) {
       addToast('This addition can be reviewed manually.', 'info')
       return
@@ -191,7 +209,8 @@ export default function AiValidatorPanel({ isOpen, onClose }: Props) {
       addToast('Could not find the target component.', 'error')
       return
     }
-    updateNode(action.componentId, {
+    if (readOnly) return
+    commitNodeUpdate(action.componentId, {
       properties: {
         ...node.properties,
         [action.property]: parseActionValue(action.newValue ?? action.value),
@@ -201,6 +220,7 @@ export default function AiValidatorPanel({ isOpen, onClose }: Props) {
   }
 
   const applyCodeFix = (fix: AiCodeFix) => {
+    if (readOnly) return
     if (!activeCodeFile) {
       addToast('No active code file selected.', 'error')
       return

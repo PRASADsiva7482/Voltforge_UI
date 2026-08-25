@@ -342,6 +342,7 @@ interface ComponentNodeProps {
   isDark: boolean;
   onSelect: () => void;
   onChange: (updates: Partial<CanvasNode>) => void;
+  onGestureStart: () => void;
   onDragEnd: (updates: Partial<CanvasNode>) => void;
   isWiring: boolean;
   wiringFromNodeId: string | null;
@@ -361,6 +362,7 @@ const ComponentNode = ({
   isDark,
   onSelect,
   onChange,
+  onGestureStart,
   onDragEnd,
   isWiring,
   wiringFromNodeId,
@@ -697,6 +699,7 @@ const ComponentNode = ({
           onSelect();
         }}
         onDragStart={() => {
+          onGestureStart();
           // Cache snap anchors ONCE at the start of the drag gesture
           const state = useCanvasStore.getState();
           snapAnchorsRef.current = state.nodes
@@ -759,6 +762,7 @@ const ComponentNode = ({
             rotation: n.rotation(),
           });
         }}
+        onTransformStart={onGestureStart}
       >
         {/* Active glow — skipped for LEDs which have their own bloom */}
         {isActive && !node.type.includes('LED') && (
@@ -2363,6 +2367,7 @@ const ComponentNode = ({
             isDark={isDark}
             startWiring={startWiring}
             finishWiring={finishWiring}
+            readOnly={readOnly}
             isProbeMode={isProbeMode}
             onProbeToggle={onProbeToggle}
           />

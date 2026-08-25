@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Save, Upload } from 'lucide-react'
+import { Plus, Save, Trash2, Upload } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { componentApi } from '../../api/services'
 import { Modal } from '../../components/ui/Modal'
@@ -7,6 +7,8 @@ import { Breadcrumbs } from '../../components/ui/Breadcrumbs'
 import { FieldShell, TextInput, SelectField, Textarea } from '../../components/ui/Field'
 import { Button } from '../../components/ui/Button'
 import type { ComponentCategory, PinPosition } from '../../types/domain'
+import { validateComponentSchema } from '../canvas/customComponentSchema'
+import { useToastStore } from '../../store/useToastStore'
 
 interface Props {
   isOpen: boolean
@@ -15,8 +17,16 @@ interface Props {
 
 const PIN_TYPES: PinPosition['type'][] = ['bidirectional', 'input', 'output', 'power', 'ground']
 
+function nextPinId(pins: PinPosition[]) {
+  const existing = new Set(pins.map((pin) => pin.id))
+  let index = pins.length + 1
+  while (existing.has(`pin_${index}`)) index += 1
+  return `pin_${index}`
+}
+
 export default function CustomComponentStudio({ isOpen, onClose }: Props) {
   const queryClient = useQueryClient()
+  const addToast = useToastStore((s) => s.addToast)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState<ComponentCategory>('SENSOR')
@@ -28,28 +38,50 @@ export default function CustomComponentStudio({ isOpen, onClose }: Props) {
   const selectedPin = pins.find((p) => p.id === selectedPinId)
 
   const saveMutation = useMutation({
-    mutationFn: () =>
-      componentApi.createCustom({
+    mutationFn: () => {
+      const type = `CUSTOM_${name.toUpperCase().replace(/\s+/g, '_')}`
+      const validation = validateComponentSchema({
+        id: type,
+        name,
+        category: 'Sensor',
+        packageType: 'MODULE',
+        pinCount: pins.length,
+        pins: pins.map((pin) => ({
+          id: pin.id,
+          name: pin.name,
+          side: pin.x <= 40 ? 'left' : pin.x >= 80 ? 'right' : pin.y <= 40 ? 'top' : 'bottom',
+        })),
+      })
+      if (!validation.valid) throw new Error(validation.errors.join(' '))
+      return componentApi.createCustom({
         name,
         description,
-        type: `CUSTOM_${name.toUpperCase().replace(/\s+/g, '_')}`,
+        type,
         category,
         svgData,
         width: 120,
         height: 90,
         pins,
         publishToCommunity,
-      }),
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['components'] })
       onClose()
     },
+    onError: (error) => addToast(error instanceof Error ? error.message : 'Unable to save custom component.', 'error'),
   })
 
   const upsertPin = (id: string, updates: Partial<PinPosition>) => {
     setPins((current) =>
       current.map((pin) => (pin.id === id ? { ...pin, ...updates } : pin))
     )
+  }
+
+  const deleteSelectedPin = () => {
+    if (!selectedPinId) return
+    setPins((current) => current.filter((pin) => pin.id !== selectedPinId))
+    setSelectedPinId(null)
   }
 
   const footer = (
@@ -153,7 +185,7 @@ export default function CustomComponentStudio({ isOpen, onClose }: Props) {
           const rect = event.currentTarget.getBoundingClientRect()
           const x = ((event.clientX - rect.left) / rect.width) * 120
           const y = ((event.clientY - rect.top) / rect.height) * 90
-          const id = `pin_${pins.length + 1}`
+          const id = nextPinId(pins)
           setPins([
             ...pins,
             { id, name: `PIN ${pins.length + 1}`, x, y, type: 'bidirectional' },
@@ -199,7 +231,7 @@ export default function CustomComponentStudio({ isOpen, onClose }: Props) {
             variant="secondary"
             size="sm"
             onClick={() => {
-              const id = `pin_${pins.length + 1}`
+              const id = nextPinId(pins)
               setPins([
                 ...pins,
                 { id, name: `PIN ${pins.length + 1}`, x: 60, y: 45, type: 'bidirectional' },
@@ -256,6 +288,14 @@ export default function CustomComponentStudio({ isOpen, onClose }: Props) {
                   />
                 </div>
               </FieldShell>
+              <Button
+                variant="danger"
+                size="sm"
+                icon={<Trash2 size={13} />}
+                onClick={deleteSelectedPin}
+              >
+                Delete Pin Anchor
+              </Button>
             </div>
           ) : (
             <p className="vf-studio-sidebar-empty">

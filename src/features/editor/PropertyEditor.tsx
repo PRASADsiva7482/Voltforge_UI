@@ -34,7 +34,7 @@ export default function PropertyEditor({ readOnly }: { readOnly?: boolean }) {
   const selectedWireId = useCanvasStore((s) => s.selectedWireId);
   const nodes = useCanvasStore((s) => s.nodes);
   const wires = useCanvasStore((s) => s.wires);
-  const updateNode = useCanvasStore((s) => s.updateNode);
+  const commitNodeUpdate = useCanvasStore((s) => s.commitNodeUpdate);
   const updateWire = useCanvasStore((s) => s.updateWire);
   const removeNode = useCanvasStore((s) => s.removeNode);
   const removeWire = useCanvasStore((s) => s.removeWire);
@@ -68,7 +68,7 @@ export default function PropertyEditor({ readOnly }: { readOnly?: boolean }) {
               <input
                 className="vf-prop-editor__input"
                 value={selectedNode.name}
-                onChange={(e) => updateNode(selectedNode.id, { name: e.target.value })}
+                onChange={(e) => commitNodeUpdate(selectedNode.id, { name: e.target.value })}
                 disabled={readOnly}
               />
             </div>
@@ -85,7 +85,7 @@ export default function PropertyEditor({ readOnly }: { readOnly?: boolean }) {
                   className="vf-prop-editor__input vf-prop-editor__input--small"
                   type="number"
                   value={Math.round(selectedNode.x)}
-                  onChange={(e) => updateNode(selectedNode.id, { x: Number(e.target.value) })}
+                  onChange={(e) => commitNodeUpdate(selectedNode.id, { x: Number(e.target.value) })}
                   disabled={readOnly}
                 />
               </div>
@@ -95,7 +95,7 @@ export default function PropertyEditor({ readOnly }: { readOnly?: boolean }) {
                   className="vf-prop-editor__input vf-prop-editor__input--small"
                   type="number"
                   value={Math.round(selectedNode.y)}
-                  onChange={(e) => updateNode(selectedNode.id, { y: Number(e.target.value) })}
+                  onChange={(e) => commitNodeUpdate(selectedNode.id, { y: Number(e.target.value) })}
                   disabled={readOnly}
                 />
               </div>
@@ -105,7 +105,7 @@ export default function PropertyEditor({ readOnly }: { readOnly?: boolean }) {
                   className="vf-prop-editor__input vf-prop-editor__input--small"
                   type="number"
                   value={selectedNode.rotation}
-                  onChange={(e) => updateNode(selectedNode.id, { rotation: Number(e.target.value) })}
+                  onChange={(e) => commitNodeUpdate(selectedNode.id, { rotation: Number(e.target.value) })}
                   disabled={readOnly}
                 />
               </div>
@@ -132,7 +132,7 @@ export default function PropertyEditor({ readOnly }: { readOnly?: boolean }) {
                           ) : isBoolean ? (
                             <button
                               className={`vf-prop-editor__toggle ${val ? 'is-on' : ''}`}
-                              onClick={() => updateNode(selectedNode.id, {
+                              onClick={() => commitNodeUpdate(selectedNode.id, {
                                 properties: { ...selectedNode.properties, [key]: !val }
                               })}
                               disabled={readOnly}
@@ -144,7 +144,7 @@ export default function PropertyEditor({ readOnly }: { readOnly?: boolean }) {
                               className="vf-prop-editor__input"
                               type={isNumber ? 'number' : 'text'}
                               value={String(val ?? '')}
-                              onChange={(e) => updateNode(selectedNode.id, {
+                              onChange={(e) => commitNodeUpdate(selectedNode.id, {
                                 properties: {
                                   ...selectedNode.properties,
                                   [key]: isNumber ? Number(e.target.value) : e.target.value

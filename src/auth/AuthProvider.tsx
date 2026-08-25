@@ -7,24 +7,18 @@ import { AuthContext, type AuthContextValue } from './AuthContext'
 
 let keycloakInitPromise: Promise<boolean> | null = null
 
-const MOCK_DEV_USER: AppUser = {
-  displayName: 'Voltforge Developer',
-  email: 'dev@voltforge.internal',
-  keycloakId: 'mock-dev-id',
-  role: 'ADMIN',
-  username: 'volt-dev',
-}
-
 function initKeycloakSafely(): Promise<boolean> {
   if (import.meta.env.VITE_AUTH_MOCK === 'true') {
-    return Promise.resolve(true)
+    console.warn('[Voltforge Auth] VITE_AUTH_MOCK is ignored because the API requires a real bearer token.')
+    return Promise.resolve(false)
   }
 
   keycloakInitPromise ??= new Promise<boolean>((resolve) => {
-    // 3.5s timeout fallback so UI never hangs indefinitely if Keycloak is down
+    // Do not manufacture a local session when Keycloak is unavailable. The API
+    // is protected and would reject the resulting requests with 401 responses.
     const timeout = setTimeout(() => {
-      console.warn('[Voltforge Auth] Keycloak server unreachable. Falling back to local developer session.')
-      resolve(true)
+      console.warn('[Voltforge Auth] Keycloak server unreachable. The workspace will remain signed out.')
+      resolve(false)
     }, 3500)
 
     keycloak
@@ -39,8 +33,8 @@ function initKeycloakSafely(): Promise<boolean> {
       })
       .catch((err) => {
         clearTimeout(timeout)
-        console.warn('[Voltforge Auth] Keycloak init error, enabling dev mode fallback:', err)
-        resolve(true)
+        console.warn('[Voltforge Auth] Keycloak init error:', err)
+        resolve(false)
       })
   })
 
@@ -60,19 +54,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const authenticated = await initKeycloakSafely()
       setAuthenticated(authenticated)
-      if (authenticated) {
-        if (keycloak.token) {
-          const synced = await syncUser()
-          setUser(synced || MOCK_DEV_USER)
-        } else {
-          setUser(MOCK_DEV_USER)
-        }
+      if (authenticated && keycloak.token) {
+        const synced = await syncUser()
+        setUser(synced)
+        if (!synced) setAuthenticated(false)
       } else {
         setUser(null)
       }
     } catch {
-      setAuthenticated(true)
-      setUser(MOCK_DEV_USER)
+      setAuthenticated(false)
+      setUser(null)
     } finally {
       setLoading(false)
     }
@@ -102,8 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           keycloak.login({ redirectUri: dashboardRedirect() })
         } catch {
-          setAuthenticated(true)
-          setUser(MOCK_DEV_USER)
+          setAuthenticated(false)
+          setUser(null)
         }
       },
       logout: () => {

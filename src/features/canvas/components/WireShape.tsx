@@ -26,6 +26,7 @@ interface WireShapeProps {
   onSelect: () => void;
   onWireDragStart: (wireId: string, index: number, x: number, y: number) => void;
   activeNewBendPoint: ActiveBendPoint | null;
+  readOnly?: boolean;
   isProbeMode?: boolean;
 }
 
@@ -38,6 +39,7 @@ const WireShape = ({
   onSelect,
   onWireDragStart,
   activeNewBendPoint,
+  readOnly,
   isProbeMode,
 }: WireShapeProps) => {
   const [hovered, setHovered] = useState(false);
@@ -67,7 +69,7 @@ const WireShape = ({
 
   const handleDoubleClick = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
     e.cancelBubble = true;
-    if (wire.routingMode === 'auto') return;
+    if (readOnly || wire.routingMode === 'auto') return;
 
     const stage = e.target.getStage();
     const pos = stage?.getRelativePointerPosition();
@@ -131,10 +133,10 @@ const WireShape = ({
       />
 
       {/* Bend point circles */}
-      {isSelected &&
+      {isSelected && !readOnly &&
         wire.routingMode !== 'auto' &&
         (wire.bendPoints || []).map((bp, idx) => (
-          <BendPointHandle key={`bp_${wire.id}_${idx}`} wireId={wire.id} index={idx} point={bp} />
+          <BendPointHandle key={`bp_${wire.id}_${idx}`} wireId={wire.id} index={idx} point={bp} readOnly={readOnly} />
         ))}
 
       {/* Phantom active drag bend point */}

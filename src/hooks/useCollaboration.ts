@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import keycloak from '../auth/keycloak';
 import { useCanvasStore } from '../store/canvasStore';
+import { usePcbStore, type PcbLayout } from '../store/pcbStore';
 import type { CanvasNode, Wire } from '../types/domain';
 
 export interface CollaboratorInfo {
@@ -78,12 +79,19 @@ export function useCollaboration(projectId: string) {
   const heartbeatRef = useRef<number | null>(null);
   const canvasSyncTimer = useRef<number | null>(null);
   const reconnectTimer = useRef<number | null>(null);
+  const reconnectBlocked = useRef(false);
   const reconnectAttempts = useRef(0);
-  const pendingCanvasSync = useRef<{ nodes: CanvasNode[]; wires: Wire[] } | null>(null);
+  const pendingCanvasSync = useRef<{
+    nodes: CanvasNode[];
+    wires: Wire[];
+    viewport?: { x: number; y: number; scale: number };
+    pcbLayout?: PcbLayout;
+  } | null>(null);
   const lastCanvasPayload = useRef<string>('');
   const userColor = useRef(COLLABORATOR_COLORS[Math.floor(Math.random() * COLLABORATOR_COLORS.length)]);
 
   const loadCanvas = useCanvasStore((s) => s.loadCanvas);
+  const loadPcb = usePcbStore((s) => s.loadPcb);
 
   const currentUserId = user?.keycloakId || 'anon';
   const displayName = user?.displayName || user?.username || 'Collaborator';
@@ -110,6 +118,7 @@ export function useCollaboration(projectId: string) {
     if (!projectId) return;
 
     let disposed = false;
+    reconnectBlocked.current = false;
 
     const clearHeartbeat = () => {
       if (heartbeatRef.current) {
@@ -119,7 +128,7 @@ export function useCollaboration(projectId: string) {
     };
 
     const scheduleReconnect = () => {
-      if (disposed || reconnectTimer.current) return;
+      if (disposed || reconnectBlocked.current || reconnectTimer.current) return;
       const delay = Math.min(1000 * 2 ** reconnectAttempts.current, MAX_RECONNECT_DELAY_MS);
       reconnectAttempts.current += 1;
       reconnectTimer.current = window.setTimeout(() => {
@@ -164,6 +173,10 @@ export function useCollaboration(projectId: string) {
           }
 
           if (frame.command === 'ERROR') {
+            // A STOMP ERROR is a protocol/application rejection (for example
+            // edit access denied), not a transient network disconnect. Do not
+            // immediately reconnect and make the editor header flap forever.
+            reconnectBlocked.current = true;
             setIsConnected(false);
             socket.close();
             continue;
@@ -192,7 +205,10 @@ export function useCollaboration(projectId: string) {
 
             if (data.eventType === 'CANVAS_SYNC' && data.payload && data.userId !== currentUserId) {
               isRemoteSyncing.current = true;
-              loadCanvas(data.payload.nodes || [], data.payload.wires || []);
+              loadCanvas(data.payload.nodes || [], data.payload.wires || [], data.payload.viewport);
+              if (data.payload.pcbLayout) {
+                loadPcb(data.payload.pcbLayout);
+              }
               window.setTimeout(() => {
                 isRemoteSyncing.current = false;
               }, 120);
@@ -240,7 +256,7 @@ export function useCollaboration(projectId: string) {
       wsRef.current = null;
       setIsConnected(false);
     };
-  }, [currentUserId, loadCanvas, projectId, sendFrame, subscribeToProject]);
+  }, [currentUserId, loadCanvas, loadPcb, projectId, sendFrame, subscribeToProject]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -284,10 +300,15 @@ export function useCollaboration(projectId: string) {
   }, [currentUserId, projectId, sendFrame]);
 
   const broadcastCanvasSync = useCallback(
-    (nodes: CanvasNode[], wires: Wire[]) => {
+    (
+      nodes: CanvasNode[],
+      wires: Wire[],
+      viewport?: { x: number; y: number; scale: number },
+      pcbLayout?: PcbLayout,
+    ) => {
       if (isRemoteSyncing.current || !isConnected) return;
 
-      pendingCanvasSync.current = { nodes, wires };
+      pendingCanvasSync.current = { nodes, wires, viewport, pcbLayout };
       if (canvasSyncTimer.current) return;
       canvasSyncTimer.current = window.setTimeout(flushCanvasSync, CANVAS_SYNC_DEBOUNCE_MS);
     },

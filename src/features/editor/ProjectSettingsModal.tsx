@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Settings, Globe, Lock, Save, Trash2, Cpu, Search } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { projectApi } from '../../api/services'
 import { useProjectStore } from '../../store/projectStore'
 import { Modal } from '../../components/ui/Modal'
@@ -9,6 +10,7 @@ import { FieldShell, TextInput, Textarea } from '../../components/ui/Field'
 import { Button } from '../../components/ui/Button'
 import { BOARD_CATALOG } from '../canvas/boardCatalog'
 import type { BoardType } from '../../types/domain'
+import { useToastStore } from '../../store/useToastStore'
 
 interface Props {
   isOpen: boolean
@@ -25,6 +27,8 @@ const BOARD_FAMILIES = Array.from(
 export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
   const { currentProject, setCurrentProject } = useProjectStore()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const addToast = useToastStore((s) => s.addToast)
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -85,12 +89,25 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: () => projectApi.delete(currentProject!.id),
+    onSuccess: () => {
+      const deletedId = currentProject?.id
+      setCurrentProject(null)
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      if (deletedId) queryClient.removeQueries({ queryKey: ['project', deletedId] })
+      addToast('Project deleted.', 'success')
+      onClose()
+      navigate('/projects')
+    },
+    onError: () => addToast('Failed to delete project.', 'error'),
+  })
+
   if (!currentProject) return null
 
   const handleDelete = () => {
-    // Perform actual project deletion in database/store if needed
     setConfirmDeleteOpen(false)
-    onClose()
+    deleteMutation.mutate()
   }
 
   const footer = (
@@ -261,4 +278,3 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
   )
 }
 export { ProjectSettingsModal }
-

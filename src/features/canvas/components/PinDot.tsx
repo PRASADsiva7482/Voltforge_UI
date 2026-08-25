@@ -27,6 +27,7 @@ interface PinDotProps {
   isDark: boolean;
   startWiring: (nodeId: string, pinId: string) => void;
   finishWiring: (nodeId: string, pinId: string) => void;
+  readOnly?: boolean;
   isProbeMode?: boolean;
   onProbeToggle?: (target: { nodeId: string; pinId: string; x: number; y: number }) => void;
 }
@@ -103,6 +104,7 @@ const PinDot = memo(function PinDot({
   isDark,
   startWiring,
   finishWiring,
+  readOnly = false,
   isProbeMode,
   onProbeToggle,
 }: PinDotProps) {
@@ -180,6 +182,7 @@ const PinDot = memo(function PinDot({
             onProbeToggle?.({ nodeId, pinId: pin.id, x: pin.x, y: pin.y });
             return;
           }
+          if (readOnly) return;
           if (isWiring) {
             if (wiringFromNodeId === nodeId) return;
             finishWiring(nodeId, pin.id);

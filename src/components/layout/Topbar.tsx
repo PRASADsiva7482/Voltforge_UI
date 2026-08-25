@@ -15,6 +15,7 @@ export function Topbar({ eyebrow = 'Voltforge workspace', title }: TopbarProps) 
   const { theme, toggleTheme } = useThemeStore()
   const { t, i18n } = useTranslation()
   const [langOpen, setLangOpen] = useState(false)
+  const [globalQuery, setGlobalQuery] = useState('')
 
   const languages = [
     { code: 'en', label: 'English' },
@@ -38,7 +39,17 @@ export function Topbar({ eyebrow = 'Voltforge workspace', title }: TopbarProps) 
         <h1>{t(title)}</h1>
       </div>
       <div className="app-topbar__actions">
-        <TextInput leftSlot={<Search size={16} />} placeholder={t("Search projects, boards, parts")} />
+        <TextInput
+          leftSlot={<Search size={16} />}
+          placeholder={t("Search projects, boards, parts")}
+          value={globalQuery}
+          onChange={(event) => setGlobalQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              navigate(`/explore${globalQuery.trim() ? `?query=${encodeURIComponent(globalQuery.trim())}` : ''}`)
+            }
+          }}
+        />
         
         {/* Language selector */}
         <div className="vf-topbar__lang-wrapper" style={{ position: 'relative' }}>

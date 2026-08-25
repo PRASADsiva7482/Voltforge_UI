@@ -37,10 +37,24 @@ export function LabChallengeRunner() {
     allPassed: false,
     objectiveResults: [],
   });
+  const previousCanvasRef = useRef<{
+    nodes: typeof nodes;
+    wires: typeof wires;
+    viewport: { x: number; y: number; scale: number };
+  } | null>(null);
 
   useEffect(() => {
     if (!challenge) return;
+    previousCanvasRef.current = {
+      nodes: useCanvasStore.getState().nodes,
+      wires: useCanvasStore.getState().wires,
+      viewport: useCanvasStore.getState().viewport,
+    };
     loadCanvas(challenge.initialCircuit.nodes || [], challenge.initialCircuit.wires || []);
+    return () => {
+      const previous = previousCanvasRef.current;
+      if (previous) loadCanvas(previous.nodes, previous.wires, previous.viewport);
+    };
   }, [challenge, loadCanvas]);
 
   useEffect(() => {

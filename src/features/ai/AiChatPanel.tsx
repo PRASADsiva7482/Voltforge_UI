@@ -14,6 +14,7 @@ import type { AiAction, AiCitation, AiCodeFix, AiWireSuggestion, CanvasNode, Wir
 
 interface Props {
   isOpen: boolean
+  readOnly?: boolean
   onApplyCode?: (code: string) => void
   onClose: () => void
   projectContext?: string
@@ -57,6 +58,16 @@ function hasWire(wires: Wire[], fromNodeId: string, fromPinId: string, toNodeId:
   )
 }
 
+function hasValidConnection(nodes: CanvasNode[], suggestion: AiWireSuggestion) {
+  const from = nodes.find((node) => node.id === suggestion.fromComponentId)
+  const to = nodes.find((node) => node.id === suggestion.toComponentId)
+  return Boolean(
+    from?.pins.some((pin) => pin.id === suggestion.fromPin || pin.name === suggestion.fromPin) &&
+    to?.pins.some((pin) => pin.id === suggestion.toPin || pin.name === suggestion.toPin) &&
+    from.id !== to.id,
+  )
+}
+
 function makeWire(suggestion: AiWireSuggestion): Wire {
   return {
     bendPoints: [],
@@ -72,6 +83,7 @@ function makeWire(suggestion: AiWireSuggestion): Wire {
 
 export default function AiChatPanel({
   isOpen,
+  readOnly = false,
   onApplyCode,
   onClose,
   projectContext,
@@ -82,7 +94,7 @@ export default function AiChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   
-  const { addNode, addWire, nodes, removeWire, selectedNodeId, selectedWireId, updateNode, viewport, wires } = useCanvasStore()
+  const { addNode, addWire, nodes, removeWire, selectedNodeId, selectedWireId, commitNodeUpdate, viewport, wires } = useCanvasStore()
   const { currentProject, activeCodeFile, updateCodeFileContent } = useProjectStore()
   const addToast = useToastStore((s) => s.addToast)
 
@@ -158,6 +170,7 @@ export default function AiChatPanel({
       canvasData: { components, wires: serializedWires, netlist: netlistPayload },
       simulationState,
       context: richContext,
+      canvasContext: richContext,
       history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })),
     }
   }, [nodes, wires, activeCodeFile, currentProject, projectContext, selectedNodeId, selectedWireId, viewport, messages])
@@ -180,7 +193,7 @@ export default function AiChatPanel({
       const response = await aiApi.chatStream({
         message: userMessage,
         ...payload,
-      })
+      }, controller.signal)
 
       if (!response.body) {
         throw new Error('No response body')
@@ -339,6 +352,11 @@ export default function AiChatPanel({
   }, [])
 
   const applyWireSuggestion = (suggestion: AiWireSuggestion) => {
+    if (readOnly) return
+    if (!hasValidConnection(nodes, suggestion)) {
+      addToast('AI suggested a pin that is not present on this canvas.', 'error')
+      return
+    }
     if (hasWire(wires, suggestion.fromComponentId, suggestion.fromPin, suggestion.toComponentId, suggestion.toPin)) {
       addToast('Wire already exists.', 'info')
       return
@@ -348,6 +366,7 @@ export default function AiChatPanel({
   }
 
   const applyRemoval = (action: AiAction) => {
+    if (readOnly) return
     if (!action.wireId) {
       addToast('This removal does not reference a specific wire.', 'error')
       return
@@ -357,6 +376,7 @@ export default function AiChatPanel({
   }
 
   const applyAddition = (action: AiAction) => {
+    if (readOnly) return
     const componentType = String(action.componentType || '').toUpperCase()
     if (!['RESISTOR', 'DIODE'].includes(componentType) || !action.between || action.between.length < 2) {
       addToast('This addition can be reviewed manually.', 'info')
@@ -425,7 +445,8 @@ export default function AiChatPanel({
       return
     }
     const nextValue = parseActionValue(action.newValue ?? action.value)
-    updateNode(action.componentId, {
+    if (readOnly) return
+    commitNodeUpdate(action.componentId, {
       properties: {
         ...node.properties,
         [action.property]: nextValue,
@@ -435,6 +456,7 @@ export default function AiChatPanel({
   }
 
   const applyCodeFix = (fix: AiCodeFix) => {
+    if (readOnly) return
     if (!activeCodeFile) {
       addToast('No active code file selected.', 'error')
       return

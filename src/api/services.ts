@@ -70,7 +70,7 @@ export const componentApi = {
 export const aiApi = {
   chat: (data: AiChatRequest) => api.post<ApiResponse<AiChatResponse>>('/ai/chat', data),
   /** SSE streaming chat — returns a raw fetch Response for ReadableStream consumption. */
-  chatStream: async (data: Record<string, unknown>): Promise<Response> => {
+  chatStream: async (data: Record<string, unknown>, signal?: AbortSignal): Promise<Response> => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (keycloak.token) {
       headers['Authorization'] = `Bearer ${keycloak.token}`
@@ -79,6 +79,7 @@ export const aiApi = {
       method: 'POST',
       headers,
       body: JSON.stringify(data),
+      signal,
     })
     if (!response.ok) {
       throw new Error(`Stream request failed: ${response.status}`)

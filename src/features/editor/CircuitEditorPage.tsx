@@ -34,6 +34,7 @@ import {
 
 import { projectApi, simulationApi, projectExportApi } from '../../api/services'
 import { useCanvasStore } from '../../store/canvasStore'
+import { usePcbStore } from '../../store/pcbStore'
 import { useProjectStore, SMART_DEVICE_PRESET } from '../../store/projectStore'
 import { useSimulationStore } from '../../store/simulationStore'
 import { useThemeStore } from '../../store/themeStore'
@@ -95,6 +96,29 @@ function bundleCodeFiles(activeFile: CodeFile | null, files: CodeFile[]): string
   return content
 }
 
+function serializeCanvas(nodes: unknown[], wires: unknown[]) {
+  return JSON.stringify({ nodes, wires })
+}
+
+function serializePcb(layout: unknown) {
+  return JSON.stringify(layout)
+}
+
+function encodeShareState(value: unknown) {
+  const bytes = new TextEncoder().encode(JSON.stringify(value))
+  let binary = ''
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte) })
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function decodeShareState(value: string) {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+  const binary = atob(padded)
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+  return JSON.parse(new TextDecoder().decode(bytes))
+}
+
 export default function CircuitEditorPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
@@ -115,11 +139,16 @@ export default function CircuitEditorPage() {
 
   // Canvas state
   const loadCanvas = useCanvasStore((s) => s.loadCanvas)
+  const resetCanvas = useCanvasStore((s) => s.resetCanvas)
   const nodes = useCanvasStore((s) => s.nodes)
   const wires = useCanvasStore((s) => s.wires)
+  const viewport = useCanvasStore((s) => s.viewport)
   const undo = useCanvasStore((s) => s.undo)
   const redo = useCanvasStore((s) => s.redo)
   const clearCanvas = useCanvasStore((s) => s.clearCanvas || (() => loadCanvas([], [])))
+  const resetPcb = usePcbStore((s) => s.resetPcb)
+  const loadPcb = usePcbStore((s) => s.loadPcb)
+  const pcbSnapshot = usePcbStore((s) => serializePcb(s.getLayout()))
 
   // Visual/Panel toggles
   const [viewMode, setViewMode] = useState<ViewMode>('split')
@@ -129,6 +158,12 @@ export default function CircuitEditorPage() {
   const canvasContainerRef = useRef<HTMLDivElement>(null)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
   const engineRef = useRef<SimulationEngine | null>(null)
+  const canvasSnapshotRef = useRef<string | null>(null)
+  const pcbSnapshotRef = useRef<string | null>(null)
+  const skipCanvasDirtyRef = useRef(false)
+  const sharedCanvasStateRef = useRef<string | null>(null)
+  const sharedCodeStateRef = useRef<string | null>(null)
+  const simulationRequestRef = useRef(0)
 
   // Migrated features panel open state
   const [showMultimeter, setShowMultimeter] = useState(false)
@@ -159,7 +194,9 @@ export default function CircuitEditorPage() {
   const updateNode = useCanvasStore((s) => s.updateNode)
 
   const isPreset = projectId === 'preset-smart-device'
-  const isOwner = Boolean(
+  const isSharedView = !projectId
+  const isOwner = isPreset || Boolean(
+    projectId &&
     currentProject &&
     user &&
     currentProject.owner?.keycloakId === user.keycloakId
@@ -172,7 +209,24 @@ export default function CircuitEditorPage() {
     broadcastCanvasSync,
     broadcastCursorMove,
   } =
-    useCollaboration(projectId || '')
+    // The smart-device preset exists only in the frontend and has no backend
+    // project record. Do not open a WebSocket for it, otherwise the server
+    // rejects the subscription and the reconnect loop makes the badge blink.
+    useCollaboration(isPreset ? '' : projectId || '')
+
+  // Reset route-owned state before a new project query resolves. Zustand is a
+  // singleton, so without this a project with no layout could display the
+  // previous project's components and PCB footprints.
+  useEffect(() => {
+    resetCanvas()
+    resetPcb()
+    setCurrentProject(null)
+    canvasSnapshotRef.current = null
+    pcbSnapshotRef.current = null
+    sharedCanvasStateRef.current = null
+    sharedCodeStateRef.current = null
+    setDirty(false)
+  }, [projectId, resetCanvas, resetPcb, setCurrentProject, setDirty])
 
   // ── Load project ──
   const { data: fetchedProject, isLoading } = useQuery({
@@ -186,41 +240,129 @@ export default function CircuitEditorPage() {
 
   // Set project layout and codes
   useEffect(() => {
-    const project = fetchedProject || (isPreset ? SMART_DEVICE_PRESET : null)
+    const project = isPreset
+      ? SMART_DEVICE_PRESET
+      : fetchedProject?.id === projectId
+        ? fetchedProject
+        : null
     if (project) {
       setCurrentProject(project as Project)
-      if (project.canvasLayout) {
-        loadCanvas(project.canvasLayout.nodes || [], project.canvasLayout.wires || [])
-      }
+      const layout = project.canvasLayout
+      loadCanvas(layout?.nodes || [], layout?.wires || [], layout?.viewport)
+      const storedPcb = (project.componentConfig as { pcbLayout?: unknown } | undefined)?.pcbLayout
+      loadPcb(storedPcb && typeof storedPcb === 'object' ? storedPcb as any : undefined)
+      canvasSnapshotRef.current = serializeCanvas(
+        useCanvasStore.getState().nodes,
+        useCanvasStore.getState().wires,
+      )
+      pcbSnapshotRef.current = serializePcb(usePcbStore.getState().getLayout())
+      skipCanvasDirtyRef.current = true
+      setDirty(false)
     }
-  }, [fetchedProject, isPreset, setCurrentProject, loadCanvas])
+  }, [fetchedProject, projectId, isPreset, setCurrentProject, loadCanvas, loadPcb, setDirty])
 
   // Parse share parameters if available
   useEffect(() => {
     const stateParam = searchParams.get('state')
-    if (stateParam) {
+    if (stateParam && sharedCanvasStateRef.current !== stateParam) {
       try {
-        const decoded = JSON.parse(atob(stateParam))
+        const decoded = decodeShareState(stateParam)
         if (decoded.nodes && decoded.wires) {
-          loadCanvas(decoded.nodes, decoded.wires)
+          loadCanvas(decoded.nodes, decoded.wires, decoded.viewport)
+          canvasSnapshotRef.current = serializeCanvas(
+            useCanvasStore.getState().nodes,
+            useCanvasStore.getState().wires,
+          )
+          skipCanvasDirtyRef.current = true
+          sharedCanvasStateRef.current = stateParam
         }
-        if (decoded.code && activeCodeFile) {
+        if (isSharedView) {
+          const sharedPcb = (decoded.componentConfig as { pcbLayout?: unknown } | undefined)?.pcbLayout
+          loadPcb(sharedPcb && typeof sharedPcb === 'object' ? sharedPcb as any : undefined)
+          const sharedCodeFiles = Array.isArray(decoded.codeFiles)
+            ? decoded.codeFiles
+            : decoded.code
+              ? [{
+                  id: `shared-code-${stateParam.slice(0, 12)}`,
+                  filename: 'main.ino',
+                  content: decoded.code,
+                  language: 'cpp',
+                  sortOrder: 0,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                }]
+              : []
+          setCurrentProject({
+            id: `shared-${stateParam.slice(0, 12)}`,
+            name: decoded.name || 'Shared Circuit',
+            description: 'Read-only shared circuit',
+            boardType: decoded.boardType || 'ARDUINO_UNO',
+            canvasLayout: {
+              nodes: decoded.nodes || [],
+              wires: decoded.wires || [],
+              viewport: decoded.viewport || { x: 0, y: 0, scale: 1 },
+            },
+            codeFiles: sharedCodeFiles,
+            componentConfig: decoded.componentConfig,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            forkCount: 0,
+            isPublic: true,
+            owner: {} as Project['owner'],
+            viewCount: 0,
+          })
+        }
+        if (decoded.code && activeCodeFile && sharedCodeStateRef.current !== stateParam) {
           updateCodeFileContent(activeCodeFile.id, decoded.code)
+          sharedCodeStateRef.current = stateParam
         }
         addToast('Loaded shared project state (read-only)', 'info')
       } catch (e) {
         console.error('Failed to parse shared state', e)
         addToast('Invalid shared state link', 'error')
       }
+    } else if (stateParam && activeCodeFile && sharedCodeStateRef.current !== stateParam) {
+      // The canvas may already have been applied while the project query was
+      // loading; apply the code once the first code file becomes available.
+      try {
+        const decoded = decodeShareState(stateParam)
+        if (decoded.code) {
+          updateCodeFileContent(activeCodeFile.id, decoded.code)
+          sharedCodeStateRef.current = stateParam
+        }
+      } catch {
+        // The first branch reports malformed links to the user.
+      }
     }
-  }, [searchParams, loadCanvas, activeCodeFile, updateCodeFileContent, addToast])
+  }, [searchParams, loadCanvas, loadPcb, activeCodeFile, updateCodeFileContent, addToast, isSharedView, setCurrentProject])
+
+  // Canvas and PCB mutations do not pass through the project store, so track
+  // both against the last loaded/saved snapshots for autosave and the dirty marker.
+  useEffect(() => {
+    if (skipCanvasDirtyRef.current) {
+      skipCanvasDirtyRef.current = false
+      return
+    }
+    const canvasChanged = canvasSnapshotRef.current !== null
+      && serializeCanvas(nodes, wires) !== canvasSnapshotRef.current
+    const pcbChanged = pcbSnapshotRef.current !== null
+      && pcbSnapshot !== pcbSnapshotRef.current
+    if (isOwner && (canvasChanged || pcbChanged)) {
+      setDirty(true)
+    }
+  }, [isOwner, nodes, pcbSnapshot, setDirty, wires])
 
   // Broadcast layout changes during collaboration
   useEffect(() => {
-    if (isLiveSyncConnected) {
-      broadcastCanvasSync(nodes, wires)
+    // Public/shared projects may be subscribed to for presence and remote
+    // updates, but only owners/editors may publish canvas changes. Sending a
+    // canvas update from a read-only project makes the backend reject the
+    // STOMP frame, which used to trigger a reconnect loop and re-render this
+    // toolbar on every connection attempt.
+    if (isLiveSyncConnected && isOwner && !isPreset) {
+      broadcastCanvasSync(nodes, wires, viewport, usePcbStore.getState().getLayout())
     }
-  }, [broadcastCanvasSync, nodes, wires, isLiveSyncConnected])
+  }, [broadcastCanvasSync, isLiveSyncConnected, isOwner, isPreset, nodes, pcbSnapshot, viewport, wires])
 
   // ── Save mutation ──
   const saveMutation = useMutation({
@@ -238,11 +380,20 @@ export default function CircuitEditorPage() {
           nodes,
           wires,
           viewport: useCanvasStore.getState().viewport,
-        } as any,
+        },
+        componentConfig: {
+          ...(currentProject.componentConfig || {}),
+          pcbLayout: usePcbStore.getState().getLayout(),
+        },
         codeFiles,
       })
     },
     onSuccess: () => {
+      canvasSnapshotRef.current = serializeCanvas(
+        useCanvasStore.getState().nodes,
+        useCanvasStore.getState().wires,
+      )
+      pcbSnapshotRef.current = serializePcb(usePcbStore.getState().getLayout())
       setDirty(false)
       setSaving(false)
       addToast('Project saved successfully', 'success')
@@ -289,17 +440,24 @@ export default function CircuitEditorPage() {
   })
 
   // ── Share project ──
-  const handleShare = () => {
+  const handleShare = async () => {
     try {
       const state = {
         nodes,
         wires,
         code: activeCodeFile?.content || '',
+        codeFiles: currentProject?.codeFiles || (activeCodeFile ? [activeCodeFile] : []),
+        componentConfig: {
+          ...(currentProject?.componentConfig || {}),
+          pcbLayout: usePcbStore.getState().getLayout(),
+        },
+        viewport,
+        name: currentProject?.name || 'Shared Circuit',
         boardType: currentProject?.boardType || 'ARDUINO_UNO',
       }
-      const encoded = btoa(JSON.stringify(state))
-      const shareUrl = `${window.location.origin}/editor/share?state=${encoded}`
-      navigator.clipboard.writeText(shareUrl)
+      const encoded = encodeShareState(state)
+      const shareUrl = `${window.location.origin}/editor/share?state=${encodeURIComponent(encoded)}`
+      await navigator.clipboard.writeText(shareUrl)
       addToast('Share link copied to clipboard!', 'success')
     } catch {
       addToast('Failed to generate share link', 'error')
@@ -351,21 +509,21 @@ export default function CircuitEditorPage() {
         }
         if (e.key === 'z' && !e.shiftKey) {
           e.preventDefault()
-          undo()
+          if (isOwner) undo()
         }
         if (e.key === 'z' && e.shiftKey) {
           e.preventDefault()
-          redo()
+          if (isOwner) redo()
         }
         if (e.key === 'y') {
           e.preventDefault()
-          redo()
+          if (isOwner) redo()
         }
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [handleSave, undo, redo])
+  }, [handleSave, undo, redo, isOwner])
 
   // ── Canvas resize observer ──
   useEffect(() => {
@@ -447,6 +605,7 @@ export default function CircuitEditorPage() {
   // ── Simulation toggle ──
   const toggleSimulation = async () => {
     if (!isSimulating) {
+      const requestId = ++simulationRequestRef.current
       setIsSimulating(true)
       setIsSimulationPaused(false)
       setSimulating(true)
@@ -497,8 +656,12 @@ export default function CircuitEditorPage() {
         }
       }
 
+      // Stop can be clicked while a remote compiler request is pending. Do not
+      // start a worker after that stop has already invalidated this request.
+      if (requestId !== simulationRequestRef.current) return
       await engineRef.current?.start(bundledCode, nodes, wires, compiledHex)
     } else {
+      simulationRequestRef.current += 1
       setIsSimulating(false)
       setIsSimulationPaused(false)
       setSimulating(false)
@@ -573,8 +736,8 @@ export default function CircuitEditorPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <h1 className="vf-editor__project-name">{projectName}</h1>
               {isDirty && <span className="vf-editor__dirty-dot" />}
-              {isLiveSyncConnected && (
-                <span className="vf-status-badge">
+              {!isPreset && (
+                <span className="vf-status-badge" aria-hidden={!isLiveSyncConnected}>
                   <span className="vf-status-badge__dot" />
                   <span>Live Sync</span>
                 </span>
@@ -681,10 +844,10 @@ export default function CircuitEditorPage() {
 
           <span className="vf-editor__divider" />
 
-          <button className="vf-editor__tool-btn" onClick={undo} title="Undo (Ctrl+Z)">
+          <button className="vf-editor__tool-btn" onClick={undo} disabled={!isOwner} title="Undo (Ctrl+Z)">
             <Undo2 size={15} />
           </button>
-          <button className="vf-editor__tool-btn" onClick={redo} title="Redo (Ctrl+Y)">
+          <button className="vf-editor__tool-btn" onClick={redo} disabled={!isOwner} title="Redo (Ctrl+Y)">
             <Redo2 size={15} />
           </button>
 
@@ -881,6 +1044,7 @@ export default function CircuitEditorPage() {
                       width={canvasSize.width}
                       height={canvasSize.height}
                       projectName={projectName}
+                      readOnly={!isOwner}
                     />
                   </div>
                 )}
@@ -905,8 +1069,9 @@ export default function CircuitEditorPage() {
                   addToast('No active code file selected', 'error')
                 }
               }}
+              readOnly={!isOwner}
             />
-            <AiValidatorPanel isOpen={showAiValidator} onClose={() => setShowAiValidator(false)} />
+            <AiValidatorPanel isOpen={showAiValidator} readOnly={!isOwner} onClose={() => setShowAiValidator(false)} />
             <IotInspectorPanel isOpen={showIotInspector} onClose={() => setShowIotInspector(false)} />
             <PropertyEditor readOnly={!isOwner} />
           </div>

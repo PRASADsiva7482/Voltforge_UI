@@ -5,7 +5,7 @@ import { useSimulationStore } from '../../store/simulationStore';
 import { useToastStore } from '../../store/useToastStore';
 import { Loader2, Maximize2, Minimize2, AlignLeft, Eye, EyeOff, Cpu, Upload, X } from 'lucide-react';
 import type { OnMount } from '@monaco-editor/react';
-import { getBoardProfile } from '../canvas/boardCatalog';
+import { getBoardProfile, isBoardComponentType } from '../canvas/boardCatalog';
 
 const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.default })));
 
@@ -16,6 +16,13 @@ function generateFullCode(userCode: string, boardType?: string): string {
   // Collect pin assignments from connected components
   const pinDefs: string[] = [];
   const seenTypes = new Set<string>();
+  const pinNames = new Set<string>();
+
+  const identifier = (value: string) => value.replace(/[^A-Za-z0-9_]/g, '_').replace(/^([^A-Za-z_])/, '_$1');
+  const boardPinNumber = (pin: { id: string; name: string }) => {
+    const match = `${pin.name} ${pin.id}`.match(/\b(?:D)?(\d{1,2})\b/i);
+    return match ? Number(match[1]) : null;
+  };
 
   nodes.forEach(node => {
     const type = node.type;
@@ -31,6 +38,32 @@ function generateFullCode(userCode: string, boardType?: string): string {
     if (type.startsWith('SENSOR_') || type.startsWith('DISPLAY_') || type.startsWith('LCD')) {
       pinDefs.push(`// ${type.replace(/_/g, ' ')}: ${node.name}`);
     }
+  });
+
+  // Derive usable constants from actual schematic connections. The previous
+  // generator emitted only comments, so a "full sketch" could not address the
+  // components it described.
+  const boardNodes = nodes.filter((node) => isBoardComponentType(node.type));
+  const boardIds = new Set(boardNodes.map((node) => node.id));
+  useCanvasStore.getState().wires.forEach((wire) => {
+    const boardNode = boardIds.has(wire.fromNodeId)
+      ? nodes.find((node) => node.id === wire.fromNodeId)
+      : boardIds.has(wire.toNodeId)
+        ? nodes.find((node) => node.id === wire.toNodeId)
+        : undefined;
+    const peripheralId = boardIds.has(wire.fromNodeId) ? wire.toNodeId : wire.fromNodeId;
+    const peripheral = nodes.find((node) => node.id === peripheralId);
+    if (!boardNode || !peripheral) return;
+    const boardPinId = boardIds.has(wire.fromNodeId) ? wire.fromPinId : wire.toPinId;
+    const peripheralPinId = boardIds.has(wire.fromNodeId) ? wire.toPinId : wire.fromPinId;
+    const boardPin = boardNode.pins.find((pin) => pin.id === boardPinId);
+    const peripheralPin = peripheral.pins.find((pin) => pin.id === peripheralPinId);
+    const pinNumber = boardPin ? boardPinNumber(boardPin) : null;
+    if (pinNumber === null) return;
+    const constantName = `${identifier(peripheral.name)}_${identifier(peripheralPin?.name || peripheralPinId)}_PIN`.toUpperCase();
+    if (pinNames.has(constantName)) return;
+    pinNames.add(constantName);
+    pinDefs.push(`const int ${constantName} = ${pinNumber}; // ${peripheral.name} / ${peripheralPin?.name || peripheralPinId}`);
   });
 
   // Determine board-specific includes
@@ -60,7 +93,7 @@ function generateFullCode(userCode: string, boardType?: string): string {
     ...includes,
     '',
     '// ── Pin Definitions ─────────────────────────────────────────',
-    ...(pinDefs.length > 0 ? pinDefs : ['// No components on canvas']),
+    ...(pinDefs.length > 0 ? pinDefs : ['// No board-connected component pins detected']),
     '',
     '// ── User Code ───────────────────────────────────────────────',
     '',
@@ -189,6 +222,7 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
                 <Cpu size={12} />
                 <span>AVR8js: Custom HEX</span>
                 <button
+                  disabled={readOnly}
                   onClick={(e) => {
                     e.stopPropagation();
                     setCustomHex(null);
@@ -212,6 +246,7 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
               <button
                 className="vf-code-editor__action-btn"
                 onClick={() => fileInputRef.current?.click()}
+                disabled={readOnly}
                 title="Upload compiled Intel HEX file to run directly on AVR8js ATmega328P emulator"
                 style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
               >

@@ -61,6 +61,19 @@ export interface DrcViolation {
   y?: number;
 }
 
+export interface PcbLayout {
+  boardWidth_mm: number;
+  boardHeight_mm: number;
+  activeLayer: PcbLayer;
+  traceWidth_mil: number;
+  gridSnap_mm: number;
+  visibleLayers: Record<PcbLayer, boolean>;
+  viewport: { x: number; y: number; scale: number };
+  footprints: PcbFootprint[];
+  traces: PcbTrace[];
+  vias: PcbVia[];
+}
+
 interface PcbState {
   boardWidth_mm: number;
   boardHeight_mm: number;
@@ -68,6 +81,7 @@ interface PcbState {
   traceWidth_mil: number;
   gridSnap_mm: number;
   visibleLayers: Record<PcbLayer, boolean>;
+  viewport: { x: number; y: number; scale: number };
 
   footprints: PcbFootprint[];
   traces: PcbTrace[];
@@ -87,6 +101,7 @@ interface PcbState {
   setActiveLayer: (layer: PcbLayer) => void;
   setTraceWidth: (mil: number) => void;
   setGridSnap: (mm: number) => void;
+  setViewport: (viewport: { x: number; y: number; scale: number }) => void;
   toggleLayerVisibility: (layer: PcbLayer) => void;
 
   setFootprints: (footprints: PcbFootprint[]) => void;
@@ -98,12 +113,15 @@ interface PcbState {
   removeVia: (id: string) => void;
   setRatlines: (ratlines: Ratline[]) => void;
   setDrcViolations: (violations: DrcViolation[]) => void;
+  resetPcb: () => void;
+  loadPcb: (layout?: Partial<PcbLayout>) => void;
+  getLayout: () => PcbLayout;
 
   selectFootprint: (id: string | null) => void;
   selectTrace: (id: string | null) => void;
   startRouting: (startPad: { componentId: string; padId: string; x: number; y: number; netId?: string }) => void;
   updateActiveRoute: (point: { x: number; y: number }) => void;
-  finishRouting: (endPad?: { componentId: string; padId: string; x: number; y: number }) => void;
+  finishRouting: (endPad?: { componentId: string; padId: string; x: number; y: number; netId?: string }, routedPoints?: { x: number; y: number }[]) => void;
   cancelRouting: () => void;
 }
 
@@ -120,6 +138,7 @@ export const usePcbStore = create<PcbState>((set, get) => ({
     'B.Silk': true,
     'Edge.Cuts': true,
   },
+  viewport: { x: 0, y: 0, scale: 1 },
 
   footprints: [],
   traces: [],
@@ -136,6 +155,7 @@ export const usePcbStore = create<PcbState>((set, get) => ({
   setActiveLayer: (activeLayer) => set({ activeLayer }),
   setTraceWidth: (traceWidth_mil) => set({ traceWidth_mil }),
   setGridSnap: (gridSnap_mm) => set({ gridSnap_mm }),
+  setViewport: (viewport) => set({ viewport }),
 
   toggleLayerVisibility: (layer) => set((state) => ({
     visibleLayers: { ...state.visibleLayers, [layer]: !state.visibleLayers[layer] }
@@ -190,18 +210,28 @@ export const usePcbStore = create<PcbState>((set, get) => ({
     };
   }),
 
-  finishRouting: (_endPad) => {
+  finishRouting: (endPad, routedPoints) => {
     const { activeRoute, activeLayer, traceWidth_mil } = get();
-    if (!activeRoute || activeRoute.currentPoints.length < 2) {
+    if (!activeRoute) {
       set({ isRoutingTrace: false, activeRoute: null });
       return;
     }
 
+    const endPoint = endPad ? { x: endPad.x, y: endPad.y } : activeRoute.currentPoints[activeRoute.currentPoints.length - 1];
+    const points = routedPoints && routedPoints.length >= 2
+      ? routedPoints
+      : activeRoute.currentPoints.length >= 2
+        ? [...activeRoute.currentPoints.slice(0, -1), endPoint]
+        : [activeRoute.startPad ? { x: activeRoute.startPad.x, y: activeRoute.startPad.y } : endPoint, endPoint];
+    if (points.length < 2 || points[0].x === points[points.length - 1].x && points[0].y === points[points.length - 1].y) {
+      set({ isRoutingTrace: false, activeRoute: null });
+      return;
+    }
     const newTrace: PcbTrace = {
       id: `trace_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      netId: activeRoute.startPad?.netId || 'net_0',
+      netId: activeRoute.startPad?.netId || endPad?.netId || `net_${activeRoute.startPad?.componentId || 'unconnected'}_${activeRoute.startPad?.padId || 'pad'}`,
       layer: activeLayer === 'B.Cu' ? 'B.Cu' : 'F.Cu',
-      points: activeRoute.currentPoints,
+      points,
       width_mm: traceWidth_mil * 0.0254,
     };
 
@@ -213,4 +243,65 @@ export const usePcbStore = create<PcbState>((set, get) => ({
   },
 
   cancelRouting: () => set({ isRoutingTrace: false, activeRoute: null }),
+
+  resetPcb: () => set({
+    boardWidth_mm: 100,
+    boardHeight_mm: 80,
+    activeLayer: 'F.Cu',
+    traceWidth_mil: 10,
+    gridSnap_mm: 0.635,
+    visibleLayers: { 'F.Cu': true, 'B.Cu': true, 'F.Silk': true, 'B.Silk': true, 'Edge.Cuts': true },
+    viewport: { x: 0, y: 0, scale: 1 },
+    footprints: [],
+    traces: [],
+    vias: [],
+    ratlines: [],
+    drcViolations: [],
+    selectedFootprintId: null,
+    selectedTraceId: null,
+    isRoutingTrace: false,
+    activeRoute: null,
+  }),
+
+  loadPcb: (layout) => {
+    const defaults = get();
+    set({
+      boardWidth_mm: Number.isFinite(layout?.boardWidth_mm) ? Number(layout?.boardWidth_mm) : defaults.boardWidth_mm,
+      boardHeight_mm: Number.isFinite(layout?.boardHeight_mm) ? Number(layout?.boardHeight_mm) : defaults.boardHeight_mm,
+      activeLayer: layout?.activeLayer === 'B.Cu' ? 'B.Cu' : 'F.Cu',
+      traceWidth_mil: Number.isFinite(layout?.traceWidth_mil) ? Number(layout?.traceWidth_mil) : defaults.traceWidth_mil,
+      gridSnap_mm: Number.isFinite(layout?.gridSnap_mm) ? Number(layout?.gridSnap_mm) : defaults.gridSnap_mm,
+      visibleLayers: { ...defaults.visibleLayers, ...(layout?.visibleLayers || {}) },
+      viewport: {
+        x: Number(layout?.viewport?.x) || 0,
+        y: Number(layout?.viewport?.y) || 0,
+        scale: Math.max(0.2, Math.min(3, Number(layout?.viewport?.scale) || 1)),
+      },
+      footprints: Array.isArray(layout?.footprints) ? layout!.footprints! : [],
+      traces: Array.isArray(layout?.traces) ? layout!.traces! : [],
+      vias: Array.isArray(layout?.vias) ? layout!.vias! : [],
+      ratlines: [],
+      drcViolations: [],
+      selectedFootprintId: null,
+      selectedTraceId: null,
+      isRoutingTrace: false,
+      activeRoute: null,
+    });
+  },
+
+  getLayout: () => {
+    const state = get();
+    return {
+      boardWidth_mm: state.boardWidth_mm,
+      boardHeight_mm: state.boardHeight_mm,
+      activeLayer: state.activeLayer,
+      traceWidth_mil: state.traceWidth_mil,
+      gridSnap_mm: state.gridSnap_mm,
+      visibleLayers: state.visibleLayers,
+      viewport: state.viewport,
+      footprints: state.footprints,
+      traces: state.traces,
+      vias: state.vias,
+    };
+  },
 }));

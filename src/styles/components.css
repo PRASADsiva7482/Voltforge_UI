@@ -1864,9 +1864,12 @@
   background: rgba(34,197,94,0.1); color: #16a34a;
   border: 1px solid rgba(34,197,94,0.2);
 }
+.vf-status-badge[aria-hidden="true"] {
+  visibility: hidden;
+}
 .vf-status-badge__dot {
   width: 5px; height: 5px; border-radius: 50%;
-  background: #22c55e; animation: vf-pulse-glow 1.5s ease-in-out infinite;
+  background: #22c55e;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

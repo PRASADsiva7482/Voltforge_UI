@@ -8,6 +8,11 @@ import { useSimulationStore } from '../../store/simulationStore';
 import { CPU, avrInstruction, AVRIOPort, AVRUSART, AVRTimer, portBConfig, portCConfig, portDConfig, timer0Config, timer1Config, timer2Config, usart0Config, PinState as AvrPinState, AVRTWI, twiConfig, AVRADC, adcConfig } from 'avr8js';
 import { buildMNACircuit } from './NetlistBuilder';
 import type { MNACircuit } from './NetlistBuilder';
+import { VirtualNetworkStack } from './network/VirtualNetworkStack';
+import { MqttBridge } from './network/MqttBridge';
+import { I2cBusArbiter } from './bus/I2cBusArbiter';
+import { SpiBusRouter } from './bus/SpiBusRouter';
+import { UartBusRouter } from './bus/UartBusRouter';
 import type { WorkerInMessage, WorkerResultMessage, WorkerOscilloscopeMessage } from './SimulationWorker';
 import { LogicRegistry } from './logic/LogicRegistry';
 import { evaluateNumericExpression } from './ExpressionEvaluator';
@@ -257,6 +262,13 @@ export class SimulationEngine {
   private sensorAutoIntervalId: number | null = null;
   private sensorStartTime = 0;
   private servoAttachments = new Map<string, string>();
+  private virtualNetwork = VirtualNetworkStack.getInstance();
+  private mqttBridge = MqttBridge.getInstance();
+  private i2cBus = I2cBusArbiter.getInstance();
+  private spiBus = SpiBusRouter.getInstance();
+  private uartBus = UartBusRouter.getInstance();
+  private activeI2cAddress = 0;
+  private i2cWriteBuffer: number[] = [];
 
   constructor(callbacks: SimulationCallbacks) {
     this.callbacks = callbacks;
@@ -265,6 +277,7 @@ export class SimulationEngine {
   public async start(code: string, nodes: CanvasNode[], wires: Wire[], hex?: string) {
     if (this.isRunning) return;
     this.isRunning = true;
+    this.isPaused = false;
     this.tick = 0;
     this.delayAccumulator = 0;
     this.currentDelay = 0;
@@ -276,6 +289,8 @@ export class SimulationEngine {
     this.currentLine = null;
     this.localSerialBuffer = '';
     this.servoAttachments.clear();
+    this.activeI2cAddress = 0;
+    this.i2cWriteBuffer = [];
 
     // Reset LCD state
     this.lcdBuffer = Array.from({ length: this.lcdRows }, () => Array(this.lcdCols).fill(' '));
@@ -385,6 +400,26 @@ export class SimulationEngine {
     // Subscribe to canvas store changes to dynamically update MNA solver values
     this.storeUnsubscribe = useCanvasStore.subscribe((state, prev) => {
       if (!this.isRunning || !this.solverWorker || !this.mnaCircuit) return;
+
+      const nodeTopologyChanged = state.nodes.length !== prev.nodes.length || state.nodes.some((node) => {
+        const previous = prev.nodesById?.get(node.id) || prev.nodes.find((item) => item.id === node.id);
+        if (!previous || previous.type !== node.type || previous.pins.length !== node.pins.length) return true;
+        return node.pins.some((pin, index) => pin.id !== previous.pins[index]?.id);
+      });
+      const wireTopologyChanged = state.wires.length !== prev.wires.length || state.wires.some((wire) => {
+        const previous = prev.wires.find((item) => item.id === wire.id);
+        return !previous || previous.fromNodeId !== wire.fromNodeId || previous.fromPinId !== wire.fromPinId
+          || previous.toNodeId !== wire.toNodeId || previous.toPinId !== wire.toPinId;
+      });
+
+      // Rebuild the electrical netlist when a user adds/removes/reconnects a
+      // component. Property/drag updates continue through the lighter path
+      // below, so normal simulation ticks do not recreate the worker.
+      if (nodeTopologyChanged || wireTopologyChanged) {
+        this.stopMNASolver();
+        this.startMNASolver(state.nodes, state.wires);
+        return;
+      }
       if (state.nodes === prev.nodes) return;
 
       state.nodes.forEach(node => {
@@ -543,7 +578,7 @@ export class SimulationEngine {
 
       // Start execution loop for visual updates, animations, and diagnostics
       this.intervalId = window.setInterval(() => {
-        if (!this.isRunning) return;
+        if (!this.isRunning || this.isPaused) return;
 
         this.runBatched(() => {
           const inputs = useSimulationStore.getState().drainSerialInput();
@@ -559,7 +594,7 @@ export class SimulationEngine {
 
           if (!isPowered) return;
 
-          this.updateDiagnosticProbes(currentNodes, wires);
+          this.updateDiagnosticProbes(currentNodes, useCanvasStore.getState().wires);
           this.updateBldcMotorAnimation();
           this.updateDcMotorAnimation();
           this.emitDebugSnapshot(false);
@@ -572,19 +607,24 @@ export class SimulationEngine {
         try {
           const currentNodes = useCanvasStore.getState().nodes;
           // First run setup()
-          await this.executeParsedStatementsAsync(this.setupStatements, currentNodes, wires, true);
-          this.updateDiagnosticProbes(currentNodes, wires);
+          await this.executeParsedStatementsAsync(this.setupStatements, currentNodes, useCanvasStore.getState().wires, true);
+          this.updateDiagnosticProbes(currentNodes, useCanvasStore.getState().wires);
 
           // Then run loop() continuously
           while (this.isRunning && !this.avrCpu) {
+            if (this.isPaused) {
+              await new Promise(resolve => setTimeout(resolve, 25));
+              continue;
+            }
             const freshNodes = useCanvasStore.getState().nodes;
+            const freshWires = useCanvasStore.getState().wires;
             const freshMcuNode = freshNodes.find(n =>
               isBoardComponentType(n.type)
             );
             const isPowered = freshMcuNode ? freshMcuNode.properties?.boardPowered !== false : true;
 
             if (isPowered) {
-              await this.executeParsedStatementsAsync(this.loopStatements, freshNodes, wires, false);
+              await this.executeParsedStatementsAsync(this.loopStatements, freshNodes, freshWires, false);
             } else {
               await new Promise(resolve => setTimeout(resolve, 100));
             }
@@ -613,7 +653,7 @@ export class SimulationEngine {
   private startSensorAutoCycling(initialNodes: CanvasNode[]) {
     this.sensorStartTime = Date.now();
     this.sensorAutoIntervalId = window.setInterval(() => {
-      if (!this.isRunning) return;
+      if (!this.isRunning || this.isPaused) return;
       const nodes = useCanvasStore.getState().nodes;
       const elapsed = (Date.now() - this.sensorStartTime) / 1000; // seconds
       const updatesList: Array<{ id: string; changes: Partial<CanvasNode> }> = [];
@@ -1124,8 +1164,16 @@ export class SimulationEngine {
     return trimmed.endsWith(';') ? trimmed : `${trimmed};`;
   }
 
+  private async waitWhilePaused() {
+    while (this.isRunning && this.isPaused) {
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+  }
+
   private async executeParsedStatementsAsync(statements: ParsedStatement[], nodes: CanvasNode[], wires: Wire[], isSetup: boolean): Promise<void> {
     for (const stmt of statements) {
+      if (!this.isRunning) return;
+      await this.waitWhilePaused();
       if (!this.isRunning) return;
       if (stmt.type === 'if') {
         const cond = stmt.condition || '0';
@@ -1147,6 +1195,8 @@ export class SimulationEngine {
 
         let iterations = 0;
         while (this.isRunning && iterations < 10000) {
+          await this.waitWhilePaused();
+          if (!this.isRunning) return;
           const condition = stmt.condition?.trim();
           if (condition) {
             const preprocessed = this.preprocessExpression(condition);
@@ -1173,6 +1223,8 @@ export class SimulationEngine {
       } else if (stmt.type === 'while') {
         let iterations = 0;
         while (this.isRunning && iterations < 10000) {
+          await this.waitWhilePaused();
+          if (!this.isRunning) return;
           const condition = stmt.condition?.trim() || '0';
           const preprocessed = this.preprocessExpression(condition);
           if (this.evaluateExpression(preprocessed) === 0) break;
@@ -1195,6 +1247,10 @@ export class SimulationEngine {
         if (!codeText) continue;
 
         this.currentLine = this.findLineForStatement(stmt.code);
+
+        if (this.executeVirtualPeripheralStatement(codeText)) {
+          continue;
+        }
 
         // pinMode(pin, mode)
         const pinMode = codeText.match(/pinMode\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)/);
@@ -1952,6 +2008,89 @@ export class SimulationEngine {
     return val;
   }
 
+  private stringArguments(code: string): string[] {
+    return Array.from(code.matchAll(/(['"])(.*?)\1/g)).map((match) => match[2]);
+  }
+
+  private numericArguments(code: string): number[] {
+    const args = code.slice(code.indexOf('(') + 1);
+    return Array.from(args.matchAll(/(?:0x[0-9a-f]+|-?\d+(?:\.\d+)?)/gi))
+      .map((match) => match[0].toLowerCase().startsWith('0x') ? parseInt(match[0], 16) : Number(match[0]))
+      .filter((value) => Number.isFinite(value));
+  }
+
+  /** Execute common Arduino network/bus calls against the in-process
+   * emulators so the inspector reflects firmware activity. */
+  private executeVirtualPeripheralStatement(codeText: string): boolean {
+    const strings = this.stringArguments(codeText);
+    const numbers = this.numericArguments(codeText);
+
+    if (/\bWiFi\.begin\s*\(/i.test(codeText)) {
+      this.virtualNetwork.connectWiFi(strings[0] || 'VoltForge-Guest', strings[1]);
+      this.globals.WL_CONNECTED = 3;
+      return true;
+    }
+    if (/\bWiFi\.disconnect\s*\(/i.test(codeText)) {
+      this.virtualNetwork.disconnectWiFi();
+      this.globals.WL_CONNECTED = 6;
+      return true;
+    }
+    if (/\b(?:mqtt|client|mqttClient)\.setServer\s*\(/i.test(codeText)) {
+      this.mqttBridge.setServer(strings[0] || 'broker.hivemq.com', numbers[0] || 1883);
+      return true;
+    }
+    if (/\b(?:mqtt|client|mqttClient)\.connect\s*\(/i.test(codeText)) {
+      this.mqttBridge.connect(strings[0] || 'voltforge_client', strings[1], strings[2]);
+      return true;
+    }
+    if (/\b(?:mqtt|client|mqttClient)\.disconnect\s*\(/i.test(codeText)) {
+      this.mqttBridge.disconnect();
+      return true;
+    }
+    if (/\b(?:mqtt|client|mqttClient)\.subscribe\s*\(/i.test(codeText)) {
+      this.mqttBridge.subscribe(strings[0] || '#');
+      return true;
+    }
+    if (/\b(?:mqtt|client|mqttClient)\.publish\s*\(/i.test(codeText)) {
+      this.mqttBridge.publish(strings[0] || 'voltforge/telemetry', strings[1] || '');
+      return true;
+    }
+    if (/\b(?:http|httpClient)\.(?:GET|get)\s*\(/i.test(codeText)) {
+      void this.virtualNetwork.httpGet(strings[0] || 'https://example.invalid/');
+      return true;
+    }
+    if (/\b(?:http|httpClient)\.(?:POST|post)\s*\(/i.test(codeText)) {
+      void this.virtualNetwork.httpPost(strings[0] || 'https://example.invalid/', strings[1] || '');
+      return true;
+    }
+    if (/\bWire\.beginTransmission\s*\(/i.test(codeText)) {
+      this.activeI2cAddress = numbers[0] || 0x27;
+      this.i2cWriteBuffer = [];
+      return true;
+    }
+    if (/\bWire\.write\s*\(/i.test(codeText)) {
+      this.i2cWriteBuffer.push(numbers[0] ?? 0);
+      return true;
+    }
+    if (/\bWire\.endTransmission\s*\(/i.test(codeText)) {
+      this.i2cBus.writeTransaction(this.activeI2cAddress || 0x27, this.i2cWriteBuffer);
+      this.i2cWriteBuffer = [];
+      return true;
+    }
+    if (/\bWire\.requestFrom\s*\(/i.test(codeText)) {
+      this.i2cBus.readTransaction(numbers[0] || this.activeI2cAddress || 0x27, numbers[1] || 1);
+      return true;
+    }
+    if (/\bSPI\.transfer\s*\(/i.test(codeText)) {
+      this.spiBus.transfer(String(numbers[0] ?? 'CS'), numbers[1] ?? 0);
+      return true;
+    }
+    if (/\bSerial\.(?:print|println)\s*\(/i.test(codeText)) {
+      this.uartBus.transmit('default', strings.join(' '));
+    }
+    return false;
+  }
+
   public setExternalPinState(pin: string, state: PinState) {
     const canonical = this.canonicalPin(pin);
     if (!this.pins[canonical]) {
@@ -2044,7 +2183,7 @@ export class SimulationEngine {
 
     this.callbacks.onSerialOutput('> AVR8js CPU Started');
     this.intervalId = window.setInterval(() => {
-      if (!this.isRunning || !this.avrCpu) return;
+      if (!this.isRunning || this.isPaused || !this.avrCpu) return;
       const cpu = this.avrCpu;
 
       this.runBatched(() => {
@@ -2214,6 +2353,7 @@ export class SimulationEngine {
 
   public stop() {
     this.isRunning = false;
+    this.isPaused = false;
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
@@ -2225,6 +2365,8 @@ export class SimulationEngine {
     this.stopMNASolver();
     this.stopSensorAutoCycling();
     AudioEngine.stopTone();
+    this.mqttBridge.disconnect();
+    this.virtualNetwork.disconnectWiFi();
     if (this.storeUnsubscribe) {
       this.storeUnsubscribe();
       this.storeUnsubscribe = null;
@@ -2386,6 +2528,7 @@ export class SimulationEngine {
         numNodes: this.mnaCircuit.numNodes,
         elements: this.mnaCircuit.elements,
         dt: 0.001, // 1ms time step
+        scopeChannels: this.mnaCircuit.scopeChannels,
       };
       this.solverWorker.postMessage(initMsg);
 
@@ -2419,6 +2562,14 @@ export class SimulationEngine {
     // Clear solver state in store
     useSimulationStore.getState().setCircuitState({}, {}, {}, {}, true);
     useSimulationStore.getState().clearOscilloscopeData();
+    useSimulationStore.getState().setLiveMeter({
+      voltage: 0,
+      acVoltage: 0,
+      current_mA: 0,
+      resistance_ohm: Number.POSITIVE_INFINITY,
+      positiveLabel: 'Probe (+)',
+      negativeLabel: 'Probe (-)',
+    });
   }
 
   /** Pause all simulation-time work while retaining the solved circuit state. */
@@ -2635,6 +2786,34 @@ export class SimulationEngine {
       componentPower,
       result.converged
     );
+
+    // Feed the floating multimeter from the two canvas probe clips. Previously
+    // only an on-canvas MULTIMETER component was updated, leaving the panel at
+    // its zero-value placeholder forever.
+    const meterProbes = useSimulationStore.getState().meterProbes.slice(0, 2);
+    if (meterProbes.length > 0) {
+      const probeValues = meterProbes.map((probe) => {
+        const mnaNode = pinToMNANode.get(`${probe.nodeId}:${probe.pinId}`) ?? 0;
+        return result.nodeVoltages[mnaNode] ?? 0;
+      });
+      const voltage = Math.abs((probeValues[0] || 0) - (probeValues[1] || 0));
+      const attachedWireCurrents = useCanvasStore.getState().wires
+        .filter((wire) => meterProbes.some((probe) =>
+          (wire.fromNodeId === probe.nodeId && wire.fromPinId === probe.pinId) ||
+          (wire.toNodeId === probe.nodeId && wire.toPinId === probe.pinId)))
+        .map((wire) => Math.abs(wireCurrents[wire.id] || 0));
+      const currentA = attachedWireCurrents.length > 0 ? Math.max(...attachedWireCurrents) : 0;
+      useSimulationStore.getState().setLiveMeter({
+        voltage,
+        acVoltage: voltage,
+        current_mA: currentA * 1000,
+        resistance_ohm: currentA > 1e-9 ? voltage / currentA : Number.POSITIVE_INFINITY,
+        positiveLabel: `${nodes.find((node) => node.id === meterProbes[0].nodeId)?.name || meterProbes[0].nodeId}:${meterProbes[0].pinId}`,
+        negativeLabel: meterProbes[1]
+          ? `${nodes.find((node) => node.id === meterProbes[1].nodeId)?.name || meterProbes[1].nodeId}:${meterProbes[1].pinId}`
+          : 'COM (0 V)',
+      });
+    }
 
     // ── MCU Board Input Feedback ──
     const mcuNode = nodes.find(n =>
@@ -3329,8 +3508,17 @@ export class SimulationEngine {
    */
   private handleOscilloscopeData(msg: WorkerOscilloscopeMessage) {
     const store = useSimulationStore.getState();
-    for (const [nodeIdx, voltage] of Object.entries(msg.samples)) {
-      store.appendOscilloscopeData(nodeIdx, voltage);
+    const frames = msg.frames?.length
+      ? msg.frames
+      : [{ timestamp: msg.timestamp, samples: msg.samples }];
+    for (const frame of frames) {
+      for (const [channel, voltage] of Object.entries(frame.samples)) {
+        store.appendOscilloscopeData(channel, voltage);
+      }
+      store.appendLogicCapture({
+        timestamp_s: frame.timestamp,
+        channels: frame.samples,
+      });
     }
   }
 }
