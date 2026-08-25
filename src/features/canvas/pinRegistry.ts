@@ -362,20 +362,22 @@ const IC_555_PINS: PinPosition[] = [
 
 // IC_74HC595: SVG viewBox 120×50
 const IC_74HC595_PINS: PinPosition[] = [
-  pin('qb', 'QB', 7, 11, 'output'),
-  pin('qc', 'QC', 7, 17, 'output'),
-  pin('qd', 'QD', 7, 23, 'output'),
-  pin('qe', 'QE', 7, 29, 'output'),
-  pin('qf', 'QF', 7, 35, 'output'),
-  pin('gnd', 'GND', 7, 41, 'ground'),
-  pin('qhp', 'QH_OUT', 113, 11, 'output'),
-  pin('srclr', 'SRCLR', 113, 17, 'input'),
-  pin('srclk', 'SRCLK', 113, 23, 'input'),
-  pin('rclk', 'RCLK', 113, 29, 'input'),
-  pin('oe', 'OE', 113, 35, 'input'),
-  pin('ser', 'SER', 113, 41, 'input'),
-  pin('qa', 'QA', 113, 47, 'output'),
-  pin('vcc', 'VCC', 7, 47, 'power'),
+  pin('qb', 'QB', 7, 8, 'output'),
+  pin('qc', 'QC', 7, 14, 'output'),
+  pin('qd', 'QD', 7, 20, 'output'),
+  pin('qe', 'QE', 7, 26, 'output'),
+  pin('qf', 'QF', 7, 32, 'output'),
+  pin('qg', 'QG', 7, 38, 'output'),
+  pin('qh', 'QH', 7, 44, 'output'),
+  pin('gnd', 'GND', 7, 50, 'ground'),
+  pin('qhp', 'QH_OUT', 113, 8, 'output'),
+  pin('srclr', 'SRCLR', 113, 14, 'input'),
+  pin('srclk', 'SRCLK', 113, 20, 'input'),
+  pin('rclk', 'RCLK', 113, 26, 'input'),
+  pin('oe', 'OE', 113, 32, 'input'),
+  pin('ser', 'SER', 113, 38, 'input'),
+  pin('qa', 'QA', 113, 44, 'output'),
+  pin('vcc', 'VCC', 113, 50, 'power'),
 ];
 
 // IC_74HC165: 8-bit PISO Shift Register (DIP-16)

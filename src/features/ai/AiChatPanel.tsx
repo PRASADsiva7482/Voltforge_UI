@@ -7,6 +7,7 @@ import { useToastStore } from '../../store/useToastStore'
 import { aiApi } from '../../api/services'
 import { buildCircuitNetlist } from '../canvas/netlist'
 import { getPinsForComponent } from '../canvas/pinRegistry'
+import { validateAiWire } from './aiWireValidation'
 import { Textarea } from '../../components/ui/Field'
 import { SuggestionsList } from '../../components/ui/SuggestionsList'
 import { CodeBlock } from '../../components/ui/CodeBlock'
@@ -55,16 +56,6 @@ function hasWire(wires: Wire[], fromNodeId: string, fromPinId: string, toNodeId:
   return wires.some((wire) =>
     (wire.fromNodeId === fromNodeId && wire.fromPinId === fromPinId && wire.toNodeId === toNodeId && wire.toPinId === toPinId) ||
     (wire.fromNodeId === toNodeId && wire.fromPinId === toPinId && wire.toNodeId === fromNodeId && wire.toPinId === fromPinId)
-  )
-}
-
-function hasValidConnection(nodes: CanvasNode[], suggestion: AiWireSuggestion) {
-  const from = nodes.find((node) => node.id === suggestion.fromComponentId)
-  const to = nodes.find((node) => node.id === suggestion.toComponentId)
-  return Boolean(
-    from?.pins.some((pin) => pin.id === suggestion.fromPin || pin.name === suggestion.fromPin) &&
-    to?.pins.some((pin) => pin.id === suggestion.toPin || pin.name === suggestion.toPin) &&
-    from.id !== to.id,
   )
 }
 
@@ -353,8 +344,9 @@ export default function AiChatPanel({
 
   const applyWireSuggestion = (suggestion: AiWireSuggestion) => {
     if (readOnly) return
-    if (!hasValidConnection(nodes, suggestion)) {
-      addToast('AI suggested a pin that is not present on this canvas.', 'error')
+    const validationError = validateAiWire(nodes, suggestion)
+    if (validationError) {
+      addToast(validationError, 'error')
       return
     }
     if (hasWire(wires, suggestion.fromComponentId, suggestion.fromPin, suggestion.toComponentId, suggestion.toPin)) {

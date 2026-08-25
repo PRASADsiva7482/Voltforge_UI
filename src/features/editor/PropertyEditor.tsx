@@ -15,7 +15,11 @@ const BOARD_READONLY_KEYS = new Set([
 
 /** Simulation state keys — always read-only on every component. */
 const SIM_STATE_KEYS = new Set([
-  'isBlown', 'faultMessage', 'isLit', 'currentMa', 'isSpinning',
+  'isBlown', 'faultMessage', 'isLit', 'currentMa', 'measuredCurrent', 'isSpinning',
+  'isBeeping', 'isActive', 'isSwitched_1', 'isSwitched_2', 'isSwitched_3', 'isSwitched_4',
+  'rpm', 'escRpm', 'bldcRpm', 'bldcRotation', 'boardPowered', 'builtInLedLit',
+  'powered', 'outputHigh', 'outputVoltage', 'isRegulating', 'timerState',
+  'shiftRegValue', 'latchRegValue', 'prevSrclk', 'prevRclk',
 ]);
 
 function isReadonly(key: string, nodeType: string): boolean {

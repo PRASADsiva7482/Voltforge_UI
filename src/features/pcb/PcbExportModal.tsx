@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle, Download, Layers, ShieldCheck } from 'lucide-react';
 import { FloatingPanel } from '../../components/ui/FloatingPanel';
 import { pcbManufacturingApi, type PcbManufacturingPayload } from '../../api/services';
@@ -35,6 +35,19 @@ export default function PcbExportModal({
   const hasErrors = violations.some((v) => v.severity === 'ERROR');
   const hasWarnings = violations.some((v) => v.severity === 'WARNING');
   const canExport = drcRan && !hasErrors && !isRunningDrc && !isExporting;
+  const designSignature = useMemo(
+    () => JSON.stringify({ boardWidth_mm, boardHeight_mm, footprints, traces, vias, wires }),
+    [boardHeight_mm, boardWidth_mm, footprints, traces, vias, wires],
+  );
+
+  useEffect(() => {
+    // A DRC result is only valid for the exact layout that was checked.
+    // Invalidate it whenever the schematic/PCB design changes.
+    setDrcRan(false);
+    setViolations([]);
+    setDrcViolations([]);
+    setErrorMessage(null);
+  }, [designSignature, setDrcViolations]);
 
   const buildPayload = (): PcbManufacturingPayload => ({
     boardHeight_mm,

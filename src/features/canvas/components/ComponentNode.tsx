@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo, useState, useCallback, memo } from 'react';
+import { useRef, useEffect, useMemo, useState, memo } from 'react';
 import { Group, Rect, Text, Circle, Image as KonvaImage, Transformer, Line, Arc } from 'react-konva';
 import Konva from 'konva';
 
@@ -7,8 +7,10 @@ import { useCanvasStore } from '../../../store/canvasStore';
 import { useSimulationStore } from '../../../store/simulationStore';
 import { getPinAbsPos, snapToRoutingGuides } from '../../../utils/wireRouting';
 import { componentSvgs } from '../componentSvgs';
+import { normalizePotentiometerPosition, potentiometerPositionPercent } from '../componentContracts';
 import { isBoardComponentType } from '../boardCatalog';
 import { SIMULATION_MODELS } from '../../simulator/simulationModels';
+import { AudioEngine } from '../../simulator/AudioEngine';
 import PinDot from './PinDot';
 import type { CanvasNode } from '../canvasTypes';
 
@@ -98,7 +100,7 @@ const useImage = (url: string) => {
   return image;
 };
 
-const getBoardLedPositions = (type: string, width: number, height: number) => {
+const getBoardLedPositions = (type: string) => {
   if (type.startsWith('ARDUINO_MEGA')) {
     return {
       pwr: { x: 30, y: 20 },
@@ -428,7 +430,7 @@ const ComponentNode = ({
       onChange({
         properties: {
           ...node.properties,
-          position: Math.round(pct),
+          position: Math.round(pct) / 100,
         },
       });
     };
@@ -493,8 +495,8 @@ const ComponentNode = ({
     e.cancelBubble = true;
     e.evt.preventDefault();
     const delta = e.evt.deltaY > 0 ? -5 : 5;
-    const currentPos = Number(node.properties?.position !== undefined ? node.properties.position : 50);
-    const newPos = Math.max(0, Math.min(100, currentPos + delta));
+    const currentPos = potentiometerPositionPercent(node.properties?.position, 0.5);
+    const newPos = Math.max(0, Math.min(100, currentPos + delta)) / 100;
     onChange({
       properties: {
         ...node.properties,
@@ -646,9 +648,9 @@ const ComponentNode = ({
     const currentBeeping = Boolean(isSimulating && node.properties?.isBeeping);
     if (currentBeeping && !prevBeepingRef.current) {
       const freq = Number(node.properties?.frequency) || 1000;
-      // AudioEngine not available in UI2
+      try { AudioEngine.playTone(freq, 'square', 0.08); } catch { /* audio is optional */ }
     } else if (!currentBeeping && prevBeepingRef.current) {
-      // AudioEngine not available in UI2
+      AudioEngine.stopTone();
     }
     prevBeepingRef.current = currentBeeping;
   }, [isSimulating, node.properties?.isBeeping, node.properties?.frequency]);
@@ -656,7 +658,7 @@ const ComponentNode = ({
   useEffect(() => {
     const currentPressed = Boolean(node.properties?.isPressed);
     if (currentPressed && !prevPressedRef.current && isButton) {
-      // AudioEngine not available in UI2
+      try { AudioEngine.playClick('button'); } catch { /* audio is optional */ }
     }
     prevPressedRef.current = currentPressed;
   }, [node.properties?.isPressed, isButton]);
@@ -664,15 +666,15 @@ const ComponentNode = ({
   useEffect(() => {
     const currentClosed = Boolean(node.properties?.isClosed);
     if (isSwitch && prevClosedRef.current !== undefined && currentClosed !== prevClosedRef.current) {
-      // AudioEngine not available in UI2
+      try { AudioEngine.playClick('switch'); } catch { /* audio is optional */ }
     }
     prevClosedRef.current = currentClosed;
   }, [node.properties?.isClosed, isSwitch]);
 
   useEffect(() => {
     const currentActive = Boolean(node.properties?.isActive);
-    if (isRelay && currentActive && !prevRelayActiveRef.current) {
-      // AudioEngine not available in UI2
+    if (isRelay && prevRelayActiveRef.current !== undefined && currentActive !== prevRelayActiveRef.current) {
+      try { AudioEngine.playClick('relay'); } catch { /* audio is optional */ }
     }
     prevRelayActiveRef.current = currentActive;
   }, [node.properties?.isActive, isRelay]);
@@ -917,8 +919,8 @@ const ComponentNode = ({
 
         {/* Potentiometer dial knob overlay */}
         {node.type === 'POTENTIOMETER' && (() => {
-          const position = Number(node.properties?.position !== undefined ? node.properties.position : 50);
-          const displayAngle = 135 + (position / 100) * 270;
+          const position = normalizePotentiometerPosition(node.properties?.position, 0.5);
+          const displayAngle = 135 + position * 270;
           return (
             <Group
               x={25}
@@ -964,7 +966,7 @@ const ComponentNode = ({
 
         {node.type === 'POTENTIOMETER' && (
           <Text
-            text={`${Math.round(Number(node.properties?.position !== undefined ? node.properties.position : 50))}%`}
+            text={`${Math.round(potentiometerPositionPercent(node.properties?.position, 0.5))}%`}
             x={0}
             y={43}
             width={50}
@@ -1360,15 +1362,6 @@ const ComponentNode = ({
           const litColor = '#ef4444';
           const dimColor = 'rgba(239,68,68,0.12)';
           // Segment geometry (relative to 50×70 viewBox)
-          const segDefs: Record<string, { d: string }> = {
-            a: { d: 'M12 8 h26 l-4 4 h-18 Z' },
-            b: { d: 'M40 12 l4 4 v18 l-4 4 l-4-4 v-18 Z' },
-            c: { d: 'M40 40 l4 4 v18 l-4 4 l-4-4 v-18 Z' },
-            d: { d: 'M12 62 h26 l-4-4 h-18 Z' },
-            e: { d: 'M10 40 l-4 4 v18 l4 4 l4-4 v-18 Z' },
-            f: { d: 'M10 12 l-4 4 v18 l4 4 l4-4 v-18 Z' },
-            g: { d: 'M12 35 h26 l-4 4 h-18 Z' },
-          };
           // We can't render SVG path in Konva directly, but we use Rects as approximation
           // For a realistic 7-seg, overlay colored rectangles at segment positions
           const segRects: { key: string; x: number; y: number; w: number; h: number; rot?: number }[] = [
@@ -1695,7 +1688,7 @@ const ComponentNode = ({
         {isBoard && (() => {
           const isPwrOn = Boolean(isSimulating) && Boolean(node.properties?.boardPowered);
           const isLOn = isPwrOn && Boolean(node.properties?.builtInLedLit);
-          const leds = getBoardLedPositions(node.type, node.width, node.height);
+          const leds = getBoardLedPositions(node.type);
           
           return (
             <>

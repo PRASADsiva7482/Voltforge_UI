@@ -8,16 +8,27 @@ import { useSimulationStore } from '../../store/simulationStore';
 import { CPU, avrInstruction, AVRIOPort, AVRUSART, AVRTimer, portBConfig, portCConfig, portDConfig, timer0Config, timer1Config, timer2Config, usart0Config, PinState as AvrPinState, AVRTWI, twiConfig, AVRADC, adcConfig } from 'avr8js';
 import { buildMNACircuit } from './NetlistBuilder';
 import type { MNACircuit } from './NetlistBuilder';
+import { normalizePotentiometerPosition } from '../canvas/componentContracts';
 import { VirtualNetworkStack } from './network/VirtualNetworkStack';
 import { MqttBridge } from './network/MqttBridge';
 import { I2cBusArbiter } from './bus/I2cBusArbiter';
 import { SpiBusRouter } from './bus/SpiBusRouter';
 import { UartBusRouter } from './bus/UartBusRouter';
 import type { WorkerInMessage, WorkerResultMessage, WorkerOscilloscopeMessage } from './SimulationWorker';
+
+const SIMULATION_RUNTIME_PROPERTY_KEYS = new Set([
+  'boardPowered', 'builtInLedLit', 'isBlown', 'faultMessage', 'isLit', 'currentMa', 'measuredCurrent',
+  'isSpinning', 'isBeeping', 'isActive', 'isPressed', 'isClosed', 'motionDetected', 'powered',
+  'outputHigh', 'temperature', 'humidity', 'distance', 'distanceCm', 'accelerationX', 'accelerationY',
+  'accelerationZ', 'gyroX', 'gyroY', 'gyroZ', 'moistureLevel', 'lightLevel', 'lcdLine1', 'lcdLine2',
+  'lcdBacklight', 'displayValue', 'displayText', 'segments', 'timerState', 'shiftRegValue', 'latchRegValue',
+  'prevSrclk', 'prevRclk', 'outputVoltage', 'isRegulating', 'escThrottle', 'escRpm', 'bldcRpm',
+  'bldcRotation', 'angle', 'rpm', 'rotation', 'currentAngle', 'isOn', 'isPowered', 'lastCommand',
+]);
 import { LogicRegistry } from './logic/LogicRegistry';
 import { evaluateNumericExpression } from './ExpressionEvaluator';
 import { AudioEngine } from './AudioEngine';
-import { getBoardLogicVoltage, isBoardComponentType } from '../canvas/boardCatalog';
+import { getBoardLogicVoltage, getBoardPinNumber, getBoardPowerVoltage, isBoardComponentType, supportsAvr8js } from '../canvas/boardCatalog';
 
 export type PinState = 'HIGH' | 'LOW' | 'INPUT' | 'OUTPUT' | 'PWM';
 
@@ -178,7 +189,7 @@ class LcdTWIEventHandler {
     this.twi.completeStop();
   }
 
-  connectToSlave(address: number, write: boolean) {
+  connectToSlave(address: number, _write: boolean) {
     this.activeAddress = address;
     const ack = (address === 0x27 || address === 0x3f);
     this.twi.completeConnect(ack);
@@ -269,12 +280,15 @@ export class SimulationEngine {
   private uartBus = UartBusRouter.getInstance();
   private activeI2cAddress = 0;
   private i2cWriteBuffer: number[] = [];
+  private i2cReadBuffer: number[] = [];
+  private virtualI2cAddresses = new Set<number>();
+  private compatibilityWarnings = new Set<string>();
 
   constructor(callbacks: SimulationCallbacks) {
     this.callbacks = callbacks;
   }
 
-  public async start(code: string, nodes: CanvasNode[], wires: Wire[], hex?: string) {
+  public async start(code: string, nodes: CanvasNode[], wires: Wire[], hex?: string, boardType?: string) {
     if (this.isRunning) return;
     this.isRunning = true;
     this.isPaused = false;
@@ -291,6 +305,9 @@ export class SimulationEngine {
     this.servoAttachments.clear();
     this.activeI2cAddress = 0;
     this.i2cWriteBuffer = [];
+    this.i2cReadBuffer = [];
+    this.unregisterVirtualI2cDevices();
+    this.compatibilityWarnings.clear();
 
     // Reset LCD state
     this.lcdBuffer = Array.from({ length: this.lcdRows }, () => Array(this.lcdCols).fill(' '));
@@ -388,6 +405,10 @@ export class SimulationEngine {
     // the pre-reset snapshot (often boardPowered=false after a previous stop).
     // Always initialize the electrical runtime from the refreshed store state.
     const initializedNodes = useCanvasStore.getState().nodes;
+    const boardNodes = initializedNodes.filter((node) => isBoardComponentType(node.type));
+    if (boardNodes.length > 1) {
+      this.callbacks.onSerialOutput(`[WARN] ${boardNodes.length} MCU boards are placed; compatibility firmware execution targets the first board (${boardNodes[0].type})`);
+    }
     this.lcdNodes = initializedNodes.filter(n =>
       n.type === 'DISPLAY_LCD_I2C' || n.type === 'LCD_16X2' ||
       n.type === 'DISPLAY_OLED' || n.type === 'OLED_DISPLAY'
@@ -396,6 +417,7 @@ export class SimulationEngine {
     this.bldcNodes = initializedNodes.filter(n => n.type === 'MOTOR_BLDC');
     this.dcMotorNodes = initializedNodes.filter(n => n.type === 'MOTOR_DC');
     this.stepperNodes = initializedNodes.filter(n => n.type === 'MOTOR_STEPPER' || n.type === 'STEPPER_MOTOR');
+    this.registerVirtualI2cDevices(initializedNodes);
 
     // Subscribe to canvas store changes to dynamically update MNA solver values
     this.storeUnsubscribe = useCanvasStore.subscribe((state, prev) => {
@@ -422,6 +444,7 @@ export class SimulationEngine {
       }
       if (state.nodes === prev.nodes) return;
 
+      let modelPropertyChanged = false;
       state.nodes.forEach(node => {
         const prevNode = prev.nodesById?.get(node.id) || prev.nodes.find(n => n.id === node.id);
         if (!prevNode) return;
@@ -429,10 +452,15 @@ export class SimulationEngine {
         const props = node.properties || {};
         const prevProps = prevNode.properties || {};
 
+        const propertyKeys = new Set([...Object.keys(props), ...Object.keys(prevProps)]);
+        if ([...propertyKeys].some((key) => !SIMULATION_RUNTIME_PROPERTY_KEYS.has(key) && props[key] !== prevProps[key])) {
+          modelPropertyChanged = true;
+        }
+
         // 1. Potentiometer position change
         if (node.type === 'POTENTIOMETER' && props.position !== prevProps.position) {
           const total = Number(props.maxResistance) || Number(props.resistance) || 10000;
-          const pos = Number(props.position !== undefined ? props.position : 50) / 100;
+          const pos = normalizePotentiometerPosition(props.position, 0.5);
           const rTop = Math.max(total * pos, 1);
           const rBot = Math.max(total * (1 - pos), 1);
 
@@ -493,7 +521,7 @@ export class SimulationEngine {
           this.solverWorker?.postMessage({
             type: 'UPDATE_PIN',
             elementId: `vs_pir_${node.id}`,
-            voltage: hasMotion ? 5 : 0,
+            voltage: hasMotion ? this.logicVoltageForNodes(state.nodes) : 0,
           });
         }
 
@@ -544,22 +572,47 @@ export class SimulationEngine {
           this.solverWorker?.postMessage({
             type: 'UPDATE_PIN',
             elementId: `vs_soil_${node.id}`,
-            voltage: moisture * 5,
+            voltage: moisture * this.logicVoltageForNodes(state.nodes),
           });
         }
 
+        // 8. ESC phase output follows the simulated throttle without
+        // restarting the worker. The visual ESC logic stores throttle as a
+        // percentage while the MNA phase sources use volts.
+        if (node.type === 'ESC_MODULE' && props.escThrottle !== prevProps.escThrottle) {
+          const outputVoltage = Math.max(0, Number(props.outputVoltage ?? 12) || 12);
+          const throttle = Math.max(0, Math.min(100, Number(props.escThrottle) || 0));
+          const phaseVoltage = outputVoltage * throttle / 100;
+          for (const phasePin of ['phase_a', 'phase_b', 'phase_c']) {
+            this.solverWorker?.postMessage({
+              type: 'UPDATE_PIN',
+              elementId: `vs_esc_phase_${phasePin}_${node.id}`,
+              voltage: phaseVoltage,
+            });
+          }
+        }
+
       });
+
+      if (modelPropertyChanged) {
+        this.refreshMnaElements(state.nodes, state.wires);
+      }
     });
 
     try {
       this.originalCodeLines = code.split('\n');
 
-      if (hex?.trim()) {
+      const runtimeBoardType = boardType || initializedNodes.find((node) => isBoardComponentType(node.type))?.type || 'ARDUINO_UNO';
+      if (hex?.trim() && supportsAvr8js(runtimeBoardType)) {
         this.callbacks.onSerialOutput('> Starting AVR8js ATmega328P emulator...');
         this.parseCode(code);
         this.startMNASolver(initializedNodes, wires);
         this.startAvr(hex, initializedNodes, wires);
         return;
+      }
+
+      if (hex?.trim()) {
+        this.callbacks.onSerialOutput(`> HEX target ${runtimeBoardType} is not supported by the ATmega328P browser emulator; using source compatibility mode`);
       }
 
       this.callbacks.onSerialOutput('> Starting compatibility interpreter...');
@@ -638,7 +691,7 @@ export class SimulationEngine {
       runInterpreter();
 
       // ── Start sensor auto-cycling for live overlays ──
-      this.startSensorAutoCycling(initializedNodes);
+      this.startSensorAutoCycling();
 
     } catch (err: any) {
       this.callbacks.onError(err.message || 'Simulation Error');
@@ -650,7 +703,7 @@ export class SimulationEngine {
   // Sensor Auto-Cycling — makes sensors feel alive during simulation
   // ═══════════════════════════════════════════════════════════════════════
 
-  private startSensorAutoCycling(initialNodes: CanvasNode[]) {
+  private startSensorAutoCycling() {
     this.sensorStartTime = Date.now();
     this.sensorAutoIntervalId = window.setInterval(() => {
       if (!this.isRunning || this.isPaused) return;
@@ -762,6 +815,75 @@ export class SimulationEngine {
       clearInterval(this.sensorAutoIntervalId);
       this.sensorAutoIntervalId = null;
     }
+  }
+
+  /** Register the canvas peripherals exposed through the compatibility I²C bus. */
+  private registerVirtualI2cDevices(nodes: CanvasNode[]) {
+    const addressOf = (node: CanvasNode, fallback: number) => {
+      const raw = node.properties?.i2cAddress;
+      if (typeof raw === 'string' && /^0x[0-9a-f]+$/i.test(raw.trim())) {
+        return parseInt(raw.trim(), 16);
+      }
+      const numeric = Number(raw);
+      return Number.isFinite(numeric) && numeric > 0 ? Math.round(numeric) : fallback;
+    };
+
+    const register = (address: number, device: Parameters<I2cBusArbiter['registerSlave']>[0]) => {
+      const normalized = Math.max(1, Math.min(0x7f, Math.round(address)));
+      if (this.virtualI2cAddresses.has(normalized)) {
+        this.callbacks.onSerialOutput(`[WARN] I2C address 0x${normalized.toString(16).toUpperCase()} is already occupied; additional device ignored`);
+        return;
+      }
+      this.i2cBus.registerSlave({ ...device, address: normalized });
+      this.virtualI2cAddresses.add(normalized);
+    };
+
+    nodes.filter((node) => node.type === 'DISPLAY_LCD_I2C').forEach((node) => {
+      const address = addressOf(node, 0x27);
+      const expander = new LcdI2CExpander((line1, line2, backlight) => {
+        (globalThis as any).__voltforgeLcdState = (globalThis as any).__voltforgeLcdState || {};
+        (globalThis as any).__voltforgeLcdState[node.id] = { line1, line2, backlight };
+        this.callbacks.onPinStateChange(node.id, '__lcd_display__', 'HIGH', 0);
+      });
+      register(address, {
+        address,
+        onReceive: (bytes) => bytes.forEach((byte) => expander.write(byte)),
+        onRequest: () => [0xff],
+      });
+    });
+
+    // Common MPU6050-style register reads. This is intentionally a stable
+    // virtual sensor frame, not a claim of cycle-accurate I²C timing.
+    nodes.filter((node) => node.type === 'SENSOR_IMU').forEach((node) => {
+      const address = addressOf(node, 0x68);
+      register(address, {
+        address,
+        onReceive: () => undefined,
+        onRequest: () => {
+          const currentNode = useCanvasStore.getState().nodes.find((item) => item.id === node.id);
+          const props = currentNode?.properties || node.properties || {};
+          const words = [
+            Number(props.accelerationX ?? 0) * 16384,
+            Number(props.accelerationY ?? 0) * 16384,
+            Number(props.accelerationZ ?? 1) * 16384,
+            0,
+            Number(props.gyroX ?? 0) * 131,
+            Number(props.gyroY ?? 0) * 131,
+            Number(props.gyroZ ?? 0) * 131,
+          ];
+          return words.flatMap((value) => {
+            const word = Math.max(-32768, Math.min(32767, Math.round(value)));
+            const encoded = word < 0 ? word + 65536 : word;
+            return [(encoded >> 8) & 0xff, encoded & 0xff];
+          });
+        },
+      });
+    });
+  }
+
+  private unregisterVirtualI2cDevices() {
+    this.virtualI2cAddresses.forEach((address) => this.i2cBus.unregisterSlave(address));
+    this.virtualI2cAddresses.clear();
   }
 
   private extractBalancedBlock(code: string, keyword: string): string | null {
@@ -1104,14 +1226,37 @@ export class SimulationEngine {
       replaced = replaced.replace(match[0], String(hum));
     }
 
+    // Wire.h receive-buffer API. requestFrom() fills the virtual buffer and
+    // these replacements let normal Arduino expressions consume it.
+    replaced = replaced.replace(/Wire\.available\s*\(\s*\)/gi, String(this.i2cReadBuffer.length));
+    const wireReadMatches = Array.from(replaced.matchAll(/Wire\.read\s*\(\s*\)/gi));
+    for (const match of wireReadMatches) {
+      const value = this.i2cReadBuffer.length > 0 ? this.i2cReadBuffer.shift()! : -1;
+      replaced = replaced.replace(match[0], String(value));
+    }
+
+    // SPI.transfer returns the byte supplied by the registered virtual
+    // slave, which allows assignments such as `uint8_t value = SPI.transfer(0)`.
+    const spiTransferMatches = Array.from(replaced.matchAll(/SPI\.transfer\s*\(\s*([^()]*)\s*\)/gi));
+    for (const match of spiTransferMatches) {
+      const byteOut = Math.max(0, Math.min(255, this.evaluateExpression(match[1])));
+      const byteIn = this.spiBus.transfer(String(this.globals.SPI_CS || 'CS'), byteOut);
+      replaced = replaced.replace(match[0], String(byteIn));
+    }
+
+    replaced = replaced
+      .replace(/\bWiFi\.status\s*\(\s*\)/gi, String(this.globals.WL_CONNECTED ?? 6))
+      .replace(/\bWiFi\.RSSI\s*\(\s*\)/gi, String(this.virtualNetwork.getStatus().rssi))
+      .replace(/\b(?:mqtt|client|mqttClient)\.connected\s*\(\s*\)/gi, this.mqttBridge.connected() ? '1' : '0')
+
     replaced = replaced
       .replace(/\bmillis\s*\(\s*\)/g, String(this.tick))
       .replace(/\bmicros\s*\(\s*\)/g, String(this.tick * 1000));
 
     // ── UART Interactive Serial CLI ──
-    replaced = replaced.replace(/Serial\.available\s*\(\s*\)/g, String(this.localSerialBuffer.length));
+    replaced = replaced.replace(/\bSerial(?:[1-9]|USB)?\.available\s*\(\s*\)/gi, String(this.localSerialBuffer.length));
 
-    const readMatches = Array.from(replaced.matchAll(/Serial\.read\s*\(\s*\)/g));
+    const readMatches = Array.from(replaced.matchAll(/\bSerial(?:[1-9]|USB)?\.read\s*\(\s*\)/gi));
     for (const match of readMatches) {
       let val = -1;
       if (this.localSerialBuffer.length > 0) {
@@ -1121,7 +1266,7 @@ export class SimulationEngine {
       replaced = replaced.replace(match[0], String(val));
     }
 
-    const parseIntMatches = Array.from(replaced.matchAll(/Serial\.parseInt\s*\(\s*\)/g));
+    const parseIntMatches = Array.from(replaced.matchAll(/\bSerial(?:[1-9]|USB)?\.parseInt\s*\(\s*\)/gi));
     for (const match of parseIntMatches) {
       const intMatch = this.localSerialBuffer.match(/^[^\d-]*(-?\d+)/);
       let val = 0;
@@ -1135,7 +1280,7 @@ export class SimulationEngine {
       replaced = replaced.replace(match[0], String(val));
     }
 
-    const parseFloatMatches = Array.from(replaced.matchAll(/Serial\.parseFloat\s*\(\s*\)/g));
+    const parseFloatMatches = Array.from(replaced.matchAll(/\bSerial(?:[1-9]|USB)?\.parseFloat\s*\(\s*\)/gi));
     for (const match of parseFloatMatches) {
       const floatMatch = this.localSerialBuffer.match(/^[^\d.-]*(-?\d+(?:\.\d+)?)/);
       let val = 0.0;
@@ -1260,12 +1405,12 @@ export class SimulationEngine {
           const isPullup = mode === 'INPUT_PULLUP';
           this.pins[pin] = { mode, state: isPullup ? 'HIGH' : 'LOW', value: isPullup ? 255 : 0 };
           this.updateMNAPinMode(pin, mode);
-          this.updateMNAPinVoltage(pin, isPullup ? 5 : 0);
+          this.updateMNAPinVoltage(pin, isPullup ? this.logicVoltageForNodes(nodes) : 0);
           continue;
         }
 
         // Serial.begin(baud)
-        const serialBegin = codeText.match(/Serial\.begin\s*\(\s*(\d+)\s*\)/);
+        const serialBegin = codeText.match(/\bSerial(?:[1-9]|USB)?\.begin\s*\(\s*(\d+)\s*\)/i);
         if (serialBegin) {
           const baudRate = Number(serialBegin[1]);
           this.callbacks.onBaudRateChange?.(baudRate);
@@ -1292,7 +1437,7 @@ export class SimulationEngine {
             this.pins[pin].state = state;
             this.pins[pin].value = state === 'HIGH' ? 255 : 0;
             this.propagatePinState(pin, state, nodes, wires, state === 'HIGH' ? 255 : 0);
-            this.updateMNAPinVoltage(pin, state === 'HIGH' ? 5 : 0);
+            this.updateMNAPinVoltage(pin, state === 'HIGH' ? this.logicVoltageForNodes(nodes) : 0);
             this.emitDebugSnapshot(false);
           }
           continue;
@@ -1312,7 +1457,7 @@ export class SimulationEngine {
           this.pins[pin].value = value;
           this.updateMNAPinMode(pin, 'PWM');
           this.propagatePinState(pin, 'PWM', nodes, wires, value);
-          this.updateMNAPinVoltage(pin, (value / 255) * 5);
+          this.updateMNAPinVoltage(pin, (value / 255) * this.logicVoltageForNodes(nodes));
           continue;
         }
 
@@ -1327,7 +1472,7 @@ export class SimulationEngine {
           this.pins[pin].state = 'PWM';
           this.pins[pin].value = 255;
           this.propagatePinState(pin, 'PWM', nodes, wires, freq);
-          this.updateMNAPinVoltage(pin, 2.5);
+          this.updateMNAPinVoltage(pin, this.logicVoltageForNodes(nodes) / 2);
           AudioEngine.playTone(freq);
           continue;
         }
@@ -1407,7 +1552,8 @@ export class SimulationEngine {
           continue;
         }
 
-        // dht.begin() — silently consume
+        // DHT initialization has no electrical side effects in the virtual
+        // sensor model; readings are supplied from the sensor properties.
         if (/dht\.begin\s*\(/i.test(codeText)) continue;
 
         // delay(ms) — simulate timing
@@ -1429,10 +1575,10 @@ export class SimulationEngine {
         }
 
         // Serial.print(...) / Serial.println(...)
-        const serialPrint = codeText.match(/Serial\.(print|println)\s*\(\s*(.*?)\s*\)$/);
+        const serialPrint = codeText.match(/\b(Serial(?:[1-9]|USB)?)\.(print|println)\s*\(\s*(.*?)\s*\)$/i);
         if (serialPrint) {
-          const method = serialPrint[1];
-          const text = this.resolveSerialArgument(serialPrint[2]);
+          const method = serialPrint[2];
+          const text = this.resolveSerialArgument(serialPrint[3]);
           const newline = method === 'println';
 
           const key = `${method}_${text}_${Math.floor(this.tick / 500)}`;
@@ -1449,8 +1595,15 @@ export class SimulationEngine {
         // ── ESC / Servo writeMicroseconds / write ──
         if (this.handleEscStatement(codeText, nodes, wires)) continue;
 
-        // I2C / Wire.h commands — silently consume so they don't cause errors
-        if (/Wire\.|lcd\.|dht\.|servo\.|esc\.|myservo\./i.test(codeText)) continue;
+        // I2C/display/actuator calls that have no compatible implementation
+        // must be visible to the user instead of disappearing silently. Read
+        // expressions are intentionally allowed through to assignment and
+        // condition preprocessing above.
+        const containsValueRead = /(?:=|\breturn\b).*\b(?:Wire\.(?:read|available)|SPI\.transfer)\s*\(/i.test(codeText);
+        if (/Wire\.|lcd\.|dht\.|servo\.|esc\.|myservo\./i.test(codeText) && !containsValueRead) {
+          this.warnCompatibilityGap(codeText);
+          continue;
+        }
 
         // C++ class constructors (e.g., LiquidCrystal_I2C lcd(...), Servo myservo, DHT dht(...))
         if (/^(?:LiquidCrystal|Servo|DHT|NewPing|Adafruit_|Wire|SoftwareSerial|ESP|IRrecv)\w*\s+\w+/i.test(codeText)) continue;
@@ -1637,6 +1790,9 @@ export class SimulationEngine {
     const raw = argument.trim();
     if (!raw) return '';
 
+    if (/^WiFi\.localIP\s*\(\s*\)$/i.test(raw)) return this.virtualNetwork.getStatus().ip;
+    if (/^WiFi\.macAddress\s*\(\s*\)$/i.test(raw)) return this.virtualNetwork.getStatus().mac;
+
     const parts = raw.split(/\s*\+\s*/);
     if (parts.length > 1) {
       return parts.map((part) => this.resolveSerialArgument(part)).join('');
@@ -1668,9 +1824,16 @@ export class SimulationEngine {
       }
     }
 
-    const value = this.evaluateExpression(raw);
+    const value = this.evaluateExpression(this.preprocessExpression(raw));
     if (!Number.isNaN(value)) return value.toString();
     return raw;
+  }
+
+  private warnCompatibilityGap(statement: string) {
+    const method = statement.match(/([A-Za-z_][\w.]*)\s*\(/)?.[1] || statement.slice(0, 48);
+    if (this.compatibilityWarnings.has(method)) return;
+    this.compatibilityWarnings.add(method);
+    this.callbacks.onSerialOutput(`[WARN] Compatibility interpreter does not emulate ${method}(); source execution continues`);
   }
 
   private writeSerial(text: string, newline: boolean) {
@@ -1766,7 +1929,7 @@ export class SimulationEngine {
       this.pins[attachedPin].state = 'PWM';
       this.pins[attachedPin].value = pwmValue;
       this.updateMNAPinMode(attachedPin, 'PWM');
-      this.updateMNAPinVoltage(attachedPin, (pwmValue / 255) * 5);
+      this.updateMNAPinVoltage(attachedPin, (pwmValue / 255) * this.logicVoltageForNodes(nodes));
       this.propagatePinState(attachedPin, 'PWM', nodes, wires, pwmValue);
     } else if (/servo/i.test(objectName)) {
       this.propagateServoSignal(pwmValue);
@@ -1889,8 +2052,12 @@ export class SimulationEngine {
 
       const label = pin.name.toUpperCase();
       if (label.includes('GND') || label === 'COM') return 0;
-      if (label === '3.3V' || label === '3V3') return 3.3;
-      if (label === '5V' || label === 'VCC') return 5;
+      const boardRailVoltage = isBoardComponentType(node.type)
+        ? getBoardPowerVoltage(node.type, pin)
+        : null;
+      if (boardRailVoltage !== null) return boardRailVoltage;
+      if (label === '3.3V' || label === '3V3' || label === '3V') return 3.3;
+      if (label === '5V' || label === 'VCC' || label === 'VDD' || label === 'VBUS') return 5;
       if (label === 'VIN') return 7;
 
       if (isBoardComponentType(node.type)) {
@@ -1966,22 +2133,21 @@ export class SimulationEngine {
   }
 
   private pinNumberFromBoardPin(pin: { id: string; name: string }) {
-    const pinStr = `${pin.name} ${pin.id}`;
-    const analogMatch = pinStr.match(/\bA([0-9]{1,2})\b/i);
-    if (analogMatch) {
-      return `A${Number(analogMatch[1])}`;
-    }
-    const match = pinStr.match(/\bD(\d{1,2})\b/i);
-    if (match) return String(Number(match[1]));
-    if (/\bTX\b/i.test(pinStr)) return '1';
-    if (/\bRX\b/i.test(pinStr)) return '3';
-    return '';
+    return getBoardPinNumber(pin);
+  }
+
+  private logicVoltageForNodes(nodes: CanvasNode[]) {
+    const board = nodes.find((node) => isBoardComponentType(node.type));
+    return board ? this.boardLogicVoltage(board.type) : 5;
   }
 
   private canonicalPin(pin: string) {
     const resolved = this.resolveValue(pin.trim()).trim();
     const analogMatch = resolved.match(/^A([0-9]{1,2})$/i);
     if (analogMatch) return `A${Number(analogMatch[1])}`;
+
+    const gpioMatch = resolved.match(/^(?:GPIO|GP)([0-9]{1,3})$/i);
+    if (gpioMatch) return String(Number(gpioMatch[1]));
 
     const digitalMatch = resolved.match(/^D?([0-9]{1,2})$/i);
     if (digitalMatch) return String(Number(digitalMatch[1]));
@@ -2063,6 +2229,9 @@ export class SimulationEngine {
       void this.virtualNetwork.httpPost(strings[0] || 'https://example.invalid/', strings[1] || '');
       return true;
     }
+    if (/\bWire\.begin\s*\(/i.test(codeText) || /\bWire\.end\s*\(/i.test(codeText)) {
+      return true;
+    }
     if (/\bWire\.beginTransmission\s*\(/i.test(codeText)) {
       this.activeI2cAddress = numbers[0] || 0x27;
       this.i2cWriteBuffer = [];
@@ -2078,15 +2247,25 @@ export class SimulationEngine {
       return true;
     }
     if (/\bWire\.requestFrom\s*\(/i.test(codeText)) {
-      this.i2cBus.readTransaction(numbers[0] || this.activeI2cAddress || 0x27, numbers[1] || 1);
+      this.i2cReadBuffer = this.i2cBus.readTransaction(
+        numbers[0] || this.activeI2cAddress || 0x27,
+        numbers[1] || 1,
+      );
       return true;
     }
-    if (/\bSPI\.transfer\s*\(/i.test(codeText)) {
-      this.spiBus.transfer(String(numbers[0] ?? 'CS'), numbers[1] ?? 0);
+    if (/\bSPI\.(?:begin|end|beginTransaction|endTransaction)\s*\(/i.test(codeText)) {
       return true;
     }
-    if (/\bSerial\.(?:print|println)\s*\(/i.test(codeText)) {
+    if (/\bSPI\.transfer\s*\(/i.test(codeText) && !/=\s*.*\bSPI\.transfer\s*\(/i.test(codeText)) {
+      this.spiBus.transfer(String(this.globals.SPI_CS || 'CS'), numbers[0] ?? 0);
+      return true;
+    }
+    if (/\b(?:Serial(?:[1-9]|USB)?)\.(?:print|println)\s*\(/i.test(codeText)) {
       this.uartBus.transmit('default', strings.join(' '));
+      return false;
+    }
+    if (/\b(?:mqtt|client|mqttClient)\.loop\s*\(/i.test(codeText)) {
+      return true;
     }
     return false;
   }
@@ -2135,7 +2314,7 @@ export class SimulationEngine {
     const twi = new AVRTWI(this.avrCpu, twiConfig, 16_000_000);
     twi.eventHandler = new LcdTWIEventHandler(twi, this.lcdNodes, this.callbacks);
 
-    const handlePort = (portName: 'B' | 'C' | 'D', value: number) => {
+    const handlePort = (portName: 'B' | 'C' | 'D', _value: number) => {
       for (let bit = 0; bit < 8; bit += 1) {
         const pin = this.avrPortToBoardPin(portName, bit);
         if (!pin) continue;
@@ -2172,7 +2351,7 @@ export class SimulationEngine {
               elementId: `r_mcu_pin_${mcuNode.id}_${this.mnaPinSuffix(pin)}`,
               voltage: resistance,
             });
-            this.updateMNAPinVoltage(pin, high ? 5 : 0);
+            this.updateMNAPinVoltage(pin, high ? this.boardLogicVoltage(mcuNode.type) : 0);
           }
         }
       }
@@ -2367,6 +2546,7 @@ export class SimulationEngine {
     AudioEngine.stopTone();
     this.mqttBridge.disconnect();
     this.virtualNetwork.disconnectWiFi();
+    this.unregisterVirtualI2cDevices();
     if (this.storeUnsubscribe) {
       this.storeUnsubscribe();
       this.storeUnsubscribe = null;
@@ -2545,6 +2725,10 @@ export class SimulationEngine {
    * Stop and dispose the solver WebWorker.
    */
   private stopMNASolver() {
+    if (this.storeUnsubscribe) {
+      this.storeUnsubscribe();
+      this.storeUnsubscribe = null;
+    }
     if (this.solverWorker) {
       const stopMsg: WorkerInMessage = { type: 'STOP' };
       this.solverWorker.postMessage(stopMsg);
@@ -2570,6 +2754,42 @@ export class SimulationEngine {
       positiveLabel: 'Probe (+)',
       negativeLabel: 'Probe (-)',
     });
+  }
+
+  /** Rebuild model values without discarding the running worker or topology. */
+  private refreshMnaElements(nodes: CanvasNode[], wires: Wire[]) {
+    if (!this.solverWorker || !this.mnaCircuit) return;
+
+    try {
+      const pinModes: Record<string, string> = {};
+      Object.entries(this.pins).forEach(([pin, info]) => {
+        pinModes[pin] = info.mode;
+      });
+
+      const boardPoweredMap: Record<string, boolean> = {};
+      nodes.forEach(node => {
+        if (isBoardComponentType(node.type)) {
+          boardPoweredMap[node.id] = node.properties?.boardPowered !== false;
+        }
+      });
+
+      const refreshed = buildMNACircuit(nodes, wires, this.mcuPinVoltages, pinModes, boardPoweredMap);
+      if (refreshed.numNodes !== this.mnaCircuit.numNodes) {
+        this.stopMNASolver();
+        this.startMNASolver(nodes, wires);
+        return;
+      }
+
+      this.mnaCircuit = refreshed;
+      this.solverWorker.postMessage({
+        type: 'UPDATE_ELEMENTS',
+        numNodes: refreshed.numNodes,
+        elements: refreshed.elements,
+        scopeChannels: refreshed.scopeChannels,
+      } as WorkerInMessage);
+    } catch (error) {
+      console.warn('[VoltForge MNA] Failed to refresh live component values:', error);
+    }
   }
 
   /** Pause all simulation-time work while retaining the solved circuit state. */
@@ -2698,6 +2918,12 @@ export class SimulationEngine {
     wires: Wire[],
     circuit: MNACircuit,
   ): Record<string, number> {
+    // Store current by component + solved MNA node instead of by the literal
+    // canvas pin id. Older saved layouts can contain aliases such as `pin1`
+    // while the hydrated component exposes `p1`; both are the same electrical
+    // terminal after netlist construction. Looking up by the literal id made
+    // those wires silently report 0 A even though the solver had a valid
+    // branch current.
     const terminalCurrents = new Map<string, number>();
     const nodesById = new Map(nodes.map((node) => [node.id, node]));
 
@@ -2705,12 +2931,13 @@ export class SimulationEngine {
       if (!Number.isFinite(current) || Math.abs(current) < Number.EPSILON) return;
       const component = nodesById.get(componentId);
       if (!component) return;
-      for (const pin of component.pins || []) {
-        const pinNode = circuit.pinToMNANode.get(`${componentId}:${pin.id}`);
-        if (pinNode !== mnaNode) continue;
-        const key = `${componentId}:${pin.id}`;
-        terminalCurrents.set(key, (terminalCurrents.get(key) || 0) + Math.abs(current));
-      }
+      const hasMatchingPin = (component.pins || []).some((pin) =>
+        circuit.pinToMNANode.get(`${componentId}:${pin.id}`) === mnaNode,
+      );
+      if (!hasMatchingPin) return;
+
+      const key = `${componentId}:${mnaNode}`;
+      terminalCurrents.set(key, (terminalCurrents.get(key) || 0) + Math.abs(current));
     };
 
     for (const element of circuit.elements) {
@@ -2723,15 +2950,25 @@ export class SimulationEngine {
     }
 
     const wireCurrents: Record<string, number> = {};
-    for (const wire of wires) {
-      const endpointCurrents = [
-        terminalCurrents.get(`${wire.fromNodeId}:${wire.fromPinId}`) || 0,
-        terminalCurrents.get(`${wire.toNodeId}:${wire.toPinId}`) || 0,
-      ].filter((current) => current > 1e-9);
+    const currentAtEndpoint = (nodeId: string, pinId: string): number => {
+      const mnaNode = circuit.pinToMNANode.get(`${nodeId}:${pinId}`);
+      if (mnaNode === undefined) return 0;
+      return terminalCurrents.get(`${nodeId}:${mnaNode}`) || 0;
+    };
 
-      wireCurrents[wire.id] = endpointCurrents.length > 1
-        ? Math.min(...endpointCurrents)
-        : endpointCurrents[0] || 0;
+    for (const wire of wires) {
+      const fromCurrent = currentAtEndpoint(wire.fromNodeId, wire.fromPinId);
+      const toCurrent = currentAtEndpoint(wire.toNodeId, wire.toPinId);
+
+      // A wire may terminate at a behavioral/connector-only component that
+      // does not expose a branch current. Use the active side in that case;
+      // when both sides are electrical, the lower value avoids overstating a
+      // branch at a junction.
+      if (fromCurrent > 1e-12 && toCurrent > 1e-12) {
+        wireCurrents[wire.id] = Math.min(fromCurrent, toCurrent);
+      } else {
+        wireCurrents[wire.id] = Math.max(fromCurrent, toCurrent, 0);
+      }
     }
     return wireCurrents;
   }
@@ -2836,11 +3073,11 @@ export class SimulationEngine {
       }
 
       if (!powered) {
-        const v5Pin = mcuNode.pins?.find(p => p.name.toUpperCase() === '5V' || p.name.toUpperCase() === 'VCC');
-        if (v5Pin) {
-          const v5Node = pinToMNANode.get(`${mcuNode.id}:${v5Pin.id}`) ?? 0;
-          const v5V = result.nodeVoltages[v5Node] ?? 0;
-          if (v5V >= 4.5) powered = true;
+        const logicRail = mcuNode.pins?.find((pin) => getBoardPowerVoltage(mcuNode.type, pin) !== null);
+        if (logicRail) {
+          const railNode = pinToMNANode.get(`${mcuNode.id}:${logicRail.id}`) ?? 0;
+          const railVoltage = result.nodeVoltages[railNode] ?? 0;
+          if (railVoltage >= this.boardLogicVoltage(mcuNode.type) * 0.85) powered = true;
         }
       }
 
@@ -3087,7 +3324,7 @@ export class SimulationEngine {
         this.solverWorker?.postMessage({
           type: 'UPDATE_PIN',
           elementId: `vs_pir_${node.id}`,
-          voltage: outputHigh ? 5 : 0,
+          voltage: outputHigh ? this.logicVoltageForNodes(nodes) : 0,
         });
         this.solverWorker?.postMessage({
           type: 'UPDATE_PIN',
@@ -3110,7 +3347,9 @@ export class SimulationEngine {
         const vccNode = pinToMNANode.get(`${node.id}:vcc`) ?? 0;
         const gndNode = pinToMNANode.get(`${node.id}:gnd`) ?? 0;
         const supplyVoltage = (result.nodeVoltages[vccNode] ?? 0) - (result.nodeVoltages[gndNode] ?? 0);
-        const powered = supplyVoltage >= 3.5;
+        const powered = node.type === 'LED_NEOPIXEL'
+          ? supplyVoltage >= 2.5
+          : supplyVoltage >= 3.5;
         if (node.properties?.powered !== powered) {
           useCanvasStore.getState().updateNode(node.id, {
             properties: {
@@ -3155,7 +3394,7 @@ export class SimulationEngine {
           this.solverWorker?.postMessage({
             type: 'UPDATE_PIN',
             elementId: `vs_soil_${node.id}`,
-            voltage: powered ? moisture * 5 : 0,
+            voltage: powered ? moisture * this.logicVoltageForNodes(nodes) : 0,
           });
 
           if (node.properties?.powered !== powered) {
@@ -3357,11 +3596,11 @@ export class SimulationEngine {
     }
 
     // ── 74HC595 Shift Register Logic ──
-    const shiftRegs = nodes.filter(n => n.type === 'IC_74HC595');
+    const shiftRegs = nodes.filter(n => n.type === 'IC_74HC595' || n.type === '74HC595');
     shiftRegs.forEach(ic => {
       const isPowered = this.isNodePowered(ic.id);
       if (!isPowered) {
-        const outputs = ['qa', 'qb', 'qc', 'qd', 'qe', 'qf', 'qhp'];
+        const outputs = ['qa', 'qb', 'qc', 'qd', 'qe', 'qf', 'qg', 'qh', 'qhp'];
         outputs.forEach(pinId => {
           this.solverWorker?.postMessage({
             type: 'UPDATE_PIN',
@@ -3375,24 +3614,27 @@ export class SimulationEngine {
       const serNode = pinToMNANode.get(`${ic.id}:ser`) ?? 0;
       const srclkNode = pinToMNANode.get(`${ic.id}:srclk`) ?? 0;
       const rclkNode = pinToMNANode.get(`${ic.id}:rclk`) ?? 0;
+      const vccNode = pinToMNANode.get(`${ic.id}:vcc`) ?? 0;
 
       const vSer = result.nodeVoltages[serNode] ?? 0;
       const vSrclk = result.nodeVoltages[srclkNode] ?? 0;
       const vRclk = result.nodeVoltages[rclkNode] ?? 0;
+      const vVcc = result.nodeVoltages[vccNode] ?? 0;
 
       const props = ic.properties || {};
       const prevSrclk = Boolean(props.prevSrclk);
       const prevRclk = Boolean(props.prevRclk);
 
-      const isSrclkHigh = vSrclk >= 2.0;
-      const isRclkHigh = vRclk >= 2.0;
+      const logicThreshold = Math.max(1.8, (vVcc || 5) * 0.6);
+      const isSrclkHigh = vSrclk >= logicThreshold;
+      const isRclkHigh = vRclk >= logicThreshold;
 
       let shiftVal = Number(props.shiftRegValue) || 0;
       let latchVal = Number(props.latchRegValue) || 0;
       let changed = false;
 
       if (isSrclkHigh && !prevSrclk) {
-        const serBit = vSer >= 2.0 ? 1 : 0;
+        const serBit = vSer >= logicThreshold ? 1 : 0;
         shiftVal = ((shiftVal << 1) | serBit) & 0xFF;
         changed = true;
       }
@@ -3401,13 +3643,13 @@ export class SimulationEngine {
         latchVal = shiftVal;
         changed = true;
 
-        const outputs = ['qa', 'qb', 'qc', 'qd', 'qe', 'qf'];
+        const outputs = ['qa', 'qb', 'qc', 'qd', 'qe', 'qf', 'qg', 'qh'];
         outputs.forEach((pinId, idx) => {
           const bit = (latchVal >> idx) & 1;
           this.solverWorker?.postMessage({
             type: 'UPDATE_PIN',
             elementId: `vs_595_${ic.id}_${pinId}`,
-            voltage: bit ? 5 : 0,
+            voltage: bit ? (vVcc || 5) : 0,
           });
         });
 
@@ -3415,7 +3657,7 @@ export class SimulationEngine {
         this.solverWorker?.postMessage({
           type: 'UPDATE_PIN',
           elementId: `vs_595_${ic.id}_qhp`,
-          voltage: qhpBit ? 5 : 0,
+          voltage: qhpBit ? (vVcc || 5) : 0,
         });
       }
 

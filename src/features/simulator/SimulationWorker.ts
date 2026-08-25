@@ -31,6 +31,13 @@ export interface WorkerUpdateSourceMessage {
   waveform?: MNAElement['waveform'];
 }
 
+export interface WorkerUpdateElementsMessage {
+  type: 'UPDATE_ELEMENTS';
+  numNodes: number;
+  elements: MNAElement[];
+  scopeChannels?: Record<string, number>;
+}
+
 export interface WorkerStartMessage {
   type: 'START';
 }
@@ -53,6 +60,7 @@ export type WorkerInMessage =
   | WorkerInitMessage
   | WorkerUpdatePinMessage
   | WorkerUpdateSourceMessage
+  | WorkerUpdateElementsMessage
   | WorkerStartMessage
   | WorkerStopMessage
   | WorkerPauseMessage
@@ -255,6 +263,29 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
         elem.value = msg.voltage;
         elem.waveform = msg.waveform;
       }
+      break;
+    }
+
+    case 'UPDATE_ELEMENTS': {
+      // Preserve transient capacitor/inductor state while replacing values
+      // after a live property edit. The topology watcher handles structural
+      // changes with a full worker restart; this path is for model values.
+      const previousById = new Map(elements.map((element) => [element.id, element]));
+      elements = msg.elements.map((element) => {
+        const previous = previousById.get(element.id);
+        return previous
+          ? {
+              ...element,
+              prevVoltage: previous.prevVoltage,
+              prevCurrent: previous.prevCurrent,
+            }
+          : element;
+      });
+      if (!solver || msg.numNodes !== elements.reduce((max, element) => Math.max(max, element.nodeA, element.nodeB), 0)) {
+        solver = new MNASolver(msg.numNodes, solver?.getTimeStep() || 0.001);
+      }
+      solver.setElements(elements);
+      scopeChannels = msg.scopeChannels || {};
       break;
     }
 

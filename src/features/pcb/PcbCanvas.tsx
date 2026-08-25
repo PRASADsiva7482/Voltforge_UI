@@ -59,9 +59,7 @@ export default function PcbCanvas({ width, height, projectName, readOnly = false
   const stageRef = useRef<Konva.Stage>(null);
 
   useEffect(() => {
-    if (nodes.length === 0 || footprints.length > 0) return;
-
-    const generated: PcbFootprint[] = nodes.map((node, index) => {
+    const createFootprint = (node: typeof nodes[number], index: number): PcbFootprint => {
       const col = index % 5;
       const row = Math.floor(index / 5);
       const pads = (node.pins || []).map((pin, pinIndex) => ({
@@ -92,10 +90,39 @@ export default function PcbCanvas({ width, height, projectName, readOnly = false
         x: 20 + col * 18,
         y: 20 + row * 18,
       };
+    };
+
+    const existingByComponent = new Map(footprints.map((footprint) => [footprint.componentId, footprint]));
+    const occupiedPlacements = new Set(footprints.map((footprint) => `${footprint.x}:${footprint.y}`));
+    let nextPlacementIndex = footprints.length;
+    const reconciled = nodes.map((node) => {
+      const existing = existingByComponent.get(node.id);
+      let generated = createFootprint(node, nextPlacementIndex);
+      while (!existing && occupiedPlacements.has(`${generated.x}:${generated.y}`)) {
+        nextPlacementIndex += 1;
+        generated = createFootprint(node, nextPlacementIndex);
+      }
+      if (!existing) {
+        occupiedPlacements.add(`${generated.x}:${generated.y}`);
+        nextPlacementIndex += 1;
+      }
+      if (!existing) return generated;
+
+      // Preserve the user's PCB placement/rotation while refreshing the
+      // schematic-derived identity, package, pad list, and net assignments.
+      return {
+        ...generated,
+        id: existing.id,
+        x: existing.x,
+        y: existing.y,
+        rotation: existing.rotation,
+      };
     });
 
-    setFootprints(generated);
-  }, [footprints.length, nodes, setFootprints, wires]);
+    if (JSON.stringify(reconciled) !== JSON.stringify(footprints)) {
+      setFootprints(reconciled);
+    }
+  }, [footprints, nodes, setFootprints, wires]);
 
   useEffect(() => {
     if (footprints.length === 0) return;

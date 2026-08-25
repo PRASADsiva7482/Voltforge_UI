@@ -5,7 +5,7 @@ import { useSimulationStore } from '../../store/simulationStore';
 import { useToastStore } from '../../store/useToastStore';
 import { Loader2, Maximize2, Minimize2, AlignLeft, Eye, EyeOff, Cpu, Upload, X } from 'lucide-react';
 import type { OnMount } from '@monaco-editor/react';
-import { getBoardProfile, isBoardComponentType } from '../canvas/boardCatalog';
+import { getBoardPinNumber, getBoardProfile, isBoardComponentType, supportsAvr8js } from '../canvas/boardCatalog';
 
 const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.default })));
 
@@ -19,10 +19,7 @@ function generateFullCode(userCode: string, boardType?: string): string {
   const pinNames = new Set<string>();
 
   const identifier = (value: string) => value.replace(/[^A-Za-z0-9_]/g, '_').replace(/^([^A-Za-z_])/, '_$1');
-  const boardPinNumber = (pin: { id: string; name: string }) => {
-    const match = `${pin.name} ${pin.id}`.match(/\b(?:D)?(\d{1,2})\b/i);
-    return match ? Number(match[1]) : null;
-  };
+  const boardPinNumber = (pin: { id: string; name: string }) => getBoardPinNumber(pin);
 
   nodes.forEach(node => {
     const type = node.type;
@@ -59,7 +56,7 @@ function generateFullCode(userCode: string, boardType?: string): string {
     const boardPin = boardNode.pins.find((pin) => pin.id === boardPinId);
     const peripheralPin = peripheral.pins.find((pin) => pin.id === peripheralPinId);
     const pinNumber = boardPin ? boardPinNumber(boardPin) : null;
-    if (pinNumber === null) return;
+    if (!pinNumber) return;
     const constantName = `${identifier(peripheral.name)}_${identifier(peripheralPin?.name || peripheralPinId)}_PIN`.toUpperCase();
     if (pinNames.has(constantName)) return;
     pinNames.add(constantName);
@@ -152,6 +149,7 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
   const customHex = useSimulationStore((s) => s.customHex);
   const setCustomHex = useSimulationStore((s) => s.setCustomHex);
   const addToast = useToastStore((s) => s.addToast);
+  const canRunCustomHex = supportsAvr8js(boardType || 'ARDUINO_UNO');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleHexUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -162,7 +160,15 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
       const content = event.target?.result as string;
       if (content && content.includes(':')) {
         setCustomHex(content);
-        addToast(`Loaded Intel HEX (${file.name}, ${content.length} chars) into AVR8js engine`, 'success');
+        const selectedBoard = boardType || 'ARDUINO_UNO';
+        const boardLabel = getBoardProfile(selectedBoard)?.name || selectedBoard.replace(/_/g, ' ');
+        const canRunInBrowser = supportsAvr8js(selectedBoard);
+        addToast(
+          canRunInBrowser
+            ? `Loaded Intel HEX (${file.name}, ${content.length} chars) into AVR8js engine`
+            : `Loaded Intel HEX for ${boardLabel}; browser execution will use source compatibility mode`,
+          canRunInBrowser ? 'success' : 'warning'
+        );
       } else {
         addToast('Invalid Intel HEX file format (must start with :)', 'error');
       }
@@ -206,7 +212,7 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
               <div
                 className="vf-code-editor__action-btn"
                 style={{
-                  backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                    backgroundColor: canRunCustomHex ? 'rgba(56, 189, 248, 0.15)' : 'rgba(250, 204, 21, 0.15)',
                   borderColor: '#38bdf8',
                   color: '#38bdf8',
                   display: 'flex',
@@ -217,10 +223,10 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
                   fontSize: '11px',
                   fontWeight: 600,
                 }}
-                title="Custom Intel HEX firmware loaded into AVR8js emulator"
+                title="Custom Intel HEX firmware; AVR8js execution is available only for Uno/Nano/ATmega328P boards"
               >
                 <Cpu size={12} />
-                <span>AVR8js: Custom HEX</span>
+                <span>{canRunCustomHex ? 'AVR8js: Custom HEX' : 'Custom HEX: Interpreter'}</span>
                 <button
                   disabled={readOnly}
                   onClick={(e) => {
@@ -247,7 +253,7 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
                 className="vf-code-editor__action-btn"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={readOnly}
-                title="Upload compiled Intel HEX file to run directly on AVR8js ATmega328P emulator"
+                title="Upload compiled Intel HEX file; direct AVR8js execution is available only for Uno/Nano/ATmega328P boards"
                 style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
               >
                 <Upload size={12} />

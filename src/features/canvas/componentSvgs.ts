@@ -526,7 +526,7 @@ export const componentSvgs: Record<string, string> = {
     '<rect x="12" y="6" width="96" height="38" rx="4" fill="%23111827" stroke="%23374151" stroke-width="2"/>' +
     '<circle cx="60" cy="6" r="3" fill="%23374151"/>' +
     '<text x="60" y="29" font-size="12" fill="%23e5e7eb" text-anchor="middle" font-family="Arial" font-weight="bold">74HC595</text>' +
-    '<path d="M7 11h8M7 17h8M7 23h8M7 29h8M7 35h8M7 41h8M7 47h8M105 11h8M105 17h8M105 23h8M105 29h8M105 35h8M105 41h8M105 47h8" stroke="%23cbd5e1" stroke-width="2.5"/>'
+    '<path d="M7 8h8M7 14h8M7 20h8M7 26h8M7 32h8M7 38h8M7 44h8M7 50h8M105 8h8M105 14h8M105 20h8M105 26h8M105 32h8M105 38h8M105 44h8M105 50h8" stroke="%23cbd5e1" stroke-width="2.5"/>'
   ),
   IC_74HC165: svg('0 0 120 55',
     '<rect x="12" y="4" width="96" height="47" rx="4" fill="%23111827" stroke="%23374151" stroke-width="2"/>' +
@@ -701,6 +701,35 @@ export const componentSvgs: Record<string, string> = {
     '<text x="80" y="68" font-size="6" fill="%2322c55e" text-anchor="middle" font-family="Arial" font-weight="bold">SCOPE</text>'
   ),
 };
+
+// Keep legacy/catalog aliases visually complete as well as electrically
+// compatible. These entries deliberately share artwork where the physical
+// package is equivalent and use compact module artwork for communication and
+// environmental sensor presets that previously fell back to a blank node.
+Object.assign(componentSvgs, {
+  TEMP_SENSOR: componentSvgs.SENSOR_DHT22,
+  LDR: componentSvgs.SENSOR_LDR,
+  SOIL_MOISTURE: svg('0 0 40 50',
+    '<rect x="5" y="5" width="30" height="34" rx="3" fill="%23334155" stroke="%2394a3b8" stroke-width="2"/>' +
+    '<path d="M12 15h16M12 22h16M12 29h10" stroke="%2322c55e" stroke-width="2" stroke-linecap="round"/>' +
+    '<path d="M14 39v8M26 39v8" stroke="%23a0a0a0" stroke-width="2"/>'
+  ),
+  IR_RECEIVER: svg('0 0 40 40',
+    '<rect x="5" y="5" width="30" height="25" rx="4" fill="%231f2937" stroke="%23a78bfa" stroke-width="2"/>' +
+    '<circle cx="20" cy="17" r="7" fill="%230f172a" stroke="%23c4b5fd" stroke-width="2"/>' +
+    '<path d="M13 33h14M16 36h8" stroke="%23a0a0a0" stroke-width="2"/>'
+  ),
+  BLUETOOTH_MODULE: svg('0 0 60 50',
+    '<rect x="5" y="5" width="50" height="40" rx="4" fill="%231e3a8a" stroke="%2360a5fa" stroke-width="2"/>' +
+    '<path d="M29 12v26l10-8-10-8 10-8-10-2M20 18l18 14M20 32l18-14" fill="none" stroke="%23dbeafe" stroke-width="2"/>' +
+    '<circle cx="10" cy="10" r="2" fill="%2322c55e"/>'
+  ),
+  WIFI_MODULE: svg('0 0 60 50',
+    '<rect x="5" y="5" width="50" height="40" rx="4" fill="%230f766e" stroke="%235eead4" stroke-width="2"/>' +
+    '<path d="M15 20c6-6 24-6 30 0M20 26c4-4 16-4 20 0M26 32c2-2 6-2 8 0" fill="none" stroke="%23ccfbf1" stroke-width="2" stroke-linecap="round"/>' +
+    '<circle cx="30" cy="37" r="2" fill="%23fbbf24"/>'
+  ),
+});
 
 // Default dimensions for each component type (width x height)
 // These MUST match the SVG viewBox and pin coordinates in pinRegistry.ts

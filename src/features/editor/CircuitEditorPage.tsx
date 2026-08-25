@@ -32,7 +32,7 @@ import {
   Layers,
 } from 'lucide-react'
 
-import { projectApi, simulationApi, projectExportApi } from '../../api/services'
+import { pcbManufacturingApi, projectApi, simulationApi, projectExportApi, type PcbManufacturingPayload } from '../../api/services'
 import { useCanvasStore } from '../../store/canvasStore'
 import { usePcbStore } from '../../store/pcbStore'
 import { useProjectStore, SMART_DEVICE_PRESET } from '../../store/projectStore'
@@ -43,7 +43,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useCollaboration } from '../../hooks/useCollaboration'
 
 import { analyzeCircuitSafety } from '../canvas/pinRegistry'
-import { isBoardComponentType } from '../canvas/boardCatalog'
+import { isBoardComponentType, supportsAvr8js } from '../canvas/boardCatalog'
 import { SimulationEngine } from '../simulator/SimulationEngine'
 import { LogicRegistry } from '../simulator/logic/LogicRegistry'
 
@@ -485,7 +485,28 @@ export default function CircuitEditorPage() {
   const handleExportGerber = async () => {
     if (!currentProject) return
     try {
-      const res = await projectExportApi.exportGerber(currentProject.id)
+      // Keep the toolbar export on the same DRC-gated manufacturing pipeline
+      // as the PCB screen. The former project endpoint could export persisted
+      // layout without checking the current design first.
+      const layout = usePcbStore.getState().getLayout()
+      const payload: PcbManufacturingPayload = {
+        boardWidth_mm: layout.boardWidth_mm,
+        boardHeight_mm: layout.boardHeight_mm,
+        footprints: layout.footprints,
+        projectName: currentProject.name || 'VoltForge_PCB',
+        traces: layout.traces,
+        vias: layout.vias,
+        wires,
+      }
+      const drc = await pcbManufacturingApi.runDrc(payload)
+      const violations = drc.data.data.violations || []
+      const errors = violations.filter((violation) => violation.severity === 'ERROR')
+      if (errors.length > 0) {
+        addToast(`Gerber export blocked by ${errors.length} DRC error${errors.length === 1 ? '' : 's'}`, 'error')
+        return
+      }
+
+      const res = await pcbManufacturingApi.exportGerber(payload)
       const blob = new Blob([res.data], { type: 'application/zip' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -625,23 +646,36 @@ export default function CircuitEditorPage() {
       }
 
       const bundledCode = bundleCodeFiles(activeCodeFile, currentProject?.codeFiles || [])
+      const selectedBoardType = currentProject?.boardType || 'ARDUINO_UNO'
       const customHex = useSimulationStore.getState().customHex;
-      let compiledHex: string | undefined = customHex || undefined
+      let compiledHex: string | undefined = customHex && supportsAvr8js(selectedBoardType)
+        ? customHex
+        : undefined
 
       if (customHex) {
-        writeSerial(`> Running custom Intel HEX on AVR8js ATmega328P emulator (${customHex.length} chars)`);
-        useSimulationStore.getState().setExecutionMode('avr8js');
+        if (supportsAvr8js(selectedBoardType)) {
+          writeSerial(`> Running custom Intel HEX on AVR8js ATmega328P emulator (${customHex.length} chars)`);
+          useSimulationStore.getState().setExecutionMode('avr8js');
+        } else {
+          writeSerial(`> HEX execution is unavailable for ${selectedBoardType}; using the source compatibility interpreter instead`);
+          useSimulationStore.getState().setExecutionMode('interpreter');
+        }
       } else {
         try {
           const compile = await simulationApi.compileFirmware({
             source: bundledCode,
-            boardType: currentProject?.boardType,
+            boardType: selectedBoardType,
             sketchName: currentProject?.name || 'VoltForgeSketch',
           })
           const result = compile.data.data
-          compiledHex = result.success ? result.hex : undefined
-          if (compiledHex) {
+          const resultBoardType = result.boardType || selectedBoardType
+          const canRunCompiledHex = Boolean(result.success && result.hex && supportsAvr8js(resultBoardType))
+          compiledHex = canRunCompiledHex ? result.hex : undefined
+          if (canRunCompiledHex) {
             useSimulationStore.getState().setExecutionMode('avr8js');
+          } else if (result.success && result.hex) {
+            useSimulationStore.getState().setExecutionMode('interpreter');
+            writeSerial(`> Firmware compiled for ${resultBoardType}, but browser execution supports only ATmega328P-compatible boards; using the source compatibility interpreter`)
           } else {
             useSimulationStore.getState().setExecutionMode('interpreter');
           }
@@ -659,7 +693,7 @@ export default function CircuitEditorPage() {
       // Stop can be clicked while a remote compiler request is pending. Do not
       // start a worker after that stop has already invalidated this request.
       if (requestId !== simulationRequestRef.current) return
-      await engineRef.current?.start(bundledCode, nodes, wires, compiledHex)
+      await engineRef.current?.start(bundledCode, nodes, wires, compiledHex, selectedBoardType)
     } else {
       simulationRequestRef.current += 1
       setIsSimulating(false)

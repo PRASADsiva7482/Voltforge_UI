@@ -27,11 +27,12 @@ export function ProjectsPage() {
     },
   })
 
-  const projects = projectsQuery.data?.content ?? []
+  const projects = projectsQuery.data?.content
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
-    if (!term) return projects
-    return projects.filter((project) => [project.name, project.description, project.boardType, project.tags].filter(Boolean).join(' ').toLowerCase().includes(term))
+    const projectList = projects ?? []
+    if (!term) return projectList
+    return projectList.filter((project) => [project.name, project.description, project.boardType, project.tags].filter(Boolean).join(' ').toLowerCase().includes(term))
   }, [projects, query])
 
   return (

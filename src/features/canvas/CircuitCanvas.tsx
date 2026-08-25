@@ -497,7 +497,7 @@ export default function CircuitCanvas({
           </Layer>
 
           {/* Animated Current Flow Layer (renders particles on active wires) */}
-          <CurrentFlowLayer />
+          <CurrentFlowLayer isSimulating={isSimulating} />
 
           <Layer listening={false}>
             {Object.values(collaborators).map((user) => (
