@@ -1,0 +1,19 @@
+{
+  "item": "OPT-001",
+  "capturedOn": "2026-08-27",
+  "scope": "MNA WebWorker scheduling before the OPT-001 implementation",
+  "measurementKind": "static-baseline",
+  "runtimeTraceCaptured": false,
+  "observations": {
+    "workerIntervalMs": 16,
+    "configuredTimeStepMs": 1,
+    "defaultSpeedOneTargetStepsPerTick": 16,
+    "maxSubstepsPerFrame": 250,
+    "maxCatchUpSeconds": 0.05,
+    "wallClockSolverBudgetMs": null,
+    "adaptiveTimeStep": false,
+    "userVisibleFidelityMode": false,
+    "userVisibleSimulationTime": false
+  },
+  "limitation": "A browser CPU/frame trace was not available in the repository environment; runtime comparison belongs in OPT-FB-001."
+}

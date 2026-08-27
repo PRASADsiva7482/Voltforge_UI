@@ -559,21 +559,30 @@ export function distToSegment(
 /**
  * Auto-assigns wire color based on electrical net type and pin role.
  */
-export function getWireAutoColor(fromPinName: string = '', toPinName: string = ''): string {
+export function getWireAutoColor(
+  fromPinName: string = '',
+  toPinName: string = '',
+  fromPinType?: string,
+  toPinType?: string,
+): string {
   const combined = `${fromPinName} ${toPinName}`.toLowerCase();
-  if (combined.includes('vcc') || combined.includes('5v') || combined.includes('3v3') || combined.includes('3.3v') || combined.includes('vin') || combined.includes('power')) {
+  const isToken = (pattern: RegExp) => pattern.test(combined);
+
+  // Ground must be checked before generic signal names.  Use a visible slate
+  // instead of near-black so a ground net remains readable on the dark canvas.
+  if (fromPinType === 'ground' || toPinType === 'ground' || isToken(/(?:^|[^a-z0-9])(gnd|ground|vss|negative|minus|0v)(?:[^a-z0-9]|$)/i)) {
+    return '#64748b'; // Ground / return
+  }
+  if (fromPinType === 'power' || toPinType === 'power' || isToken(/(?:^|[^a-z0-9])(vcc|vdd|5v|3v3|3\.3v|vin|power|positive|plus)(?:[^a-z0-9]|$)/i)) {
     return '#ef4444'; // Red
   }
-  if (combined.includes('gnd') || combined.includes('ground') || combined.includes('0v')) {
-    return '#111827'; // Black
-  }
-  if (combined.includes('sda') || combined.includes('data') || combined.includes('mosi') || combined.includes('rx') || combined.includes('in')) {
+  if (isToken(/(?:^|[^a-z0-9])(sda|data|mosi|miso|rx|in[1-4]?|input)(?:[^a-z0-9]|$)/i)) {
     return '#3b82f6'; // Blue
   }
-  if (combined.includes('scl') || combined.includes('clock') || combined.includes('sck') || combined.includes('tx') || combined.includes('clk')) {
+  if (isToken(/(?:^|[^a-z0-9])(scl|clock|sck|tx|clk)(?:[^a-z0-9]|$)/i)) {
     return '#eab308'; // Yellow
   }
-  if (combined.includes('pwm') || combined.includes('out') || combined.includes('analog') || combined.includes('a0') || combined.includes('a1')) {
+  if (isToken(/(?:^|[^a-z0-9])(pwm|out|analog|a[0-9]+|signal)(?:[^a-z0-9]|$)/i)) {
     return '#10b981'; // Green
   }
   return '#22c55e'; // Default Voltforge emerald

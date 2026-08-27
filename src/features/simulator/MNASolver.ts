@@ -5,6 +5,8 @@
 
 // ── MNA Element Types ────────────────────────────────────────────────────
 
+import { applyMnaElementValueUpdates } from './mnaIncremental';
+
 export type MNAElementType =
   | 'RESISTOR'
   | 'VOLTAGE_SOURCE'
@@ -89,6 +91,18 @@ export interface MNAElement {
   // Capacitor companion model state
   prevVoltage?: number;  // Voltage across capacitor at previous time step
   prevCurrent?: number;  // Current through capacitor at previous time step
+}
+
+/**
+ * Mutable model fields for an element whose topology is already compiled.
+ * Node references, element type, and transient history are intentionally
+ * excluded by the update method so an ordinary value edit cannot invalidate
+ * the solver's voltage-source index or dynamic state.
+ */
+export interface MNAElementValueUpdate {
+  id: string;
+  changes: Partial<MNAElement>;
+  unset?: Array<keyof MNAElement>;
 }
 
 export interface MNASolution {
@@ -177,6 +191,15 @@ export class MNASolver {
       || e.type === 'MOTOR_DC'
       || e.type === 'OPAMP'
     );
+  }
+
+  /**
+   * Apply model-parameter changes without rebuilding the element array or
+   * voltage-source index. The caller has already validated that topology is
+   * unchanged.
+   */
+  public updateElementValues(updates: MNAElementValueUpdate[]) {
+    applyMnaElementValueUpdates(this.elements, updates);
   }
 
   /**

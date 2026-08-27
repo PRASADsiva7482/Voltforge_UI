@@ -5,9 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && npm run test:bundle-budget",
     "lint": "oxlint",
-    "test": "tsc -b && oxlint",
+    "test": "tsc -b && oxlint && npm run test:worker-protocol && npm run test:result-subscription && npm run test:runtime-delta && npm run test:model-revision && npm run test:mna-incremental && npm run test:scope-capture && npm run test:canvas-render && npm run test:avr-budget",
+    "test:worker-protocol": "node scripts/run-worker-backpressure-tests.mjs",
+    "test:result-subscription": "node scripts/run-result-subscription-tests.mjs",
+    "test:runtime-delta": "node scripts/run-runtime-delta-tests.mjs",
+    "test:model-revision": "node scripts/run-model-revision-tests.mjs",
+    "test:mna-incremental": "node scripts/run-mna-incremental-tests.mjs",
+    "test:scope-capture": "node scripts/run-scope-capture-tests.mjs",
+    "test:canvas-render": "node scripts/run-canvas-render-tests.mjs",
+    "test:avr-budget": "node scripts/run-avr-execution-budget-tests.mjs",
+    "test:bundle-budget": "node scripts/check-bundle-budget.mjs",
     "preview": "vite preview"
   },
 

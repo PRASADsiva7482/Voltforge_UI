@@ -65,8 +65,8 @@ export function HeroCircuitScene() {
           </div>
           <div className="hero-node hero-node--sensor">
             <Gauge size={22} />
-            <strong>DHT22</strong>
-            <small>Signal locked</small>
+            <strong>Light sensor</strong>
+            <small>Signal active</small>
           </div>
           <div className="hero-node hero-node--relay">
             <Zap size={22} />

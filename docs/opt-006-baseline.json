@@ -1,0 +1,16 @@
+{
+  "item": "OPT-006",
+  "capturedOn": "2026-08-27",
+  "scope": "MNA netlist and worker refresh before OPT-006",
+  "measurementKind": "static-baseline",
+  "runtimeTraceCaptured": false,
+  "observations": {
+    "netlistRefresh": "SimulationEngine.refreshMnaElements calls buildMNACircuit with all nodes and wires for every live model refresh",
+    "connectivityWork": "Every refresh re-registers pins, merges direct wires, evaluates breadboard internal links, and evaluates breadboard proximity links",
+    "workerUpdate": "SimulationWorker.UPDATE_ELEMENTS replaces the complete element array and calls MNASolver.setElements",
+    "mutableElementGranularity": "No element-level value patch message exists",
+    "topologyCache": false,
+    "topologyLifecycle": "A changed MNA node count stops and recreates the worker"
+  },
+  "limitation": "Browser compile timings, worker lifecycle counts, and breadboard/direct-wire runtime traces were unavailable; validate cache reuse, patch counts, and connectivity equivalence through OPT-FB-006."
+}

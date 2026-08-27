@@ -7,8 +7,7 @@ import CircuitCanvas from '../canvas/CircuitCanvas';
 import ComponentPanel from '../editor/ComponentPanel';
 import PropertyEditor from '../editor/PropertyEditor';
 import SerialMonitor from '../editor/SerialMonitor';
-import { SimulationEngine } from '../simulator/SimulationEngine';
-import { LogicRegistry } from '../simulator/logic/LogicRegistry';
+import { SimulationEngineLoadCancelledError, useDeferredSimulationEngine } from '../simulator/useDeferredSimulationEngine';
 import labCatalog from './labCatalog.json';
 import { LabCriteriaEvaluator, type EvaluationResult, type LabChallenge } from './labCriteriaEvaluator';
 
@@ -22,13 +21,14 @@ export function LabChallengeRunner() {
   const wires = useCanvasStore((s) => s.wires);
   const isSimulating = useSimulationStore((s) => s.isSimulating);
   const setSimulating = useSimulationStore((s) => s.setSimulating);
+  const setResultDataConsumer = useSimulationStore((s) => s.setResultDataConsumer);
   const nodeVoltages = useSimulationStore((s) => s.nodeVoltages);
   const branchCurrents = useSimulationStore((s) => s.branchCurrents);
   const writeSerial = useSimulationStore((s) => s.writeSerial);
   const clearSerial = useSimulationStore((s) => s.clearSerial);
 
   const canvasHostRef = useRef<HTMLDivElement>(null);
-  const engineRef = useRef<SimulationEngine | null>(null);
+  const simulationRequestRef = useRef(0);
   const [canvasSize, setCanvasSize] = useState({ height: 520, width: 820 });
   const [revealedHints, setRevealedHints] = useState(0);
   const [showHintModal, setShowHintModal] = useState(false);
@@ -42,6 +42,15 @@ export function LabChallengeRunner() {
     wires: typeof wires;
     viewport: { x: number; y: number; scale: number };
   } | null>(null);
+  const { getSimulationEngine, stopSimulationEngine } = useDeferredSimulationEngine({
+    onError: (error) => writeSerial(`[ERROR] ${error}`),
+    onSerialOutput: (text) => writeSerial(text),
+  });
+
+  useEffect(() => {
+    setResultDataConsumer('lab', true);
+    return () => setResultDataConsumer('lab', false);
+  }, [setResultDataConsumer]);
 
   useEffect(() => {
     if (!challenge) return;
@@ -57,21 +66,10 @@ export function LabChallengeRunner() {
     };
   }, [challenge, loadCanvas]);
 
-  useEffect(() => {
-    engineRef.current = new SimulationEngine({
-      onError: (err) => writeSerial(`[ERROR] ${err}`),
-      onPinStateChange: (componentId, pinId, state, value) => {
-        const node = useCanvasStore.getState().nodes.find((item) => item.id === componentId);
-        if (node) LogicRegistry.dispatch(node.type, componentId, pinId, state, value);
-      },
-      onSerialOutput: (text) => writeSerial(text),
-    });
-
-    return () => {
-      engineRef.current?.stop();
-      setSimulating(false);
-    };
-  }, [setSimulating, writeSerial]);
+  useEffect(() => () => {
+    simulationRequestRef.current += 1;
+    setSimulating(false);
+  }, [setSimulating]);
 
   useEffect(() => {
     const host = canvasHostRef.current;
@@ -110,15 +108,27 @@ export function LabChallengeRunner() {
 
   const toggleSimulation = async () => {
     if (!isSimulating) {
+      const requestId = ++simulationRequestRef.current;
       setSimulating(true);
       clearSerial();
       writeSerial('> Challenge verification simulation started');
-      await engineRef.current?.start('', nodes, wires);
+      try {
+        const engine = await getSimulationEngine();
+        if (requestId !== simulationRequestRef.current) return;
+        await engine.start('', nodes, wires);
+      } catch (error) {
+        if (requestId !== simulationRequestRef.current) return;
+        setSimulating(false);
+        if (!(error instanceof SimulationEngineLoadCancelledError)) {
+          writeSerial(`[ERROR] Unable to start simulation: ${error instanceof Error ? error.message : 'engine load failed'}`);
+        }
+      }
       return;
     }
 
+    simulationRequestRef.current += 1;
     setSimulating(false);
-    engineRef.current?.stop();
+    stopSimulationEngine();
     writeSerial('> Simulation stopped');
   };
 

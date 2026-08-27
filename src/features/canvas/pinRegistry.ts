@@ -229,29 +229,6 @@ const RELAY_PINS: PinPosition[] = [
   pin('nc', 'NC', 70, 40, 'bidirectional'),
 ];
 
-// DHT22/TEMP_SENSOR: SVG viewBox 60×80, pads at y≈76-80
-const DHT_PINS: PinPosition[] = [
-  pin('vcc', 'VCC', 16, 80, 'power'),
-  pin('data', 'DATA', 26, 80, 'output'),
-  pin('nc', 'NC', 36, 80, 'bidirectional'),
-  pin('gnd', 'GND', 46, 80, 'ground'),
-];
-
-const DHT11_PINS: PinPosition[] = [
-  pin('vcc', 'VCC', 12, 80, 'power'),
-  pin('data', 'DATA', 24, 80, 'bidirectional'),
-  pin('nc', 'NC', 36, 80, 'bidirectional'),
-  pin('gnd', 'GND', 48, 80, 'ground'),
-];
-
-// ULTRASONIC: SVG viewBox 80×60 (was 80×50 mapped to 60×60), pads at bottom
-const ULTRASONIC_PINS: PinPosition[] = [
-  pin('vcc', 'VCC', 9, 60, 'power'),
-  pin('trig', 'TRIG', 21, 60, 'input'),
-  pin('echo', 'ECHO', 59, 60, 'output'),
-  pin('gnd', 'GND', 71, 60, 'ground'),
-];
-
 const LCD_16X2_PINS: PinPosition[] = (() => {
   const names = ['VSS', 'VDD', 'V0', 'RS', 'RW', 'E', 'D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'A', 'K'];
   return names.map((name, i) => {
@@ -293,30 +270,6 @@ const SOIL_MOISTURE_PINS: PinPosition[] = [
   pin('vcc', 'VCC', 10, 50, 'power'),
   pin('gnd', 'GND', 20, 50, 'ground'),
   pin('sig', 'SIG', 30, 50, 'output'),
-];
-
-const IR_RECEIVER_PINS: PinPosition[] = [
-  pin('out', 'OUT', 10, 40, 'output'),
-  pin('gnd', 'GND', 20, 40, 'ground'),
-  pin('vcc', 'VCC', 30, 40, 'power'),
-];
-
-const BT_MODULE_PINS: PinPosition[] = [
-  pin('vcc', 'VCC', 0, 10, 'power'),
-  pin('gnd', 'GND', 0, 22, 'ground'),
-  pin('tx', 'TX', 0, 34, 'output'),
-  pin('rx', 'RX', 0, 46, 'input'),
-  pin('en', 'EN', 60, 20, 'input'),
-  pin('state', 'STATE', 60, 35, 'output'),
-];
-
-const WIFI_MODULE_PINS: PinPosition[] = [
-  pin('vcc', '3V3', 0, 10, 'power'),
-  pin('gnd', 'GND', 0, 20, 'ground'),
-  pin('tx', 'TX', 0, 30, 'output'),
-  pin('rx', 'RX', 0, 40, 'input'),
-  pin('rst', 'RST', 60, 15, 'input'),
-  pin('ch_pd', 'CH_PD', 60, 30, 'input'),
 ];
 
 // STEPPER_MOTOR: SVG viewBox 70×70, wires exit bottom
@@ -460,14 +413,6 @@ const IC_CD4017_PINS: PinPosition[] = [
   pin('vcc', 'VDD', 113, 50, 'power'),
 ];
 
-// LED_NEOPIXEL: SVG viewBox 60×20
-const NEOPIXEL_PINS: PinPosition[] = [
-  pin('din', 'DIN', 0, 10, 'input'),
-  pin('vcc', 'VCC', 30, 20, 'power'),
-  pin('gnd', 'GND', 30, 0, 'ground'),
-  pin('dout', 'DOUT', 60, 10, 'output'),
-];
-
 // DISPLAY_7SEG: SVG viewBox 50×70
 const SEG7_PINS: PinPosition[] = [
   pin('a', 'A', 3, 70, 'input'),
@@ -479,15 +424,6 @@ const SEG7_PINS: PinPosition[] = [
   pin('g', 'G', 41, 70, 'input'),
   pin('dp', 'DP', 47, 70, 'input'),
   pin('com', 'COM', 25, 0, 'bidirectional'),
-];
-
-// SENSOR_IMU: SVG viewBox 60×60
-const IMU_PINS: PinPosition[] = [
-  pin('vcc', 'VCC', 6, 60, 'power'),
-  pin('gnd', 'GND', 18, 60, 'ground'),
-  pin('scl', 'SCL', 30, 60, 'bidirectional'),
-  pin('sda', 'SDA', 42, 60, 'bidirectional'),
-  pin('int', 'INT', 54, 60, 'output'),
 ];
 
 // BREADBOARD: SVG viewBox 220x120 - power rails + terminal strips
@@ -592,13 +528,6 @@ const MOTOR_BLDC_PINS: PinPosition[] = [
   pin('phase_c', 'Phase C', 65, 80, 'input'),
 ];
 
-// RC_RECEIVER: SVG viewBox 80×60, 3 output pins
-const RC_RECEIVER_PINS: PinPosition[] = [
-  pin('gnd', 'GND', 20, 60, 'ground'),
-  pin('vcc', 'VCC', 40, 60, 'power'),
-  pin('ppm', 'PPM Signal', 60, 60, 'output'),
-];
-
 // AMMETER: SVG viewBox 90×70, two terminal pins
 const AMMETER_PINS: PinPosition[] = [
   pin('in', 'IN (+)', 24, 70, 'input'),
@@ -692,7 +621,6 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
   // LEDs
   LED_STANDARD: LED_PINS,
   LED_RGB: LED_RGB_PINS,
-  LED_NEOPIXEL: NEOPIXEL_PINS,
 
   // Input
   PUSH_BUTTON: BUTTON_PINS,
@@ -713,18 +641,11 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
   RELAY_4CH: RELAY_4CH_PINS,
 
   // Sensors
-  TEMP_SENSOR: DHT_PINS,
-  SENSOR_DHT11: DHT11_PINS,
-  SENSOR_DHT22: DHT_PINS,
-  ULTRASONIC_SENSOR: ULTRASONIC_PINS,
-  SENSOR_ULTRASONIC: ULTRASONIC_PINS,
   PIR_SENSOR: PIR_PINS,
   SENSOR_PIR: PIR_PINS,
   LDR: LDR_PINS,
   SENSOR_LDR: LDR_PINS,
   SOIL_MOISTURE: SOIL_MOISTURE_PINS,
-  IR_RECEIVER: IR_RECEIVER_PINS,
-  SENSOR_IMU: IMU_PINS,
 
   // Displays
   LCD_16X2: LCD_16X2_PINS,
@@ -734,13 +655,10 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
   DISPLAY_7SEG: SEG7_PINS,
 
   // Communication
-  BLUETOOTH_MODULE: BT_MODULE_PINS,
-  WIFI_MODULE: WIFI_MODULE_PINS,
 
   // Drone / ESC
   ESC_MODULE: ESC_PINS,
   MOTOR_BLDC: MOTOR_BLDC_PINS,
-  RC_RECEIVER: RC_RECEIVER_PINS,
 
   // Instruments
   AMMETER: AMMETER_PINS,

@@ -72,7 +72,6 @@ export const LED_COLOR_MAP: Record<string, string> = {
   white: '#f8fafc',
   orange: '#f97316',
   rgb: '#a855f7',
-  neopixel: '#a855f7',
 };
 export const LED_COLOR_DEFAULT = '#ef4444';
 
@@ -161,17 +160,12 @@ export const SENSOR_BAR_HEIGHT = 4;
 export const SENSOR_BAR_BG = 'rgba(255,255,255,0.1)';
 
 // ── Sensor-specific colors ──────────────────────────────────────────────
-export const TEMP_HOT_COLOR = '#ef4444';
-export const TEMP_COLD_COLOR = '#3b82f6';
-export const TEMP_WARM_COLOR = '#f59e0b';
-export const ULTRASONIC_WAVE_COLOR = '#38bdf8';
 export const PIR_ACTIVE_COLOR = '#ef4444';
 export const PIR_IDLE_COLOR = '#22c55e';
 export const LDR_SUN_COLOR = '#fbbf24';
 export const LDR_MOON_COLOR = '#6366f1';
 export const SOIL_WET_COLOR = '#3b82f6';
 export const SOIL_DRY_COLOR = '#d97706';
-export const IMU_TILT_COLOR = '#a855f7';
 
 // ── Motor motion blur ───────────────────────────────────────────────────
 export const MOTOR_BLUR_RPM_THRESHOLD = 2000;

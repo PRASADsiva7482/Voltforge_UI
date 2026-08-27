@@ -122,6 +122,14 @@ export class ShiftRegister165Logic implements IComponentLogic {
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
+    if (pinId === '__power_reset__') {
+      this.shiftRegister.delete(componentId);
+      this.prevClk.delete(componentId);
+      this.parallelInputs.delete(componentId);
+      return;
+    }
+    if (node.properties?.powered !== true) return;
+
     const pin = node.pins?.find(p => p.id === pinId);
     const pinName = (pin?.name || pinId).toUpperCase();
     const isHigh = state === 'HIGH';
@@ -178,6 +186,13 @@ export class Decoder138Logic implements IComponentLogic {
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
+    if (pinId === '__power_reset__') {
+      this.address.delete(componentId);
+      this.enables.delete(componentId);
+      return;
+    }
+    if (node.properties?.powered !== true) return;
+
     const pin = node.pins?.find(p => p.id === pinId);
     const pinName = (pin?.name || pinId).toUpperCase();
     const isHigh = state === 'HIGH';
@@ -233,6 +248,14 @@ export class Multiplexer151Logic implements IComponentLogic {
     const { updateNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
+
+    if (pinId === '__power_reset__') {
+      this.dataInputs.delete(componentId);
+      this.select.delete(componentId);
+      this.enableBar.delete(componentId);
+      return;
+    }
+    if (node.properties?.powered !== true) return;
 
     const pin = node.pins?.find(p => p.id === pinId);
     const pinName = (pin?.name || pinId).toUpperCase();
@@ -294,6 +317,13 @@ export class DecadeCounter4017Logic implements IComponentLogic {
     const { updateNode, nodes, wires } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
+
+    if (pinId === '__power_reset__') {
+      this.count.delete(componentId);
+      this.prevClk.delete(componentId);
+      return;
+    }
+    if (node.properties?.powered !== true) return;
 
     const pin = node.pins?.find(p => p.id === pinId);
     const pinName = (pin?.name || pinId).toUpperCase();

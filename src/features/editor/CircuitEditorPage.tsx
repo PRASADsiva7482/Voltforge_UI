@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState, useRef } from 'react'
+import { lazy, Suspense, useEffect, useCallback, useState, useRef, type ReactNode } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -14,7 +14,6 @@ import {
   Layout,
   PanelLeftClose,
   PanelRightClose,
-  Download,
   Zap,
   Sun,
   Moon,
@@ -26,10 +25,14 @@ import {
   Settings,
   Share2,
   GitFork,
-  FileText,
   Trash2,
   Wifi,
   Layers,
+  ChevronDown,
+  SlidersHorizontal,
+  Bug,
+  FileArchive,
+  CircuitBoard,
 } from 'lucide-react'
 
 import { pcbManufacturingApi, projectApi, simulationApi, projectExportApi, type PcbManufacturingPayload } from '../../api/services'
@@ -44,31 +47,86 @@ import { useCollaboration } from '../../hooks/useCollaboration'
 
 import { analyzeCircuitSafety } from '../canvas/pinRegistry'
 import { isBoardComponentType, supportsAvr8js } from '../canvas/boardCatalog'
-import { SimulationEngine } from '../simulator/SimulationEngine'
-import { LogicRegistry } from '../simulator/logic/LogicRegistry'
+import { SimulationEngineLoadCancelledError, useDeferredSimulationEngine } from '../simulator/useDeferredSimulationEngine'
 
 import CircuitCanvas from '../canvas/CircuitCanvas'
-import PcbCanvas from '../pcb/PcbCanvas'
 import ComponentPanel from './ComponentPanel'
 import PropertyEditor from './PropertyEditor'
 import SerialMonitor from './SerialMonitor'
-import CodeEditor from './CodeEditor'
-
-// Import feature panels
-import MultimeterPanel from './MultimeterPanel'
-import OscilloscopePanel from './OscilloscopePanel'
-import BomPanel from './BomPanel'
-import AiChatPanel from '../ai/AiChatPanel'
-import AiValidatorPanel from './AiValidatorPanel'
-import IotInspectorPanel from './IotInspectorPanel'
-import ProjectSettingsModal from './ProjectSettingsModal'
 
 import { ContextMenu } from '../../components/ui/ContextMenu'
-import { Dropdown } from '../../components/ui/Dropdown'
 import { SplitPane } from '../../components/ui/SplitPane'
 import type { Project, CodeFile } from '../../types/domain'
+import {
+  createMaximumComponentRegressionPreset,
+  MAX_COMPONENT_REGRESSION_BOARD,
+  MAX_COMPONENT_REGRESSION_FIRMWARE,
+} from '../../store/maxComponentRegressionPreset'
+import {
+  runMaximumComponentRegression,
+  type MaximumComponentRegressionTrace,
+} from '../simulator/regression/maxComponentRegression'
+import {
+  runMaximumCanvasRenderRegression,
+  type MaximumCanvasRenderTrace,
+} from '../canvas/regression/canvasRenderRegression'
+import {
+  AVR_COMPILED_TRACE_DURATION_MS,
+  AVR_COMPILED_TRACE_FIRMWARE,
+  AVR_COMPILED_TRACE_ID,
+  AVR_FRAME_TIME_TARGET_MS,
+  AVR_INPUT_LATENCY_TARGET_MS,
+  captureAvrCompiledFirmwareMode,
+  createAvrCompiledFirmwareFixture,
+  type AvrCompiledFirmwareTrace,
+} from '../simulator/regression/avrCompiledFirmwareTrace'
+import type { SimulationFidelityMode } from '../simulator/simulationModels'
+
+const PcbCanvas = lazy(() => import('../pcb/PcbCanvas'))
+const CodeEditor = lazy(() => import('./CodeEditor'))
+const MultimeterPanel = lazy(() => import('./MultimeterPanel'))
+const OscilloscopePanel = lazy(() => import('./OscilloscopePanel'))
+const BomPanel = lazy(() => import('./BomPanel'))
+const AiChatPanel = lazy(() => import('../ai/AiChatPanel'))
+const AiValidatorPanel = lazy(() => import('./AiValidatorPanel'))
+const IotInspectorPanel = lazy(() => import('./IotInspectorPanel'))
+const ProjectSettingsModal = lazy(() => import('./ProjectSettingsModal'))
+const SolverDiagnosticsPanel = lazy(() => import('./SolverDiagnosticsPanel'))
 
 type ViewMode = 'canvas' | 'code' | 'split' | 'pcb'
+
+function EditorFeatureBoundary({ children, label }: { children: ReactNode; label: string }) {
+  return (
+    <Suspense fallback={<div className="vf-editor-feature-loading" role="status" aria-live="polite">Loading {label}…</div>}>
+      {children}
+    </Suspense>
+  )
+}
+
+function SecondaryToolButton({
+  icon,
+  label,
+  onClick,
+  pressed,
+}: {
+  icon: ReactNode
+  label: string
+  onClick: () => void
+  pressed?: boolean
+}) {
+  return (
+    <button
+      className={`vf-editor__secondary-tool ${pressed ? 'is-active' : ''}`}
+      onClick={onClick}
+      type="button"
+      aria-label={label}
+      aria-pressed={typeof pressed === 'boolean' ? pressed : undefined}
+      title={label}
+    >
+      {icon}
+    </button>
+  )
+}
 
 function bundleCodeFiles(activeFile: CodeFile | null, files: CodeFile[]): string {
   if (!activeFile) return ''
@@ -157,13 +215,17 @@ export default function CircuitEditorPage() {
   const [isSimulationPaused, setIsSimulationPaused] = useState(false)
   const canvasContainerRef = useRef<HTMLDivElement>(null)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
-  const engineRef = useRef<SimulationEngine | null>(null)
   const canvasSnapshotRef = useRef<string | null>(null)
   const pcbSnapshotRef = useRef<string | null>(null)
   const skipCanvasDirtyRef = useRef(false)
   const sharedCanvasStateRef = useRef<string | null>(null)
   const sharedCodeStateRef = useRef<string | null>(null)
   const simulationRequestRef = useRef(0)
+  const regressionTokenRef = useRef(0)
+  const canvasRenderRegressionTokenRef = useRef(0)
+  const avrCompiledTraceTokenRef = useRef(0)
+  const secondaryToolsButtonRef = useRef<HTMLButtonElement>(null)
+  const secondaryToolsTrayRef = useRef<HTMLDivElement>(null)
 
   // Migrated features panel open state
   const [showMultimeter, setShowMultimeter] = useState(false)
@@ -172,6 +234,13 @@ export default function CircuitEditorPage() {
   const [showAiValidator, setShowAiValidator] = useState(false)
   const [showIotInspector, setShowIotInspector] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [secondaryToolsOpen, setSecondaryToolsOpen] = useState(false)
+  const [regressionMode, setRegressionMode] = useState<SimulationFidelityMode | 'both' | null>(null)
+  const [regressionRuns, setRegressionRuns] = useState<MaximumComponentRegressionTrace[]>([])
+  const [canvasRenderTraceRunning, setCanvasRenderTraceRunning] = useState(false)
+  const [canvasRenderTrace, setCanvasRenderTrace] = useState<MaximumCanvasRenderTrace | null>(null)
+  const [avrCompiledTraceRunning, setAvrCompiledTraceRunning] = useState(false)
+  const [avrCompiledTrace, setAvrCompiledTrace] = useState<AvrCompiledFirmwareTrace | null>(null)
 
   // Right-click context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -187,11 +256,50 @@ export default function CircuitEditorPage() {
   const setDebugSnapshot = useSimulationStore((s) => s.setDebugSnapshot)
   const setSerialPanelOpen = useSimulationStore((s) => s.setSerialPanelOpen)
   const setSimulating = useSimulationStore((s) => s.setSimulating)
+  const fidelityMode = useSimulationStore((s) => s.fidelityMode)
+  const setFidelityMode = useSimulationStore((s) => s.setFidelityMode)
+  const simulationTime = useSimulationStore((s) => s.simulationTime)
+  const executionMode = useSimulationStore((s) => s.executionMode)
+  const avrWorkload = useSimulationStore((s) => s.avrWorkload)
+  const solverDiagnosticsOpen = useSimulationStore((s) => s.solverDiagnosticsOpen)
+  const solverDiagnostics = useSimulationStore((s) => s.solverDiagnostics)
+  const setSolverDiagnosticsOpen = useSimulationStore((s) => s.setSolverDiagnosticsOpen)
+  const clearSolverDiagnostics = useSimulationStore((s) => s.clearSolverDiagnostics)
   const toggleMeterProbe = useSimulationStore((s) => s.toggleMeterProbe)
   const oscilloscopePanelOpen = useSimulationStore((s) => s.oscilloscopePanelOpen)
   const setOscilloscopePanelOpen = useSimulationStore((s) => s.setOscilloscopePanelOpen)
   const { theme, toggleTheme } = useThemeStore()
   const updateNode = useCanvasStore((s) => s.updateNode)
+  const { engineRef, getSimulationEngine, stopSimulationEngine } = useDeferredSimulationEngine({
+    onSerialOutput: (text, options) => writeSerial(text, options),
+    onBaudRateChange: setBaudRate,
+    onDebugSnapshot: setDebugSnapshot,
+    onError: (error) => writeSerial(`[ERROR] ${error}`),
+  })
+
+  useEffect(() => {
+    if (!secondaryToolsOpen) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSecondaryToolsOpen(false)
+        secondaryToolsButtonRef.current?.focus()
+      }
+    }
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (
+        secondaryToolsButtonRef.current?.contains(target)
+        || secondaryToolsTrayRef.current?.contains(target)
+      ) return
+      setSecondaryToolsOpen(false)
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    document.addEventListener('mousedown', closeOnOutsideClick)
+    return () => {
+      document.removeEventListener('keydown', closeOnEscape)
+      document.removeEventListener('mousedown', closeOnOutsideClick)
+    }
+  }, [secondaryToolsOpen])
 
   const isPreset = projectId === 'preset-smart-device'
   const isSharedView = !projectId
@@ -212,7 +320,7 @@ export default function CircuitEditorPage() {
     // The smart-device preset exists only in the frontend and has no backend
     // project record. Do not open a WebSocket for it, otherwise the server
     // rejects the subscription and the reconnect loop makes the badge blink.
-    useCollaboration(isPreset ? '' : projectId || '')
+    useCollaboration(isPreset || !user ? '' : projectId || '')
 
   // Reset route-owned state before a new project query resolves. Zustand is a
   // singleton, so without this a project with no layout could display the
@@ -235,12 +343,12 @@ export default function CircuitEditorPage() {
       const r = await projectApi.getById(projectId!)
       return r.data.data
     },
-    enabled: !!projectId,
+    enabled: !!projectId && !isPreset,
   })
 
   // Set project layout and codes
   useEffect(() => {
-    const project = isPreset
+    const project = projectId === 'preset-smart-device'
       ? SMART_DEVICE_PRESET
       : fetchedProject?.id === projectId
         ? fetchedProject
@@ -359,10 +467,10 @@ export default function CircuitEditorPage() {
     // canvas update from a read-only project makes the backend reject the
     // STOMP frame, which used to trigger a reconnect loop and re-render this
     // toolbar on every connection attempt.
-    if (isLiveSyncConnected && isOwner && !isPreset) {
+    if (isLiveSyncConnected && isOwner && !isPreset && regressionMode === null && !canvasRenderTraceRunning && !avrCompiledTraceRunning) {
       broadcastCanvasSync(nodes, wires, viewport, usePcbStore.getState().getLayout())
     }
-  }, [broadcastCanvasSync, isLiveSyncConnected, isOwner, isPreset, nodes, pcbSnapshot, viewport, wires])
+  }, [avrCompiledTraceRunning, broadcastCanvasSync, canvasRenderTraceRunning, isLiveSyncConnected, isOwner, isPreset, nodes, pcbSnapshot, regressionMode, viewport, wires])
 
   // ── Save mutation ──
   const saveMutation = useMutation({
@@ -562,23 +670,6 @@ export default function CircuitEditorPage() {
     return () => ro.disconnect()
   }, [leftPanelOpen, viewMode])
 
-  // ── Setup simulation engine ──
-  useEffect(() => {
-    engineRef.current = new SimulationEngine({
-      onSerialOutput: (text, options) => writeSerial(text, options),
-      onBaudRateChange: setBaudRate,
-      onPinStateChange: (cid, pid, state, value) => {
-        const node = useCanvasStore.getState().nodes.find((n) => n.id === cid)
-        if (node) LogicRegistry.dispatch(node.type, cid, pid, state, value)
-      },
-      onDebugSnapshot: setDebugSnapshot,
-      onError: (err) => writeSerial(`[ERROR] ${err}`),
-    })
-    return () => {
-      engineRef.current?.stop()
-    }
-  }, [setBaudRate, setDebugSnapshot, writeSerial])
-
   // ── Component Interaction (button press, relay activation, etc.) ──
   const handleComponentInteraction = useCallback(
     (nodeId: string, event: 'press' | 'release') => {
@@ -620,7 +711,7 @@ export default function CircuitEditorPage() {
         }
       })
     },
-    [nodes, wires, isSimulating, updateNode]
+    [engineRef, nodes, wires, isSimulating, updateNode]
   )
 
   // ── Simulation toggle ──
@@ -693,9 +784,20 @@ export default function CircuitEditorPage() {
       // Stop can be clicked while a remote compiler request is pending. Do not
       // start a worker after that stop has already invalidated this request.
       if (requestId !== simulationRequestRef.current) return
-      await engineRef.current?.start(bundledCode, nodes, wires, compiledHex, selectedBoardType)
+      try {
+        const engine = await getSimulationEngine()
+        if (requestId !== simulationRequestRef.current) return
+        await engine.start(bundledCode, nodes, wires, compiledHex, selectedBoardType)
+      } catch (error) {
+        if (error instanceof SimulationEngineLoadCancelledError || requestId !== simulationRequestRef.current) return
+        setIsSimulating(false)
+        setIsSimulationPaused(false)
+        setSimulating(false)
+        writeSerial(`[ERROR] Unable to start simulation: ${error instanceof Error ? error.message : 'engine load failed'}`)
+      }
     } else {
       simulationRequestRef.current += 1
+      if (regressionMode !== null) regressionTokenRef.current += 1
       setIsSimulating(false)
       setIsSimulationPaused(false)
       setSimulating(false)
@@ -720,6 +822,380 @@ export default function CircuitEditorPage() {
     }
   }
 
+  const stopRegression = useCallback(() => {
+    if (regressionMode === null) return
+    regressionTokenRef.current += 1
+    stopSimulationEngine()
+    setIsSimulating(false)
+    setIsSimulationPaused(false)
+    setSimulating(false)
+  }, [regressionMode, setSimulating, stopSimulationEngine])
+
+  const runRegression = useCallback(async () => {
+    if (regressionMode !== null || canvasRenderTraceRunning || avrCompiledTraceRunning) return
+    if (isSimulating) {
+      addToast('Stop the active simulation before running the regression trace', 'info')
+      return
+    }
+    let engine
+    try {
+      engine = await getSimulationEngine()
+    } catch (error) {
+      if (!(error instanceof SimulationEngineLoadCancelledError)) {
+        addToast(`Simulation engine failed to load: ${error instanceof Error ? error.message : 'unknown error'}`, 'error')
+      }
+      return
+    }
+
+    const originalNodes = useCanvasStore.getState().nodes
+    const originalWires = useCanvasStore.getState().wires
+    const originalViewport = useCanvasStore.getState().viewport
+    const originalFidelity = useSimulationStore.getState().fidelityMode
+    const originalDirty = useProjectStore.getState().isDirty
+    const preset = createMaximumComponentRegressionPreset()
+    const token = ++regressionTokenRef.current
+
+    const runtime = {
+      setFidelityMode: (mode: SimulationFidelityMode) => setFidelityMode(mode),
+      start: async () => {
+        setIsSimulating(true)
+        setIsSimulationPaused(false)
+        setSimulating(true)
+        await engine.start(
+          MAX_COMPONENT_REGRESSION_FIRMWARE,
+          preset.nodes,
+          preset.wires,
+          undefined,
+          MAX_COMPONENT_REGRESSION_BOARD,
+        )
+      },
+      stop: () => engine.stop(),
+      subscribe: (listener: () => void) => {
+        let previous = useSimulationStore.getState().solverDiagnostics
+        return useSimulationStore.subscribe((state) => {
+          if (state.solverDiagnostics === previous) return
+          previous = state.solverDiagnostics
+          listener()
+        })
+      },
+      getDiagnostics: () => useSimulationStore.getState().solverDiagnostics,
+      getNodes: () => useCanvasStore.getState().nodes,
+    }
+
+    setRegressionMode('both')
+    setSolverDiagnosticsOpen(true)
+    clearSolverDiagnostics()
+    setRegressionRuns([])
+
+    try {
+      for (const mode of ['adaptive', 'full-fidelity'] as const) {
+        if (regressionTokenRef.current !== token) break
+        loadCanvas(preset.nodes, preset.wires, { x: -240, y: -120, scale: 0.72 })
+        skipCanvasDirtyRef.current = true
+        clearSolverDiagnostics()
+        const trace = await runMaximumComponentRegression(preset, mode, runtime, {
+          shouldStop: () => regressionTokenRef.current !== token,
+        })
+        if (regressionTokenRef.current !== token) break
+        setRegressionRuns((previous) => [...previous, trace])
+      }
+    } catch (error) {
+      addToast(`Regression trace failed: ${error instanceof Error ? error.message : 'unknown error'}`, 'error')
+    } finally {
+      engine.stop()
+      setIsSimulating(false)
+      setIsSimulationPaused(false)
+      setSimulating(false)
+      loadCanvas(originalNodes, originalWires, originalViewport)
+      skipCanvasDirtyRef.current = true
+      setDirty(originalDirty)
+      setFidelityMode(originalFidelity)
+      setRegressionMode(null)
+    }
+  }, [
+    addToast,
+    avrCompiledTraceRunning,
+    canvasRenderTraceRunning,
+    clearSolverDiagnostics,
+    getSimulationEngine,
+    isSimulating,
+    loadCanvas,
+    regressionMode,
+    setDirty,
+    setFidelityMode,
+    setIsSimulating,
+    setIsSimulationPaused,
+    setSolverDiagnosticsOpen,
+    setSimulating,
+  ])
+
+  const stopCanvasRenderRegression = useCallback(() => {
+    if (!canvasRenderTraceRunning) return
+    canvasRenderRegressionTokenRef.current += 1
+  }, [canvasRenderTraceRunning])
+
+  const runCanvasRenderRegression = useCallback(async () => {
+    if (canvasRenderTraceRunning || regressionMode !== null || avrCompiledTraceRunning) return
+    if (isSimulating) {
+      addToast('Stop the active simulation before running the canvas trace', 'info')
+      return
+    }
+
+    const originalCanvas = useCanvasStore.getState()
+    const originalSimulation = useSimulationStore.getState()
+    const originalNodes = originalCanvas.nodes
+    const originalWires = originalCanvas.wires
+    const originalViewport = originalCanvas.viewport
+    const originalViewMode = viewMode
+    const originalDirty = useProjectStore.getState().isDirty
+    const preset = createMaximumComponentRegressionPreset()
+    const token = ++canvasRenderRegressionTokenRef.current
+    const measurementConsumerSignature = () => {
+      const state = useSimulationStore.getState()
+      return JSON.stringify({
+        meterMode: state.meterMode,
+        meterProbes: state.meterProbes.map((probe) => [probe.id, probe.nodeId, probe.pinId]),
+        resultDataConsumers: state.resultDataConsumers,
+        thermalHeatmapEnabled: state.thermalHeatmapEnabled,
+        oscilloscopePanelOpen: state.oscilloscopePanelOpen,
+      })
+    }
+
+    setCanvasRenderTraceRunning(true)
+    setCanvasRenderTrace(null)
+    setSolverDiagnosticsOpen(true)
+    setViewMode('canvas')
+    loadCanvas(preset.nodes, preset.wires, { x: -80, y: -40, scale: 1 })
+    skipCanvasDirtyRef.current = true
+    useSimulationStore.getState().setCircuitState({}, {}, {}, {}, true)
+    setIsSimulating(true)
+    setSimulating(true)
+
+    try {
+      const trace = await runMaximumCanvasRenderRegression(preset, {
+        viewportWidth: Math.max(1, canvasSize.width),
+        viewportHeight: Math.max(1, canvasSize.height),
+        setScenario: (showCurrentFlow, qualityMode) => {
+          const state = useSimulationStore.getState()
+          state.setShowCurrentFlow(showCurrentFlow)
+          state.setCurrentFlowQualityMode(qualityMode)
+        },
+        setViewport: (nextViewport) => useCanvasStore.getState().setViewport(nextViewport),
+        publishWireCurrents: (wireCurrents) => {
+          const state = useSimulationStore.getState()
+          state.setCircuitState(
+            state.nodeVoltages,
+            wireCurrents,
+            state.branchCurrents,
+            state.componentPower,
+            state.solverConverged,
+          )
+        },
+        getWireCurrents: () => useSimulationStore.getState().wireCurrents,
+        getMeasurementConsumerSignature: measurementConsumerSignature,
+        now: () => performance.now(),
+        requestFrame: (callback) => window.requestAnimationFrame(callback),
+      }, {
+        shouldStop: () => canvasRenderRegressionTokenRef.current !== token,
+      })
+      setCanvasRenderTrace(trace)
+      if (trace.completed) addToast('Canvas rendering trace completed', 'success')
+    } catch (error) {
+      addToast(`Canvas trace failed: ${error instanceof Error ? error.message : 'unknown error'}`, 'error')
+    } finally {
+      setIsSimulating(false)
+      loadCanvas(originalNodes, originalWires, originalViewport)
+      skipCanvasDirtyRef.current = true
+      const state = useSimulationStore.getState()
+      state.setCircuitState(
+        originalSimulation.nodeVoltages,
+        originalSimulation.wireCurrents,
+        originalSimulation.branchCurrents,
+        originalSimulation.componentPower,
+        originalSimulation.solverConverged,
+      )
+      state.setShowCurrentFlow(originalSimulation.showCurrentFlow)
+      state.setCurrentFlowQualityMode(originalSimulation.currentFlowQualityMode)
+      state.setSimulating(originalSimulation.isSimulating)
+      setDirty(originalDirty)
+      setViewMode(originalViewMode)
+      setCanvasRenderTraceRunning(false)
+    }
+  }, [
+    addToast,
+    avrCompiledTraceRunning,
+    canvasRenderTraceRunning,
+    canvasSize.height,
+    canvasSize.width,
+    isSimulating,
+    loadCanvas,
+    regressionMode,
+    setDirty,
+    setIsSimulating,
+    setSimulating,
+    setSolverDiagnosticsOpen,
+    viewMode,
+  ])
+
+  const stopAvrCompiledFirmwareTrace = useCallback(() => {
+    if (!avrCompiledTraceRunning) return
+    avrCompiledTraceTokenRef.current += 1
+    engineRef.current?.stopAvrRuntimeTrace()
+    stopSimulationEngine()
+    setIsSimulating(false)
+    setIsSimulationPaused(false)
+    setSimulating(false)
+  }, [avrCompiledTraceRunning, engineRef, setSimulating, stopSimulationEngine])
+
+  const runAvrCompiledFirmwareTrace = useCallback(async () => {
+    if (avrCompiledTraceRunning || canvasRenderTraceRunning || regressionMode !== null) return
+    if (isSimulating) {
+      addToast('Stop the active simulation before running the compiled AVR trace', 'info')
+      return
+    }
+
+    const originalCanvas = useCanvasStore.getState()
+    const originalSimulation = useSimulationStore.getState()
+    const originalNodes = originalCanvas.nodes
+    const originalWires = originalCanvas.wires
+    const originalViewport = originalCanvas.viewport
+    const originalViewMode = viewMode
+    const originalDirty = useProjectStore.getState().isDirty
+    const fixture = createAvrCompiledFirmwareFixture()
+    const token = ++avrCompiledTraceTokenRef.current
+    const inputProbeTarget = document.createElement('button')
+
+    setAvrCompiledTraceRunning(true)
+    setAvrCompiledTrace(null)
+    setSolverDiagnosticsOpen(true)
+    setViewMode('canvas')
+    loadCanvas(fixture.nodes, fixture.wires, { x: 40, y: 20, scale: 0.9 })
+    skipCanvasDirtyRef.current = true
+
+    try {
+      const compile = await simulationApi.compileFirmware({
+        source: AVR_COMPILED_TRACE_FIRMWARE,
+        boardType: 'ARDUINO_UNO',
+        sketchName: 'VoltForgeAvrResponsiveness',
+      })
+      const result = compile.data.data
+      if (!result.success || !result.hex?.trim()) {
+        throw new Error(result.stderr || result.diagnostics?.[0] || 'compiler returned no Intel HEX')
+      }
+      if (avrCompiledTraceTokenRef.current !== token) return
+
+      const engine = await getSimulationEngine()
+      if (avrCompiledTraceTokenRef.current !== token) return
+      const modes: AvrCompiledFirmwareTrace['modes'] = []
+
+      for (const mode of ['adaptive', 'full-fidelity'] as const) {
+        if (avrCompiledTraceTokenRef.current !== token) break
+        setFidelityMode(mode)
+        useSimulationStore.getState().setExecutionMode('avr8js')
+        setIsSimulating(true)
+        setIsSimulationPaused(false)
+        setSimulating(true)
+        engine.startAvrRuntimeTrace()
+        await engine.start(
+          AVR_COMPILED_TRACE_FIRMWARE,
+          fixture.nodes,
+          fixture.wires,
+          result.hex,
+          'ARDUINO_UNO',
+        )
+
+        const modeTrace = await captureAvrCompiledFirmwareMode(mode, {
+          now: () => performance.now(),
+          requestFrame: (callback) => window.requestAnimationFrame(callback),
+          scheduleInputProbe: (callback) => {
+            window.setTimeout(() => {
+              inputProbeTarget.addEventListener('click', callback, { once: true })
+              inputProbeTarget.click()
+            }, 0)
+          },
+          getWorkload: () => useSimulationStore.getState().avrWorkload,
+          getPeripheralSnapshot: () => engine.getAvrRuntimeTraceSnapshot(),
+          shouldStop: () => avrCompiledTraceTokenRef.current !== token,
+        }, AVR_COMPILED_TRACE_DURATION_MS)
+        engine.stopAvrRuntimeTrace()
+        engine.stop()
+        setIsSimulating(false)
+        setIsSimulationPaused(false)
+        setSimulating(false)
+        modes.push(modeTrace)
+        if (!modeTrace.completed) break
+      }
+
+      if (modes.length > 0) {
+        const trace: AvrCompiledFirmwareTrace = {
+          fixtureId: AVR_COMPILED_TRACE_ID,
+          capturedAt: new Date().toISOString(),
+          compiler: result.compiler,
+          targetBoard: 'ARDUINO_UNO',
+          source: AVR_COMPILED_TRACE_FIRMWARE,
+          durationPerModeMs: AVR_COMPILED_TRACE_DURATION_MS,
+          inputLatencyTargetMs: AVR_INPUT_LATENCY_TARGET_MS,
+          frameTimeTargetMs: AVR_FRAME_TIME_TARGET_MS,
+          completed: modes.length === 2 && modes.every((mode) => mode.completed),
+          modes,
+        }
+        setAvrCompiledTrace(trace)
+        if (trace.completed && trace.modes.every((mode) => mode.responsive)) {
+          addToast('Compiled AVR responsiveness trace passed in both fidelity modes', 'success')
+        } else if (trace.completed) {
+          addToast('Compiled AVR trace completed with one or more failed targets', 'info')
+        }
+      }
+    } catch (error) {
+      if (avrCompiledTraceTokenRef.current === token) {
+        addToast(`Compiled AVR trace failed: ${error instanceof Error ? error.message : 'unknown error'}`, 'error')
+      }
+    } finally {
+      engineRef.current?.stopAvrRuntimeTrace()
+      stopSimulationEngine()
+      setIsSimulating(false)
+      setIsSimulationPaused(false)
+      setSimulating(false)
+      loadCanvas(originalNodes, originalWires, originalViewport)
+      skipCanvasDirtyRef.current = true
+      const state = useSimulationStore.getState()
+      state.resetSimulationTime()
+      state.setCircuitState(
+        originalSimulation.nodeVoltages,
+        originalSimulation.wireCurrents,
+        originalSimulation.branchCurrents,
+        originalSimulation.componentPower,
+        originalSimulation.solverConverged,
+        originalSimulation.simulationTime,
+      )
+      state.setShowCurrentFlow(originalSimulation.showCurrentFlow)
+      state.setCurrentFlowQualityMode(originalSimulation.currentFlowQualityMode)
+      state.setExecutionMode(originalSimulation.executionMode)
+      state.setFidelityMode(originalSimulation.fidelityMode)
+      state.setSimulating(originalSimulation.isSimulating)
+      setDirty(originalDirty)
+      setViewMode(originalViewMode)
+      setAvrCompiledTraceRunning(false)
+    }
+  }, [
+    addToast,
+    avrCompiledTraceRunning,
+    canvasRenderTraceRunning,
+    engineRef,
+    getSimulationEngine,
+    isSimulating,
+    loadCanvas,
+    regressionMode,
+    setDirty,
+    setFidelityMode,
+    setIsSimulating,
+    setIsSimulationPaused,
+    setSimulating,
+    setSolverDiagnosticsOpen,
+    stopSimulationEngine,
+    viewMode,
+  ])
+
   // Right click context menu handler
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -742,9 +1218,20 @@ export default function CircuitEditorPage() {
   const projectName = currentProject?.name || 'Untitled Project'
 
   const exportDropdownItems = [
-    { label: 'Export ZIP Archive', icon: <FileText size={12} />, onClick: handleExportZip },
-    { label: 'Export Gerber PCB', icon: <Package size={12} />, onClick: handleExportGerber },
+    { label: 'Export ZIP archive', icon: <FileArchive size={15} />, onClick: handleExportZip },
+    { label: 'Export Gerber PCB', icon: <CircuitBoard size={15} />, onClick: handleExportGerber },
   ]
+
+  const activeSecondaryToolCount = [
+    showMultimeter,
+    oscilloscopePanelOpen,
+    showBom,
+    showAiChat,
+    showAiValidator,
+    showIotInspector,
+    solverDiagnosticsOpen,
+    showSettings,
+  ].filter(Boolean).length
 
   const contextMenuItems = !isOwner
     ? []
@@ -756,9 +1243,10 @@ export default function CircuitEditorPage() {
 
   return (
     <div className="vf-editor">
-      {/* ── Toolbar ── */}
-      <header className="vf-editor__toolbar">
-        <div className="vf-editor__toolbar-left">
+      {/* ── Prioritized command ribbon ── */}
+      <header className={`vf-editor__ribbon ${secondaryToolsOpen ? 'is-expanded' : ''}`}>
+        <div className="vf-editor__toolbar">
+          <div className="vf-editor__toolbar-left">
           <button
             className="vf-editor__back"
             onClick={() => navigate('/projects')}
@@ -766,8 +1254,8 @@ export default function CircuitEditorPage() {
           >
             <ArrowLeft size={16} />
           </button>
-          <div className="vf-editor__project-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="vf-editor__project-info">
+            <div className="vf-editor__project-primary">
               <h1 className="vf-editor__project-name">{projectName}</h1>
               {isDirty && <span className="vf-editor__dirty-dot" />}
               {!isPreset && (
@@ -778,17 +1266,14 @@ export default function CircuitEditorPage() {
               )}
             </div>
             {currentProject?.forkedFromId && currentProject?.forkedFromName && (
-              <span className="vf-editor__forked-from" style={{ fontSize: '10px', color: 'rgba(255,255,255,0.45)', lineHeight: '1' }}>
+              <span className="vf-editor__forked-from">
                 forked from{' '}
                 <a
                   href={`/editor/${currentProject.forkedFromId}`}
-                  style={{ color: '#818cf8', textDecoration: 'none', fontWeight: 500 }}
                   onClick={(e) => {
                     e.preventDefault();
                     navigate(`/editor/${currentProject.forkedFromId}`);
                   }}
-                  onMouseOver={(e) => (e.currentTarget.style.textDecoration = 'underline')}
-                  onMouseOut={(e) => (e.currentTarget.style.textDecoration = 'none')}
                 >
                   {currentProject.forkedFromName}
                 </a>
@@ -803,6 +1288,8 @@ export default function CircuitEditorPage() {
               className={`vf-editor__view-btn ${viewMode === 'canvas' ? 'is-active' : ''}`}
               onClick={() => setViewMode('canvas')}
               title="Canvas view"
+              type="button"
+              aria-pressed={viewMode === 'canvas'}
             >
               <Layout size={14} />
             </button>
@@ -810,6 +1297,8 @@ export default function CircuitEditorPage() {
               className={`vf-editor__view-btn ${viewMode === 'split' ? 'is-active' : ''}`}
               onClick={() => setViewMode('split')}
               title="Split view"
+              type="button"
+              aria-pressed={viewMode === 'split'}
             >
               <Code2 size={14} />
               <Layout size={14} />
@@ -818,6 +1307,8 @@ export default function CircuitEditorPage() {
               className={`vf-editor__view-btn ${viewMode === 'code' ? 'is-active' : ''}`}
               onClick={() => setViewMode('code')}
               title="Code view"
+              type="button"
+              aria-pressed={viewMode === 'code'}
             >
               <Code2 size={14} />
             </button>
@@ -825,56 +1316,12 @@ export default function CircuitEditorPage() {
               className={`vf-editor__view-btn ${viewMode === 'pcb' ? 'is-active' : ''}`}
               onClick={() => setViewMode('pcb')}
               title="2-Layer PCB Layout view"
+              type="button"
+              aria-pressed={viewMode === 'pcb'}
             >
               <Layers size={14} />
             </button>
           </div>
-
-          <span className="vf-editor__divider" />
-
-          {/* Instruments / Validators Overlay toggles */}
-          <button
-            className={`vf-editor__tool-btn ${showMultimeter ? 'is-active' : ''}`}
-            onClick={() => setShowMultimeter(!showMultimeter)}
-            title="Digital Multimeter"
-          >
-            <Gauge size={15} />
-          </button>
-          <button
-            className={`vf-editor__tool-btn ${oscilloscopePanelOpen ? 'is-active' : ''}`}
-            onClick={() => setOscilloscopePanelOpen(!oscilloscopePanelOpen)}
-            title="Oscilloscope Trace"
-          >
-            <Activity size={15} />
-          </button>
-          <button
-            className={`vf-editor__tool-btn ${showBom ? 'is-active' : ''}`}
-            onClick={() => setShowBom(!showBom)}
-            title="Bill of Materials"
-          >
-            <Package size={15} />
-          </button>
-          <button
-            className={`vf-editor__tool-btn ${showAiChat ? 'is-active' : ''}`}
-            onClick={() => setShowAiChat(!showAiChat)}
-            title="VoltForge AI Assistant"
-          >
-            <Sparkles size={15} />
-          </button>
-          <button
-            className={`vf-editor__tool-btn ${showAiValidator ? 'is-active' : ''}`}
-            onClick={() => setShowAiValidator(!showAiValidator)}
-            title="AI Circuit Validator"
-          >
-            <ShieldAlert size={15} />
-          </button>
-          <button
-            className={`vf-editor__tool-btn ${showIotInspector ? 'is-active' : ''}`}
-            onClick={() => setShowIotInspector(!showIotInspector)}
-            title="IoT & Cloud Telemetry Inspector (WiFi / MQTT)"
-          >
-            <Wifi size={15} />
-          </button>
 
           <span className="vf-editor__divider" />
 
@@ -887,14 +1334,58 @@ export default function CircuitEditorPage() {
 
           <span className="vf-editor__divider" />
 
+          <label
+            className="vf-editor__solver-control"
+            title={isSimulating
+              ? 'Stop the simulation before changing solver and AVR fidelity'
+              : 'Adaptive widens expensive solver timesteps and gives AVR execution a 4 ms frame slice; Full fidelity keeps the solver timestep and gives AVR an 8 ms slice'}
+          >
+            <span>Fidelity</span>
+            <select
+              value={fidelityMode}
+              disabled={isSimulating}
+              onChange={(event) => setFidelityMode(
+                event.target.value === 'full-fidelity' ? 'full-fidelity' : 'adaptive',
+              )}
+              aria-label="Solver fidelity"
+            >
+              <option value="adaptive">Adaptive</option>
+              <option value="full-fidelity">Full fidelity</option>
+            </select>
+          </label>
+          {isSimulating && !canvasRenderTraceRunning && !avrCompiledTraceRunning && (
+            <span className="vf-editor__simulation-time" title="Monotonic physical simulation time">
+              t={simulationTime.toFixed(3)}s
+            </span>
+          )}
+          {isSimulating && !canvasRenderTraceRunning && !avrCompiledTraceRunning && executionMode === 'avr8js' && avrWorkload.active && (
+            <span
+              className={`vf-editor__avr-workload ${avrWorkload.budgetLimited ? 'is-limited' : ''}`}
+              title={[
+                `${avrWorkload.fidelityMode === 'full-fidelity' ? 'Full fidelity' : 'Adaptive'} AVR execution`,
+                `${avrWorkload.averageSliceMs.toFixed(2)} ms average of ${avrWorkload.sliceBudgetMs.toFixed(0)} ms slice budget`,
+                `${Math.round(avrWorkload.instructionsPerSecond).toLocaleString()} instructions/s`,
+                `${avrWorkload.pendingCycleLagMs.toFixed(1)} ms retained cycle debt`,
+                'Firmware instructions and peripheral ticks are never skipped',
+              ].join(' · ')}
+            >
+              {avrWorkload.budgetLimited ? 'AVR capped' : 'AVR'} · {(avrWorkload.emulatedClockHz / 1_000_000).toFixed(2)} MHz · {avrWorkload.mainThreadUtilizationPercent.toFixed(0)}%
+            </span>
+          )}
+
           <button
             className={`vf-editor__sim-btn ${isSimulating ? 'is-running' : ''}`}
             onClick={toggleSimulation}
+            disabled={regressionMode !== null || canvasRenderTraceRunning || avrCompiledTraceRunning}
+            type="button"
+            aria-label={canvasRenderTraceRunning ? 'Canvas trace running' : avrCompiledTraceRunning ? 'AVR trace running' : isSimulating ? 'Stop simulation' : 'Start simulation'}
           >
-            {isSimulating ? <Square size={14} /> : <Play size={14} />}
-            {isSimulating ? 'Stop' : 'Simulate'}
+            {canvasRenderTraceRunning || avrCompiledTraceRunning ? <Gauge size={14} /> : isSimulating ? <Square size={14} /> : <Play size={14} />}
+            <span className="vf-editor__action-label">
+              {canvasRenderTraceRunning ? 'Canvas trace' : avrCompiledTraceRunning ? 'AVR trace' : isSimulating ? 'Stop' : 'Simulate'}
+            </span>
           </button>
-          {isSimulating && (
+          {isSimulating && !canvasRenderTraceRunning && !avrCompiledTraceRunning && (
             <>
               <button
                 className="vf-editor__tool-btn"
@@ -925,54 +1416,24 @@ export default function CircuitEditorPage() {
 
         <div className="vf-editor__toolbar-right">
           <button
-            className="vf-editor__tool-btn"
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            ref={secondaryToolsButtonRef}
+            className={`vf-editor__tools-toggle ${secondaryToolsOpen || activeSecondaryToolCount > 0 ? 'is-active' : ''}`}
+            onClick={() => setSecondaryToolsOpen((open) => !open)}
+            type="button"
+            aria-expanded={secondaryToolsOpen}
+            aria-controls="vf-editor-secondary-tools"
+            aria-label={`${secondaryToolsOpen ? 'Hide' : 'Show'} secondary editor tools${activeSecondaryToolCount > 0 ? `, ${activeSecondaryToolCount} active` : ''}`}
+            title={secondaryToolsOpen ? 'Hide secondary editor tools' : 'Show secondary editor tools'}
           >
-            {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+            <SlidersHorizontal size={14} />
+            <span className="vf-editor__action-label">Tools</span>
+            {activeSecondaryToolCount > 0 && (
+              <span className="vf-editor__tools-count" aria-label={`${activeSecondaryToolCount} active tools`}>
+                {activeSecondaryToolCount}
+              </span>
+            )}
+            <ChevronDown className="vf-editor__tools-chevron" size={13} />
           </button>
-
-          <button
-            className="vf-editor__tool-btn"
-            onClick={() => setLeftPanelOpen(!leftPanelOpen)}
-            title="Toggle component panel"
-          >
-            <PanelLeftClose size={15} />
-          </button>
-          <button
-            className="vf-editor__tool-btn"
-            onClick={() => setViewMode(viewMode === 'canvas' ? 'split' : 'canvas')}
-            title={viewMode === 'canvas' ? 'Show code editor' : 'Hide code editor'}
-          >
-            <PanelRightClose size={15} />
-          </button>
-
-          <button
-            className="vf-editor__tool-btn"
-            onClick={handleShare}
-            title="Copy shareable state URL"
-          >
-            <Share2 size={15} />
-          </button>
-
-          <Dropdown
-            trigger={
-              <button className="vf-editor__tool-btn" title="Export project">
-                <Download size={15} />
-              </button>
-            }
-            items={exportDropdownItems}
-          />
-
-          {isOwner && (
-            <button
-              className="vf-editor__tool-btn"
-              onClick={() => setShowSettings(true)}
-              title="Project settings"
-            >
-              <Settings size={15} />
-            </button>
-          )}
 
           <span className="vf-editor__divider" />
 
@@ -982,9 +1443,11 @@ export default function CircuitEditorPage() {
               className="vf-editor__save-btn"
               onClick={handleSave}
               disabled={isSaving || isPreset}
+              type="button"
+              aria-label={isSaving ? 'Saving project' : 'Save project'}
             >
               <Save size={14} />
-              {isSaving ? 'Saving...' : 'Save'}
+              <span className="vf-editor__action-label">{isSaving ? 'Saving...' : 'Save'}</span>
             </button>
           ) : currentProject?.userForkId ? (
             <button
@@ -994,9 +1457,11 @@ export default function CircuitEditorPage() {
                 borderColor: '#10b981',
               }}
               onClick={() => navigate(`/editor/${currentProject.userForkId}`)}
+              type="button"
+              aria-label="Go to your fork"
             >
               <GitFork size={14} />
-              Go to your Fork
+              <span className="vf-editor__action-label">Go to your Fork</span>
             </button>
           ) : (
             <button
@@ -1007,12 +1472,128 @@ export default function CircuitEditorPage() {
               }}
               onClick={() => forkMutation.mutate()}
               disabled={forkMutation.isPending}
+              type="button"
+              aria-label={forkMutation.isPending ? 'Forking project' : 'Fork project to edit'}
             >
               <GitFork size={14} />
-              {forkMutation.isPending ? 'Forking...' : 'Fork to Edit'}
+              <span className="vf-editor__action-label">{forkMutation.isPending ? 'Forking...' : 'Fork to Edit'}</span>
             </button>
           )}
         </div>
+        </div>
+
+        {secondaryToolsOpen && (
+          <div
+            ref={secondaryToolsTrayRef}
+            id="vf-editor-secondary-tools"
+            className="vf-editor__secondary-ribbon"
+            role="toolbar"
+            aria-label="Secondary editor tools"
+            aria-orientation="horizontal"
+          >
+            <div className="vf-editor__secondary-group">
+              <span className="vf-editor__secondary-label">Inspect</span>
+              <SecondaryToolButton
+                icon={<Gauge size={15} />}
+                label="Multimeter"
+                onClick={() => setShowMultimeter(!showMultimeter)}
+                pressed={showMultimeter}
+              />
+              <SecondaryToolButton
+                icon={<Activity size={15} />}
+                label="Oscilloscope"
+                onClick={() => setOscilloscopePanelOpen(!oscilloscopePanelOpen)}
+                pressed={oscilloscopePanelOpen}
+              />
+              <SecondaryToolButton
+                icon={<Package size={15} />}
+                label="Bill of materials"
+                onClick={() => setShowBom(!showBom)}
+                pressed={showBom}
+              />
+            </div>
+
+            <span className="vf-editor__secondary-divider" />
+
+            <div className="vf-editor__secondary-group">
+              <span className="vf-editor__secondary-label">Assist</span>
+              <SecondaryToolButton
+                icon={<Sparkles size={15} />}
+                label="AI assistant"
+                onClick={() => setShowAiChat(!showAiChat)}
+                pressed={showAiChat}
+              />
+              <SecondaryToolButton
+                icon={<ShieldAlert size={15} />}
+                label="AI validator"
+                onClick={() => setShowAiValidator(!showAiValidator)}
+                pressed={showAiValidator}
+              />
+              <SecondaryToolButton
+                icon={<Wifi size={15} />}
+                label="IoT inspector"
+                onClick={() => setShowIotInspector(!showIotInspector)}
+                pressed={showIotInspector}
+              />
+              <SecondaryToolButton
+                icon={<Bug size={15} />}
+                label="Solver and performance diagnostics"
+                onClick={() => setSolverDiagnosticsOpen(!solverDiagnosticsOpen)}
+                pressed={solverDiagnosticsOpen}
+              />
+            </div>
+
+            <span className="vf-editor__secondary-divider" />
+
+            <div className="vf-editor__secondary-group">
+              <span className="vf-editor__secondary-label">Workspace</span>
+              <SecondaryToolButton
+                icon={theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+                label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+                onClick={toggleTheme}
+              />
+              <SecondaryToolButton
+                icon={<PanelLeftClose size={15} />}
+                label="Toggle component panel"
+                onClick={() => setLeftPanelOpen(!leftPanelOpen)}
+                pressed={leftPanelOpen}
+              />
+              <SecondaryToolButton
+                icon={<PanelRightClose size={15} />}
+                label={viewMode === 'split' ? 'Close split workspace' : 'Open split workspace'}
+                onClick={() => setViewMode(viewMode === 'split' ? 'canvas' : 'split')}
+                pressed={viewMode === 'split'}
+              />
+            </div>
+
+            <span className="vf-editor__secondary-divider" />
+
+            <div className="vf-editor__secondary-group">
+              <span className="vf-editor__secondary-label">Project</span>
+              <SecondaryToolButton
+                icon={<Share2 size={15} />}
+                label="Copy share link"
+                onClick={handleShare}
+              />
+              {exportDropdownItems.map((item) => (
+                <SecondaryToolButton
+                  icon={item.icon}
+                  key={item.label}
+                  label={item.label}
+                  onClick={item.onClick}
+                />
+              ))}
+              {isOwner && (
+                <SecondaryToolButton
+                  icon={<Settings size={15} />}
+                  label="Project settings"
+                  onClick={() => setShowSettings(true)}
+                  pressed={showSettings}
+                />
+              )}
+            </div>
+          </div>
+        )}
       </header>
 
       {/* ── Main content ── */}
@@ -1020,7 +1601,7 @@ export default function CircuitEditorPage() {
         {/* Left panel — Component library */}
         {leftPanelOpen && viewMode !== 'code' && (
           <aside className="vf-editor__left-panel">
-            <ComponentPanel readOnly={!isOwner} />
+            <ComponentPanel readOnly={!isOwner || canvasRenderTraceRunning || avrCompiledTraceRunning} />
           </aside>
         )}
 
@@ -1040,13 +1621,15 @@ export default function CircuitEditorPage() {
                       collaborators={activeUsers}
                       onComponentInteraction={handleComponentInteraction}
                       onCursorMove={broadcastCursorMove}
-                      readOnly={!isOwner}
+                      readOnly={!isOwner || canvasRenderTraceRunning || avrCompiledTraceRunning}
                     />
                   </div>
                 }
                 right={
                   <div className="vf-editor__code-area is-split">
-                    <CodeEditor readOnly={!isOwner} />
+                    <EditorFeatureBoundary label="code editor">
+                      <CodeEditor readOnly={!isOwner} />
+                    </EditorFeatureBoundary>
                   </div>
                 }
               />
@@ -1063,74 +1646,129 @@ export default function CircuitEditorPage() {
                       collaborators={activeUsers}
                       onComponentInteraction={handleComponentInteraction}
                       onCursorMove={broadcastCursorMove}
-                      readOnly={!isOwner}
+                      readOnly={!isOwner || canvasRenderTraceRunning || avrCompiledTraceRunning}
                     />
                   </div>
                 )}
                 {viewMode === 'code' && (
                   <div className="vf-editor__code-area">
-                    <CodeEditor readOnly={!isOwner} />
+                    <EditorFeatureBoundary label="code editor">
+                      <CodeEditor readOnly={!isOwner} />
+                    </EditorFeatureBoundary>
                   </div>
                 )}
                 {viewMode === 'pcb' && (
                   <div ref={canvasContainerRef} className="vf-editor__canvas-area">
-                    <PcbCanvas
-                      width={canvasSize.width}
-                      height={canvasSize.height}
-                      projectName={projectName}
-                      readOnly={!isOwner}
-                    />
+                    <EditorFeatureBoundary label="PCB workspace">
+                      <PcbCanvas
+                        width={canvasSize.width}
+                        height={canvasSize.height}
+                        projectName={projectName}
+                        readOnly={!isOwner}
+                      />
+                    </EditorFeatureBoundary>
                   </div>
                 )}
               </>
             )}
 
             {/* Instrument floating overlays */}
-            <MultimeterPanel
-              isOpen={showMultimeter}
-              onClose={() => setShowMultimeter(false)}
-            />
-            <BomPanel isOpen={showBom} onClose={() => setShowBom(false)} />
-            <AiChatPanel
-              isOpen={showAiChat}
-              onClose={() => setShowAiChat(false)}
-              projectContext={projectName}
-              onApplyCode={!isOwner ? undefined : (code) => {
-                if (activeCodeFile) {
-                  updateCodeFileContent(activeCodeFile.id, code)
-                  addToast('Generated code applied to editor!', 'success')
-                } else {
-                  addToast('No active code file selected', 'error')
-                }
-              }}
-              readOnly={!isOwner}
-            />
-            <AiValidatorPanel isOpen={showAiValidator} readOnly={!isOwner} onClose={() => setShowAiValidator(false)} />
-            <IotInspectorPanel isOpen={showIotInspector} onClose={() => setShowIotInspector(false)} />
-            <PropertyEditor readOnly={!isOwner} />
+            {showMultimeter && (
+              <EditorFeatureBoundary label="multimeter">
+                <MultimeterPanel isOpen onClose={() => setShowMultimeter(false)} />
+              </EditorFeatureBoundary>
+            )}
+            {showBom && (
+              <EditorFeatureBoundary label="bill of materials">
+                <BomPanel isOpen onClose={() => setShowBom(false)} />
+              </EditorFeatureBoundary>
+            )}
+            {showAiChat && (
+              <EditorFeatureBoundary label="AI assistant">
+                <AiChatPanel
+                  isOpen
+                  onClose={() => setShowAiChat(false)}
+                  projectContext={projectName}
+                  onApplyCode={!isOwner ? undefined : (code) => {
+                    if (activeCodeFile) {
+                      updateCodeFileContent(activeCodeFile.id, code)
+                      addToast('Generated code applied to editor!', 'success')
+                    } else {
+                      addToast('No active code file selected', 'error')
+                    }
+                  }}
+                  readOnly={!isOwner}
+                />
+              </EditorFeatureBoundary>
+            )}
+            {showAiValidator && (
+              <EditorFeatureBoundary label="AI validator">
+                <AiValidatorPanel isOpen readOnly={!isOwner} onClose={() => setShowAiValidator(false)} />
+              </EditorFeatureBoundary>
+            )}
+            {showIotInspector && (
+              <EditorFeatureBoundary label="IoT inspector">
+                <IotInspectorPanel isOpen onClose={() => setShowIotInspector(false)} />
+              </EditorFeatureBoundary>
+            )}
+            {solverDiagnosticsOpen && (
+              <EditorFeatureBoundary label="solver diagnostics">
+                <SolverDiagnosticsPanel
+                  isOpen
+                  onClose={() => {
+                    if (regressionMode !== null) stopRegression()
+                    if (canvasRenderTraceRunning) stopCanvasRenderRegression()
+                    if (avrCompiledTraceRunning) stopAvrCompiledFirmwareTrace()
+                    setSolverDiagnosticsOpen(false)
+                  }}
+                  diagnostics={solverDiagnostics}
+                  regressionMode={regressionMode}
+                  regressionRuns={regressionRuns}
+                  onRunRegression={runRegression}
+                  onStopRegression={stopRegression}
+                  canvasRenderTraceRunning={canvasRenderTraceRunning}
+                  canvasRenderTrace={canvasRenderTrace}
+                  onRunCanvasRenderTrace={runCanvasRenderRegression}
+                  onStopCanvasRenderTrace={stopCanvasRenderRegression}
+                  avrCompiledTraceRunning={avrCompiledTraceRunning}
+                  avrCompiledTrace={avrCompiledTrace}
+                  onRunAvrCompiledTrace={runAvrCompiledFirmwareTrace}
+                  onStopAvrCompiledTrace={stopAvrCompiledFirmwareTrace}
+                />
+              </EditorFeatureBoundary>
+            )}
+            <PropertyEditor readOnly={!isOwner || canvasRenderTraceRunning || avrCompiledTraceRunning} />
           </div>
 
           {/* Serial monitor / Oscilloscope Trace splits */}
           <div className="vf-editor-bottom-pane">
             <SerialMonitor />
-            <OscilloscopePanel
-              simulationPaused={isSimulationPaused}
-              onPause={() => {
-                engineRef.current?.pause()
-                setIsSimulationPaused(true)
-              }}
-              onResume={() => {
-                engineRef.current?.resume()
-                setIsSimulationPaused(false)
-              }}
-              onStep={() => engineRef.current?.step()}
-            />
+            {oscilloscopePanelOpen && (
+              <EditorFeatureBoundary label="oscilloscope">
+                <OscilloscopePanel
+                  simulationPaused={isSimulationPaused}
+                  onPause={() => {
+                    engineRef.current?.pause()
+                    setIsSimulationPaused(true)
+                  }}
+                  onResume={() => {
+                    engineRef.current?.resume()
+                    setIsSimulationPaused(false)
+                  }}
+                  onStep={() => engineRef.current?.step()}
+                />
+              </EditorFeatureBoundary>
+            )}
           </div>
         </div>
       </div>
 
       {/* Settings Modal */}
-      <ProjectSettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      {showSettings && (
+        <EditorFeatureBoundary label="project settings">
+          <ProjectSettingsModal isOpen onClose={() => setShowSettings(false)} />
+        </EditorFeatureBoundary>
+      )}
 
       {/* Canvas right-click context menu */}
       <ContextMenu

@@ -49,7 +49,7 @@ export function ExplorePage() {
         {templateProjects.length > 0 ? (
           <div className="project-grid">
             {templateProjects.map((project) => (
-              <ProjectSummaryCard key={project.id} onOpen={() => navigate(`/editor/${project.id}`)} project={project} />
+              <ProjectSummaryCard key={project.id} onOpen={() => navigate(`/public-project/${project.id}`)} project={project} />
             ))}
           </div>
         ) : null}
@@ -68,7 +68,7 @@ export function ExplorePage() {
         {projects.length > 0 ? (
           <div className="project-grid">
             {projects.map((project) => (
-              <ProjectSummaryCard key={project.id} onOpen={() => navigate(`/editor/${project.id}`)} project={project} />
+              <ProjectSummaryCard key={project.id} onOpen={() => navigate(`/public-project/${project.id}`)} project={project} />
             ))}
           </div>
         ) : null}

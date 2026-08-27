@@ -38,7 +38,7 @@ export function OscilloscopeScreen({
     ...(colors || {}),
   }), [colors])
 
-  const channelKeys = Object.keys(data)
+  const channelKeys = useMemo(() => Object.keys(data), [data])
 
   useEffect(() => {
     const canvas = canvasRef.current

@@ -15,7 +15,7 @@ const BOARD_READONLY_KEYS = new Set([
 
 /** Simulation state keys — always read-only on every component. */
 const SIM_STATE_KEYS = new Set([
-  'isBlown', 'faultMessage', 'isLit', 'currentMa', 'measuredCurrent', 'isSpinning',
+  'isBlown', 'faultMessage', 'isLit', 'currentMa', 'measuredVoltage', 'measuredCurrent', 'measuredResistance', 'resistanceUnsafe', 'displayValue', 'isSpinning',
   'isBeeping', 'isActive', 'isSwitched_1', 'isSwitched_2', 'isSwitched_3', 'isSwitched_4',
   'rpm', 'escRpm', 'bldcRpm', 'bldcRotation', 'boardPowered', 'builtInLedLit',
   'powered', 'outputHigh', 'outputVoltage', 'isRegulating', 'timerState',
@@ -133,6 +133,19 @@ export default function PropertyEditor({ readOnly }: { readOnly?: boolean }) {
                           <label className="vf-prop-editor__label">{key}</label>
                           {readonly ? (
                             <span className="vf-prop-editor__readonly">{formatValue(val)}</span>
+                          ) : selectedNode.type === 'MULTIMETER' && key === 'mode' ? (
+                            <select
+                              className="vf-prop-editor__input"
+                              value={String(val || 'VOLTAGE')}
+                              onChange={(e) => commitNodeUpdate(selectedNode.id, {
+                                properties: { ...selectedNode.properties, mode: e.target.value }
+                              })}
+                              disabled={readOnly}
+                            >
+                              <option value="VOLTAGE">Voltage</option>
+                              <option value="CURRENT">Current</option>
+                              <option value="RESISTANCE">Resistance</option>
+                            </select>
                           ) : isBoolean ? (
                             <button
                               className={`vf-prop-editor__toggle ${val ? 'is-on' : ''}`}

@@ -1,0 +1,17 @@
+{
+  "item": "OPT-009",
+  "capturedOn": "2026-08-27",
+  "scope": "Native AVR8js main-thread execution before OPT-009",
+  "measurementKind": "static-baseline",
+  "runtimeTraceCaptured": false,
+  "observations": {
+    "scheduler": "A 16 ms setInterval runs a synchronous fixed batch whenever simulation is running, unpaused, and board power is available",
+    "batchSize": "Each interval executes exactly 25,000 avrInstruction and cpu.tick pairs",
+    "wallTimeBudget": "The instruction loop has no performance deadline or yield check",
+    "clockReconciliation": "Batch size is not derived from elapsed wall time, CPU cycles, simulation speed, or delayed frames",
+    "stallBehavior": "Background-tab and main-thread stalls rely on interval behavior without an explicit bounded catch-up policy",
+    "fidelityMode": "Adaptive and Full fidelity affect the MNA worker but do not change AVR scheduling",
+    "diagnostics": "No AVR instruction rate, emulated clock rate, slice duration, utilization, retained cycle debt, or budget-limited status is exposed"
+  },
+  "limitation": "Compiled-firmware browser frame-time and input-latency traces were unavailable; validate deterministic cycle partitioning and responsiveness through OPT-FB-010."
+}

@@ -36,14 +36,14 @@ type CircuitNode = {
 
 const palette: PaletteItem[] = [
   { icon: <Cpu size={17} />, label: 'Arduino Uno', meta: 'MCU board' },
-  { icon: <Gauge size={17} />, label: 'DHT22', meta: 'Sensor' },
+  { icon: <Gauge size={17} />, label: 'Light sensor', meta: 'Sensor' },
   { icon: <Zap size={17} />, label: 'Relay module', meta: 'Output' },
   { icon: <Binary size={17} />, label: 'Logic probe', meta: 'Debug' },
 ]
 
 const nodes: CircuitNode[] = [
   { id: 'uno', kind: 'board', label: 'Arduino Uno R3', meta: 'ATmega328P', x: 41, y: 48 },
-  { id: 'sensor', kind: 'sensor', label: 'DHT22', meta: 'D2 data', x: 16, y: 24 },
+  { id: 'sensor', kind: 'sensor', label: 'Light sensor', meta: 'A0 signal', x: 16, y: 24 },
   { id: 'relay', kind: 'output', label: 'Relay', meta: 'D8 trigger', x: 70, y: 24 },
   { id: 'power', kind: 'power', label: '5V rail', meta: 'USB power', x: 73, y: 70 },
 ]
@@ -62,8 +62,8 @@ const modes = [
 
 const terminalLines = [
   { tone: 'muted' as const, value: '[09:30:02] compiler: sketch.ino loaded' },
-  { tone: 'success' as const, value: '[09:30:04] simulation: DHT22 signal locked at 50Hz' },
-  { value: '[09:30:05] serial: temperature=27.4C humidity=61%' },
+  { tone: 'success' as const, value: '[09:30:04] simulation: light sensor signal locked' },
+  { value: '[09:30:05] serial: lightLevel=61%' },
   { tone: 'warning' as const, value: '[09:30:06] relay: debounce window raised to 25ms' },
 ]
 

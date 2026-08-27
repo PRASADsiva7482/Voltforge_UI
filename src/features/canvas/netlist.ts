@@ -464,10 +464,8 @@ function netVoltage(net?: NetlistNode): number {
 }
 
 function parseMilliAmps(value: unknown, fallback: number): number {
-  if (typeof value === 'number') return value;
-  if (typeof value !== 'string') return fallback;
-  const numeric = Number(value.replace(/[^0-9.]/g, ''));
-  return Number.isFinite(numeric) ? numeric : fallback;
+  if (value === undefined || value === null || value === '') return fallback;
+  return ledMaximumCurrent_mA({ maxCurrent: value });
 }
 
 /**
@@ -499,7 +497,7 @@ export function analyzeCircuitSafetyWithSolver(
     const currentMa = Math.abs(current) * 1000;
 
     // LED overcurrent check
-    if (node.type.includes('LED') && !node.type.includes('NEOPIXEL')) {
+    if (node.type.includes('LED')) {
       const maxCurrent = parseMilliAmps(node.properties?.maxCurrent, 20);
 
       if (currentMa > maxCurrent * 2) {

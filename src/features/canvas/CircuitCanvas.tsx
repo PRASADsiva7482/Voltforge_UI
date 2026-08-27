@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect, useState } from 'react';
+import { useCallback, useRef, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Stage, Layer, Rect, Group, Text, Circle, Line, Shape } from 'react-konva';
 import Konva from 'konva';
@@ -31,6 +31,8 @@ import {
   COLLABORATOR_DEFAULT_COLOR,
 } from './canvasConstants';
 import type { Collaborator, ActiveBendPoint, Wire } from './canvasTypes';
+import { createCurrentFlowRenderBudget, cullWiresToViewport } from './renderBudget';
+import { canvasLayoutBudgetFields, recordCanvasLayout } from './canvasRenderInstrumentation';
 
 interface Props {
   width: number;
@@ -181,16 +183,23 @@ const WireToolbar = () => {
 // ── PCB Trace Layer ──
 const PcbTraceLayer = ({
   wires,
+  allWires,
   isDark,
 }: {
   wires: Wire[];
+  allWires: Wire[];
   isDark: boolean;
 }) => {
   const nodes = useCanvasStore((state) => state.nodes);
+  const wireIndexById = useMemo(
+    () => new Map(allWires.map((wire, index) => [wire.id, index])),
+    [allWires],
+  );
   return (
     <Layer listening={false}>
-      {wires.map((wire, index) => {
-        const points = getWireRenderPoints({ ...wire, routingMode: 'auto' }, nodes, [], wires);
+      {wires.map((wire) => {
+        const points = getWireRenderPoints({ ...wire, routingMode: 'auto' }, nodes, [], allWires);
+        const index = wireIndexById.get(wire.id) ?? 0;
         const isBottom = index % 2 === 1;
         return (
           <Line
@@ -310,11 +319,61 @@ export default function CircuitCanvas({
   const cancelWiring = useCanvasStore((state) => state.cancelWiring);
   const setViewport = useCanvasStore((state) => state.setViewport);
   const addBendPoint = useCanvasStore((state) => state.addBendPoint);
+  const showCurrentFlow = useSimulationStore((state) => state.showCurrentFlow);
+  const storeIsSimulating = useSimulationStore((state) => state.isSimulating);
+  const currentFlowQualityMode = useSimulationStore((state) => state.currentFlowQualityMode);
+  const thermalHeatmapEnabled = useSimulationStore((state) => state.thermalHeatmapEnabled);
 
   const stageRef = useRef<Konva.Stage>(null);
   const gridLayerRef = useRef<Konva.Layer>(null);
+  const viewportRenderAnchorRef = useRef(viewport);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [activeNewBendPoint, setActiveNewBendPoint] = useState<ActiveBendPoint | null>(null);
+
+  const wireRenderContext = useMemo(() => {
+    const nodesById = useCanvasStore.getState().nodesById;
+    return {
+      nodesById,
+      visibleWires: cullWiresToViewport(wires, nodesById, viewport, width, height),
+    };
+  }, [wires, viewport, width, height]);
+
+  const currentFlowBudget = useMemo(
+    () => createCurrentFlowRenderBudget(
+      currentFlowQualityMode,
+      viewport.scale,
+      wireRenderContext.visibleWires.length,
+      width,
+      height,
+    ),
+    [currentFlowQualityMode, viewport.scale, wireRenderContext.visibleWires.length, width, height],
+  );
+
+  useEffect(() => {
+    recordCanvasLayout({
+      viewport: { ...viewport },
+      viewportWidth: width,
+      viewportHeight: height,
+      totalWireCount: wires.length,
+      mountedWireShapeCount: wireRenderContext.visibleWires.length,
+      currentFlowEnabled: Boolean((isSimulating ?? storeIsSimulating) && showCurrentFlow),
+      ...canvasLayoutBudgetFields(currentFlowBudget),
+    });
+  }, [
+    currentFlowBudget,
+    height,
+    isSimulating,
+    showCurrentFlow,
+    storeIsSimulating,
+    viewport,
+    width,
+    wireRenderContext.visibleWires.length,
+    wires.length,
+  ]);
+
+  useEffect(() => {
+    viewportRenderAnchorRef.current = viewport;
+  }, [viewport]);
 
   const handleWireDragStart = useCallback(
     (wireId: string, index: number, x: number, y: number) => {
@@ -407,8 +466,19 @@ export default function CircuitCanvas({
           y={viewport.y}
           scaleX={viewport.scale}
           scaleY={viewport.scale}
+          onDragMove={(e: KonvaEventObject<DragEvent>) => {
+            const anchor = viewportRenderAnchorRef.current;
+            const nextX = e.target.x();
+            const nextY = e.target.y();
+            if (Math.max(Math.abs(nextX - anchor.x), Math.abs(nextY - anchor.y)) < 64) return;
+            const nextViewport = { ...anchor, x: nextX, y: nextY };
+            viewportRenderAnchorRef.current = nextViewport;
+            setViewport(nextViewport);
+          }}
           onDragEnd={(e: KonvaEventObject<DragEvent>) => {
-            setViewport({ ...viewport, x: e.target.x(), y: e.target.y() });
+            const nextViewport = { ...viewport, x: e.target.x(), y: e.target.y() };
+            viewportRenderAnchorRef.current = nextViewport;
+            setViewport(nextViewport);
           }}
           onWheel={handleWheel}
           onClick={(e: KonvaEventObject<MouseEvent>) => {
@@ -457,7 +527,9 @@ export default function CircuitCanvas({
             <CanvasMat width={width} height={height} viewport={viewport} isDark={isDark} />
           </Layer>
 
-          {viewMode === 'pcb' && <PcbTraceLayer wires={wires} isDark={isDark} />}
+          {viewMode === 'pcb' && (
+            <PcbTraceLayer wires={wireRenderContext.visibleWires} allWires={wires} isDark={isDark} />
+          )}
 
           {/* Component layer (below wires) */}
           <Layer opacity={viewMode === 'pcb' ? 0.35 : 1}>
@@ -477,7 +549,7 @@ export default function CircuitCanvas({
 
           {/* Wire layer (on top — wires should never be hidden under components) */}
           <Layer>
-            {wires.map((w) => (
+            {wireRenderContext.visibleWires.map((w) => (
               <WireShape
                 key={w.id}
                 wire={w}
@@ -497,7 +569,14 @@ export default function CircuitCanvas({
           </Layer>
 
           {/* Animated Current Flow Layer (renders particles on active wires) */}
-          <CurrentFlowLayer isSimulating={isSimulating} />
+          <CurrentFlowLayer
+            isSimulating={isSimulating}
+            visibleWires={wireRenderContext.visibleWires}
+            allWires={wires}
+            nodesById={wireRenderContext.nodesById}
+            viewportScale={viewport.scale}
+            budget={currentFlowBudget}
+          />
 
           <Layer listening={false}>
             {Object.values(collaborators).map((user) => (
@@ -552,17 +631,33 @@ export default function CircuitCanvas({
       <button
         onClick={() => useSimulationStore.getState().setShowCurrentFlow(!useSimulationStore.getState().showCurrentFlow)}
         className="vf-canvas-overlay-btn"
-        style={{ left: 195, color: useSimulationStore((s) => s.showCurrentFlow) ? '#38bdf8' : 'inherit' }}
+        style={{ left: 195, color: showCurrentFlow ? '#38bdf8' : 'inherit' }}
         title="Toggle animated current flow particles on wires"
       >
         <Zap size={14} />
         Current Flow
       </button>
 
+      {showCurrentFlow && (currentFlowBudget.isLimited || currentFlowQualityMode === 'full') && (
+        <button
+          onClick={() => useSimulationStore.getState().setCurrentFlowQualityMode(
+            currentFlowQualityMode === 'full' ? 'adaptive' : 'full',
+          )}
+          className={`vf-canvas-quality-control ${currentFlowBudget.isLimited ? 'is-limited' : 'is-full'}`}
+          title={currentFlowQualityMode === 'full'
+            ? 'Full current-flow detail is enabled. Click to restore the adaptive rendering budget.'
+            : `Current-flow detail is limited for ${currentFlowBudget.limitLabel}. Electrical values are unchanged. Click for full detail.`}
+        >
+          {currentFlowQualityMode === 'full'
+            ? 'Flow detail: Full · Use adaptive'
+            : 'Flow detail limited · Use full'}
+        </button>
+      )}
+
       <button
         onClick={() => useSimulationStore.getState().setThermalHeatmapEnabled(!useSimulationStore.getState().thermalHeatmapEnabled)}
         className="vf-canvas-overlay-btn"
-        style={{ left: 310, color: useSimulationStore((s) => s.thermalHeatmapEnabled) ? '#f97316' : 'inherit' }}
+        style={{ left: 310, color: thermalHeatmapEnabled ? '#f97316' : 'inherit' }}
         title="Toggle live component power and thermal stress heat map"
       >
         Thermal Map

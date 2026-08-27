@@ -4,27 +4,99 @@
 
 import type { CanvasNode, Wire } from '../../types/domain';
 import { useCanvasStore } from '../../store/canvasStore';
-import { useSimulationStore } from '../../store/simulationStore';
+import { classifyCanvasModelChange } from '../../store/modelRevision';
+import { useSimulationStore, type MeterMeasurementMode } from '../../store/simulationStore';
 import { CPU, avrInstruction, AVRIOPort, AVRUSART, AVRTimer, portBConfig, portCConfig, portDConfig, timer0Config, timer1Config, timer2Config, usart0Config, PinState as AvrPinState, AVRTWI, twiConfig, AVRADC, adcConfig } from 'avr8js';
 import { buildMNACircuit } from './NetlistBuilder';
-import type { MNACircuit } from './NetlistBuilder';
+import type { MNACircuit, VirtualMeterConfiguration } from './NetlistBuilder';
+import { ledMaximumCurrent_mA, numericProperty, SIMULATION_MODELS } from './simulationModels';
 import { normalizePotentiometerPosition } from '../canvas/componentContracts';
+import { AvrExecutionBudgetScheduler, avrSliceBudgetForMode } from './avrExecutionBudget';
+import { AvrRuntimeTraceCollector, type AvrRuntimeTraceSnapshot } from './avrRuntimeTrace';
 import { VirtualNetworkStack } from './network/VirtualNetworkStack';
 import { MqttBridge } from './network/MqttBridge';
 import { I2cBusArbiter } from './bus/I2cBusArbiter';
 import { SpiBusRouter } from './bus/SpiBusRouter';
 import { UartBusRouter } from './bus/UartBusRouter';
-import type { WorkerInMessage, WorkerResultMessage, WorkerOscilloscopeMessage } from './SimulationWorker';
+import type {
+  WorkerInMessage,
+  WorkerRequestResultMessage,
+  WorkerResultMessage,
+  WorkerResultSubscription,
+  WorkerOscilloscopeMessage,
+} from './SimulationWorker';
+import { buildResultSubscription, materializeResultBuffers } from './resultSubscription';
+import { RuntimeDeltaCollector, RuntimeReconciliationIndex } from './runtimeDelta';
+import {
+  planIncrementalMnaRefresh,
+  reusableMnaTopologyForVirtualMeter,
+  SolverWorkerLifecycleGate,
+  virtualMeterTopologySignature,
+} from './mnaIncremental';
+import {
+  isCurrentScopeCaptureRevision,
+  nextScopeCaptureRevision,
+  scopeSampleIntervalSeconds,
+} from './scopeCapture';
 
-const SIMULATION_RUNTIME_PROPERTY_KEYS = new Set([
-  'boardPowered', 'builtInLedLit', 'isBlown', 'faultMessage', 'isLit', 'currentMa', 'measuredCurrent',
-  'isSpinning', 'isBeeping', 'isActive', 'isPressed', 'isClosed', 'motionDetected', 'powered',
-  'outputHigh', 'temperature', 'humidity', 'distance', 'distanceCm', 'accelerationX', 'accelerationY',
-  'accelerationZ', 'gyroX', 'gyroY', 'gyroZ', 'moistureLevel', 'lightLevel', 'lcdLine1', 'lcdLine2',
-  'lcdBacklight', 'displayValue', 'displayText', 'segments', 'timerState', 'shiftRegValue', 'latchRegValue',
-  'prevSrclk', 'prevRclk', 'outputVoltage', 'isRegulating', 'escThrottle', 'escRpm', 'bldcRpm',
-  'bldcRotation', 'angle', 'rpm', 'rotation', 'currentAngle', 'isOn', 'isPowered', 'lastCommand',
-]);
+const DIGITAL_IC_FAMILY: Record<string, '165' | '138' | '151' | '4017'> = {
+  IC_74HC165: '165',
+  '74HC165': '165',
+  IC_74HC138: '138',
+  '74HC138': '138',
+  IC_74HC151: '151',
+  '74HC151': '151',
+  IC_CD4017: '4017',
+  CD4017: '4017',
+};
+
+const DIGITAL_IC_OUTPUTS: Record<'165' | '138' | '151' | '4017', ReadonlyArray<readonly [string, string]>> = {
+  '165': [['q7', 'serialOut'], ['q7_bar', 'serialOutInverted']],
+  '138': Array.from({ length: 8 }, (_, index) => [`y${index}`, `Y${index}`] as const),
+  '151': [['y', 'outputY'], ['w', 'outputW']],
+  '4017': [
+    ...Array.from({ length: 10 }, (_, index) => [`q${index}`, `Q${index}`] as const),
+    ['co', 'carryOut'],
+  ],
+};
+
+function digitalIcFamily(type: string): '165' | '138' | '151' | '4017' | null {
+  return DIGITAL_IC_FAMILY[type] ?? null;
+}
+
+function resetDigitalIcProperties(type: string): Record<string, boolean | number> {
+  const family = digitalIcFamily(type);
+  if (family === '165') {
+    return { shiftValue: 0, serialOut: false, serialOutInverted: false };
+  }
+  if (family === '138') {
+    return { activeChannel: -1, ...Object.fromEntries(Array.from({ length: 8 }, (_, index) => [`Y${index}`, false])) };
+  }
+  if (family === '151') {
+    return { selectedInput: 0, outputY: false, outputW: false };
+  }
+  if (family === '4017') {
+    return { currentCount: 0, carryOut: false, ...Object.fromEntries(Array.from({ length: 10 }, (_, index) => [`Q${index}`, false])) };
+  }
+  return {};
+}
+
+function meterMeasurementMode(value: unknown): MeterMeasurementMode {
+  const normalized = String(value || 'VOLTAGE').trim().toUpperCase();
+  if (normalized === 'CURRENT' || normalized === 'MA') return 'CURRENT';
+  if (normalized === 'RESISTANCE' || normalized === 'OHM' || normalized === 'CONTINUITY') return 'RESISTANCE';
+  return 'VOLTAGE';
+}
+
+function meterDisplayValue(mode: MeterMeasurementMode, value: number, resistanceUnsafe = false): string {
+  if (mode === 'CURRENT') return `${(value * 1000).toFixed(2)}mA`;
+  if (mode === 'RESISTANCE') {
+    if (resistanceUnsafe) return 'POWER OFF';
+    if (!Number.isFinite(value)) return 'OL';
+    return value >= 1_000 ? `${(value / 1_000).toFixed(2)}kΩ` : `${value.toFixed(2)}Ω`;
+  }
+  return `${value.toFixed(2)}V`;
+}
 import { LogicRegistry } from './logic/LogicRegistry';
 import { evaluateNumericExpression } from './ExpressionEvaluator';
 import { AudioEngine } from './AudioEngine';
@@ -45,6 +117,15 @@ interface PinInfo {
   state: PinState;
   value: number; // 0-255 for analogWrite, 0/1 for digital
 }
+
+type MaterializedSolverResult = Omit<
+  WorkerResultMessage,
+  'nodeIndices' | 'nodeVoltages' | 'branchCurrentElementIds' | 'branchCurrents' | 'powerElementIds' | 'componentPower'
+> & {
+  nodeVoltages: number[];
+  branchCurrents: Record<string, number>;
+  componentPower: Record<string, number>;
+};
 
 interface ParsedStatement {
   type: 'statement' | 'if' | 'for' | 'while';
@@ -170,7 +251,8 @@ class LcdTWIEventHandler {
   constructor(
     private twi: any,
     private lcdNodes: CanvasNode[],
-    private callbacks: SimulationCallbacks
+    private callbacks: SimulationCallbacks,
+    private onTraceEvent?: (kind: 'start' | 'stop' | 'connect' | 'write' | 'read') => void,
   ) {
     this.lcdExpander = new LcdI2CExpander((line1, line2, backlight) => {
       (globalThis as any).__voltforgeLcdState = (globalThis as any).__voltforgeLcdState || {};
@@ -182,20 +264,24 @@ class LcdTWIEventHandler {
   }
 
   start() {
+    this.onTraceEvent?.('start');
     this.twi.completeStart();
   }
 
   stop() {
+    this.onTraceEvent?.('stop');
     this.twi.completeStop();
   }
 
   connectToSlave(address: number, _write: boolean) {
+    this.onTraceEvent?.('connect');
     this.activeAddress = address;
     const ack = (address === 0x27 || address === 0x3f);
     this.twi.completeConnect(ack);
   }
 
   writeByte(value: number) {
+    this.onTraceEvent?.('write');
     const ack = (this.activeAddress === 0x27 || this.activeAddress === 0x3f);
     if (ack && this.lcdExpander) {
       this.lcdExpander.write(value);
@@ -204,6 +290,7 @@ class LcdTWIEventHandler {
   }
 
   readByte() {
+    this.onTraceEvent?.('read');
     this.twi.completeRead(0xff);
   }
 }
@@ -219,7 +306,7 @@ export class SimulationEngine {
   private isPaused = false;
   private simulationSpeed = 1;
   private isBatching = false;
-  private accumulatedUpdates: Map<string, Record<string, any>> = new Map();
+  private runtimeDeltaCollector = new RuntimeDeltaCollector();
   private originalUpdateNode: any = null;
   private intervalId: number | null = null;
   private callbacks: SimulationCallbacks;
@@ -236,9 +323,12 @@ export class SimulationEngine {
   private breakpoints = new Set<number>();
   private currentLine: number | null = null;
   private avrCpu: CPU | null = null;
+  private avrAnimationFrameId: number | null = null;
   private avrPorts: Record<string, AVRIOPort> = {};
   private avrUsart: AVRUSART | null = null;
   private avrAdc: AVRADC | null = null;
+  private avrBudgetScheduler: AvrExecutionBudgetScheduler | null = null;
+  private avrRuntimeTrace = new AvrRuntimeTraceCollector();
   // For toggling state with delay patterns (e.g., blink)
   private pinToggleState: Record<string, boolean> = {};
   private lastDcMotorUpdateTime = 0;
@@ -258,17 +348,24 @@ export class SimulationEngine {
   // ── ESC / BLDC Motor state ──
   private escNodes: CanvasNode[] = [];   // ESC modules on canvas
   private bldcNodes: CanvasNode[] = [];  // BLDC motors on canvas
+  private escPhaseVoltages = new Map<string, number>();
+  private digitalIcOutputVoltages = new Map<string, number>();
+  private digitalIcPrimeRequests = new Set<string>();
+  private virtualMeterSignature = '';
   private dcMotorNodes: CanvasNode[] = [];  // DC motors on canvas
   private stepperNodes: CanvasNode[] = [];  // Stepper motors on canvas
 
   // ── MNA Solver Integration ──
   private solverWorker: Worker | null = null;
-  private mnaCircuit: MNACircuit | null = null;
-  private mcuPinVoltages: Record<string, number> = {};  // pin number → voltage
-  private storeUnsubscribe: (() => void) | null = null;
-  private lastResultTime = 0;
-  private pendingResult: WorkerResultMessage | null = null;
-  private resultRafId: number | null = null;
+private solverWorkerLifecycle = new SolverWorkerLifecycleGate();
+private mnaCircuit: MNACircuit | null = null;
+private mcuPinVoltages: Record<string, number> = {};  // pin number → voltage
+private storeUnsubscribe: (() => void) | null = null;
+private resultDemandUnsubscribe: (() => void) | null = null;
+private resultRequestTimerId: number | null = null;
+private resultRequestOutstanding = false;
+private scopeCaptureRevision = 0;
+  private simulationNodeIndex = new RuntimeReconciliationIndex<CanvasNode>();
   private localSerialBuffer = '';
   private sensorAutoIntervalId: number | null = null;
   private sensorStartTime = 0;
@@ -308,6 +405,7 @@ export class SimulationEngine {
     this.i2cReadBuffer = [];
     this.unregisterVirtualI2cDevices();
     this.compatibilityWarnings.clear();
+    useSimulationStore.getState().resetAvrWorkload();
 
     // Reset LCD state
     this.lcdBuffer = Array.from({ length: this.lcdRows }, () => Array(this.lcdCols).fill(' '));
@@ -330,6 +428,9 @@ export class SimulationEngine {
 
     // Reset MNA state
     this.mcuPinVoltages = {};
+    this.escPhaseVoltages.clear();
+    this.digitalIcOutputVoltages.clear();
+    this.digitalIcPrimeRequests.clear();
 
     // Initialize board properties: power on! And clear/reset other nodes to their initial simulation state.
     const { updateNode } = useCanvasStore.getState();
@@ -348,9 +449,17 @@ export class SimulationEngine {
         updates.rgbBlue = 0;
         changed = true;
       } else if (node.type === 'DISPLAY_LCD_I2C' || node.type === 'LCD_16X2' || node.type === 'DISPLAY_OLED' || node.type === 'OLED_DISPLAY') {
+        updates.powered = false;
+        updates.displaySupplyVoltage = 0;
         updates.lcdBacklight = false;
         updates.lcdLine1 = '';
         updates.lcdLine2 = '';
+        changed = true;
+      } else if (digitalIcFamily(node.type)) {
+        this.callbacks.onPinStateChange(node.id, '__power_reset__', 'LOW');
+        updates.powered = false;
+        updates.digitalIcSupplyVoltage = 0;
+        Object.assign(updates, resetDigitalIcProperties(node.type));
         changed = true;
       } else if (node.type === 'DISPLAY_7SEG') {
         updates.isActive = false;
@@ -362,6 +471,13 @@ export class SimulationEngine {
         updates.rpm = 0;
         updates.motorTick = 0;
         changed = true;
+      } else if (node.type === 'ESC_MODULE') {
+        updates.powered = false;
+        updates.escSupplyVoltage = 0;
+        updates.escThrottle = 0;
+        updates.escRpm = 0;
+        updates.isActive = false;
+        changed = true;
       } else if (node.type === 'MOTOR_BLDC') {
         updates.bldcRpm = 0;
         updates.bldcRotation = 0;
@@ -371,6 +487,14 @@ export class SimulationEngine {
         updates.isSpinning = false;
         updates.stepperRotation = 0;
         updates.stepperSteps = 0;
+        updates.prevCoilA = false;
+        updates.prevCoilB = false;
+        updates.stepperPattern = '';
+        updates.powered = false;
+        updates.phase1Active = false;
+        updates.phase2Active = false;
+        updates.phase3Active = false;
+        updates.phase4Active = false;
         changed = true;
       } else if (node.type === 'BUZZER') {
         updates.isBeeping = false;
@@ -385,9 +509,14 @@ export class SimulationEngine {
         });
         changed = true;
       } else if (node.type === 'MULTIMETER' || node.type === 'AMMETER' || node.type === 'OSCILLOSCOPE') {
-        updates.displayValue = node.type === 'MULTIMETER' ? '0.00V' : node.type === 'AMMETER' ? '0.00 mA' : 'SCOPE';
+        const meterMode = meterMeasurementMode(node.properties?.mode);
+        updates.displayValue = node.type === 'MULTIMETER'
+          ? meterDisplayValue(meterMode, meterMode === 'RESISTANCE' ? Number.POSITIVE_INFINITY : 0)
+          : node.type === 'AMMETER' ? '0.00 mA' : 'SCOPE';
         updates.measuredVoltage = 0;
         updates.measuredCurrent = 0;
+        updates.measuredResistance = Number.POSITIVE_INFINITY;
+        updates.resistanceUnsafe = false;
         changed = true;
       }
 
@@ -421,41 +550,36 @@ export class SimulationEngine {
 
     // Subscribe to canvas store changes to dynamically update MNA solver values
     this.storeUnsubscribe = useCanvasStore.subscribe((state, prev) => {
-      if (!this.isRunning || !this.solverWorker || !this.mnaCircuit) return;
+      if (!this.isRunning) return;
 
-      const nodeTopologyChanged = state.nodes.length !== prev.nodes.length || state.nodes.some((node) => {
-        const previous = prev.nodesById?.get(node.id) || prev.nodes.find((item) => item.id === node.id);
-        if (!previous || previous.type !== node.type || previous.pins.length !== node.pins.length) return true;
-        return node.pins.some((pin, index) => pin.id !== previous.pins[index]?.id);
-      });
-      const wireTopologyChanged = state.wires.length !== prev.wires.length || state.wires.some((wire) => {
-        const previous = prev.wires.find((item) => item.id === wire.id);
-        return !previous || previous.fromNodeId !== wire.fromNodeId || previous.fromPinId !== wire.fromPinId
-          || previous.toNodeId !== wire.toNodeId || previous.toPinId !== wire.toPinId;
-      });
+      // Runtime-only updates use a separate store action and leave this
+      // revision untouched. Model changes carry their affected IDs, so this
+      // path never compares every node/property on every simulation tick.
+      const reconciliation = classifyCanvasModelChange(state, prev);
+      if (reconciliation.kind === 'ignore') return;
+      const { change } = reconciliation;
 
       // Rebuild the electrical netlist when a user adds/removes/reconnects a
       // component. Property/drag updates continue through the lighter path
       // below, so normal simulation ticks do not recreate the worker.
-      if (nodeTopologyChanged || wireTopologyChanged) {
-        this.stopMNASolver();
+      if (reconciliation.kind === 'rebuild-topology') {
+        if (this.solverWorker || this.solverWorkerLifecycle.hasActiveWorker) {
+          this.stopMNASolver(true);
+        }
         this.startMNASolver(state.nodes, state.wires);
         return;
       }
-      if (state.nodes === prev.nodes) return;
 
-      let modelPropertyChanged = false;
-      state.nodes.forEach(node => {
-        const prevNode = prev.nodesById?.get(node.id) || prev.nodes.find(n => n.id === node.id);
-        if (!prevNode) return;
+      if (!this.solverWorker || !this.mnaCircuit) return;
+
+      for (const nodeId of change.nodeIds) {
+        const node = state.nodesById.get(nodeId);
+        const prevNode = prev.nodesById?.get(nodeId);
+        if (!node || !prevNode) continue;
 
         const props = node.properties || {};
         const prevProps = prevNode.properties || {};
 
-        const propertyKeys = new Set([...Object.keys(props), ...Object.keys(prevProps)]);
-        if ([...propertyKeys].some((key) => !SIMULATION_RUNTIME_PROPERTY_KEYS.has(key) && props[key] !== prevProps[key])) {
-          modelPropertyChanged = true;
-        }
 
         // 1. Potentiometer position change
         if (node.type === 'POTENTIOMETER' && props.position !== prevProps.position) {
@@ -576,13 +700,31 @@ export class SimulationEngine {
           });
         }
 
-        // 8. ESC phase output follows the simulated throttle without
-        // restarting the worker. The visual ESC logic stores throttle as a
-        // percentage while the MNA phase sources use volts.
-        if (node.type === 'ESC_MODULE' && props.escThrottle !== prevProps.escThrottle) {
-          const outputVoltage = Math.max(0, Number(props.outputVoltage ?? 12) || 12);
-          const throttle = Math.max(0, Math.min(100, Number(props.escThrottle) || 0));
-          const phaseVoltage = outputVoltage * throttle / 100;
+        if (
+          (node.type === 'DISPLAY_LCD_I2C' || node.type === 'LCD_16X2' || node.type === 'DISPLAY_OLED' || node.type === 'OLED_DISPLAY') &&
+          props.lcdBacklight !== prevProps.lcdBacklight
+        ) {
+          const isOled = node.type === 'DISPLAY_OLED' || node.type === 'OLED_DISPLAY';
+          this.solverWorker?.postMessage({
+            type: 'UPDATE_PIN',
+            elementId: `r_display_power_${node.id}`,
+            voltage: isOled ? 330 : props.lcdBacklight !== false ? 250 : 1_000,
+          });
+        }
+
+        // 8. ESC phase output is gated by the solved VCC/GND supply.
+        if (node.type === 'ESC_MODULE' && (
+          props.escThrottle !== prevProps.escThrottle ||
+          props.powered !== prevProps.powered ||
+          props.escSupplyVoltage !== prevProps.escSupplyVoltage ||
+          props.outputVoltage !== prevProps.outputVoltage
+        )) {
+          const configuredVoltage = Math.max(0, Number(props.outputVoltage ?? SIMULATION_MODELS.bldc.supplyVoltage) || SIMULATION_MODELS.bldc.supplyVoltage);
+          const supplyVoltage = Math.max(0, Number(props.escSupplyVoltage) || 0);
+          const throttle = props.powered === true
+            ? Math.max(0, Math.min(100, Number(props.escThrottle) || 0))
+            : 0;
+          const phaseVoltage = Math.min(configuredVoltage, supplyVoltage) * throttle / 100;
           for (const phasePin of ['phase_a', 'phase_b', 'phase_c']) {
             this.solverWorker?.postMessage({
               type: 'UPDATE_PIN',
@@ -592,11 +734,26 @@ export class SimulationEngine {
           }
         }
 
-      });
+        if (digitalIcFamily(node.type)) {
+          const family = digitalIcFamily(node.type)!;
+          const outputChanged = DIGITAL_IC_OUTPUTS[family].some(([, propertyKey]) => props[propertyKey] !== prevProps[propertyKey]);
+          if (
+            outputChanged ||
+            props.powered !== prevProps.powered ||
+            props.digitalIcSupplyVoltage !== prevProps.digitalIcSupplyVoltage
+          ) {
+            this.updatePowerGatedDigitalIcOutputs(
+              node,
+              props,
+              props.powered === true,
+              Math.max(0, Number(props.digitalIcSupplyVoltage) || 0),
+            );
+          }
+        }
 
-      if (modelPropertyChanged) {
-        this.refreshMnaElements(state.nodes, state.wires);
       }
+
+      this.refreshMnaElements(state.nodes, state.wires);
     });
 
     try {
@@ -647,7 +804,6 @@ export class SimulationEngine {
 
           if (!isPowered) return;
 
-          this.updateDiagnosticProbes(currentNodes, useCanvasStore.getState().wires);
           this.updateBldcMotorAnimation();
           this.updateDcMotorAnimation();
           this.emitDebugSnapshot(false);
@@ -661,8 +817,6 @@ export class SimulationEngine {
           const currentNodes = useCanvasStore.getState().nodes;
           // First run setup()
           await this.executeParsedStatementsAsync(this.setupStatements, currentNodes, useCanvasStore.getState().wires, true);
-          this.updateDiagnosticProbes(currentNodes, useCanvasStore.getState().wires);
-
           // Then run loop() continuously
           while (this.isRunning && !this.avrCpu) {
             if (this.isPaused) {
@@ -716,33 +870,6 @@ export class SimulationEngine {
         const nodeChanges: Record<string, any> = {};
         let changed = false;
 
-        // ── DHT Temperature + Humidity: oscillate around set value ──
-        if (node.type === 'TEMP_SENSOR' || node.type === 'SENSOR_DHT11' || node.type === 'SENSOR_DHT22') {
-          const baseTemp = Number(props.temperature ?? 25);
-          const baseHum = Number(props.humidity ?? 60);
-          const tempVariation = Math.sin(elapsed * 0.2) * 2 + Math.sin(elapsed * 0.7) * 0.5;
-          const humVariation = Math.sin(elapsed * 0.15) * 5 + Math.cos(elapsed * 0.4) * 2;
-          const newTemp = Math.round((baseTemp + tempVariation) * 10) / 10;
-          const newHum = Math.max(0, Math.min(100, Math.round(baseHum + humVariation)));
-
-          if (props.temperature !== newTemp || props.humidity !== newHum) {
-            nodeChanges.temperature = newTemp;
-            nodeChanges.humidity = newHum;
-            changed = true;
-          }
-        }
-
-        // ── Ultrasonic: distance slowly varies ±15cm ──
-        if (node.type === 'ULTRASONIC_SENSOR' || node.type === 'SENSOR_ULTRASONIC') {
-          const baseDist = Number(props.distance ?? 100);
-          const distVariation = Math.sin(elapsed * 0.3) * 15 + Math.cos(elapsed * 0.8) * 5;
-          const newDist = Math.max(2, Math.min(400, Math.round(baseDist + distVariation)));
-          if (props.distance !== newDist) {
-            nodeChanges.distance = newDist;
-            changed = true;
-          }
-        }
-
         // ── PIR: motion triggers in bursts ──
         if (node.type === 'PIR_SENSOR' || node.type === 'SENSOR_PIR') {
           const isMotionPhase = Math.sin(elapsed * 0.5) > 0.6;
@@ -760,22 +887,6 @@ export class SimulationEngine {
           const newLight = Math.max(0, Math.min(100, Math.round(baseLight + lightVariation)));
           if (props.lightLevel !== newLight) {
             nodeChanges.lightLevel = newLight;
-            changed = true;
-          }
-        }
-
-        // ── IMU: subtle accelerometer noise + gentle tilt ──
-        if (node.type === 'SENSOR_IMU') {
-          const baseAx = Number(props.accelerationX ?? 0);
-          const baseAy = Number(props.accelerationY ?? 0);
-          const noise = () => (Math.random() - 0.5) * 0.2;
-          const tiltX = Math.sin(elapsed * 0.4) * 0.5 + noise();
-          const tiltY = Math.cos(elapsed * 0.3) * 0.3 + noise();
-          const newAx = Math.round((baseAx + tiltX) * 100) / 100;
-          const newAy = Math.round((baseAy + tiltY) * 100) / 100;
-          if (props.accelerationX !== newAx || props.accelerationY !== newAy) {
-            nodeChanges.accelerationX = newAx;
-            nodeChanges.accelerationY = newAy;
             changed = true;
           }
         }
@@ -805,7 +916,7 @@ export class SimulationEngine {
       }
 
       if (updatesList.length > 0) {
-        useCanvasStore.getState().batchUpdateNodes(updatesList);
+        useCanvasStore.getState().batchUpdateRuntimeNodes(updatesList);
       }
     }, 1000); // Update every 1000ms
   }
@@ -852,33 +963,6 @@ export class SimulationEngine {
       });
     });
 
-    // Common MPU6050-style register reads. This is intentionally a stable
-    // virtual sensor frame, not a claim of cycle-accurate I²C timing.
-    nodes.filter((node) => node.type === 'SENSOR_IMU').forEach((node) => {
-      const address = addressOf(node, 0x68);
-      register(address, {
-        address,
-        onReceive: () => undefined,
-        onRequest: () => {
-          const currentNode = useCanvasStore.getState().nodes.find((item) => item.id === node.id);
-          const props = currentNode?.properties || node.properties || {};
-          const words = [
-            Number(props.accelerationX ?? 0) * 16384,
-            Number(props.accelerationY ?? 0) * 16384,
-            Number(props.accelerationZ ?? 1) * 16384,
-            0,
-            Number(props.gyroX ?? 0) * 131,
-            Number(props.gyroY ?? 0) * 131,
-            Number(props.gyroZ ?? 0) * 131,
-          ];
-          return words.flatMap((value) => {
-            const word = Math.max(-32768, Math.min(32767, Math.round(value)));
-            const encoded = word < 0 ? word + 65536 : word;
-            return [(encoded >> 8) & 0xff, encoded & 0xff];
-          });
-        },
-      });
-    });
   }
 
   private unregisterVirtualI2cDevices() {
@@ -1198,34 +1282,6 @@ export class SimulationEngine {
       replaced = replaced.replace(match[0], String(val10));
     }
 
-    // pulseIn(pin, HIGH/LOW) — for ultrasonic ECHO pin, returns duration proportional to distance
-    const pulseMatches = Array.from(replaced.matchAll(/pulseIn\s*\(\s*(\w+)\s*,\s*(\w+)\s*(?:,\s*\w+\s*)?\)/g));
-    for (const match of pulseMatches) {
-      const nodes = useCanvasStore.getState().nodes;
-      const sensor = nodes.find(n => n.type === 'SENSOR_ULTRASONIC' || n.type === 'ULTRASONIC_SENSOR');
-      let duration = 0;
-      if (sensor) {
-        const dist = Number(sensor.properties?.distance ?? 100);
-        duration = Math.round(dist * 58.2); // µs round-trip time for sound at 343 m/s
-      }
-      replaced = replaced.replace(match[0], String(duration));
-    }
-
-    // dht.readTemperature() & dht.readHumidity() inline replacement
-    const dhtTempMatches = Array.from(replaced.matchAll(/dht\.readTemperature\s*\([^)]*\)/gi));
-    for (const match of dhtTempMatches) {
-      const sensor = useCanvasStore.getState().nodes.find(n => n.type === 'TEMP_SENSOR' || n.type === 'SENSOR_DHT11' || n.type === 'SENSOR_DHT22');
-      const temp = sensor ? Number(sensor.properties?.temperature ?? 25) : 25;
-      replaced = replaced.replace(match[0], String(temp));
-    }
-
-    const dhtHumMatches = Array.from(replaced.matchAll(/dht\.readHumidity\s*\([^)]*\)/gi));
-    for (const match of dhtHumMatches) {
-      const sensor = useCanvasStore.getState().nodes.find(n => n.type === 'TEMP_SENSOR' || n.type === 'SENSOR_DHT11' || n.type === 'SENSOR_DHT22');
-      const hum = sensor ? Number(sensor.properties?.humidity ?? 60) : 60;
-      replaced = replaced.replace(match[0], String(hum));
-    }
-
     // Wire.h receive-buffer API. requestFrom() fills the virtual buffer and
     // these replacements let normal Arduino expressions consume it.
     replaced = replaced.replace(/Wire\.available\s*\(\s*\)/gi, String(this.i2cReadBuffer.length));
@@ -1491,71 +1547,6 @@ export class SimulationEngine {
           continue;
         }
 
-        // dht.readTemperature()
-        const dhtTempAssign = codeText.match(/(?:float\s+)?(\w+)\s*=\s*dht\.readTemperature\s*\(/i);
-        if (dhtTempAssign) {
-          const sensor = nodes.find(n => n.type === 'TEMP_SENSOR' || n.type === 'SENSOR_DHT11' || n.type === 'SENSOR_DHT22');
-          let temp = 0;
-          if (sensor && this.isNodePowered(sensor.id)) {
-            temp = Number(sensor.properties?.temperature !== undefined ? sensor.properties.temperature : 25);
-          } else if (!sensor) {
-            temp = 24.5 + Math.sin(this.tick / 3000) * 2;
-          }
-          this.globals[dhtTempAssign[1]] = Math.round(temp * 10) / 10;
-          this.emitDebugSnapshot(false);
-          continue;
-        }
-
-        // dht.readHumidity()
-        const dhtHumAssign = codeText.match(/(?:float\s+)?(\w+)\s*=\s*dht\.readHumidity\s*\(/i);
-        if (dhtHumAssign) {
-          const sensor = nodes.find(n => n.type === 'TEMP_SENSOR' || n.type === 'SENSOR_DHT11' || n.type === 'SENSOR_DHT22');
-          let hum = 0;
-          if (sensor && this.isNodePowered(sensor.id)) {
-            hum = Number(sensor.properties?.humidity !== undefined ? sensor.properties.humidity : 60);
-          } else if (!sensor) {
-            hum = 58 + Math.cos(this.tick / 5000) * 5;
-          }
-          this.globals[dhtHumAssign[1]] = Math.round(hum * 10) / 10;
-          this.emitDebugSnapshot(false);
-          continue;
-        }
-
-        // Ultrasonic read: sonar.ping_cm() / sonar.readDistance()
-        const sonarAssign = codeText.match(/(?:float|int|long)?\s*(\w+)\s*=\s*sonar\.(?:ping_cm|readDistance|ping)\s*\(/i);
-        if (sonarAssign) {
-          const sensor = nodes.find(n => n.type === 'SENSOR_ULTRASONIC' || n.type === 'ULTRASONIC_SENSOR');
-          let dist = 0;
-          if (sensor && this.isNodePowered(sensor.id)) {
-            dist = Number(sensor.properties?.distance !== undefined ? sensor.properties.distance : 100);
-          } else if (!sensor) {
-            dist = 120 + Math.sin(this.tick / 1000) * 20;
-          }
-          this.globals[sonarAssign[1]] = Math.round(dist);
-          this.emitDebugSnapshot(false);
-          continue;
-        }
-
-        // Accelerometer / Gyro read: mpu.getAccelerationX() / Y / Z
-        const mpuAssign = codeText.match(/(?:float|double)?\s*(\w+)\s*=\s*mpu\.get(?:Acceleration|Gyro)([XYZ])\s*\(/i);
-        if (mpuAssign) {
-          const axis = mpuAssign[2].toUpperCase();
-          const isGyro = codeText.toLowerCase().includes('gyro');
-          const sensor = nodes.find(n => n.type === 'SENSOR_IMU');
-          let val = 0;
-          if (sensor && this.isNodePowered(sensor.id)) {
-            const propName = isGyro ? `gyro${axis}` : `acceleration${axis}`;
-            val = Number(sensor.properties?.[propName] !== undefined ? sensor.properties[propName] : 0);
-          }
-          this.globals[mpuAssign[1]] = val;
-          this.emitDebugSnapshot(false);
-          continue;
-        }
-
-        // DHT initialization has no electrical side effects in the virtual
-        // sensor model; readings are supplied from the sensor properties.
-        if (/dht\.begin\s*\(/i.test(codeText)) continue;
-
         // delay(ms) — simulate timing
         const delay = codeText.match(/delay\s*\(\s*(.+?)\s*\)/);
         if (delay) {
@@ -1600,13 +1591,13 @@ export class SimulationEngine {
         // expressions are intentionally allowed through to assignment and
         // condition preprocessing above.
         const containsValueRead = /(?:=|\breturn\b).*\b(?:Wire\.(?:read|available)|SPI\.transfer)\s*\(/i.test(codeText);
-        if (/Wire\.|lcd\.|dht\.|servo\.|esc\.|myservo\./i.test(codeText) && !containsValueRead) {
+        if (/Wire\.|lcd\.|servo\.|esc\.|myservo\./i.test(codeText) && !containsValueRead) {
           this.warnCompatibilityGap(codeText);
           continue;
         }
 
-        // C++ class constructors (e.g., LiquidCrystal_I2C lcd(...), Servo myservo, DHT dht(...))
-        if (/^(?:LiquidCrystal|Servo|DHT|NewPing|Adafruit_|Wire|SoftwareSerial|ESP|IRrecv)\w*\s+\w+/i.test(codeText)) continue;
+        // C++ class constructors (e.g., LiquidCrystal_I2C lcd(...), Servo myservo)
+        if (/^(?:LiquidCrystal|Servo|Adafruit_|Wire|SoftwareSerial|ESP)\w*\s+\w+/i.test(codeText)) continue;
 
         // #include directives
         if (/^#\s*include\b/.test(codeText)) continue;
@@ -1865,20 +1856,6 @@ export class SimulationEngine {
     });
   }
 
-  private updateDiagnosticProbes(nodes: CanvasNode[], wires: Wire[]) {
-    const meters = nodes.filter(node => node.type === 'MULTIMETER');
-    meters.forEach(meter => {
-      const probePin = meter.pins?.find(pin => /v|vcc|\+|probe/i.test(`${pin.id} ${pin.name}`));
-      const comPin = meter.pins?.find(pin => /com|gnd|ground|-/i.test(`${pin.id} ${pin.name}`));
-      if (!probePin) return;
-
-      const probeVoltage = this.voltageAtPin(meter.id, probePin.id, nodes, wires);
-      const commonVoltage = comPin ? this.voltageAtPin(meter.id, comPin.id, nodes, wires) : 0;
-      const voltage = Math.max(0, probeVoltage - commonVoltage);
-      this.callbacks.onPinStateChange(meter.id, probePin.id, voltage > 0.05 ? 'HIGH' : 'LOW', voltage);
-    });
-  }
-
   /**
    * Handle ESC-related statements:
    *   esc.writeMicroseconds(value)  — maps 1000-2000µs to 0-255 PWM
@@ -1965,6 +1942,105 @@ export class SimulationEngine {
     });
   }
 
+  private updateEscPhaseOutputs(escId: string, phaseVoltage: number) {
+    const nextVoltage = Math.max(0, phaseVoltage);
+    const previousVoltage = this.escPhaseVoltages.get(escId);
+    if (previousVoltage !== undefined && Math.abs(previousVoltage - nextVoltage) < 0.001) return;
+
+    this.escPhaseVoltages.set(escId, nextVoltage);
+    for (const phasePin of ['phase_a', 'phase_b', 'phase_c']) {
+      this.solverWorker?.postMessage({
+        type: 'UPDATE_PIN',
+        elementId: `vs_esc_phase_${phasePin}_${escId}`,
+        voltage: nextVoltage,
+      });
+    }
+  }
+
+  private updateEscConnectedBldcMotors(escId: string, rpm: number) {
+    const { nodes, wires, updateNode } = useCanvasStore.getState();
+    const connectedMotorIds = new Set<string>();
+
+    for (const phasePin of ['phase_a', 'phase_b', 'phase_c']) {
+      wires.forEach((wire) => {
+        if (wire.fromNodeId === escId && wire.fromPinId === phasePin) {
+          connectedMotorIds.add(wire.toNodeId);
+        } else if (wire.toNodeId === escId && wire.toPinId === phasePin) {
+          connectedMotorIds.add(wire.fromNodeId);
+        }
+      });
+    }
+
+    connectedMotorIds.forEach((motorId) => {
+      const motor = nodes.find((node) => node.id === motorId && node.type === 'MOTOR_BLDC');
+      if (!motor) return;
+
+      const isSpinning = rpm > 0;
+      if (motor.properties?.bldcRpm !== rpm || motor.properties?.isSpinning !== isSpinning) {
+        updateNode(motor.id, {
+          properties: {
+            ...motor.properties,
+            bldcRpm: rpm,
+            isSpinning,
+          },
+        });
+      }
+
+      const bldcState = (globalThis as any).__voltforgeBldcState || {};
+      (globalThis as any).__voltforgeBldcState = {
+        ...bldcState,
+        [motor.id]: {
+          rotation: Number(motor.properties?.bldcRotation) || 0,
+          rpm,
+        },
+      };
+    });
+  }
+
+  private updateEscDrive(escNode: CanvasNode, measuredSupplyVoltage: number) {
+    const { nodesById, updateNode } = useCanvasStore.getState();
+    const esc = nodesById.get(escNode.id) || escNode;
+    const props = esc.properties || {};
+    const supplyVoltage = Math.round(Math.max(0, measuredSupplyVoltage) * 1000) / 1000;
+    const powered = supplyVoltage >= SIMULATION_MODELS.esc.minimumSupplyVoltage;
+    const requestedThrottle = Math.max(0, Math.min(100, (() => {
+      const explicitRequest = Number(props.escRequestedThrottle);
+      if (Number.isFinite(explicitRequest)) return explicitRequest;
+
+      const activeThrottle = Number(props.escThrottle);
+      if (Number.isFinite(activeThrottle) && activeThrottle > 0) return activeThrottle;
+
+      return numericProperty(props.escPwm, 0) * 100 / 255;
+    })()));
+    const throttle = powered ? requestedThrottle : 0;
+    const maximumRpm = Math.max(0, numericProperty(props.maximumRpm, SIMULATION_MODELS.bldc.maximumRpm));
+    const rpm = powered ? Math.round(maximumRpm * throttle / 100) : 0;
+    const configuredVoltage = Math.max(0, numericProperty(props.outputVoltage, SIMULATION_MODELS.bldc.supplyVoltage));
+    const phaseVoltage = powered ? Math.min(configuredVoltage, supplyVoltage) * throttle / 100 : 0;
+
+    this.updateEscPhaseOutputs(esc.id, phaseVoltage);
+    this.updateEscConnectedBldcMotors(esc.id, rpm);
+
+    if (
+      props.powered !== powered ||
+      props.escSupplyVoltage !== supplyVoltage ||
+      props.escThrottle !== throttle ||
+      props.escRpm !== rpm ||
+      props.isActive !== (powered && throttle > 0)
+    ) {
+      updateNode(esc.id, {
+        properties: {
+          ...props,
+          powered,
+          escSupplyVoltage: supplyVoltage,
+          escThrottle: throttle,
+          escRpm: rpm,
+          isActive: powered && throttle > 0,
+        },
+      });
+    }
+  }
+
   /**
    * Animate BLDC motors: increment rotation based on stored RPM.
    * Called every tick (~100ms). Rotation speed is proportional to RPM.
@@ -2038,7 +2114,7 @@ export class SimulationEngine {
     });
 
     if (updatesList.length > 0) {
-      useCanvasStore.getState().batchUpdateNodes(updatesList);
+      useCanvasStore.getState().batchUpdateRuntimeNodes(updatesList);
     }
   }
 
@@ -2288,9 +2364,22 @@ export class SimulationEngine {
     this.breakpoints = new Set(lines);
   }
 
+  public startAvrRuntimeTrace(): void {
+    this.avrRuntimeTrace.start();
+  }
+
+  public stopAvrRuntimeTrace(): void {
+    this.avrRuntimeTrace.stop();
+  }
+
+  public getAvrRuntimeTraceSnapshot(): AvrRuntimeTraceSnapshot {
+    return this.avrRuntimeTrace.read(this.avrCpu?.cycles ?? 0);
+  }
+
   private startAvr(hex: string, nodes: CanvasNode[], wires: Wire[]) {
     const program = this.hexToProgram(hex);
     this.avrCpu = new CPU(program);
+    const cpu = this.avrCpu;
     this.avrPorts = {
       B: new AVRIOPort(this.avrCpu, portBConfig),
       C: new AVRIOPort(this.avrCpu, portCConfig),
@@ -2302,6 +2391,7 @@ export class SimulationEngine {
     this.avrUsart = new AVRUSART(this.avrCpu, usart0Config, 16_000_000);
     this.avrUsart.onLineTransmit = (line) => this.callbacks.onSerialOutput(line);
     this.avrUsart.onByteTransmit = (value) => {
+      this.avrRuntimeTrace.recordUartByte();
       const text = String.fromCharCode(value);
       this.callbacks.onSerialOutput(text, { newline: text === '\n' });
     };
@@ -2310,9 +2400,19 @@ export class SimulationEngine {
     };
 
     this.avrAdc = new AVRADC(this.avrCpu, adcConfig);
+    const defaultAdcRead = this.avrAdc.onADCRead;
+    this.avrAdc.onADCRead = (input) => {
+      this.avrRuntimeTrace.recordAdcConversion();
+      defaultAdcRead(input);
+    };
 
     const twi = new AVRTWI(this.avrCpu, twiConfig, 16_000_000);
-    twi.eventHandler = new LcdTWIEventHandler(twi, this.lcdNodes, this.callbacks);
+    twi.eventHandler = new LcdTWIEventHandler(
+      twi,
+      this.lcdNodes,
+      this.callbacks,
+      (kind) => this.avrRuntimeTrace.recordI2cEvent(kind),
+    );
 
     const handlePort = (portName: 'B' | 'C' | 'D', _value: number) => {
       for (let bit = 0; bit < 8; bit += 1) {
@@ -2332,6 +2432,7 @@ export class SimulationEngine {
         const changed = !prevPin || prevPin.mode !== mode || prevPin.state !== state;
 
         if (changed) {
+          this.avrRuntimeTrace.recordPinTransition(pin);
           this.pins[pin] = { mode, state, value: val };
           this.propagatePinState(pin, state, nodes, wires, val);
 
@@ -2361,38 +2462,113 @@ export class SimulationEngine {
     this.avrPorts.D.addListener((value) => handlePort('D', value));
 
     this.callbacks.onSerialOutput('> AVR8js CPU Started');
-    this.intervalId = window.setInterval(() => {
-      if (!this.isRunning || this.isPaused || !this.avrCpu) return;
-      const cpu = this.avrCpu;
+    const fidelityMode = useSimulationStore.getState().fidelityMode;
+    const avrModel = SIMULATION_MODELS.avr;
+    const budgetConfig = avrSliceBudgetForMode(
+      fidelityMode,
+      avrModel,
+      SIMULATION_MODELS.clock.framePeriod_s * 1000,
+    );
+    const scheduler = new AvrExecutionBudgetScheduler(budgetConfig);
+    this.avrBudgetScheduler = scheduler;
+    this.callbacks.onSerialOutput(
+      `> AVR ${fidelityMode === 'full-fidelity' ? 'Full fidelity' : 'Adaptive'} budget: ${budgetConfig.sliceBudgetMs} ms/frame; 16 MHz cycle order preserved`,
+    );
 
-      this.runBatched(() => {
-        const inputs = useSimulationStore.getState().drainSerialInput();
-        if (inputs.length > 0) {
-          const str = inputs.join('');
-          for (let i = 0; i < str.length; i++) {
-            this.avrUsart?.writeByte(str.charCodeAt(i));
+    useSimulationStore.getState().setAvrWorkload({
+      active: true,
+      fidelityMode,
+      sliceBudgetMs: budgetConfig.sliceBudgetMs,
+      averageSliceMs: 0,
+      maximumSliceMs: 0,
+      maximumDeadlineOvershootMs: 0,
+      mainThreadUtilizationPercent: 0,
+      instructionsPerSecond: 0,
+      emulatedClockHz: 0,
+      pendingCycleLagMs: 0,
+      budgetLimited: false,
+      hardLimitReached: false,
+      backgroundStallCount: 0,
+    });
+
+    const instructionRuntime = {
+      now: () => performance.now(),
+      readCycles: () => cpu.cycles,
+      executeInstruction: () => avrInstruction(cpu),
+      tickPeripheral: () => cpu.tick(),
+    };
+
+    const runAvrFrame = (frameTimestampMs: number) => {
+      this.avrAnimationFrameId = null;
+      if (!this.isRunning || this.avrCpu !== cpu || this.avrBudgetScheduler !== scheduler) return;
+
+      if (this.isPaused) {
+        scheduler.runFrame({
+          frameTimestampMs,
+          paused: true,
+          powered: true,
+          speed: this.simulationSpeed,
+        }, instructionRuntime);
+      } else {
+        try {
+          const frameResult = this.runBatched(() => {
+            const inputs = useSimulationStore.getState().drainSerialInput();
+            if (inputs.length > 0) {
+              const str = inputs.join('');
+              for (let i = 0; i < str.length; i += 1) {
+                this.avrUsart?.writeByte(str.charCodeAt(i));
+              }
+            }
+
+            const currentNodes = useCanvasStore.getState().nodes;
+            const mcuNode = currentNodes.find((node) => isBoardComponentType(node.type));
+            const isPowered = mcuNode ? mcuNode.properties?.boardPowered !== false : true;
+
+            const result = scheduler.runFrame({
+              frameTimestampMs,
+              paused: false,
+              powered: isPowered,
+              speed: this.simulationSpeed,
+            }, instructionRuntime);
+
+            this.updateBldcMotorAnimation();
+            this.updateDcMotorAnimation();
+            this.pushLcdToCanvas(currentNodes);
+            this.emitDebugSnapshot(false);
+            return result;
+          });
+
+          const telemetry = frameResult?.telemetry;
+          if (telemetry) {
+            useSimulationStore.getState().setAvrWorkload({
+              active: true,
+              fidelityMode,
+              sliceBudgetMs: budgetConfig.sliceBudgetMs,
+              averageSliceMs: telemetry.averageSliceMs,
+              maximumSliceMs: telemetry.maximumSliceMs,
+              maximumDeadlineOvershootMs: telemetry.maximumDeadlineOvershootMs,
+              mainThreadUtilizationPercent: telemetry.mainThreadUtilizationPercent,
+              instructionsPerSecond: telemetry.instructionsPerSecond,
+              emulatedClockHz: telemetry.emulatedClockHz,
+              pendingCycleLagMs: telemetry.pendingCycleLagMs,
+              budgetLimited: telemetry.budgetLimited,
+              hardLimitReached: telemetry.hardLimitReached,
+              backgroundStallCount: telemetry.backgroundStallCount,
+            });
           }
+        } catch (error) {
+          this.callbacks.onError(error instanceof Error ? error.message : 'AVR Execution Error');
+          this.stop();
+          return;
         }
+      }
 
-        const currentNodes = useCanvasStore.getState().nodes;
-        const mcuNode = currentNodes.find(n =>
-          isBoardComponentType(n.type)
-        );
-        const isPowered = mcuNode ? mcuNode.properties?.boardPowered !== false : true;
+      if (this.isRunning && this.avrCpu === cpu) {
+        this.avrAnimationFrameId = window.requestAnimationFrame(runAvrFrame);
+      }
+    };
 
-        if (isPowered) {
-          for (let i = 0; i < 25000; i += 1) {
-            avrInstruction(cpu);
-            cpu.tick();
-          }
-        }
-        this.updateBldcMotorAnimation();
-        this.updateDcMotorAnimation();
-        this.pushLcdToCanvas(currentNodes);
-        this.updateDiagnosticProbes(currentNodes, wires);
-        this.emitDebugSnapshot(false);
-      });
-    }, 16);
+    this.avrAnimationFrameId = window.requestAnimationFrame(runAvrFrame);
   }
 
   private hexToProgram(hex: string): Uint16Array {
@@ -2454,14 +2630,13 @@ export class SimulationEngine {
     });
   }
 
-  private runBatched(fn: () => void) {
+  private runBatched<T>(fn: () => T): T {
     if (this.isBatching) {
-      fn();
-      return;
+      return fn();
     }
 
     this.isBatching = true;
-    this.accumulatedUpdates.clear();
+    this.runtimeDeltaCollector.reset();
 
     const store = useCanvasStore.getState() as any;
     this.originalUpdateNode = store.updateNode;
@@ -2475,26 +2650,12 @@ export class SimulationEngine {
         return;
       }
 
-      let existing = this.accumulatedUpdates.get(id);
-      if (!existing) {
-        existing = {};
-        this.accumulatedUpdates.set(id, existing);
-      }
-      if (updates.properties) {
-        existing.properties = {
-          ...existing.properties,
-          ...updates.properties
-        };
-      }
-      Object.entries(updates).forEach(([key, val]) => {
-        if (key !== 'properties') {
-          existing![key] = val;
-        }
-      });
+      const currentNode = store.nodesById.get(id);
+      this.runtimeDeltaCollector.stage(id, currentNode, updates);
     };
 
     try {
-      fn();
+      return fn();
     } finally {
       this.isBatching = false;
       if (this.originalUpdateNode) {
@@ -2502,45 +2663,33 @@ export class SimulationEngine {
         this.originalUpdateNode = null;
       }
 
-      if (this.accumulatedUpdates.size > 0) {
-        const batch: Array<{ id: string; changes: Partial<CanvasNode> }> = [];
-
-        this.accumulatedUpdates.forEach((changes, id) => {
-          const node = store.nodes.find((n: any) => n.id === id);
-          if (node) {
-            const mergedProperties = changes.properties
-              ? { ...node.properties, ...changes.properties }
-              : node.properties;
-
-            batch.push({
-              id,
-              changes: {
-                ...changes,
-                properties: mergedProperties
-              }
-            });
-          }
-        });
-
-        if (batch.length > 0) {
-          store.batchUpdateNodes(batch);
-        }
-        this.accumulatedUpdates.clear();
+      const batch = this.runtimeDeltaCollector.materialize(store.nodesById);
+      if (batch.length > 0) {
+        store.batchUpdateRuntimeNodes(batch);
       }
+      this.runtimeDeltaCollector.reset();
     }
   }
 
   public stop() {
     this.isRunning = false;
     this.isPaused = false;
+    this.clearSolverResultSchedule();
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
+    if (this.avrAnimationFrameId !== null) {
+      window.cancelAnimationFrame(this.avrAnimationFrameId);
+      this.avrAnimationFrameId = null;
+    }
     this.avrCpu = null;
+    this.avrBudgetScheduler = null;
     this.avrUsart = null;
     this.avrPorts = {};
     this.avrAdc = null;
+    this.avrRuntimeTrace.stop();
+    useSimulationStore.getState().resetAvrWorkload();
     this.stopMNASolver();
     this.stopSensorAutoCycling();
     AudioEngine.stopTone();
@@ -2592,6 +2741,14 @@ export class SimulationEngine {
           updates.isSpinning = false;
           updates.stepperRotation = 0;
           updates.stepperSteps = 0;
+          updates.prevCoilA = false;
+          updates.prevCoilB = false;
+          updates.stepperPattern = '';
+          updates.powered = false;
+          updates.phase1Active = false;
+          updates.phase2Active = false;
+          updates.phase3Active = false;
+          updates.phase4Active = false;
           changed = true;
         } else if (node.type === 'BUZZER') {
           updates.isBeeping = false;
@@ -2606,9 +2763,14 @@ export class SimulationEngine {
           });
           changed = true;
         } else if (node.type === 'MULTIMETER' || node.type === 'AMMETER' || node.type === 'OSCILLOSCOPE') {
-          updates.displayValue = node.type === 'MULTIMETER' ? '0.00V' : node.type === 'AMMETER' ? '0.00 mA' : 'SCOPE';
+          const meterMode = meterMeasurementMode(node.properties?.mode);
+          updates.displayValue = node.type === 'MULTIMETER'
+            ? meterDisplayValue(meterMode, meterMode === 'RESISTANCE' ? Number.POSITIVE_INFINITY : 0)
+            : node.type === 'AMMETER' ? '0.00 mA' : 'SCOPE';
           updates.measuredVoltage = 0;
           updates.measuredCurrent = 0;
+          updates.measuredResistance = Number.POSITIVE_INFINITY;
+          updates.resistanceUnsafe = false;
           changed = true;
         }
 
@@ -2633,6 +2795,108 @@ export class SimulationEngine {
   /**
    * Build the MNA circuit from the canvas and start the solver WebWorker.
    */
+  private getVirtualMeterConfiguration(): VirtualMeterConfiguration {
+    const state = useSimulationStore.getState();
+    const probes: VirtualMeterConfiguration['probes'] = [];
+    for (const probe of state.meterProbes.slice(0, 2)) {
+      if (typeof probe.nodeId === 'string' && typeof probe.pinId === 'string') {
+        probes.push({ nodeId: probe.nodeId, pinId: probe.pinId });
+      }
+    }
+    return {
+      mode: state.meterMode,
+      probes,
+    };
+  }
+
+  private currentVirtualMeterSignature(): string {
+    return virtualMeterTopologySignature(this.getVirtualMeterConfiguration());
+  }
+
+  /**
+   * Cache the node-to-MNA bindings used by result reconciliation. The canvas
+   * store remains the source of current runtime properties, while this index
+   * avoids rescanning the full canvas and rebuilding pin lookups per result.
+   */
+  private rebuildSimulationNodeIndex(nodes: CanvasNode[], circuit: MNACircuit) {
+    this.simulationNodeIndex.rebuild(nodes, circuit.pinToMNANode);
+  }
+
+  private indexedSimulationNodes(): CanvasNode[] {
+    const nodesById = useCanvasStore.getState().nodesById;
+    return this.simulationNodeIndex.currentNodes(nodesById);
+  }
+
+  /**
+   * Build the smallest result contract needed by the active UI consumers.
+   * Exposed component pins are retained for visible feedback; internal MNA
+   * nodes are requested only by full diagnostics consumers. Branch and power
+   * values are similarly opt-in so a resistor-only canvas does not serialize
+   * every derived current and wattage on every presentation frame.
+   */
+  private buildResultSubscription(nodes: CanvasNode[], circuit: MNACircuit): WorkerResultSubscription {
+    const state = useSimulationStore.getState();
+    return buildResultSubscription({
+      nodes,
+      circuit,
+      showCurrentFlow: state.showCurrentFlow,
+      thermalHeatmapEnabled: state.thermalHeatmapEnabled,
+      resultDataConsumers: state.resultDataConsumers,
+      virtualMeter: this.getVirtualMeterConfiguration(),
+      diagnosticsEnabled: state.solverDiagnosticsOpen,
+    });
+  }
+
+  private sendResultSubscription(nodes = useCanvasStore.getState().nodes, circuit = this.mnaCircuit) {
+    if (!this.solverWorker || !circuit) return;
+    this.solverWorker.postMessage({
+      type: 'SET_RESULT_SUBSCRIPTION',
+      subscription: this.buildResultSubscription(nodes, circuit),
+    } as WorkerInMessage);
+  }
+
+  private scopeSampleIntervalSeconds(): number {
+    const timePerDivMs = useSimulationStore.getState().oscilloscopeTimePerDivMs;
+    return scopeSampleIntervalSeconds(
+      timePerDivMs,
+      SIMULATION_MODELS.scope.horizontalDivisions,
+      SIMULATION_MODELS.scope.targetSamplesPerScreen,
+    );
+  }
+
+  private sendScopeCaptureConfig() {
+    this.scopeCaptureRevision = nextScopeCaptureRevision(this.scopeCaptureRevision);
+    this.solverWorker?.postMessage({
+      type: 'SET_SCOPE_CONFIG',
+      sampleInterval_s: this.scopeSampleIntervalSeconds(),
+      revision: this.scopeCaptureRevision,
+    } as WorkerInMessage);
+  }
+
+  private watchResultDemand() {
+    this.resultDemandUnsubscribe?.();
+    this.resultDemandUnsubscribe = useSimulationStore.subscribe((state, previous) => {
+      if (!this.isRunning || !this.solverWorker || !this.mnaCircuit) return;
+
+      const meterChanged = state.meterMode !== previous.meterMode || state.meterProbes !== previous.meterProbes;
+      const resultDemandChanged =
+        state.showCurrentFlow !== previous.showCurrentFlow ||
+        state.thermalHeatmapEnabled !== previous.thermalHeatmapEnabled ||
+        state.resultDataConsumers !== previous.resultDataConsumers ||
+        state.solverDiagnosticsOpen !== previous.solverDiagnosticsOpen;
+      const scopeCaptureChanged = state.oscilloscopeTimePerDivMs !== previous.oscilloscopeTimePerDivMs;
+      if (!meterChanged && !resultDemandChanged && !scopeCaptureChanged) return;
+
+      if (meterChanged) {
+        this.refreshMnaElements(useCanvasStore.getState().nodes, useCanvasStore.getState().wires);
+      } else if (resultDemandChanged) {
+        this.sendResultSubscription();
+      }
+      if (scopeCaptureChanged) this.sendScopeCaptureConfig();
+      if (this.isPaused) this.requestSolverResult(true, true);
+    });
+  }
+
   private startMNASolver(nodes: CanvasNode[], wires: Wire[]) {
     try {
       const pinModes: Record<string, string> = {};
@@ -2648,7 +2912,9 @@ export class SimulationEngine {
       });
 
       // Build the circuit netlist
-      this.mnaCircuit = buildMNACircuit(nodes, wires, this.mcuPinVoltages, pinModes, boardPoweredMap);
+      const virtualMeter = this.getVirtualMeterConfiguration();
+      this.mnaCircuit = buildMNACircuit(nodes, wires, this.mcuPinVoltages, pinModes, boardPoweredMap, virtualMeter);
+      this.virtualMeterSignature = this.currentVirtualMeterSignature();
 
       const elementIds = new Set<string>();
       for (const element of this.mnaCircuit.elements) {
@@ -2663,100 +2929,163 @@ export class SimulationEngine {
         return;
       }
 
+      if (this.solverWorker || this.solverWorkerLifecycle.hasActiveWorker) {
+        throw new Error('Attempted to start an MNA worker before disposing the active generation');
+      }
+
       // Create WebWorker
-      this.solverWorker = new Worker(
+      const worker = new Worker(
         new URL('./SimulationWorker.ts', import.meta.url),
         { type: 'module' }
       );
+      const workerGeneration = this.solverWorkerLifecycle.start(elementIds);
+      this.solverWorker = worker;
+      this.clearSolverResultSchedule();
+      this.resultRequestOutstanding = false;
 
-      // Handle messages from the worker — throttle RESULT to ~15fps to avoid
-      // starving the main-thread event loop with Zustand dispatches + React
-      // reconciliation on every 16ms solver tick.
-      this.solverWorker.onmessage = (event: MessageEvent) => {
+      // The worker only emits a RESULT after receiving a presentation credit.
+      // This keeps cadence control at the producer boundary instead of
+      // allowing full payloads to queue behind a busy main thread.
+      worker.onmessage = (event: MessageEvent) => {
+        if (this.solverWorker !== worker || !this.solverWorkerLifecycle.accepts(workerGeneration)) return;
         const msg = event.data;
         if (msg.type === 'RESULT') {
-          this.pendingResult = msg as WorkerResultMessage;
-          const now = performance.now();
-          if (now - this.lastResultTime >= 66) {
-            // Enough time has passed — process immediately
-            this.lastResultTime = now;
-            this.handleSolverResult(this.pendingResult!, nodes);
-            this.pendingResult = null;
-          } else if (!this.resultRafId) {
-            // Schedule deferred processing on the next animation frame
-            this.resultRafId = requestAnimationFrame(() => {
-              this.resultRafId = null;
-              if (this.pendingResult) {
-                this.lastResultTime = performance.now();
-                this.handleSolverResult(this.pendingResult!, nodes);
-                this.pendingResult = null;
-              }
-            });
-          }
+          this.resultRequestOutstanding = false;
+          this.handleSolverResult(msg as WorkerResultMessage, nodes);
+          this.scheduleSolverResultRequest();
         } else if (msg.type === 'OSCILLOSCOPE') {
           this.handleOscilloscopeData(msg as WorkerOscilloscopeMessage);
         }
       };
 
-      this.solverWorker.onerror = (err) => {
+      worker.onerror = (err) => {
+        if (this.solverWorker !== worker || !this.solverWorkerLifecycle.accepts(workerGeneration)) return;
         console.warn('[VoltForge MNA] Solver worker error:', err.message);
       };
 
       // Initialize the worker with circuit data
+      this.scopeCaptureRevision = nextScopeCaptureRevision(this.scopeCaptureRevision);
       const initMsg: WorkerInMessage = {
         type: 'INIT',
         numNodes: this.mnaCircuit.numNodes,
         elements: this.mnaCircuit.elements,
-        dt: 0.001, // 1ms time step
+        dt: SIMULATION_MODELS.clock.defaultTimeStep_s,
+        fidelityMode: useSimulationStore.getState().fidelityMode,
+        resultSubscription: this.buildResultSubscription(nodes, this.mnaCircuit),
         scopeChannels: this.mnaCircuit.scopeChannels,
+        scopeSampleInterval_s: this.scopeSampleIntervalSeconds(),
+        scopeCaptureRevision: this.scopeCaptureRevision,
       };
+      this.rebuildSimulationNodeIndex(nodes, this.mnaCircuit);
       this.solverWorker.postMessage(initMsg);
+      this.watchResultDemand();
 
       // Start the solver loop
       const startMsg: WorkerInMessage = { type: 'START' };
       this.solverWorker.postMessage(startMsg);
+      this.requestSolverResult(true);
 
     } catch (err: any) {
+      this.disposeSolverWorker();
+      this.mnaCircuit = null;
       console.warn('[VoltForge MNA] Failed to start solver:', err.message);
     }
   }
 
   /**
+   * Cancel a delayed presentation credit without touching an already-issued
+   * credit that the worker may still be fulfilling.
+   */
+  private clearSolverResultSchedule() {
+    if (this.resultRequestTimerId !== null) {
+      window.clearTimeout(this.resultRequestTimerId);
+      this.resultRequestTimerId = null;
+    }
+  }
+
+  /** Issue one producer-side result credit to the worker. */
+  private requestSolverResult(immediate = false, allowPaused = false) {
+    if (!this.solverWorker || !this.isRunning || (!allowPaused && this.isPaused)) return;
+    if (this.resultRequestOutstanding) return;
+
+    this.clearSolverResultSchedule();
+    const sendRequest = () => {
+      this.resultRequestTimerId = null;
+      if (!this.solverWorker || !this.isRunning || (!allowPaused && this.isPaused)) return;
+      if (this.resultRequestOutstanding) return;
+      this.resultRequestOutstanding = true;
+      const request: WorkerRequestResultMessage = { type: 'REQUEST_RESULT' };
+      this.solverWorker.postMessage(request);
+    };
+
+    if (immediate) {
+      sendRequest();
+    } else {
+      this.resultRequestTimerId = window.setTimeout(sendRequest, SIMULATION_MODELS.clock.presentationPeriod_ms);
+    }
+  }
+
+  /** Schedule the next result only after the current result was consumed. */
+  private scheduleSolverResultRequest() {
+    this.clearSolverResultSchedule();
+    if (!this.isPaused) this.requestSolverResult();
+  }
+
+  /**
    * Stop and dispose the solver WebWorker.
    */
-  private stopMNASolver() {
-    if (this.storeUnsubscribe) {
+  private disposeSolverWorker() {
+    const worker = this.solverWorker;
+    this.solverWorker = null;
+    this.solverWorkerLifecycle.stop();
+    if (!worker) return;
+    try {
+      const stopMsg: WorkerInMessage = { type: 'STOP' };
+      worker.postMessage(stopMsg);
+    } catch {
+      // A worker that already failed or closed can reject postMessage; it
+      // still must be terminated and its generation must remain inactive.
+    } finally {
+      worker.terminate();
+    }
+  }
+
+  private stopMNASolver(preserveCanvasSubscription = false) {
+    if (!preserveCanvasSubscription && this.storeUnsubscribe) {
       this.storeUnsubscribe();
       this.storeUnsubscribe = null;
     }
-    if (this.solverWorker) {
-      const stopMsg: WorkerInMessage = { type: 'STOP' };
-      this.solverWorker.postMessage(stopMsg);
-      this.solverWorker.terminate();
-      this.solverWorker = null;
+    if (this.resultDemandUnsubscribe) {
+      this.resultDemandUnsubscribe();
+      this.resultDemandUnsubscribe = null;
     }
+    this.disposeSolverWorker();
     this.mnaCircuit = null;
+    this.simulationNodeIndex.clear();
     this.mcuPinVoltages = {};
-    this.pendingResult = null;
-    if (this.resultRafId) {
-      cancelAnimationFrame(this.resultRafId);
-      this.resultRafId = null;
-    }
+    this.digitalIcOutputVoltages.clear();
+    this.digitalIcPrimeRequests.clear();
+    this.virtualMeterSignature = '';
+    this.scopeCaptureRevision = nextScopeCaptureRevision(this.scopeCaptureRevision);
+    this.clearSolverResultSchedule();
+    this.resultRequestOutstanding = false;
 
     // Clear solver state in store
     useSimulationStore.getState().setCircuitState({}, {}, {}, {}, true);
+    useSimulationStore.getState().resetSimulationTime();
     useSimulationStore.getState().clearOscilloscopeData();
     useSimulationStore.getState().setLiveMeter({
       voltage: 0,
       acVoltage: 0,
       current_mA: 0,
       resistance_ohm: Number.POSITIVE_INFINITY,
+      resistanceUnsafe: false,
       positiveLabel: 'Probe (+)',
       negativeLabel: 'Probe (-)',
     });
   }
 
-  /** Rebuild model values without discarding the running worker or topology. */
+  /** Refresh model parameters while retaining the compiled MNA topology. */
   private refreshMnaElements(nodes: CanvasNode[], wires: Wire[]) {
     if (!this.solverWorker || !this.mnaCircuit) return;
 
@@ -2773,20 +3102,55 @@ export class SimulationEngine {
         }
       });
 
-      const refreshed = buildMNACircuit(nodes, wires, this.mcuPinVoltages, pinModes, boardPoweredMap);
-      if (refreshed.numNodes !== this.mnaCircuit.numNodes) {
-        this.stopMNASolver();
+      const virtualMeter = this.getVirtualMeterConfiguration();
+      const reusableTopology = reusableMnaTopologyForVirtualMeter(
+        this.virtualMeterSignature,
+        virtualMeter,
+        this.mnaCircuit.topology,
+      );
+      const refreshed = buildMNACircuit(
+        nodes,
+        wires,
+        this.mcuPinVoltages,
+        pinModes,
+        boardPoweredMap,
+        virtualMeter,
+        reusableTopology,
+      );
+      const refreshPlan = planIncrementalMnaRefresh(this.mnaCircuit, refreshed);
+      if (refreshPlan.kind === 'rebuild-topology') {
+        this.stopMNASolver(true);
         this.startMNASolver(nodes, wires);
         return;
       }
 
-      this.mnaCircuit = refreshed;
-      this.solverWorker.postMessage({
-        type: 'UPDATE_ELEMENTS',
-        numNodes: refreshed.numNodes,
+      const previousCircuit = this.mnaCircuit;
+
+      // Retain the original topology object and maps. Only the mutable model
+      // values and instrument channels are replaced on the main-thread cache.
+      this.mnaCircuit = {
+        ...previousCircuit,
         elements: refreshed.elements,
         scopeChannels: refreshed.scopeChannels,
-      } as WorkerInMessage);
+      };
+      this.rebuildSimulationNodeIndex(nodes, this.mnaCircuit);
+      this.virtualMeterSignature = this.currentVirtualMeterSignature();
+
+      if (refreshPlan.elementUpdates.length > 0) {
+        this.solverWorker.postMessage({
+          type: 'UPDATE_ELEMENT_VALUES',
+          updates: refreshPlan.elementUpdates,
+        } as WorkerInMessage);
+      }
+      if (refreshPlan.scopeChannelsChanged) {
+        useSimulationStore.getState().clearOscilloscopeData();
+        this.solverWorker.postMessage({
+          type: 'SET_SCOPE_CHANNELS',
+          scopeChannels: refreshed.scopeChannels,
+        } as WorkerInMessage);
+        this.sendScopeCaptureConfig();
+      }
+      this.sendResultSubscription(nodes, this.mnaCircuit);
     } catch (error) {
       console.warn('[VoltForge MNA] Failed to refresh live component values:', error);
     }
@@ -2795,7 +3159,27 @@ export class SimulationEngine {
   /** Pause all simulation-time work while retaining the solved circuit state. */
   public pause() {
     if (!this.isRunning || this.isPaused) return;
+    this.clearSolverResultSchedule();
+    // Request the solver's latest cached state before pausing. The worker can
+    // publish it without advancing physical time, so Pause never leaves the
+    // UI showing an older presentation than the state actually reached.
+    this.requestSolverResult(true, true);
     this.isPaused = true;
+    if (this.avrCpu) {
+      this.avrBudgetScheduler?.suspend(performance.now());
+      useSimulationStore.getState().setAvrWorkload({
+        averageSliceMs: 0,
+        maximumSliceMs: 0,
+        maximumDeadlineOvershootMs: 0,
+        mainThreadUtilizationPercent: 0,
+        instructionsPerSecond: 0,
+        emulatedClockHz: 0,
+        pendingCycleLagMs: 0,
+        budgetLimited: false,
+        hardLimitReached: false,
+        backgroundStallCount: 0,
+      });
+    }
     AudioEngine.stopTone();
     this.solverWorker?.postMessage({ type: 'PAUSE' } as WorkerInMessage);
     this.emitDebugSnapshot(true);
@@ -2805,13 +3189,17 @@ export class SimulationEngine {
   public resume() {
     if (!this.isRunning || !this.isPaused) return;
     this.isPaused = false;
+    this.avrBudgetScheduler?.resume(performance.now());
     this.solverWorker?.postMessage({ type: 'RESUME' } as WorkerInMessage);
+    this.requestSolverResult(true);
     this.emitDebugSnapshot(false);
   }
 
   /** Advance exactly one MNA transient step while paused. */
   public step() {
-    if (!this.isRunning || !this.isPaused) return;
+    if (!this.isRunning || !this.isPaused || !this.solverWorker) return;
+    this.clearSolverResultSchedule();
+    this.resultRequestOutstanding = true;
     this.solverWorker?.postMessage({ type: 'STEP' } as WorkerInMessage);
   }
 
@@ -2886,6 +3274,123 @@ export class SimulationEngine {
    * Handle solver results from the WebWorker.
    * Maps MNA element IDs back to canvas components and dispatches visual updates.
    */
+  private updatePowerGatedDigitalIc(
+    node: CanvasNode,
+    result: MaterializedSolverResult,
+    pinToMNANode: Map<string, number>,
+  ) {
+    const family = digitalIcFamily(node.type);
+    if (!family) return;
+
+    const vccNode = pinToMNANode.get(`${node.id}:vcc`);
+    const gndNode = pinToMNANode.get(`${node.id}:gnd`);
+    const supplyVoltage = vccNode === undefined || gndNode === undefined
+      ? 0
+      : Math.max(0, (result.nodeVoltages[vccNode] ?? 0) - (result.nodeVoltages[gndNode] ?? 0));
+    const powered = supplyVoltage >= SIMULATION_MODELS.digitalIc.minimumSupplyVoltage;
+    const roundedSupplyVoltage = Math.round(supplyVoltage * 1000) / 1000;
+
+    if (powered && node.properties?.powered !== true) {
+      // The firmware may have driven its pins before the first solver result.
+      // Re-evaluate the actual electrical input levels after this batched
+      // update commits so a setup()-only circuit is not left inert.
+      this.digitalIcPrimeRequests.add(node.id);
+    }
+
+    if (!powered && node.properties?.powered !== false) {
+      // Clear the state stored inside the logic handlers as well as the canvas
+      // properties, so a later supply recovery starts from a clean model.
+      this.callbacks.onPinStateChange(node.id, '__power_reset__', 'LOW');
+    }
+
+    const nextProperties = {
+      ...node.properties,
+      powered,
+      digitalIcSupplyVoltage: roundedSupplyVoltage,
+      ...(powered ? {} : resetDigitalIcProperties(node.type)),
+    };
+    const changed = Object.entries(nextProperties).some(([key, value]) => node.properties?.[key] !== value);
+    if (changed) {
+      useCanvasStore.getState().updateNode(node.id, { properties: nextProperties });
+    }
+
+    const currentNode = useCanvasStore.getState().nodesById.get(node.id) || node;
+    this.updatePowerGatedDigitalIcOutputs(
+      currentNode,
+      currentNode.properties || {},
+      powered,
+      supplyVoltage,
+    );
+  }
+
+  private updatePowerGatedDigitalIcOutputs(
+    node: CanvasNode,
+    properties: Record<string, unknown>,
+    powered: boolean,
+    supplyVoltage: number,
+  ) {
+    const family = digitalIcFamily(node.type);
+    if (!family) return;
+
+    const logicVoltage = powered ? Math.max(0, supplyVoltage) : 0;
+    for (const [pinId, propertyKey] of DIGITAL_IC_OUTPUTS[family]) {
+      const elementId = family === '165'
+        ? `vs_165_${node.id}_${pinId}`
+        : family === '138'
+          ? `vs_138_${node.id}_${pinId}`
+          : family === '151'
+            ? `vs_151_${node.id}_${pinId}`
+            : `vs_4017_${node.id}_${pinId}`;
+      const voltage = powered && properties[propertyKey] === true ? logicVoltage : 0;
+      const previousVoltage = this.digitalIcOutputVoltages.get(elementId);
+      if (previousVoltage !== undefined && Math.abs(previousVoltage - voltage) < 0.001) continue;
+
+      this.digitalIcOutputVoltages.set(elementId, voltage);
+      this.solverWorker?.postMessage({
+        type: 'UPDATE_PIN',
+        elementId,
+        voltage,
+      });
+    }
+  }
+
+  private primePowerGatedDigitalIcInputs(result: MaterializedSolverResult, pinToMNANode: Map<string, number>) {
+    const componentIds = [...this.digitalIcPrimeRequests];
+    this.digitalIcPrimeRequests.clear();
+
+    for (const componentId of componentIds) {
+      const node = useCanvasStore.getState().nodes.find((item) => item.id === componentId);
+      const family = node ? digitalIcFamily(node.type) : null;
+      if (!node || !family || node.properties?.powered !== true) continue;
+
+      const vccNode = pinToMNANode.get(`${node.id}:vcc`);
+      const gndNode = pinToMNANode.get(`${node.id}:gnd`);
+      if (vccNode === undefined || gndNode === undefined) continue;
+
+      const supplyVoltage = Math.max(0, (result.nodeVoltages[vccNode] ?? 0) - (result.nodeVoltages[gndNode] ?? 0));
+      const gndVoltage = result.nodeVoltages[gndNode] ?? 0;
+      const threshold = Math.max(1.8, supplyVoltage * 0.6);
+      const dispatchInput = (pinId: string) => {
+        const inputNode = pinToMNANode.get(`${node.id}:${pinId}`);
+        const voltage = inputNode === undefined ? 0 : (result.nodeVoltages[inputNode] ?? 0) - gndVoltage;
+        this.callbacks.onPinStateChange(node.id, pinId, voltage >= threshold ? 'HIGH' : 'LOW');
+      };
+
+      if (family === '165') {
+        ['d0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'ser', 'ce', 'pl'].forEach(dispatchInput);
+        // A clock that is already high when power appears is not a rising edge.
+        this.callbacks.onPinStateChange(node.id, 'clk', 'LOW');
+      } else if (family === '138') {
+        ['a0', 'a1', 'a2', 'e1_bar', 'e2_bar', 'e3'].forEach(dispatchInput);
+      } else if (family === '151') {
+        ['d0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'a', 'b', 'c', 'e_bar'].forEach(dispatchInput);
+      } else {
+        ['clk_inh', 'reset'].forEach(dispatchInput);
+        this.callbacks.onPinStateChange(node.id, 'clk', 'LOW');
+      }
+    }
+  }
+
   /**
    * Helper to check if a component is powered (voltage difference > 3V).
    */
@@ -2893,8 +3398,7 @@ export class SimulationEngine {
     if (!this.mnaCircuit) return true;
     const pinToMNANode = this.mnaCircuit.pinToMNANode;
 
-    const nodes = useCanvasStore.getState().nodes;
-    const node = nodes.find(n => n.id === nodeId);
+    const node = useCanvasStore.getState().nodesById.get(nodeId);
     if (!node) return true;
 
     // Find power and ground pins by labels
@@ -2913,7 +3417,7 @@ export class SimulationEngine {
   }
 
   private solvedWireCurrents(
-    result: WorkerResultMessage,
+    result: MaterializedSolverResult,
     nodes: CanvasNode[],
     wires: Wire[],
     circuit: MNACircuit,
@@ -2973,13 +3477,52 @@ export class SimulationEngine {
     return wireCurrents;
   }
 
-  private handleSolverResult(result: WorkerResultMessage, _nodes: CanvasNode[]) {
+  private materializeSolverResult(wireResult: WorkerResultMessage): MaterializedSolverResult {
+    const { nodeVoltages, branchCurrents, componentPower } = materializeResultBuffers(
+      wireResult,
+      this.mnaCircuit?.numNodes ?? 0,
+    );
+
+    const {
+      nodeIndices: _nodeIndices,
+      nodeVoltages: _wireNodeVoltages,
+      branchCurrentElementIds: _branchCurrentElementIds,
+      branchCurrents: _wireBranchCurrents,
+      powerElementIds: _powerElementIds,
+      componentPower: _wireComponentPower,
+      ...metadata
+    } = wireResult;
+
+    return {
+      ...metadata,
+      nodeVoltages,
+      branchCurrents,
+      componentPower,
+    };
+  }
+
+  private handleSolverResult(wireResult: WorkerResultMessage, _nodes: CanvasNode[]) {
     if (!this.mnaCircuit) return;
     const circuit = this.mnaCircuit;
 
+    if (this.currentVirtualMeterSignature() !== this.virtualMeterSignature) {
+      this.refreshMnaElements(useCanvasStore.getState().nodes, useCanvasStore.getState().wires);
+      return;
+    }
+
+    const result = this.materializeSolverResult(wireResult);
+
+    // Diagnostics are sampled in the worker and arrive only when the editor
+    // has an active diagnostics consumer. Keep this update outside the normal
+    // result maps so instrumentation never expands the hot-path store work.
+    if (wireResult.diagnostics) {
+      useSimulationStore.getState().setSolverDiagnostics(wireResult.diagnostics);
+    }
+
     this.runBatched(() => {
-      const { elementToComponent, pinToMNANode } = circuit;
-    const nodes = useCanvasStore.getState().nodes;
+      const { elementToComponent } = circuit;
+      const pinToMNANode = this.simulationNodeIndex.pinNodes;
+    const nodes = this.indexedSimulationNodes();
 
     // Build component-level voltage and current maps
     const componentCurrents: Record<string, number> = {};
@@ -3015,40 +3558,61 @@ export class SimulationEngine {
     (globalThis as any).__voltforgePinVoltages = pinVoltages;
 
     // Update store with solver state
-    const wireCurrents = this.solvedWireCurrents(result, nodes, useCanvasStore.getState().wires, circuit);
+    const wireCurrents = useSimulationStore.getState().showCurrentFlow
+      ? this.solvedWireCurrents(result, nodes, useCanvasStore.getState().wires, circuit)
+      : {};
     useSimulationStore.getState().setCircuitState(
       nodeVoltageMap,
       wireCurrents,
       componentCurrents,
       componentPower,
-      result.converged
+      result.converged,
+      result.timestamp,
     );
 
-    // Feed the floating multimeter from the two canvas probe clips. Previously
-    // only an on-canvas MULTIMETER component was updated, leaving the panel at
-    // its zero-value placeholder forever.
-    const meterProbes = useSimulationStore.getState().meterProbes.slice(0, 2);
+    // Floating probe meter uses the same MNA elements as the on-canvas DMM:
+    // high impedance for voltage, a series shunt for current, and an internal
+    // 1 V / 1 kΩ test path for resistance.
+    const meterState = useSimulationStore.getState();
+    const meterProbes = meterState.meterProbes.slice(0, 2);
+    const nodesById = useCanvasStore.getState().nodesById;
     if (meterProbes.length > 0) {
-      const probeValues = meterProbes.map((probe) => {
-        const mnaNode = pinToMNANode.get(`${probe.nodeId}:${probe.pinId}`) ?? 0;
-        return result.nodeVoltages[mnaNode] ?? 0;
-      });
-      const voltage = Math.abs((probeValues[0] || 0) - (probeValues[1] || 0));
-      const attachedWireCurrents = useCanvasStore.getState().wires
-        .filter((wire) => meterProbes.some((probe) =>
-          (wire.fromNodeId === probe.nodeId && wire.fromPinId === probe.pinId) ||
-          (wire.toNodeId === probe.nodeId && wire.toPinId === probe.pinId)))
-        .map((wire) => Math.abs(wireCurrents[wire.id] || 0));
-      const currentA = attachedWireCurrents.length > 0 ? Math.max(...attachedWireCurrents) : 0;
+      const positiveNode = pinToMNANode.get(`${meterProbes[0].nodeId}:${meterProbes[0].pinId}`) ?? 0;
+      const negativeNode = meterProbes[1]
+        ? pinToMNANode.get(`${meterProbes[1].nodeId}:${meterProbes[1].pinId}`) ?? 0
+        : 0;
+      const voltage = (result.nodeVoltages[positiveNode] ?? 0) - (result.nodeVoltages[negativeNode] ?? 0);
+      const mode = meterState.meterMode;
+      const hasResistanceTest = circuit.elements.some((element) => element.id === 'r_vm_ohm_virtual');
+      const resistanceUnsafe = mode === 'RESISTANCE' && meterProbes.length === 2 && !hasResistanceTest;
+      const testCurrent = result.branchCurrents.r_vm_ohm_virtual ?? 0;
+      const rawResistance = hasResistanceTest && Math.abs(testCurrent) > 1e-12
+        ? Math.abs(voltage / testCurrent)
+        : Number.POSITIVE_INFINITY;
+      const resistance = rawResistance > SIMULATION_MODELS.meter.maximumResistance_ohm
+        ? Number.POSITIVE_INFINITY
+        : rawResistance;
+      const currentA = result.branchCurrents.mm_virtual ?? 0;
       useSimulationStore.getState().setLiveMeter({
         voltage,
-        acVoltage: voltage,
+        acVoltage: Math.abs(voltage),
         current_mA: currentA * 1000,
-        resistance_ohm: currentA > 1e-9 ? voltage / currentA : Number.POSITIVE_INFINITY,
-        positiveLabel: `${nodes.find((node) => node.id === meterProbes[0].nodeId)?.name || meterProbes[0].nodeId}:${meterProbes[0].pinId}`,
+        resistance_ohm: resistance,
+        resistanceUnsafe,
+        positiveLabel: `${nodesById.get(meterProbes[0].nodeId || '')?.name || meterProbes[0].nodeId}:${meterProbes[0].pinId}`,
         negativeLabel: meterProbes[1]
-          ? `${nodes.find((node) => node.id === meterProbes[1].nodeId)?.name || meterProbes[1].nodeId}:${meterProbes[1].pinId}`
+          ? `${nodesById.get(meterProbes[1].nodeId || '')?.name || meterProbes[1].nodeId}:${meterProbes[1].pinId}`
           : 'COM (0 V)',
+      });
+    } else {
+      useSimulationStore.getState().setLiveMeter({
+        voltage: 0,
+        acVoltage: 0,
+        current_mA: 0,
+        resistance_ohm: Number.POSITIVE_INFINITY,
+        resistanceUnsafe: false,
+        positiveLabel: 'Probe (+)',
+        negativeLabel: 'Probe (-)',
       });
     }
 
@@ -3165,14 +3729,47 @@ export class SimulationEngine {
 
     // Dispatch to specific components
     for (const node of nodes) {
-      // Multimeter: read voltage between probe nodes
+      if (digitalIcFamily(node.type)) {
+        this.updatePowerGatedDigitalIc(node, result, pinToMNANode);
+      }
+
+      // Multimeter: its electrical model is selected from the component mode.
       if (node.type === 'MULTIMETER') {
         const probeNode = pinToMNANode.get(`${node.id}:v_probe`) ?? 0;
         const comNode = pinToMNANode.get(`${node.id}:com`) ?? 0;
-        const probeV = result.nodeVoltages[probeNode] ?? 0;
-        const comV = result.nodeVoltages[comNode] ?? 0;
-        const voltage = Math.abs(probeV - comV);
-        LogicRegistry.dispatch('MULTIMETER', node.id, 'v_probe', voltage > 0.01 ? 'HIGH' : 'LOW', voltage);
+        const voltage = (result.nodeVoltages[probeNode] ?? 0) - (result.nodeVoltages[comNode] ?? 0);
+        const mode = meterMeasurementMode(node.properties?.mode);
+        const hasResistanceTest = circuit.elements.some((element) => element.id === `r_mm_ohm_${node.id}`);
+        const resistanceUnsafe = mode === 'RESISTANCE' && !hasResistanceTest;
+        const resistanceTestCurrent = result.branchCurrents[`r_mm_ohm_${node.id}`] ?? 0;
+        const rawResistance = hasResistanceTest && Math.abs(resistanceTestCurrent) > 1e-12
+          ? Math.abs(voltage / resistanceTestCurrent)
+          : Number.POSITIVE_INFINITY;
+        const resistance = rawResistance > SIMULATION_MODELS.meter.maximumResistance_ohm
+          ? Number.POSITIVE_INFINITY
+          : rawResistance;
+        const current = result.branchCurrents[`mm_${node.id}`] ?? 0;
+        const measuredValue = mode === 'CURRENT' ? current : mode === 'RESISTANCE' ? resistance : voltage;
+        const displayValue = meterDisplayValue(mode, measuredValue, resistanceUnsafe);
+
+        if (
+          node.properties?.measuredVoltage !== voltage ||
+          node.properties?.measuredCurrent !== current ||
+          node.properties?.measuredResistance !== resistance ||
+          node.properties?.resistanceUnsafe !== resistanceUnsafe ||
+          node.properties?.displayValue !== displayValue
+        ) {
+          useCanvasStore.getState().updateNode(node.id, {
+            properties: {
+              ...node.properties,
+              measuredVoltage: voltage,
+              measuredCurrent: current,
+              measuredResistance: resistance,
+              resistanceUnsafe,
+              displayValue,
+            },
+          });
+        }
       }
 
       // Ammeter: read branch current
@@ -3211,12 +3808,12 @@ export class SimulationEngine {
       }
 
       // LED: check if enough current flows (> 1mA) to light up
-      if (node.type.includes('LED') && !node.type.includes('NEOPIXEL') && node.type !== 'LED_RGB') {
+      if (node.type.includes('LED') && node.type !== 'LED_RGB') {
         const elemId = `led_diode_${node.id}`;
         const current = result.branchCurrents[elemId] ?? result.branchCurrents[`led_${node.id}`] ?? 0;
         const isLit = Math.abs(current) > 0.001; // > 1mA
 
-        const maxCurrent = Number(node.properties?.maxCurrent) || 20;
+        const maxCurrent = ledMaximumCurrent_mA(node.properties || {});
         const currentMa = Math.abs(current) * 1000;
         if (currentMa > maxCurrent * 2) {
           useCanvasStore.getState().updateNode(node.id, {
@@ -3248,9 +3845,22 @@ export class SimulationEngine {
 
       // DC Motor: check current to spin
       if (node.type === 'MOTOR_DC') {
-        const current = result.branchCurrents[`mot_${node.id}`] ?? 0;
-        const m1Node = pinToMNANode.get(`${node.id}:m1`) ?? 0;
-        const m2Node = pinToMNANode.get(`${node.id}:m2`) ?? 0;
+        const motorPins = node.pins || [];
+        const positivePin = motorPins.find((pin) =>
+          /^(m1|positive|pos|plus|vcc|power)$/i.test(pin.id)
+          || /m\s*\+|positive|pos|plus|vcc|power/i.test(`${pin.id} ${pin.name}`));
+        const negativePin = motorPins.find((pin) =>
+          /^(m2|negative|neg|minus|gnd|ground)$/i.test(pin.id)
+          || /m\s*[-−]|negative|neg|minus|gnd|ground/i.test(`${pin.id} ${pin.name}`));
+        const terminalPinA = positivePin && negativePin
+          ? positivePin
+          : motorPins[0];
+        const terminalPinB = positivePin && negativePin
+          ? negativePin
+          : motorPins.find((pin) => pin.id !== terminalPinA?.id) || motorPins[1];
+        const current = result.branchCurrents[`mot_${node.id}`] ?? componentCurrents[node.id] ?? 0;
+        const m1Node = pinToMNANode.get(`${node.id}:${terminalPinA?.id || 'm1'}`) ?? 0;
+        const m2Node = pinToMNANode.get(`${node.id}:${terminalPinB?.id || 'm2'}`) ?? 0;
         const appliedVoltage = (result.nodeVoltages[m1Node] ?? 0) - (result.nodeVoltages[m2Node] ?? 0);
         const currentMa = Math.abs(current) * 1000;
         const isSpinning = Math.abs(appliedVoltage) >= 0.5 && currentMa >= 1;
@@ -3313,6 +3923,45 @@ export class SimulationEngine {
         }
       }
 
+      if (node.type === 'DISPLAY_LCD_I2C' || node.type === 'LCD_16X2' || node.type === 'DISPLAY_OLED' || node.type === 'OLED_DISPLAY') {
+        const vccPin = node.pins?.find((pin) => /\b(vcc|vdd|5v|3v3)\b/i.test(`${pin.id} ${pin.name}`));
+        const gndPin = node.pins?.find((pin) => /\b(gnd|vss)\b/i.test(`${pin.id} ${pin.name}`));
+        const vccNode = vccPin ? pinToMNANode.get(`${node.id}:${vccPin.id}`) : undefined;
+        const gndNode = gndPin ? pinToMNANode.get(`${node.id}:${gndPin.id}`) : undefined;
+        const supplyVoltage = vccNode === undefined || gndNode === undefined
+          ? 0
+          : Math.max(0, (result.nodeVoltages[vccNode] ?? 0) - (result.nodeVoltages[gndNode] ?? 0));
+        const isOled = node.type === 'DISPLAY_OLED' || node.type === 'OLED_DISPLAY';
+        const minimumSupplyVoltage = isOled
+          ? SIMULATION_MODELS.display.oledMinimumSupplyVoltage
+          : SIMULATION_MODELS.display.lcdMinimumSupplyVoltage;
+        const powered = supplyVoltage >= minimumSupplyVoltage;
+        const lcdState = (globalThis as any).__voltforgeLcdState?.[node.id];
+        const lcdLine1 = powered ? lcdState?.line1 || node.properties?.lcdLine1 || '' : '';
+        const lcdLine2 = powered ? lcdState?.line2 || node.properties?.lcdLine2 || '' : '';
+        const lcdBacklight = powered && (lcdState?.backlight ?? node.properties?.lcdBacklight !== false);
+        const roundedSupplyVoltage = Math.round(supplyVoltage * 1000) / 1000;
+
+        if (
+          node.properties?.powered !== powered ||
+          node.properties?.displaySupplyVoltage !== roundedSupplyVoltage ||
+          node.properties?.lcdLine1 !== lcdLine1 ||
+          node.properties?.lcdLine2 !== lcdLine2 ||
+          node.properties?.lcdBacklight !== lcdBacklight
+        ) {
+          useCanvasStore.getState().updateNode(node.id, {
+            properties: {
+              ...node.properties,
+              powered,
+              displaySupplyVoltage: roundedSupplyVoltage,
+              lcdLine1,
+              lcdLine2,
+              lcdBacklight,
+            },
+          });
+        }
+      }
+
       if (node.type === 'SENSOR_PIR' || node.type === 'PIR_SENSOR') {
         const vccNode = pinToMNANode.get(`${node.id}:vcc`) ?? 0;
         const gndNode = pinToMNANode.get(`${node.id}:gnd`) ?? 0;
@@ -3343,40 +3992,34 @@ export class SimulationEngine {
         }
       }
 
-      if (node.type === 'MOTOR_SERVO' || node.type === 'SERVO_MOTOR' || node.type === 'LED_NEOPIXEL') {
+      if (node.type === 'MOTOR_SERVO' || node.type === 'SERVO_MOTOR') {
         const vccNode = pinToMNANode.get(`${node.id}:vcc`) ?? 0;
         const gndNode = pinToMNANode.get(`${node.id}:gnd`) ?? 0;
         const supplyVoltage = (result.nodeVoltages[vccNode] ?? 0) - (result.nodeVoltages[gndNode] ?? 0);
-        const powered = node.type === 'LED_NEOPIXEL'
-          ? supplyVoltage >= 2.5
-          : supplyVoltage >= 3.5;
+        const powered = supplyVoltage >= 3.5;
         if (node.properties?.powered !== powered) {
           useCanvasStore.getState().updateNode(node.id, {
             properties: {
               ...node.properties,
               powered,
-              ...(powered ? {} : node.type === 'LED_NEOPIXEL' ? { isLit: false } : { isSpinning: false }),
+              ...(powered ? {} : { isSpinning: false }),
             },
           });
         }
       }
 
-      // Communication & powered modules: check power and set powered flag
-      if (node.type === 'BLUETOOTH_MODULE' || node.type === 'WIFI_MODULE' ||
-          node.type === 'IR_RECEIVER' || node.type === 'ESC_MODULE' ||
-          node.type === 'RC_RECEIVER') {
+      // ESC module: use its solved VCC/GND differential to gate every phase
+      // source and the connected BLDC state.
+      if (node.type === 'ESC_MODULE') {
         const vccPin = node.pins?.find(p => /vcc|3v3/i.test(p.id));
         const gndPin = node.pins?.find(p => /gnd/i.test(p.id));
         if (vccPin && gndPin) {
           const vccNode = pinToMNANode.get(`${node.id}:${vccPin.id}`) ?? 0;
           const gndNode = pinToMNANode.get(`${node.id}:${gndPin.id}`) ?? 0;
           const supplyVoltage = (result.nodeVoltages[vccNode] ?? 0) - (result.nodeVoltages[gndNode] ?? 0);
-          const powered = supplyVoltage >= 2.5;
-          if (node.properties?.powered !== powered) {
-            useCanvasStore.getState().updateNode(node.id, {
-              properties: { ...node.properties, powered },
-            });
-          }
+          this.updateEscDrive(node, supplyVoltage);
+        } else {
+          this.updateEscDrive(node, 0);
         }
       }
 
@@ -3452,13 +4095,23 @@ export class SimulationEngine {
 
       // ULN2003 stepper module: validate the standard half-step sequence.
       if (node.type === 'MOTOR_STEPPER') {
-        const gndNode = pinToMNANode.get(`${node.id}:gnd`) ?? 0;
-        const vccNode = pinToMNANode.get(`${node.id}:vcc`) ?? 0;
+        const findStepperPin = (labels: string[]) => node.pins?.find((pin) => {
+          const label = `${pin.id} ${pin.name}`.toLowerCase();
+          return labels.some((candidate) =>
+            label.split(/[^a-z0-9]+/i).includes(candidate) ||
+            pin.id.toLowerCase() === candidate,
+          );
+        });
+        const gndPin = findStepperPin(['gnd', 'ground', 'negative', 'neg', '0v']);
+        const vccPin = findStepperPin(['vcc', 'vdd', 'power', 'positive', 'pos', '5v']);
+        const gndNode = gndPin ? pinToMNANode.get(`${node.id}:${gndPin.id}`) ?? 0 : 0;
+        const vccNode = vccPin ? pinToMNANode.get(`${node.id}:${vccPin.id}`) ?? 0 : 0;
         const gndVoltage = result.nodeVoltages[gndNode] ?? 0;
         const supplyVoltage = (result.nodeVoltages[vccNode] ?? 0) - gndVoltage;
         const powered = supplyVoltage >= 3.5;
         const phases = [1, 2, 3, 4].map((ch) => {
-          const inputNode = pinToMNANode.get(`${node.id}:in${ch}`) ?? 0;
+          const phasePin = findStepperPin([`in${ch}`, `phase${ch}`]);
+          const inputNode = phasePin ? pinToMNANode.get(`${node.id}:${phasePin.id}`) ?? 0 : 0;
           return powered && ((result.nodeVoltages[inputNode] ?? 0) - gndVoltage) >= 2;
         });
         const pattern = phases.map((active) => active ? '1' : '0').join('');
@@ -3479,22 +4132,32 @@ export class SimulationEngine {
           voltage: powered && activePhaseCount > 0 ? 50 / activePhaseCount : 1e8,
         });
 
-        if (pattern !== previousPattern || stepDelta !== 0) {
-          const currentSteps = Number(node.properties?.stepperSteps) || 0;
-          const stepsPerRev = parseInt(String(node.properties?.stepsPerRev || '2048'), 10) || 2048;
-          const newSteps = currentSteps + stepDelta;
-          const rotation = ((newSteps % stepsPerRev) / stepsPerRev) * 360;
-          const phaseProperties = Object.fromEntries(phases.map((active, index) => [`phase${index + 1}Active`, active]));
+        const currentSteps = Number(node.properties?.stepperSteps) || 0;
+        const stepsPerRev = Math.max(1, Number(
+          node.properties?.stepsPerRev ?? node.properties?.stepsPerRevolution ?? 2048,
+        ) || 2048);
+        const newSteps = currentSteps + stepDelta;
+        const rotation = ((newSteps % stepsPerRev) + stepsPerRev) % stepsPerRev / stepsPerRev * 360;
+        const phaseProperties = Object.fromEntries(phases.map((active, index) => [`phase${index + 1}Active`, active]));
+        const energized = powered && activePhaseCount > 0;
+        const nextProperties = {
+          ...node.properties,
+          ...phaseProperties,
+          stepperPattern: pattern,
+          stepperSteps: newSteps,
+          stepperRotation: rotation,
+          // Keep the visual actuator state on while a valid coil is energized;
+          // the rotation position changes only for a valid adjacent sequence.
+          isSpinning: energized,
+          powered,
+        };
+        const changed = pattern !== previousPattern
+          || node.properties?.powered !== powered
+          || node.properties?.isSpinning !== energized
+          || node.properties?.stepperRotation !== rotation;
+        if (changed) {
           useCanvasStore.getState().updateNode(node.id, {
-            properties: {
-              ...node.properties,
-              ...phaseProperties,
-              stepperPattern: pattern,
-              stepperSteps: newSteps,
-              stepperRotation: rotation,
-              isSpinning: stepDelta !== 0,
-              powered,
-            },
+            properties: nextProperties,
           });
         }
       }
@@ -3741,26 +4404,80 @@ export class SimulationEngine {
       }
     });
 
+    // Generic component feedback. The netlist builder gives unsupported
+    // components a safe resistor load; expose the resulting voltage/current
+    // so custom parts still visibly respond while the simulation runs.
+    for (const node of nodes) {
+      if (!circuit.genericComponentIds.has(node.id)) continue;
+
+      const pins = node.pins || [];
+      const powerPin = pins.find((pin) =>
+        pin.type === 'power' || /(?:^|[\s_:+-])(vcc|vdd|vin|vbat|3v3|5v|12v|power|positive|pos|plus)(?:$|[\s_:+-])/i.test(`${pin.id} ${pin.name || ''}`));
+      const groundPin = pins.find((pin) =>
+        pin.type === 'ground' || /(?:^|[\s_:+-])(gnd|ground|vss|negative|neg|minus)(?:$|[\s_:+-])/i.test(`${pin.id} ${pin.name || ''}`));
+      const powerVoltage = powerPin && groundPin
+        ? Math.abs(
+          (result.nodeVoltages[pinToMNANode.get(`${node.id}:${powerPin.id}`) ?? 0] ?? 0)
+            - (result.nodeVoltages[pinToMNANode.get(`${node.id}:${groundPin.id}`) ?? 0] ?? 0),
+        )
+        : null;
+      const currentA = Math.abs(componentCurrents[node.id] || 0);
+      const ratedVoltage = Math.max(0.5, numericProperty(
+        node.properties?.ratedVoltage ?? node.properties?.voltage,
+        5,
+      ));
+      const powerThreshold = Math.max(0.25, Math.min(2.5, ratedVoltage * 0.5));
+      const powered = powerVoltage !== null
+        ? powerVoltage >= powerThreshold
+        : currentA > 1e-6;
+      const lightSource = /LED|LAMP|BULB/i.test(`${node.type} ${node.name || ''}`);
+      const motorLike = /MOTOR|FAN|PUMP/i.test(`${node.type} ${node.name || ''}`);
+      const isBlown = Boolean(node.properties?.isBlown);
+      const updates: Record<string, unknown> = {
+        powered,
+        isPowered: powered,
+        isActive: powered,
+        currentMa: currentA * 1000,
+      };
+
+      if (powerVoltage !== null) updates.supplyVoltage = powerVoltage;
+      if (lightSource) {
+        updates.isLit = !isBlown && currentA * 1000 >= SIMULATION_MODELS.led.lightThreshold_mA;
+      }
+      if (motorLike) {
+        const isSpinning = powered && currentA >= 0.001;
+        updates.isSpinning = isSpinning;
+        updates.rpm = isSpinning ? Math.round(Math.min(3000, Math.max(300, currentA * 1000 * 120))) : 0;
+      }
+
+      const currentProperties = useCanvasStore.getState().nodesById.get(node.id)?.properties || node.properties || {};
+      const changed = Object.entries(updates).some(([key, value]) => currentProperties[key] !== value);
+      if (changed) {
+        useCanvasStore.getState().updateNode(node.id, {
+          properties: {
+            ...currentProperties,
+            ...updates,
+          },
+        });
+      }
+    }
+
       this.pushLcdToCanvas(nodes);
     });
+
+    this.primePowerGatedDigitalIcInputs(result, circuit.pinToMNANode);
   }
 
   /**
    * Handle oscilloscope data from the WebWorker.
    */
   private handleOscilloscopeData(msg: WorkerOscilloscopeMessage) {
-    const store = useSimulationStore.getState();
-    const frames = msg.frames?.length
-      ? msg.frames
-      : [{ timestamp: msg.timestamp, samples: msg.samples }];
-    for (const frame of frames) {
-      for (const [channel, voltage] of Object.entries(frame.samples)) {
-        store.appendOscilloscopeData(channel, voltage);
-      }
-      store.appendLogicCapture({
-        timestamp_s: frame.timestamp,
-        channels: frame.samples,
-      });
-    }
+    if (!isCurrentScopeCaptureRevision(msg.captureRevision, this.scopeCaptureRevision)) return;
+    useSimulationStore.getState().publishOscilloscopeBatch({
+      channelIds: msg.channelIds,
+      timestamps_s: msg.timestamps,
+      values: msg.values,
+      samplePeriodMs: msg.samplePeriodMs,
+    });
   }
 }

@@ -26,7 +26,7 @@ function generateFullCode(userCode: string, boardType?: string): string {
     if (seenTypes.has(type)) return;
     seenTypes.add(type);
 
-    if (type === 'LED_STANDARD' || type === 'LED_RGB' || type === 'LED_NEOPIXEL') {
+    if (type === 'LED_STANDARD' || type === 'LED_RGB') {
       pinDefs.push(`// LED: ${node.name}`);
     }
     if (type === 'SERVO_MOTOR' || type === 'MOTOR_SERVO') {
@@ -76,8 +76,6 @@ function generateFullCode(userCode: string, boardType?: string): string {
     ...(nodes.some(n => n.type.includes('LCD') || n.type.includes('OLED')) ? ['#include <Wire.h>'] : []),
     ...(nodes.some(n => n.type.includes('LCD_I2C') || n.type === 'DISPLAY_LCD_I2C') ? ['#include <LiquidCrystal_I2C.h>'] : []),
     ...(nodes.some(n => n.type.includes('OLED') || n.type === 'DISPLAY_OLED') ? ['#include <Adafruit_SSD1306.h>'] : []),
-    ...(nodes.some(n => n.type === 'SENSOR_DHT11' || n.type === 'SENSOR_DHT22' || n.type === 'TEMP_SENSOR') ? ['#include <DHT.h>'] : []),
-    ...(nodes.some(n => n.type === 'LED_NEOPIXEL') ? ['#include <Adafruit_NeoPixel.h>'] : []),
   ];
 
   const header = [

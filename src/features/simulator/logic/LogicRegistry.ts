@@ -73,40 +73,6 @@ export class RgbLedLogic implements IComponentLogic {
 }
 
 /**
- * Logic for NeoPixel LEDs — addressable color from DIN pin
- */
-export class NeoPixelLogic implements IComponentLogic {
-  onPinStateChange(componentId: string, pinId: string, state: PinState, value?: number): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
-    const node = nodes.find(n => n.id === componentId);
-    if (!node) return;
-    if (node.properties?.isBlown) return;
-    if (node.properties?.powered === false) return;
-
-    const pin = node.pins?.find(p => p.id === pinId);
-    const pinLabel = `${pinId} ${pin?.name || ''}`.toLowerCase();
-    if (!pinLabel.includes('din') && !pinLabel.includes('data')) return;
-
-    // PWM value encodes a color index or brightness
-    const pwm = state === 'PWM' ? Math.max(0, Math.min(255, value ?? 0)) : state === 'HIGH' ? 255 : 0;
-    const isLit = pwm > 0;
-
-    // Map PWM to a rainbow-like hue for visual variety
-    const hue = Math.round((pwm / 255) * 360);
-    const hexColor = `hsl(${hue}, 100%, 50%)`;
-
-    updateNode(componentId, {
-      properties: {
-        ...node.properties,
-        requestedOn: isLit,
-        requestedColor: hexColor,
-        neoPixelBrightness: pwm,
-      },
-    });
-  }
-}
-
-/**
  * Logic for DC Motors
  */
 export class MotorLogic implements IComponentLogic {
@@ -354,6 +320,20 @@ export class LcdDisplayLogic implements IComponentLogic {
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
+    if (node.properties?.powered !== true) {
+      if (node.properties?.lcdLine1 || node.properties?.lcdLine2 || node.properties?.lcdBacklight !== false) {
+        updateNode(componentId, {
+          properties: {
+            ...node.properties,
+            lcdLine1: '',
+            lcdLine2: '',
+            lcdBacklight: false,
+          },
+        });
+      }
+      return;
+    }
+
     // Read from the global LCD state set by SimulationEngine
     const lcdState = (globalThis as any).__voltforgeLcdState?.[componentId];
     if (!lcdState) return;
@@ -387,19 +367,23 @@ export class ESCLogic implements IComponentLogic {
     // Map PWM 0-255 to throttle percentage (0-100)
     // In real ESC: 1000µs = 0%, 1500µs = 50%, 2000µs = 100%
     const pwm = state === 'PWM' ? Math.max(0, Math.min(255, value ?? 0)) : state === 'HIGH' ? 255 : 0;
-    const throttlePercent = Math.round((pwm / 255) * 100);
+    const requestedThrottle = Math.round((pwm / 255) * 100);
     const maximumRpm = Math.max(
       0,
       numericProperty(node.properties?.maximumRpm, SIMULATION_MODELS.bldc.maximumRpm),
     );
-    const rpm = Math.round((pwm / 255) * maximumRpm);
+    const requestedRpm = Math.round((pwm / 255) * maximumRpm);
+    const powered = node.properties?.powered === true;
+    const throttlePercent = powered ? requestedThrottle : 0;
+    const rpm = powered ? requestedRpm : 0;
 
     updateNode(componentId, {
       properties: {
         ...node.properties,
+        escRequestedThrottle: requestedThrottle,
         escThrottle: throttlePercent,
         escRpm: rpm,
-        isActive: pwm > 0,
+        isActive: powered && pwm > 0,
       },
     });
 
@@ -511,45 +495,6 @@ export class OscilloscopeLogic implements IComponentLogic {
 }
 
 /**
- * Logic for DHT Temperature/Humidity Sensors — updates live reading overlay
- */
-export class SensorDHTLogic implements IComponentLogic {
-  onPinStateChange(componentId: string, pinId: string, _state: PinState, value?: number): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
-    const node = nodes.find(n => n.id === componentId);
-    if (!node) return;
-
-    // Temperature and humidity updates come as __sensor_update__ synthetic events
-    if (pinId === '__sensor_temp__') {
-      updateNode(componentId, {
-        properties: { ...node.properties, temperature: value ?? 25 },
-      });
-    } else if (pinId === '__sensor_hum__') {
-      updateNode(componentId, {
-        properties: { ...node.properties, humidity: value ?? 60 },
-      });
-    }
-  }
-}
-
-/**
- * Logic for Ultrasonic Distance Sensors — updates distance reading overlay
- */
-export class SensorUltrasonicLogic implements IComponentLogic {
-  onPinStateChange(componentId: string, pinId: string, _state: PinState, value?: number): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
-    const node = nodes.find(n => n.id === componentId);
-    if (!node) return;
-
-    if (pinId === '__sensor_dist__' || pinId === 'echo') {
-      updateNode(componentId, {
-        properties: { ...node.properties, distance: value ?? 100 },
-      });
-    }
-  }
-}
-
-/**
  * Logic for PIR Motion Sensors — updates motion detection visual
  */
 export class SensorPIRLogic implements IComponentLogic {
@@ -586,24 +531,6 @@ export class SensorLDRLogic implements IComponentLogic {
 /**
  * Logic for IMU Sensors — updates tilt visualization
  */
-export class SensorIMULogic implements IComponentLogic {
-  onPinStateChange(componentId: string, pinId: string, _state: PinState, value?: number): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
-    const node = nodes.find(n => n.id === componentId);
-    if (!node) return;
-
-    if (pinId === '__sensor_accel_x__') {
-      updateNode(componentId, {
-        properties: { ...node.properties, accelerationX: value ?? 0 },
-      });
-    } else if (pinId === '__sensor_accel_y__') {
-      updateNode(componentId, {
-        properties: { ...node.properties, accelerationY: value ?? 0 },
-      });
-    }
-  }
-}
-
 /**
  * Logic for Soil Moisture Sensors — updates moisture bar
  */
@@ -625,24 +552,6 @@ export class SoilMoistureLogic implements IComponentLogic {
  * Generic logic for powered communication/auxiliary modules.
  * Tracks whether the module is powered (VCC above threshold) and updates the canvas.
  */
-export class PoweredModuleLogic implements IComponentLogic {
-  onPinStateChange(componentId: string, pinId: string, state: PinState, value?: number): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
-    const node = nodes.find(n => n.id === componentId);
-    if (!node) return;
-
-    // Interpret VCC pin voltage as power indication
-    if (/vcc|3v3/i.test(pinId)) {
-      const powered = state === 'HIGH' || (value !== undefined && value > 2.5);
-      if (node.properties?.powered !== powered) {
-        updateNode(componentId, {
-          properties: { ...node.properties, powered },
-        });
-      }
-    }
-  }
-}
-
 /**
  * Global Registry
  */
@@ -651,7 +560,6 @@ export class LogicRegistry {
     // LEDs
     'LED_STANDARD': new LedLogic(),
     'LED_RGB': new RgbLedLogic(),
-    'LED_NEOPIXEL': new NeoPixelLogic(),
     // Motors
     'MOTOR_DC': new MotorLogic(),
     'SERVO_MOTOR': new ServoLogic(),
@@ -683,22 +591,11 @@ export class LogicRegistry {
     'BUTTON': new ButtonLogic(),
     'SWITCH_SPST': new SwitchLogic(),
     // Sensors — live data overlay handlers
-    'TEMP_SENSOR': new SensorDHTLogic(),
-    'SENSOR_DHT11': new SensorDHTLogic(),
-    'SENSOR_DHT22': new SensorDHTLogic(),
-    'ULTRASONIC_SENSOR': new SensorUltrasonicLogic(),
-    'SENSOR_ULTRASONIC': new SensorUltrasonicLogic(),
     'PIR_SENSOR': new SensorPIRLogic(),
     'SENSOR_PIR': new SensorPIRLogic(),
     'LDR': new SensorLDRLogic(),
     'SENSOR_LDR': new SensorLDRLogic(),
-    'SENSOR_IMU': new SensorIMULogic(),
     'SOIL_MOISTURE': new SoilMoistureLogic(),
-    // Communication & powered modules
-    'BLUETOOTH_MODULE': new PoweredModuleLogic(),
-    'WIFI_MODULE': new PoweredModuleLogic(),
-    'IR_RECEIVER': new PoweredModuleLogic(),
-    'RC_RECEIVER': new PoweredModuleLogic(),
     // Digital Logic ICs (74xx / CD4000)
     'IC_74HC595': new ShiftRegister595Logic(),
     '74HC595': new ShiftRegister595Logic(),

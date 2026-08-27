@@ -191,7 +191,7 @@ export function decodeUart(
   for (let index = 1; index < frames.length; index += 1) {
     const previous = digitalValue(frames[index - 1], channel, threshold);
     const current = digitalValue(frames[index], channel, threshold);
-    if (previous || current || frames[index].timestamp_s <= frames[index - 1].timestamp_s) continue;
+    if (!previous || current || frames[index].timestamp_s <= frames[index - 1].timestamp_s) continue;
 
     const start = frames[index].timestamp_s;
     const bits = Array.from({ length: 8 }, (_, bit) => (levelAt(start + bitTime * (1.5 + bit)) ? 1 : 0));
@@ -203,6 +203,16 @@ export function decodeUart(
       text: value >= 32 && value <= 126 ? String.fromCharCode(value) : '.',
       framingValid: stop,
     });
+
+    // Ignore transitions inside the frame that was just decoded. Leave the
+    // stop-bit edge available so a back-to-back frame can start immediately.
+    const stopSampleTime = start + bitTime * 9.5;
+    while (
+      index + 1 < frames.length &&
+      frames[index + 1].timestamp_s < stopSampleTime
+    ) {
+      index += 1;
+    }
   }
   return decoded;
 }
@@ -220,4 +230,3 @@ export function analyzeProtocols(
     uart: decodeUart(frames, find(/uart|tx|rx|serial/, 0), baudRate),
   };
 }
-

@@ -1,0 +1,17 @@
+{
+  "item": "OPT-007",
+  "capturedOn": "2026-08-27",
+  "scope": "Oscilloscope and logic-capture pipeline before OPT-007",
+  "measurementKind": "static-baseline",
+  "runtimeTraceCaptured": false,
+  "observations": {
+    "workerBuffer": "An array retains up to 4096 per-substep frame objects and removes the oldest frame with shift",
+    "workerPayload": "OSCILLOSCOPE posts an array of timestamp and channel-record objects without transferable numeric buffers",
+    "enginePublication": "SimulationEngine loops every frame and channel, calling one scope store action per channel and one logic action per frame",
+    "scopeRetention": "Each appended channel sample copies and may slice its retained array",
+    "logicRetention": "Each appended logic frame copies and slices the retained logic array",
+    "timebaseRouting": "Time-per-division is panel-local state and does not influence worker capture cadence",
+    "manualStepDelivery": "A paused REQUEST_RESULT can consume the result credit before STEP publishes its newly solved state"
+  },
+  "limitation": "Browser publication counts, ring-wrap traces, and protocol-decoder captures were unavailable; validate cadence, bounded retention, pause/step ordering, and protocol edges through OPT-FB-007."
+}

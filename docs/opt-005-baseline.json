@@ -1,0 +1,15 @@
+{
+  "item": "OPT-005",
+  "capturedOn": "2026-08-27",
+  "scope": "Canvas-to-solver change detection before OPT-005",
+  "measurementKind": "static-baseline",
+  "runtimeTraceCaptured": false,
+  "observations": {
+    "subscriptionScope": "SimulationEngine subscribes to the complete canvas store",
+    "runtimeFeedback": "Runtime property writes enter the same updateNode path as user model edits",
+    "changeDetection": "Every canvas update compares node counts, node topology, wire topology, and property keys",
+    "modelRouting": "Electrical model refresh decisions are inferred by scanning previous and current canvas snapshots",
+    "runtimeIsolation": false
+  },
+  "limitation": "Browser store-listener and netlist-refresh counts were unavailable; validate runtime isolation and targeted model edits in OPT-FB-005."
+}

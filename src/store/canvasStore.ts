@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import type { CanvasNode, Wire, ElectronicComponent, WireBendPoint, PinPosition } from '../types/domain';
 import { rerouteAutoWires, routeWireBetweenNodes, getWireAutoColor } from '../utils/wireRouting';
 import { hydrateCanvasNode, type CanvasNodeSeed } from '../features/canvas/componentFactory';
+import { nextModelChange, type CanvasModelChange } from './modelRevision';
+import { applyIndexedRuntimeNodeUpdates } from './runtimeNodeMutation';
+
+export type { CanvasModelChange } from './modelRevision';
 
 
 /** Compatibility aliases for pin IDs used by older saved diagrams. These are
@@ -65,7 +69,12 @@ interface CanvasState {
   nodes: CanvasNode[];
   /** O(1) lookup map — kept in sync with `nodes` array on every mutation. */
   nodesById: Map<string, CanvasNode>;
+  /** O(1) array-position lookup for sparse runtime and targeted model writes. */
+  nodeIndexById: Map<string, number>;
   wires: Wire[];
+  /** Increments only for electrical-model or topology mutations. */
+  modelRevision: number;
+  lastModelChange: CanvasModelChange | null;
   selectedNodeId: string | null;
   selectedWireId: string | null;
   isWiring: boolean;
@@ -96,6 +105,8 @@ interface CanvasState {
    *    reference is preserved entirely — no rerouting, no downstream re-renders.
    */
   updateNode: (id: string, updates: Partial<CanvasNode>) => void;
+  /** Update simulation/runtime properties without marking the electrical model dirty. */
+  updateRuntimeNode: (id: string, updates: Partial<CanvasNode>) => void;
   /** Apply a user-authored property/geometry edit as one undoable operation. */
   commitNodeUpdate: (id: string, updates: Partial<CanvasNode>) => void;
 
@@ -109,11 +120,11 @@ interface CanvasState {
   updateNodeDragEnd: (id: string, updates: Partial<CanvasNode>) => void;
 
   /**
-   * batchUpdateNodes — batches multiple node property updates into a single
+   * batchUpdateRuntimeNodes — batches multiple runtime property updates into a single
    * store mutation.  Used by SimulationEngine to avoid N separate re-renders
    * per simulation tick.
    */
-  batchUpdateNodes: (updates: Array<{ id: string; changes: Partial<CanvasNode> }>) => void;
+  batchUpdateRuntimeNodes: (updates: Array<{ id: string; changes: Partial<CanvasNode> }>) => void;
 
   removeNode: (id: string) => void;
   selectNode: (id: string | null) => void;
@@ -142,7 +153,6 @@ interface CanvasState {
   redo: () => void;
 }
 
-
 const WIRE_COLORS = ['#22c55e', '#ef4444', '#3b82f6', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4', '#f97316'];
 
 let wireCounter = 0;
@@ -163,10 +173,19 @@ function buildNodesMap(nodes: CanvasNode[]): Map<string, CanvasNode> {
   return map;
 }
 
+function buildNodeIndex(nodes: CanvasNode[]): Map<string, number> {
+  const index = new Map<string, number>();
+  nodes.forEach((node, position) => index.set(node.id, position));
+  return index;
+}
+
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: [],
   nodesById: new Map(),
+  nodeIndexById: new Map(),
   wires: [],
+  modelRevision: 0,
+  lastModelChange: null,
   selectedNodeId: null,
   selectedWireId: null,
   isWiring: false,
@@ -185,18 +204,33 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       const nodes = [...state.nodes, node];
       const nodesById = new Map(state.nodesById);
       nodesById.set(node.id, node);
-      return { nodes, nodesById };
+      const nodeIndexById = new Map(state.nodeIndexById);
+      nodeIndexById.set(node.id, state.nodes.length);
+      return {
+        nodes,
+        nodesById,
+        nodeIndexById,
+        ...nextModelChange(state, {
+          kind: 'node',
+          nodeIds: [node.id],
+          wireIds: [],
+          topologyChanged: true,
+        }),
+      };
     });
   },
 
   // ── Fast drag-time update: only reroute wires connected to this node ──────
   updateNode: (id, updates) =>
     set((state) => {
+      const nodeIndex = state.nodeIndexById.get(id);
+      if (nodeIndex === undefined) return state;
       const geometryChanged = Object.keys(updates).some((k) => GEOMETRY_KEYS.has(k));
-      const nodes = state.nodes.map((n) => (n.id === id ? { ...n, ...updates } : n));
-      const updatedNode = nodes.find((n) => n.id === id);
-      const nodesById = new Map(state.nodesById);
-      if (updatedNode) nodesById.set(id, updatedNode);
+      const updatedNode = { ...state.nodes[nodeIndex], ...updates };
+      const nodes = [...state.nodes];
+      nodes[nodeIndex] = updatedNode;
+      const nodesById = new Map(state.nodesById).set(id, updatedNode);
+      const modelChanged = Object.keys(updates).some((key) => key === 'properties' || key === 'type' || key === 'pins');
       return {
         nodes,
         nodesById,
@@ -206,22 +240,51 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         wires: geometryChanged
           ? rerouteConnectedWires(id, nodes, state.wires)
           : state.wires,
+        ...(modelChanged ? nextModelChange(state, {
+          kind: 'node',
+          nodeIds: [id],
+          wireIds: [],
+          topologyChanged: Object.keys(updates).some((key) => key === 'type' || key === 'pins'),
+        }) : {}),
+      };
+    }),
+
+  updateRuntimeNode: (id, updates) =>
+    set((state) => {
+      const result = applyIndexedRuntimeNodeUpdates(state, [{ id, changes: updates }]);
+      if (!result.changed) return state;
+      return {
+        nodes: result.nodes,
+        nodesById: result.nodesById,
+        // Runtime updates are property-only and never invalidate the solver
+        // netlist or the model-change revision.
+        wires: state.wires,
       };
     }),
 
   commitNodeUpdate: (id, updates) => {
     get().pushHistory();
     set((state) => {
-      const nodes = state.nodes.map((n) => (n.id === id ? { ...n, ...updates } : n));
-      const updatedNode = nodes.find((n) => n.id === id);
+      const nodeIndex = state.nodeIndexById.get(id);
+      if (nodeIndex === undefined) return state;
+      const updatedNode = { ...state.nodes[nodeIndex], ...updates };
+      const nodes = [...state.nodes];
+      nodes[nodeIndex] = updatedNode;
       return {
         nodes,
-        nodesById: updatedNode
-          ? new Map(state.nodesById).set(id, updatedNode)
-          : state.nodesById,
+        nodesById: new Map(state.nodesById).set(id, updatedNode),
         wires: Object.keys(updates).some((key) => GEOMETRY_KEYS.has(key))
           ? rerouteAutoWires(nodes, state.wires)
           : state.wires,
+        ...nextModelChange(state, {
+          kind: 'node',
+          nodeIds: [id],
+          wireIds: [],
+          topologyChanged:
+            Object.keys(updates).some((key) => key === 'type' || key === 'pins') ||
+            (Object.keys(updates).some((key) => GEOMETRY_KEYS.has(key)) &&
+              state.nodes.some((node) => node.type === 'BREADBOARD')),
+        }),
       };
     });
   },
@@ -229,28 +292,37 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   // ── DragEnd commit: push history + full global reroute ───────────────────
   updateNodeDragEnd: (id, updates) => {
     set((state) => {
-      const nodes = state.nodes.map((n) => (n.id === id ? { ...n, ...updates } : n));
+      const nodeIndex = state.nodeIndexById.get(id);
+      if (nodeIndex === undefined) return state;
+      const nodes = [...state.nodes];
+      nodes[nodeIndex] = { ...nodes[nodeIndex], ...updates };
+      const geometryChanged = Object.keys(updates).some((key) => GEOMETRY_KEYS.has(key));
       return {
         nodes,
-        nodesById: buildNodesMap(nodes),
+        nodesById: new Map(state.nodesById).set(id, nodes[nodeIndex]),
         wires: rerouteAutoWires(nodes, state.wires),
+        // Breadboard proximity is part of MNA connectivity. Drag frames stay
+        // lightweight, but the committed drag must invalidate that topology
+        // once so a component moved onto/off a rail is recompiled correctly.
+        ...(geometryChanged && nodes.some((node) => node.type === 'BREADBOARD')
+          ? nextModelChange(state, {
+              kind: 'node',
+              nodeIds: [id],
+              wireIds: [],
+              topologyChanged: true,
+            })
+          : {}),
       };
     });
   },
 
   // ── Batch update: merge N simulation updates into 1 store mutation ────────
-  batchUpdateNodes: (updates) =>
+  batchUpdateRuntimeNodes: (updates) =>
     set((state) => {
-      const nodesById = new Map(state.nodesById);
-      const nodes = state.nodes.map((n) => {
-        const entry = updates.find((u) => u.id === n.id);
-        if (!entry) return n;
-        const merged = { ...n, ...entry.changes };
-        nodesById.set(n.id, merged);
-        return merged;
-      });
+      const result = applyIndexedRuntimeNodeUpdates(state, updates);
+      if (!result.changed) return state;
       // Batch updates are property-only (simulation), so wires are preserved.
-      return { nodes, nodesById };
+      return { nodes: result.nodes, nodesById: result.nodesById, wires: state.wires };
     }),
 
   removeNode: (id) => {
@@ -262,8 +334,15 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       return {
         nodes,
         nodesById,
+        nodeIndexById: buildNodeIndex(nodes),
         wires: state.wires.filter((w) => w.fromNodeId !== id && w.toNodeId !== id),
         selectedNodeId: state.selectedNodeId === id ? null : state.selectedNodeId,
+        ...nextModelChange(state, {
+          kind: 'node',
+          nodeIds: [id],
+          wireIds: [],
+          topologyChanged: true,
+        }),
       };
     });
   },
@@ -276,29 +355,59 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       const routedWire = wire.routingMode === 'auto'
         ? { ...wire, bendPoints: routeWireBetweenNodes(wire, state.nodes) }
         : wire;
-      return { wires: [...state.wires, routedWire] };
+      return {
+        wires: [...state.wires, routedWire],
+        ...nextModelChange(state, {
+          kind: 'wire',
+          nodeIds: [wire.fromNodeId, wire.toNodeId],
+          wireIds: [wire.id],
+          topologyChanged: true,
+        }),
+      };
     });
   },
 
   updateWire: (id, updates) => {
     get().pushHistory();
-    set((state) => ({
-      wires: state.wires.map((w) => {
+    set((state) => {
+      const topologyChanged = Object.keys(updates).some((key) =>
+        key === 'fromNodeId' || key === 'fromPinId' || key === 'toNodeId' || key === 'toPinId'
+      );
+      const wires = state.wires.map((w) => {
         if (w.id !== id) return w;
         const next = { ...w, ...updates };
         return next.routingMode === 'auto'
           ? { ...next, bendPoints: routeWireBetweenNodes(next, state.nodes) }
           : next;
-      }),
-    }));
+      });
+      const changedWire = wires.find((wire) => wire.id === id);
+      return {
+        wires,
+        ...(topologyChanged && changedWire ? nextModelChange(state, {
+          kind: 'wire',
+          nodeIds: [changedWire.fromNodeId, changedWire.toNodeId],
+          wireIds: [id],
+          topologyChanged: true,
+        }) : {}),
+      };
+    });
   },
 
   removeWire: (id) => {
     get().pushHistory();
-    set((state) => ({
-      wires: state.wires.filter((w) => w.id !== id),
-      selectedWireId: state.selectedWireId === id ? null : state.selectedWireId,
-    }));
+    set((state) => {
+      const removedWire = state.wires.find((wire) => wire.id === id);
+      return {
+        wires: state.wires.filter((w) => w.id !== id),
+        selectedWireId: state.selectedWireId === id ? null : state.selectedWireId,
+        ...(removedWire ? nextModelChange(state, {
+          kind: 'wire',
+          nodeIds: [removedWire.fromNodeId, removedWire.toNodeId],
+          wireIds: [id],
+          topologyChanged: true,
+        }) : {}),
+      };
+    });
   },
 
   selectWire: (id) => set({ selectedWireId: id, selectedNodeId: null }),
@@ -318,7 +427,16 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         return;
       }
       get().pushHistory();
-      const autoColor = getWireAutoColor(wiringFrom.pinId, pinId);
+      const fromNode = get().nodesById.get(wiringFrom.nodeId) || get().nodes.find((node) => node.id === wiringFrom.nodeId);
+      const toNode = get().nodesById.get(nodeId) || get().nodes.find((node) => node.id === nodeId);
+      const fromPin = fromNode?.pins.find((pin) => pin.id === wiringFrom.pinId);
+      const toPin = toNode?.pins.find((pin) => pin.id === pinId);
+      const autoColor = getWireAutoColor(
+        fromPin?.name || wiringFrom.pinId,
+        toPin?.name || pinId,
+        fromPin?.type,
+        toPin?.type,
+      );
       const chosenColor = (wiringColor === '#22c55e' || !wiringColor) ? autoColor : wiringColor;
       const wire: Wire = {
         id: `wire_${++wireCounter}_${Date.now()}`,
@@ -338,6 +456,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         wires: [...state.wires, wire],
         isWiring: false,
         wiringFrom: null,
+        ...nextModelChange(state, {
+          kind: 'wire',
+          nodeIds: [wire.fromNodeId, wire.toNodeId],
+          wireIds: [wire.id],
+          topologyChanged: true,
+        }),
       }));
     } else {
       set({ isWiring: false, wiringFrom: null });
@@ -390,12 +514,26 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   clearCanvas: () => {
     get().pushHistory();
-    set({ nodes: [], nodesById: new Map(), wires: [], selectedNodeId: null, selectedWireId: null });
+    set((state) => ({
+      nodes: [],
+      nodesById: new Map(),
+      nodeIndexById: new Map(),
+      wires: [],
+      selectedNodeId: null,
+      selectedWireId: null,
+      ...nextModelChange(state, {
+        kind: 'reset',
+        nodeIds: [],
+        wireIds: [],
+        topologyChanged: true,
+      }),
+    }));
   },
 
-  resetCanvas: () => set({
+  resetCanvas: () => set((state) => ({
     nodes: [],
     nodesById: new Map(),
+    nodeIndexById: new Map(),
     wires: [],
     selectedNodeId: null,
     selectedWireId: null,
@@ -405,7 +543,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     history: [],
     historyIndex: -1,
     redoHistory: [],
-  }),
+    ...nextModelChange(state, {
+      kind: 'reset',
+      nodeIds: [],
+      wireIds: [],
+      topologyChanged: true,
+    }),
+  })),
 
   loadCanvas: (nodes, wires, viewport = { x: 0, y: 0, scale: 1 }) => {
     const componentLibrary = get().componentLibrary;
@@ -445,6 +589,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({
       nodes: finalNodes,
       nodesById: buildNodesMap(finalNodes),
+      nodeIndexById: buildNodeIndex(finalNodes),
       wires: rerouteAutoWires(finalNodes, migratedWires),
       selectedNodeId: null,
       selectedWireId: null,
@@ -458,6 +603,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       history: [],
       historyIndex: -1,
       redoHistory: [],
+      ...nextModelChange(get(), {
+        kind: 'reset',
+        nodeIds: finalNodes.map((node) => node.id),
+        wireIds: migratedWires.map((wire) => wire.id),
+        topologyChanged: true,
+      }),
     });
   },
 
@@ -494,7 +645,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         mcuNodes.push(n);
       } else if (t.includes('BATTERY') || t.includes('POWER') || t.includes('REGULATOR') || t.includes('7805') || t.includes('VCC') || t.includes('GND')) {
         powerNodes.push(n);
-      } else if (t.includes('SENSOR') || t.includes('DHT') || t.includes('BME') || t.includes('MPU') || t.includes('LDR') || t.includes('BUTTON') || t.includes('POT') || t.includes('ENCODER') || t.includes('ULTRASONIC') || t.includes('HC_SR04')) {
+      } else if (t.includes('SENSOR') || t.includes('BME') || t.includes('LDR') || t.includes('BUTTON') || t.includes('POT') || t.includes('ENCODER')) {
         sensorNodes.push(n);
       } else if (t.includes('DISPLAY') || t.includes('OLED') || t.includes('LCD') || t.includes('SERVO') || t.includes('RELAY') || t.includes('MOTOR') || t.includes('LED') || t.includes('BUZZER') || t.includes('MATRIX')) {
         outputNodes.push(n);
@@ -541,7 +692,14 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({
       nodes: finalNodes,
       nodesById: buildNodesMap(finalNodes),
+      nodeIndexById: buildNodeIndex(finalNodes),
       wires: finalWires,
+      ...nextModelChange(get(), {
+        kind: 'reset',
+        nodeIds: finalNodes.map((node) => node.id),
+        wireIds: finalWires.map((wire) => wire.id),
+        topologyChanged: finalNodes.some((node) => node.type === 'BREADBOARD'),
+      }),
     });
   },
 
@@ -553,9 +711,16 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({
       nodes: prevState.nodes,
       nodesById: buildNodesMap(prevState.nodes),
+      nodeIndexById: buildNodeIndex(prevState.nodes),
       wires: prevState.wires,
       historyIndex: historyIndex - 1,
       redoHistory: [...redoHistory, { nodes: JSON.parse(JSON.stringify(nodes)), wires: JSON.parse(JSON.stringify(wires)) }],
+      ...nextModelChange(get(), {
+        kind: 'reset',
+        nodeIds: prevState.nodes.map((node) => node.id),
+        wireIds: prevState.wires.map((wire) => wire.id),
+        topologyChanged: true,
+      }),
     });
   },
 
@@ -566,9 +731,16 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({
       nodes: nextState.nodes,
       nodesById: buildNodesMap(nextState.nodes),
+      nodeIndexById: buildNodeIndex(nextState.nodes),
       wires: nextState.wires,
       historyIndex: Math.min(history.length - 1, historyIndex + 1),
       redoHistory: redoHistory.slice(0, -1),
+      ...nextModelChange(get(), {
+        kind: 'reset',
+        nodeIds: nextState.nodes.map((node) => node.id),
+        wireIds: nextState.wires.map((wire) => wire.id),
+        topologyChanged: true,
+      }),
     });
   }
 }));

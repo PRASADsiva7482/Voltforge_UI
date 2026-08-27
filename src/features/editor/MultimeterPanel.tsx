@@ -29,10 +29,12 @@ export default function MultimeterPanel({
   blackProbePin: propBlackPin,
 }: Props) {
   const storeLiveMeter = useSimulationStore((s) => s.liveMeter)
+  const setMeterMode = useSimulationStore((s) => s.setMeterMode)
   const voltage = propVoltage !== undefined ? propVoltage : storeLiveMeter.voltage
   const acVoltage = propAcVoltage !== undefined ? propAcVoltage : storeLiveMeter.acVoltage
   const current = propCurrent !== undefined ? propCurrent : storeLiveMeter.current_mA
   const resistance = propResistance !== undefined ? propResistance : storeLiveMeter.resistance_ohm
+  const resistanceUnsafe = storeLiveMeter.resistanceUnsafe
   const redProbePin = propRedPin || storeLiveMeter.positiveLabel || 'Probe (+)'
   const blackProbePin = propBlackPin || storeLiveMeter.negativeLabel || 'Probe (-)'
   const [mode, setMode] = useState<MeterMode>('V_DC')
@@ -41,7 +43,11 @@ export default function MultimeterPanel({
   const [soundEnabled, setSoundEnabled] = useState(true)
   const audioContextRef = useRef<AudioContext | null>(null)
 
-  const isContinuityShort = mode === 'CONT' && resistance < 5.0 && resistance >= 0
+  const isContinuityShort = mode === 'CONT' && !resistanceUnsafe && resistance < 5.0 && resistance >= 0
+
+  useEffect(() => {
+    setMeterMode(mode === 'mA' ? 'CURRENT' : mode === 'OHM' || mode === 'CONT' ? 'RESISTANCE' : 'VOLTAGE')
+  }, [mode, setMeterMode])
 
   // Handle continuity buzzer sound
   useEffect(() => {
@@ -91,8 +97,12 @@ export default function MultimeterPanel({
 
   const displayReading = isHold && holdValue !== null ? holdValue : rawReading
   const displayString = mode === 'CONT'
-    ? (isContinuityShort ? '0.00 BEEP' : 'OPEN')
-    : displayReading.toFixed(2)
+    ? (resistanceUnsafe ? 'POWER OFF' : isContinuityShort ? '0.00 BEEP' : 'OPEN')
+    : mode === 'OHM' && resistanceUnsafe
+      ? 'POWER OFF'
+      : mode === 'OHM' && !Number.isFinite(displayReading)
+        ? 'OL'
+        : displayReading.toFixed(2)
 
   const tabItems = [
     { id: 'V_DC', label: 'V⎓' },
@@ -185,7 +195,8 @@ export default function MultimeterPanel({
             items={tabItems}
             value={mode}
             onChange={(id) => {
-              setMode(id as MeterMode)
+              const nextMode = id as MeterMode
+              setMode(nextMode)
               setIsHold(false)
             }}
             className="vf-multimeter-tabs"
@@ -212,8 +223,12 @@ export default function MultimeterPanel({
           </div>
         </div>
 
-        <p className="vf-multimeter-hint" style={{ fontSize: '10px', color: '#64748b', textAlign: 'center', marginTop: '6px' }}>
-          Attach probe clips to pins on the canvas to measure
+        <p className="vf-multimeter-hint" style={{ fontSize: '10px', color: resistanceUnsafe ? '#f87171' : '#64748b', textAlign: 'center', marginTop: '6px' }}>
+          {mode === 'mA'
+            ? 'Current mode inserts a 0.1 Ω shunt between both probes'
+            : mode === 'OHM' || mode === 'CONT'
+              ? resistanceUnsafe ? 'Turn off every external power source before measuring resistance' : 'Resistance mode uses the meter’s internal 1 V test source'
+              : 'Attach both probe clips to pins on the canvas to measure voltage'}
         </p>
       </div>
     </FloatingPanel>

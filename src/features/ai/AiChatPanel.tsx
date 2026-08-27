@@ -88,6 +88,12 @@ export default function AiChatPanel({
   const { addNode, addWire, nodes, removeWire, selectedNodeId, selectedWireId, commitNodeUpdate, viewport, wires } = useCanvasStore()
   const { currentProject, activeCodeFile, updateCodeFileContent } = useProjectStore()
   const addToast = useToastStore((s) => s.addToast)
+  const setResultDataConsumer = useSimulationStore((s) => s.setResultDataConsumer)
+
+  useEffect(() => {
+    setResultDataConsumer('ai', isOpen)
+    return () => setResultDataConsumer('ai', false)
+  }, [isOpen, setResultDataConsumer])
 
   const buildPayload = useCallback(() => {
     const simState = useSimulationStore.getState()

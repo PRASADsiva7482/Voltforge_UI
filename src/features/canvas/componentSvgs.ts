@@ -203,55 +203,7 @@ export const componentSvgs: Record<string, string> = {
     '<rect x="27" y="42" width="2" height="32" fill="%233b82f6"/>' +
     '<rect x="34" y="42" width="2" height="28" fill="%23666"/>'
   ),
-  LED_NEOPIXEL: svg('0 0 60 20',
-    '<rect width="60" height="20" rx="3" fill="%23111"/>' +
-    '<circle cx="10" cy="10" r="6" fill="%23ef4444" opacity="0.8"/>' +
-    '<circle cx="30" cy="10" r="6" fill="%2322c55e" opacity="0.8"/>' +
-    '<circle cx="50" cy="10" r="6" fill="%233b82f6" opacity="0.8"/>'
-  ),
-
   // ── Sensors ──
-  SENSOR_DHT22: svg('0 0 60 80',
-    '<rect width="60" height="80" rx="4" fill="white" stroke="%23ddd" stroke-width="1"/>' +
-    '<rect x="8" y="8" width="44" height="44" rx="2" fill="%23e5e7eb"/>' +
-    '<circle cx="30" cy="30" r="12" fill="%23f0f0f0" stroke="%23999" stroke-width="1"/>' +
-    '<text x="30" y="70" font-size="8" fill="%23333" text-anchor="middle" font-family="Arial" font-weight="bold">DHT22</text>' +
-    '<rect x="14" y="76" width="4" height="4" fill="%23b8860b"/>' +
-    '<rect x="24" y="76" width="4" height="4" fill="%23b8860b"/>' +
-    '<rect x="34" y="76" width="4" height="4" fill="%23b8860b"/>'
-  ),
-  SENSOR_DHT11: svg('0 0 60 80',
-    '<rect width="60" height="80" rx="5" fill="%232563eb" stroke="%231e3a8a" stroke-width="1"/>' +
-    '<rect x="9" y="10" width="42" height="42" rx="3" fill="%233b82f6"/>' +
-    '<path d="M16 18h28M16 26h28M16 34h28M16 42h28" stroke="%23bfdbfe" stroke-width="3" stroke-linecap="round"/>' +
-    '<text x="30" y="68" font-size="8" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">DHT11</text>' +
-    '<rect x="12" y="76" width="5" height="4" fill="%23b8860b"/>' +
-    '<rect x="23" y="76" width="5" height="4" fill="%23b8860b"/>' +
-    '<rect x="34" y="76" width="5" height="4" fill="%23b8860b"/>' +
-    '<rect x="45" y="76" width="5" height="4" fill="%23b8860b"/>'
-  ),
-  SENSOR_ULTRASONIC: svg('0 0 80 50',
-    '<rect width="80" height="50" rx="4" fill="%230ea5e9"/>' +
-    '<circle cx="22" cy="22" r="12" fill="%23c0c0c0" stroke="%23888" stroke-width="1"/>' +
-    '<circle cx="58" cy="22" r="12" fill="%23c0c0c0" stroke="%23888" stroke-width="1"/>' +
-    '<rect x="6" y="42" width="6" height="6" fill="%23b8860b"/>' +
-    '<rect x="18" y="42" width="6" height="6" fill="%23b8860b"/>' +
-    '<rect x="56" y="42" width="6" height="6" fill="%23b8860b"/>' +
-    '<rect x="68" y="42" width="6" height="6" fill="%23b8860b"/>' +
-    '<text x="40" y="48" font-size="6" fill="white" text-anchor="middle" font-family="Arial">HC-SR04</text>'
-  ),
-  ULTRASONIC_SENSOR: svg('0 0 80 50',
-    '<rect width="80" height="50" rx="4" fill="%230ea5e9"/>' +
-    '<circle cx="22" cy="22" r="12" fill="%23c0c0c0" stroke="%23888" stroke-width="1"/>' +
-    '<circle cx="58" cy="22" r="12" fill="%23c0c0c0" stroke="%23888" stroke-width="1"/>' +
-    '<circle cx="22" cy="22" r="7" fill="%2394a3b8"/>' +
-    '<circle cx="58" cy="22" r="7" fill="%2394a3b8"/>' +
-    '<rect x="6" y="42" width="6" height="6" fill="%23b8860b"/>' +
-    '<rect x="18" y="42" width="6" height="6" fill="%23b8860b"/>' +
-    '<rect x="56" y="42" width="6" height="6" fill="%23b8860b"/>' +
-    '<rect x="68" y="42" width="6" height="6" fill="%23b8860b"/>' +
-    '<text x="40" y="48" font-size="6" fill="white" text-anchor="middle" font-family="Arial">HC-SR04</text>'
-  ),
   SENSOR_PIR: svg('0 0 60 70',
     '<rect x="5" y="20" width="50" height="50" rx="4" fill="%23059669"/>' +
     '<circle cx="30" cy="28" r="18" fill="%23f8fafc" opacity="0.9"/>' +
@@ -274,14 +226,6 @@ export const componentSvgs: Record<string, string> = {
     '<rect x="8" y="34" width="4" height="6" fill="%23a0a0a0"/>' +
     '<rect x="28" y="34" width="4" height="6" fill="%23a0a0a0"/>'
   ),
-  SENSOR_IMU: svg('0 0 60 60',
-    '<rect width="60" height="60" rx="4" fill="%23581c87"/>' +
-    '<rect x="8" y="8" width="44" height="44" rx="2" fill="%231e1b4b"/>' +
-    '<circle cx="30" cy="30" r="4" fill="%238b5cf6"/>' +
-    '<text x="30" y="18" font-size="7" fill="%238b5cf6" text-anchor="middle" font-family="Arial">MPU</text>' +
-    '<text x="30" y="48" font-size="6" fill="%23a78bfa" text-anchor="middle" font-family="Arial">6050</text>'
-  ),
-
   // ── Displays ──
   DISPLAY_LCD_I2C: svg('0 0 120 60',
     '<rect width="120" height="60" rx="4" fill="%230369a1"/>' +
@@ -615,24 +559,6 @@ export const componentSvgs: Record<string, string> = {
     '<text x="40" y="75" font-size="5" fill="%236b7280" text-anchor="middle" font-family="Arial">2204</text>'
   ),
 
-  RC_RECEIVER: svg('0 0 80 60',
-    '<rect width="80" height="60" rx="4" fill="%23262626"/>' +
-    '<rect x="0" y="0" width="80" height="20" rx="4" fill="%23ef4444"/>' +
-    '<text x="40" y="14" font-size="10" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">FlySky FS-iA6B</text>' +
-    '<rect x="4" y="25" width="72" height="25" fill="%23171717"/>' +
-    // Pins block
-    '<rect x="18" y="50" width="6" height="10" fill="%23555"/>' +    // GND
-    '<rect x="38" y="50" width="6" height="10" fill="%23ef4444"/>' +  // VCC
-    '<rect x="58" y="50" width="6" height="10" fill="%23f97316"/>' +  // PPM
-    // Labels for pins
-    '<text x="21" y="44" font-size="6" fill="%23a3a3a3" text-anchor="middle" font-family="Arial">G</text>' +
-    '<text x="41" y="44" font-size="6" fill="%23ef4444" text-anchor="middle" font-family="Arial">V</text>' +
-    '<text x="61" y="44" font-size="6" fill="%23f97316" text-anchor="middle" font-family="Arial">S</text>' +
-    // Antennas
-    '<path d="M10 20 Q5 0 -10 -10" stroke="black" stroke-width="1.5" fill="none"/>' +
-    '<path d="M70 20 Q75 0 90 -10" stroke="black" stroke-width="1.5" fill="none"/>'
-  ),
-
   // ── Instruments / Meters ──
   AMMETER: svg('0 0 90 70',
     '<rect x="4" y="2" width="82" height="66" rx="8" fill="%2338bdf8" stroke="%230284c7" stroke-width="2"/>' +
@@ -704,30 +630,13 @@ export const componentSvgs: Record<string, string> = {
 
 // Keep legacy/catalog aliases visually complete as well as electrically
 // compatible. These entries deliberately share artwork where the physical
-// package is equivalent and use compact module artwork for communication and
-// environmental sensor presets that previously fell back to a blank node.
+// package is equivalent.
 Object.assign(componentSvgs, {
-  TEMP_SENSOR: componentSvgs.SENSOR_DHT22,
   LDR: componentSvgs.SENSOR_LDR,
   SOIL_MOISTURE: svg('0 0 40 50',
     '<rect x="5" y="5" width="30" height="34" rx="3" fill="%23334155" stroke="%2394a3b8" stroke-width="2"/>' +
     '<path d="M12 15h16M12 22h16M12 29h10" stroke="%2322c55e" stroke-width="2" stroke-linecap="round"/>' +
     '<path d="M14 39v8M26 39v8" stroke="%23a0a0a0" stroke-width="2"/>'
-  ),
-  IR_RECEIVER: svg('0 0 40 40',
-    '<rect x="5" y="5" width="30" height="25" rx="4" fill="%231f2937" stroke="%23a78bfa" stroke-width="2"/>' +
-    '<circle cx="20" cy="17" r="7" fill="%230f172a" stroke="%23c4b5fd" stroke-width="2"/>' +
-    '<path d="M13 33h14M16 36h8" stroke="%23a0a0a0" stroke-width="2"/>'
-  ),
-  BLUETOOTH_MODULE: svg('0 0 60 50',
-    '<rect x="5" y="5" width="50" height="40" rx="4" fill="%231e3a8a" stroke="%2360a5fa" stroke-width="2"/>' +
-    '<path d="M29 12v26l10-8-10-8 10-8-10-2M20 18l18 14M20 32l18-14" fill="none" stroke="%23dbeafe" stroke-width="2"/>' +
-    '<circle cx="10" cy="10" r="2" fill="%2322c55e"/>'
-  ),
-  WIFI_MODULE: svg('0 0 60 50',
-    '<rect x="5" y="5" width="50" height="40" rx="4" fill="%230f766e" stroke="%235eead4" stroke-width="2"/>' +
-    '<path d="M15 20c6-6 24-6 30 0M20 26c4-4 16-4 20 0M26 32c2-2 6-2 8 0" fill="none" stroke="%23ccfbf1" stroke-width="2" stroke-linecap="round"/>' +
-    '<circle cx="30" cy="37" r="2" fill="%23fbbf24"/>'
   ),
 });
 
@@ -772,7 +681,6 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
   // LEDs (match SVG viewBox)
   LED_STANDARD: { w: 40, h: 80 },
   LED_RGB: { w: 50, h: 80 },
-  LED_NEOPIXEL: { w: 60, h: 20 },
   BATTERY_9V: { w: 70, h: 80 },
   BATTERY_AA: { w: 50, h: 80 },
   DC_SOURCE_3V3: { w: 80, h: 60 },
@@ -799,18 +707,11 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
   RELAY_4CH: { w: 120, h: 50 },
 
   // Sensors (match SVG viewBox)
-  TEMP_SENSOR: { w: 60, h: 80 },
-  SENSOR_DHT11: { w: 60, h: 80 },
-  SENSOR_DHT22: { w: 60, h: 80 },
-  ULTRASONIC_SENSOR: { w: 80, h: 60 },
-  SENSOR_ULTRASONIC: { w: 80, h: 60 },
   PIR_SENSOR: { w: 60, h: 70 },
   SENSOR_PIR: { w: 60, h: 70 },
   LDR: { w: 40, h: 40 },
   SENSOR_LDR: { w: 40, h: 40 },
   SOIL_MOISTURE: { w: 40, h: 50 },
-  IR_RECEIVER: { w: 40, h: 40 },
-  SENSOR_IMU: { w: 60, h: 60 },
 
   // Displays (match SVG viewBox)
   LCD_16X2: { w: 170, h: 60 },
@@ -819,14 +720,9 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
   DISPLAY_OLED: { w: 80, h: 60 },
   DISPLAY_7SEG: { w: 50, h: 70 },
 
-  // Communication
-  BLUETOOTH_MODULE: { w: 60, h: 50 },
-  WIFI_MODULE: { w: 60, h: 50 },
-
   // Drone / ESC
   ESC_MODULE: { w: 120, h: 60 },
   MOTOR_BLDC: { w: 80, h: 80 },
-  RC_RECEIVER: { w: 80, h: 60 },
 
   // Instruments
   AMMETER: { w: 90, h: 70 },

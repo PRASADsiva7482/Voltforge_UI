@@ -1,0 +1,273 @@
+{
+  "schemaVersion": 1,
+  "backlogType": "simulation-optimization",
+  "createdOn": "2026-08-27",
+  "audit": {
+    "target": "maximum-component simulation regression circuit",
+    "scope": "Performance and responsiveness only. Component support, correctness, and unsupported-component work are intentionally excluded.",
+    "method": "Static audit of the active simulator, worker, store, and canvas execution paths. No browser CPU, memory, or frame-time trace was captured in this audit.",
+    "interpretation": "Each item is confirmed as existing work in the code path. Its measured contribution on a particular laptop must be baselined before and after implementation."
+  },
+  "rules": {
+    "doNotChangeSimulationBehaviorSilently": true,
+    "captureBaselineBeforeEachItem": true,
+    "useTheMaximumComponentCircuitForRegression": true,
+    "closeOnlyAfterResponsivenessAndSimulationChecksPass": true
+  },
+  "recommendedOrder": [
+    "OPT-001",
+    "OPT-002",
+    "OPT-003",
+    "OPT-004",
+    "OPT-005",
+    "OPT-006",
+    "OPT-007",
+    "OPT-008",
+    "OPT-009"
+  ],
+  "items": [
+    {
+      "id": "OPT-001",
+      "priority": "P0",
+      "status": "in_progress",
+      "title": "Make solver work adaptive to circuit cost",
+      "appliesWhen": "Every MNA simulation; impact grows with circuit size and nonlinear elements.",
+      "evidence": [
+        "SimulationWorker.ts runs every 16 ms and, with the default 1 ms timestep, performs about 16 solve passes per worker tick.",
+        "MNASolver.ts creates a dense matrix for each solve, permits up to 50 Newton-Raphson iterations, and uses dense Gaussian elimination."
+      ],
+      "work": "Introduce an explicit simulation-work budget with adaptive substeps or timestep selection for large circuits. Preserve a user-visible full-fidelity mode for cases that require the current transient accuracy.",
+      "definitionOfDone": [
+        "The maximum-component circuit has a bounded solver budget per wall-clock frame.",
+        "Simulation time remains monotonic and the selected fidelity mode is visible to the user.",
+        "Representative transient, motor, LED, and digital-IC regression scenarios still pass."
+      ],
+      "implementation": {
+        "completedOn": "2026-08-27",
+        "summary": "Added an 8 ms worker solver budget, cost-based adaptive timestep selection capped at 5 ms, Full fidelity mode, monotonic store-side simulation time, and visible toolbar controls.",
+        "verification": [
+          "UI TypeScript build and Vite production build pass.",
+          "UI oxlint pass.",
+          "Static pre-change baseline captured in docs/opt-001-baseline.json."
+        ],
+        "remainingValidation": "Run the maximum-component browser regression and compare Adaptive versus Full fidelity using OPT-FB-001."
+      }
+    },
+    {
+      "id": "OPT-002",
+      "priority": "P0",
+      "status": "in_progress",
+      "title": "Implement real worker-to-UI result backpressure",
+      "appliesWhen": "Every running MNA simulation.",
+      "evidence": [
+        "SimulationEngine.ts documents a 15 FPS UI throttle, but a requestAnimationFrame processes the latest pending result on the next frame, so result handling can still run near the worker's 16 ms cadence.",
+        "SimulationWorker.ts serializes and posts a RESULT message every worker tick."
+      ],
+      "work": "Move result cadence control to a worker/main-thread backpressure protocol. Keep only the latest unconsumed result and do not build or post a new full UI payload until the selected presentation cadence permits it.",
+      "definitionOfDone": [
+        "The measured RESULT message rate never exceeds the configured presentation rate.",
+        "A slow main thread cannot accumulate an unbounded message queue.",
+        "Pausing, stepping, and stopping still show the correct final state."
+      ],
+      "implementation": {
+        "completedOn": "2026-08-27",
+        "summary": "Added a one-credit REQUEST_RESULT protocol, worker-side result suppression and duplicate-request collapsing, cached paused-state delivery, and a bounded pending oscilloscope frame buffer.",
+        "verification": [
+          "UI TypeScript build and Vite production build pass.",
+          "UI oxlint pass.",
+          "Static pre-change baseline captured in docs/opt-002-baseline.json."
+        ],
+        "remainingValidation": "Run worker protocol assertions and a browser message-rate trace using OPT-FB-001 and OPT-FB-002."
+      }
+    },
+    {
+      "id": "OPT-003",
+      "priority": "P0",
+      "status": "in_progress",
+      "title": "Send only solver data currently needed by the UI",
+      "appliesWhen": "Every posted solver result; especially costly with many MNA elements and wires.",
+      "evidence": [
+        "SimulationWorker.ts calculates component power for every element and converts every branch-current Map entry to an object before each RESULT post.",
+        "SimulationEngine.ts reconstructs component-current, component-power, node-voltage, pin-voltage, and wire-current maps for every handled result."
+      ],
+      "work": "Define result subscriptions for meters, probes, current-flow, thermal view, and visible components. Emit only subscribed values, use compact transferable numeric data where appropriate, and derive shared maps once.",
+      "definitionOfDone": [
+        "Current, power, and wire-flow data are absent from RESULT messages unless a feature needs them.",
+        "The UI receives no duplicate derived map for the same measurement.",
+        "All enabled measurement and overlay features retain correct values."
+      ],
+      "implementation": {
+        "startedOn": "2026-08-27",
+        "summary": "Added worker result subscriptions, transferable Float64Array measurement payloads, explicit AI/lab full-result demand, and one main-thread materialization path for legacy store consumers.",
+        "verification": [
+          "Static pre-change payload baseline captured in docs/opt-003-baseline.json.",
+          "UI TypeScript build and Vite production build pass.",
+          "UI oxlint pass and git diff whitespace check pass."
+        ],
+        "remainingValidation": "Run the UI build and add runtime payload/consumer assertions through OPT-FB-001 and OPT-FB-003."
+      }
+    },
+    {
+      "id": "OPT-004",
+      "priority": "P0",
+      "status": "in_progress",
+      "title": "Reconcile solver results as deltas instead of rescanning the full circuit",
+      "appliesWhen": "Every handled RESULT message.",
+      "evidence": [
+        "SimulationEngine.ts rebuilds several full result maps, resolves wire currents, and scans every canvas node to update component feedback on each handled result.",
+        "The result handler also performs repeated component lookups and writes canvas runtime properties through updateNode."
+      ],
+      "work": "Pre-index simulation-capable nodes and their MNA bindings at netlist build time. Compare rounded or thresholded runtime values, then publish only changed component state in one batch without rebuilding unchanged maps.",
+      "definitionOfDone": [
+        "Unchanged solver output causes no canvas-node write.",
+        "Only components with changed display or behavioral state are reconciled.",
+        "The maximum-component circuit remains interactive while visual state is updating."
+      ],
+      "implementation": {
+        "startedOn": "2026-08-27",
+        "summary": "Added a stable simulation-node and pin-to-MNA index, deadband/deep-equality filtering before batch publication, O(1) batch lookup paths, and indexed result-node retrieval.",
+        "verification": [
+          "Static pre-change reconciliation baseline captured in docs/opt-004-baseline.json.",
+          "UI TypeScript build and oxlint pass.",
+          "UI Vite production build and git diff whitespace check pass."
+        ],
+        "remainingValidation": "Run deterministic unchanged-result write-count and maximum-component responsiveness checks through OPT-FB-004."
+      }
+    },
+    {
+      "id": "OPT-005",
+      "priority": "P0",
+      "status": "in_progress",
+      "title": "Separate runtime simulation state from model-change detection",
+      "appliesWhen": "Whenever the canvas store changes during a running simulation.",
+      "evidence": [
+        "SimulationEngine.ts subscribes to the entire canvas store and compares every node, wire, and property-key set to decide whether to rebuild or update the MNA model.",
+        "Simulation feedback writes properties back to canvas nodes, so runtime visual updates enter the same global subscription path."
+      ],
+      "work": "Route explicit electrical-model edits separately from runtime display state. Replace whole-store comparisons with targeted model-version or dirty-element updates and preserve the current topology watcher only for true structural edits.",
+      "definitionOfDone": [
+        "A runtime-only visual update does not scan all node properties or rebuild MNA elements.",
+        "Electrical property and topology edits still update the running solver correctly.",
+        "No simulation feedback loop is introduced by canvas state writes."
+      ],
+      "implementation": {
+        "startedOn": "2026-08-27",
+        "summary": "Added explicit canvas model revisions and targeted change metadata, introduced runtime-only node/batch actions, and changed SimulationEngine model synchronization to ignore runtime updates and process only affected model nodes.",
+        "verification": [
+          "Static pre-change canvas-to-solver baseline captured in docs/opt-005-baseline.json.",
+          "UI TypeScript build and oxlint pass.",
+          "UI Vite production build, JSON validation, and git diff whitespace check pass."
+        ],
+        "remainingValidation": "Run deterministic model-revision, runtime-isolation, and maximum-component checks through OPT-FB-005."
+      }
+    },
+    {
+      "id": "OPT-006",
+      "priority": "P1",
+      "status": "in_progress",
+      "title": "Cache and incrementally update compiled MNA topology",
+      "appliesWhen": "When the circuit topology or an electrical model value changes during simulation.",
+      "evidence": [
+        "SimulationEngine.ts refreshMnaElements rebuilds the complete MNA circuit from all nodes and wires for a model-property refresh.",
+        "A changed MNA node count stops and recreates the worker instead of reusing a compiled topology."
+      ],
+      "work": "Split netlist compilation into cached connectivity/topology data and mutable element parameters. Update only the changed MNA elements where possible, and reserve worker recreation for unavoidable structural changes.",
+      "definitionOfDone": [
+        "Changing one supported electrical property does not rebuild unrelated connectivity.",
+        "Topology changes preserve the expected solver lifecycle and do not leak workers.",
+        "Breadboard and direct-wire connectivity regressions pass."
+      ],
+      "implementation": {
+        "startedOn": "2026-08-27",
+        "summary": "Added a cached MNA topology contract, a cache-aware netlist path that skips Union-Find and breadboard proximity discovery for model-only refreshes, topology-shape validation, in-place mutable element patches, and dedicated scope-channel updates.",
+        "verification": [
+          "Static pre-change netlist and worker lifecycle baseline captured in docs/opt-006-baseline.json.",
+          "UI TypeScript build and oxlint pass.",
+          "UI Vite production build, JSON validation, and git diff whitespace check pass."
+        ],
+        "remainingValidation": "Run deterministic mutable-element patch counts, worker lifecycle checks, and breadboard/direct-wire connectivity regressions through OPT-FB-006."
+      }
+    },
+    {
+      "id": "OPT-007",
+      "priority": "P1",
+      "status": "in_progress",
+      "title": "Batch oscilloscope and logic-capture buffering",
+      "appliesWhen": "When one or more oscilloscope channels are connected.",
+      "evidence": [
+        "SimulationWorker.ts collects scope samples for every transient substep and posts all pending frames with the next worker result.",
+        "SimulationEngine.ts appends each frame and channel individually, while simulationStore.ts copies retained scope and logic arrays on every append."
+      ],
+      "work": "Use fixed-capacity ring buffers or chunked batches outside the render-critical store, downsample according to the active scope timebase, and publish one snapshot per presentation frame.",
+      "definitionOfDone": [
+        "A worker result with multiple scope frames produces one batched store publication.",
+        "Retained waveform history has a fixed memory bound without repeated full-array copies.",
+        "Scope waveform order, timebase, and pause/step behavior remain correct."
+      ],
+      "implementation": {
+        "startedOn": "2026-08-27",
+        "summary": "Added timebase-aware worker capture intervals, fixed-capacity typed-array buffering, transferable scope batches, external fixed-capacity waveform and logic rings, one store publication per batch, and a step-owned result credit that preserves paused step ordering.",
+        "verification": [
+          "Static pre-change scope pipeline baseline captured in docs/opt-007-baseline.json.",
+          "UI TypeScript build and oxlint pass.",
+          "UI Vite production build, JSON validation, and git diff whitespace check pass."
+        ],
+        "remainingValidation": "Run deterministic buffer-wrap, timebase-change, pause/step, and protocol-decoder capture checks through OPT-FB-007."
+      }
+    },
+    {
+      "id": "OPT-008",
+      "priority": "P1",
+      "status": "in_progress",
+      "title": "Add a rendering-quality budget for dense wire and current-flow views",
+      "appliesWhen": "Large canvases; current-flow animation is an additional cost when enabled.",
+      "evidence": [
+        "CircuitCanvas.tsx mounts a WireShape for every wire in the canvas.",
+        "CurrentFlowLayer.tsx recomputes and draws particles for every active wire on every Konva animation frame when current flow is enabled."
+      ],
+      "work": "Add viewport culling and an adaptive visual budget: cap animated particles, reduce animation cadence at overview zoom, and provide a clear large-circuit quality mode without hiding electrical values.",
+      "definitionOfDone": [
+        "Off-screen wires and particles do not consume normal render work.",
+        "Current-flow animation stays legible without a dense visual-noise field.",
+        "Users can identify when a quality limit is active and can opt into full detail."
+      ],
+      "implementation": {
+        "startedOn": "2026-08-27",
+        "summary": "Added viewport-culled schematic and PCB wire layers, restricted current-flow geometry to visible wires, introduced density/zoom-aware particle and cadence budgets, and exposed a visible Full detail override without changing solver electrical values.",
+        "verification": [
+          "Static pre-change rendering baseline captured in docs/opt-008-baseline.json.",
+          "UI TypeScript build and oxlint pass.",
+          "UI Vite production build, JSON validation, and git diff whitespace check pass."
+        ],
+        "remainingValidation": "Run deterministic scene-count checks and a browser frame-time/GPU trace for adaptive and full visual modes through OPT-FB-008."
+      }
+    },
+    {
+      "id": "OPT-009",
+      "priority": "P1",
+      "status": "in_progress",
+      "title": "Budget native AVR emulation on the main thread",
+      "appliesWhen": "Only when a supported board runs compiled HEX through AVR8js.",
+      "evidence": [
+        "SimulationEngine.ts runs 25,000 AVR instructions inside a 16 ms main-thread interval for the native AVR path.",
+        "This work shares the UI thread with React, Konva, input handling, and worker-result reconciliation."
+      ],
+      "work": "Make AVR instruction batches time-budgeted, yield when the frame budget is exhausted, and expose the emulator workload in the same performance diagnostics used for the solver.",
+      "definitionOfDone": [
+        "Native AVR execution cannot monopolize a frame for an unbounded duration.",
+        "Instruction timing remains deterministic within the documented emulator fidelity mode.",
+        "The editor remains responsive while a compiled sketch is running."
+      ],
+      "implementation": {
+        "startedOn": "2026-08-27",
+        "summary": "Replaced the fixed 25,000-instruction interval with requestAnimationFrame execution slices, 4 ms Adaptive and 8 ms Full fidelity wall-time budgets, bounded cycle catch-up, ordered AVR instruction/peripheral ticks, pause/power-off debt resets, and throttled visible workload telemetry.",
+        "verification": [
+          "Static pre-change AVR scheduling baseline captured in docs/opt-009-baseline.json.",
+          "UI TypeScript build and oxlint pass.",
+          "UI Vite production build, JSON validation, and git diff whitespace check pass."
+        ],
+        "remainingValidation": "Run deterministic scheduler-clock assertions and compiled-firmware browser responsiveness traces through OPT-FB-010."
+      }
+    }
+  ]
+}
