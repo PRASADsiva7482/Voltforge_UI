@@ -113,6 +113,14 @@ export function hydrateCanvasNode(seed: CanvasNodeSeed, componentLibrary: Electr
     ...(seed.properties || {}),
   };
 
+  // Older/imported standard LEDs store their physical colour in the generic
+  // `color` field. Apply that explicit value after catalog defaults so the
+  // default `ledColor: red` cannot incorrectly recolour a blue (or other)
+  // LED at render time.
+  if (seed.type === 'LED_STANDARD' && typeof properties.color === 'string' && properties.color.trim()) {
+    properties.ledColor = properties.color;
+  }
+
   if (component?.svgData && properties.svgData === undefined) {
     properties.svgData = component.svgData;
   }

@@ -467,6 +467,10 @@ export default function CircuitCanvas({
           scaleX={viewport.scale}
           scaleY={viewport.scale}
           onDragMove={(e: KonvaEventObject<DragEvent>) => {
+            // Konva drag events from a component bubble to the Stage. Only a
+            // drag that began on the Stage itself is canvas panning; otherwise
+            // the component's coordinates would be written as the viewport.
+            if (e.target !== e.currentTarget) return;
             const anchor = viewportRenderAnchorRef.current;
             const nextX = e.target.x();
             const nextY = e.target.y();
@@ -476,6 +480,7 @@ export default function CircuitCanvas({
             setViewport(nextViewport);
           }}
           onDragEnd={(e: KonvaEventObject<DragEvent>) => {
+            if (e.target !== e.currentTarget) return;
             const nextViewport = { ...viewport, x: e.target.x(), y: e.target.y() };
             viewportRenderAnchorRef.current = nextViewport;
             setViewport(nextViewport);
