@@ -82,6 +82,7 @@ export default function AiChatPanel({
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
+  const [sessionId, setSessionId] = useState<string>()
   const scrollRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   
@@ -166,11 +167,18 @@ export default function AiChatPanel({
       code,
       canvasData: { components, wires: serializedWires, netlist: netlistPayload },
       simulationState,
+      sessionId,
+      projectId: currentProject?.id,
+      files: (currentProject?.codeFiles || []).slice(0, 5).map((file) => ({
+        content: file.content.slice(0, 60_000),
+        filename: file.filename,
+        language: file.language,
+      })),
       context: richContext,
       canvasContext: richContext,
       history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })),
     }
-  }, [nodes, wires, activeCodeFile, currentProject, projectContext, selectedNodeId, selectedWireId, viewport, messages])
+  }, [nodes, wires, activeCodeFile, currentProject, projectContext, selectedNodeId, selectedWireId, viewport, messages, sessionId])
 
   const handleSendStream = useCallback(async (userMessage: string) => {
     const payload = buildPayload()
@@ -233,8 +241,21 @@ export default function AiChatPanel({
             const event = JSON.parse(trimmed)
             const eventType = currentEventType || event.type || ''
 
-            if (eventType === 'thought') {
-              const thoughtText = event.step || event.content || ''
+            if (eventType === 'start') {
+              if (event.sessionId) setSessionId(event.sessionId)
+              const source = event.mode === 'local-deterministic'
+                ? 'Using the offline VoltForge engineering engine. A release-approved neural model is not active yet.'
+                : `Using ${event.model || 'the local VoltForge model'}.`
+              setMessages((prev) => {
+                const updated = [...prev]
+                const last = updated[updated.length - 1]
+                if (last?.role === 'assistant') {
+                  updated[updated.length - 1] = { ...last, thought: `${source}\n` }
+                }
+                return updated
+              })
+            } else if (eventType === 'thought' || eventType === 'tool' || eventType === 'status') {
+              const thoughtText = event.summary || event.step || event.content || ''
               if (thoughtText) {
                 setMessages((prev) => {
                   const updated = [...prev]
@@ -251,8 +272,8 @@ export default function AiChatPanel({
                   return updated
                 })
               }
-            } else if (eventType === 'token') {
-              const tokenText = event.token || event.content || ''
+            } else if (eventType === 'token' || eventType === 'delta') {
+              const tokenText = event.delta || event.token || event.content || ''
               if (tokenText) {
                 setMessages((prev) => {
                   const updated = [...prev]
@@ -266,7 +287,39 @@ export default function AiChatPanel({
                   return updated
                 })
               }
-            } else if (eventType === 'metadata' || eventType === 'done' || event.reply) {
+            } else if (eventType === 'proposal') {
+              setMessages((prev) => {
+                const updated = [...prev]
+                const last = updated[updated.length - 1]
+                if (last?.role === 'assistant') {
+                  updated[updated.length - 1] = {
+                    ...last,
+                    additions: event.additions || last.additions,
+                    removals: event.removals || last.removals,
+                    valueChanges: event.valueChanges || last.valueChanges,
+                    wireSuggestions: event.wireSuggestions || last.wireSuggestions,
+                    codeFixes: event.codeFixes || last.codeFixes,
+                  }
+                }
+                return updated
+              })
+            } else if (eventType === 'error') {
+              const errorMessage = event.message || event.error || 'The AI response stopped unexpectedly.'
+              setIsStreaming(false)
+              setMessages((prev) => {
+                const updated = [...prev]
+                const last = updated[updated.length - 1]
+                if (last?.role === 'assistant') {
+                  updated[updated.length - 1] = {
+                    ...last,
+                    content: last.content ? `${last.content}\n\n${errorMessage}` : errorMessage,
+                    isStreaming: false,
+                  }
+                }
+                return updated
+              })
+            } else if (eventType === 'metadata' || eventType === 'done' || eventType === 'complete' || event.reply) {
+              if (event.sessionId) setSessionId(event.sessionId)
               setIsStreaming(false)
               setMessages((prev) => {
                 const updated = [...prev]
@@ -288,6 +341,7 @@ export default function AiChatPanel({
                 return updated
               })
             }
+            currentEventType = ''
           } catch {
             // Non-JSON line or partial chunk — ignore
           }
@@ -316,7 +370,11 @@ export default function AiChatPanel({
       abortRef.current = null
       // Mark streaming as complete for any remaining messages
       setMessages((prev) =>
-        prev.map((m) => (m.isStreaming ? { ...m, isStreaming: false } : m))
+        prev.map((m) => (m.isStreaming ? {
+          ...m,
+          content: m.content || (controller.signal.aborted ? 'Response stopped.' : 'No response was returned.'),
+          isStreaming: false,
+        } : m))
       )
     }
   }, [buildPayload])
@@ -726,7 +784,7 @@ export default function AiChatPanel({
           </div>
           <div>
             <h3 className="vf-ai-chat__brand-name">VoltForge AI</h3>
-            <span className="vf-ai-chat__brand-sub">Project-aware local AI</span>
+            <span className="vf-ai-chat__brand-sub">Local project engineering assistant</span>
           </div>
         </div>
         <button
@@ -770,12 +828,12 @@ export default function AiChatPanel({
               {msg.role === 'user' ? <User size={12} /> : <Bot size={12} />}
             </div>
             <div className="vf-ai-chat__msg-body">
-              {/* Thinking box */}
+              {/* User-visible engineering status; hidden model reasoning is never displayed. */}
               {msg.role === 'assistant' && msg.thought && (
                 <details className="vf-ai-chat__thinking" open={msg.isStreaming && !msg.content}>
                   <summary className="vf-ai-chat__thinking-summary">
                     <Brain size={12} />
-                    <span>{msg.isStreaming && !msg.content ? 'Thinking...' : 'Thought process'}</span>
+                    <span>{msg.isStreaming && !msg.content ? 'Running engineering checks...' : 'Engineering checks'}</span>
                   </summary>
                   <div className="vf-ai-chat__thinking-content">
                     {msg.thought.split('\n').filter(Boolean).map((step, si) => (

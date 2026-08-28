@@ -291,12 +291,16 @@ export type AiGenerateResponse = {
 export type AiChatRequest = {
   boardType?: BoardType | string
   canvasData?: Record<string, unknown>
+  canvasContext?: string
   code?: string
   components?: unknown[]
   context?: string
+  files?: { content: string; filename: string; language: string }[]
   history?: { content: string; role: 'user' | 'assistant' }[]
   message: string
   netlist?: Record<string, unknown>
+  projectId?: string
+  sessionId?: string
   simulationState?: Record<string, unknown>
   wires?: unknown[]
 }
