@@ -145,6 +145,8 @@ interface CanvasState {
   clearCanvas: () => void;
   resetCanvas: () => void;
   loadCanvas: (nodes: CanvasNodeSeed[], wires: Wire[], viewport?: { x: number; y: number; scale: number }) => void;
+  /** Commit a fully planned editor change as exactly one undoable canvas edit. */
+  commitCanvasSnapshot: (nodes: CanvasNode[], wires: Wire[]) => void;
   autoArrangeLayout: () => void;
 
   // History Actions
@@ -610,6 +612,35 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         topologyChanged: true,
       }),
     });
+  },
+
+  commitCanvasSnapshot: (nextNodes, nextWires) => {
+    const current = get();
+    if (JSON.stringify(current.nodes) === JSON.stringify(nextNodes)
+      && JSON.stringify(current.wires) === JSON.stringify(nextWires)) return;
+
+    current.pushHistory();
+    const nodes = nextNodes.map((node) => ({
+      ...node,
+      pins: node.pins.map((pin) => ({ ...pin })),
+      properties: { ...node.properties },
+    }));
+    const wires = nextWires.map((wire) => ({
+      ...wire,
+      bendPoints: wire.bendPoints.map((point) => ({ ...point })),
+    }));
+    set((state) => ({
+      nodes,
+      nodesById: buildNodesMap(nodes),
+      nodeIndexById: buildNodeIndex(nodes),
+      wires: rerouteAutoWires(nodes, wires),
+      ...nextModelChange(state, {
+        kind: 'reset',
+        nodeIds: nodes.map((node) => node.id),
+        wireIds: wires.map((wire) => wire.id),
+        topologyChanged: true,
+      }),
+    }));
   },
 
   // History Implementation

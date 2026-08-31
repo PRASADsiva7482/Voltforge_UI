@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, Info, Play, Plus, ShieldAlert, Trash2, Wrench, Zap } from 'lucide-react'
+import { AlertTriangle, Info, Play, ShieldAlert } from 'lucide-react'
 import { useCanvasStore } from '../../store/canvasStore'
 import { useProjectStore } from '../../store/projectStore'
 import { useToastStore } from '../../store/useToastStore'
@@ -9,9 +9,16 @@ import { Callout } from '../../components/ui/Callout'
 import { Button } from '../../components/ui/Button'
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner'
 import { buildCircuitNetlist } from '../canvas/netlist'
-import { getPinsForComponent } from '../canvas/pinRegistry'
-import { validateAiWire } from '../ai/aiWireValidation'
-import type { AiAction, AiCodeFix, AiValidationResponse, AiWireSuggestion, CanvasNode, Wire } from '../../types/domain'
+import { AiProposalReview } from '../ai/AiProposalReview'
+import {
+  buildAiProposal,
+  calculateEditorRevision,
+  defaultAiProposalSelection,
+  isAiProposalCurrent,
+  type AiProposal,
+} from '../ai/aiProposal'
+import { planAiProposalChanges } from '../ai/aiProposalTransaction'
+import type { AiValidationResponse } from '../../types/domain'
 
 interface Props {
   isOpen: boolean
@@ -19,49 +26,25 @@ interface Props {
   onClose: () => void
 }
 
-function pinRef(ref?: string) {
-  const [nodeId, pinId] = String(ref || '').split('/')
-  return nodeId && pinId ? { nodeId, pinId } : null
-}
-
-function resistanceValue(value?: string) {
-  const numeric = Number(String(value || '').replace(/[^0-9.]/g, ''))
-  return Number.isFinite(numeric) && numeric > 0 ? numeric : 220
-}
-
-function parseActionValue(value: unknown) {
-  if (typeof value === 'number' || typeof value === 'boolean') return value
-  const text = String(value ?? '').trim()
-  const numeric = Number(text.replace(/[^0-9.+-]/g, ''))
-  return Number.isFinite(numeric) && /[0-9]/.test(text) ? numeric : text
-}
-
-function hasWire(wires: Wire[], fromNodeId: string, fromPinId: string, toNodeId: string, toPinId: string) {
-  return wires.some((wire) =>
-    (wire.fromNodeId === fromNodeId && wire.fromPinId === fromPinId && wire.toNodeId === toNodeId && wire.toPinId === toPinId) ||
-    (wire.fromNodeId === toNodeId && wire.fromPinId === toPinId && wire.toNodeId === fromNodeId && wire.toPinId === fromPinId)
-  )
-}
-
-function makeWire(suggestion: AiWireSuggestion): Wire {
-  return {
-    bendPoints: [],
-    color: suggestion.color || '#3b82f6',
-    fromNodeId: suggestion.fromComponentId,
-    fromPinId: suggestion.fromPin,
-    id: `ai_wire_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    routingMode: 'auto',
-    toNodeId: suggestion.toComponentId,
-    toPinId: suggestion.toPin,
-  }
+interface AppliedAiTransaction {
+  afterEditorRevision: string
+  beforeCode?: string
+  canvasChanged: boolean
+  codeFileId?: string
+  projectId?: string
+  proposalId: string
 }
 
 export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: Props) {
-  const { addNode, addWire, nodes, removeWire, commitNodeUpdate, wires } = useCanvasStore()
+  const { modelRevision, nodes, wires } = useCanvasStore()
   const { activeCodeFile, currentProject, updateCodeFileContent } = useProjectStore()
   const addToast = useToastStore((s) => s.addToast)
   const [isValidating, setIsValidating] = useState(false)
   const [validationResult, setValidationResult] = useState<AiValidationResponse | null>(null)
+  const [proposal, setProposal] = useState<AiProposal>()
+  const [proposalSelections, setProposalSelections] = useState<string[]>([])
+  const [appliedTransaction, setAppliedTransaction] = useState<AppliedAiTransaction>()
+  const [isApplyingProposal, setIsApplyingProposal] = useState(false)
 
   const handleValidate = async () => {
     if (nodes.length === 0) {
@@ -70,6 +53,11 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
     }
     setIsValidating(true)
     setValidationResult(null)
+    setProposal(undefined)
+    setProposalSelections([])
+    setAppliedTransaction(undefined)
+    const sourceEditorRevision = calculateEditorRevision(nodes, wires, currentProject?.codeFiles || [], modelRevision)
+    const sourceProjectRevision = currentProject?.updatedAt
     try {
       const netlist = buildCircuitNetlist(nodes, wires)
       const res = await aiApi.validateCircuit({
@@ -102,7 +90,21 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
           toPin: w.toPinId,
         })),
       })
-      setValidationResult(res.data.data)
+      const result = res.data.data
+      setValidationResult(result)
+      const nextProposal = buildAiProposal({
+        additions: result.additions,
+        codeFixes: result.codeFixes,
+        id: `validator-${Date.now()}`,
+        projectId: currentProject?.id,
+        removals: result.removals,
+        sourceEditorRevision,
+        sourceProjectRevision,
+        valueChanges: result.valueChanges,
+        wireSuggestions: result.wireSuggestions,
+      })
+      setProposal(nextProposal)
+      if (nextProposal) setProposalSelections(defaultAiProposalSelection(nextProposal))
     } catch (e) {
       console.error(e)
       addToast('Validation failed.', 'error')
@@ -111,123 +113,87 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
     }
   }
 
-  const applyWireSuggestion = (suggestion: AiWireSuggestion) => {
-    if (readOnly) return
-    const validationError = validateAiWire(nodes, suggestion)
-    if (validationError) {
-      addToast(validationError, 'error')
-      return
-    }
-    if (hasWire(wires, suggestion.fromComponentId, suggestion.fromPin, suggestion.toComponentId, suggestion.toPin)) {
-      addToast('Wire already exists.', 'info')
-      return
-    }
-    addWire(makeWire(suggestion))
-    addToast('AI wire suggestion applied.', 'success')
+  const toggleProposalItem = (itemId: string) => {
+    if (!proposal) return
+    setProposalSelections((selected) => selected.includes(itemId)
+      ? selected.filter((id) => id !== itemId)
+      : [...selected, itemId])
   }
 
-  const applyRemoval = (action: AiAction) => {
-    if (readOnly) return
-    if (!action.wireId) {
-      addToast('This removal does not reference a specific wire.', 'error')
+  const applyProposal = () => {
+    if (readOnly || isApplyingProposal || !proposal || !currentProject?.id) return
+    const projectState = useProjectStore.getState()
+    const canvasState = useCanvasStore.getState()
+    const currentEditorRevision = calculateEditorRevision(
+      canvasState.nodes,
+      canvasState.wires,
+      projectState.currentProject?.codeFiles || [],
+      canvasState.modelRevision,
+    )
+    if (!isAiProposalCurrent(proposal, {
+      editorRevision: currentEditorRevision,
+      projectId: projectState.currentProject?.id,
+      projectRevision: projectState.currentProject?.updatedAt,
+    })) {
+      addToast('This validation proposal is stale. Re-validate the current project.', 'error')
       return
     }
-    removeWire(action.wireId)
-    addToast('AI removal applied.', 'success')
-  }
+    if (proposalSelections.length === 0) {
+      addToast('Select at least one proposed change to apply.', 'info')
+      return
+    }
 
-  const applyAddition = (action: AiAction) => {
-    if (readOnly) return
-    if (String(action.componentType || '').toUpperCase() !== 'RESISTOR' || !action.between || action.between.length < 2) {
-      addToast('This addition can be reviewed manually.', 'info')
-      return
-    }
-    const first = pinRef(action.between[0])
-    const second = pinRef(action.between[1])
-    if (!first || !second) {
-      addToast('AI addition has incomplete pin references.', 'error')
-      return
-    }
-
-    const firstNode = nodes.find((node) => node.id === first.nodeId)
-    const secondNode = nodes.find((node) => node.id === second.nodeId)
-    const x = firstNode && secondNode ? (firstNode.x + secondNode.x) / 2 : 220
-    const y = firstNode && secondNode ? (firstNode.y + secondNode.y) / 2 : 220
-    const resistorId = `ai_resistor_${Date.now()}`
-    const resistor: CanvasNode = {
-      componentId: resistorId,
-      height: 24,
-      id: resistorId,
-      name: `${resistanceValue(action.value)} Ohm Resistor`,
-      pins: getPinsForComponent('RESISTOR', undefined, 90, 24),
-      properties: { resistance: resistanceValue(action.value) },
-      rotation: 0,
-      type: 'RESISTOR',
-      width: 90,
-      x,
-      y,
-    }
-    addNode(resistor)
-    addWire({
-      bendPoints: [],
-      color: '#f59e0b',
-      fromNodeId: first.nodeId,
-      fromPinId: first.pinId,
-      id: `ai_wire_${Date.now()}_a`,
-      routingMode: 'auto',
-      toNodeId: resistorId,
-      toPinId: 'p1',
+    setIsApplyingProposal(true)
+    const plan = planAiProposalChanges(proposal, proposalSelections, {
+      activeCodeFile: projectState.activeCodeFile,
+      nodes: canvasState.nodes,
+      wires: canvasState.wires,
     })
-    addWire({
-      bendPoints: [],
-      color: '#f59e0b',
-      fromNodeId: resistorId,
-      fromPinId: 'p2',
-      id: `ai_wire_${Date.now()}_b`,
-      routingMode: 'auto',
-      toNodeId: second.nodeId,
-      toPinId: second.pinId,
+    if (plan.errors.length > 0) {
+      setIsApplyingProposal(false)
+      addToast(`Proposal rejected: ${plan.errors[0]}`, 'error')
+      return
+    }
+    if (!plan.canvasChanged && !plan.codeChanged) {
+      setIsApplyingProposal(false)
+      addToast('The selected proposal does not change the current project.', 'info')
+      return
+    }
+
+    if (plan.canvasChanged) useCanvasStore.getState().commitCanvasSnapshot(plan.nextNodes, plan.nextWires)
+    if (plan.codeChanged && projectState.activeCodeFile && typeof plan.nextCode === 'string') {
+      updateCodeFileContent(projectState.activeCodeFile.id, plan.nextCode)
+    }
+    const afterProject = useProjectStore.getState()
+    const afterCanvas = useCanvasStore.getState()
+    setAppliedTransaction({
+      afterEditorRevision: calculateEditorRevision(afterCanvas.nodes, afterCanvas.wires, afterProject.currentProject?.codeFiles || [], afterCanvas.modelRevision),
+      beforeCode: plan.codeChanged ? plan.beforeCode : undefined,
+      canvasChanged: plan.canvasChanged,
+      codeFileId: plan.codeChanged ? projectState.activeCodeFile?.id : undefined,
+      projectId: projectState.currentProject?.id,
+      proposalId: proposal.id,
     })
-    addToast('AI resistor addition applied.', 'success')
+    setIsApplyingProposal(false)
+    addToast(`${proposalSelections.length} AI change${proposalSelections.length === 1 ? '' : 's'} applied as one reviewable transaction.`, 'success')
   }
 
-  const applyValueChange = (action: AiAction) => {
-    if (!action.componentId || !action.property) {
-      addToast('This value change is missing a target property.', 'error')
+  const undoAppliedProposal = () => {
+    if (!proposal || !appliedTransaction || appliedTransaction.proposalId !== proposal.id) return
+    const projectState = useProjectStore.getState()
+    const canvasState = useCanvasStore.getState()
+    const currentEditorRevision = calculateEditorRevision(canvasState.nodes, canvasState.wires, projectState.currentProject?.codeFiles || [], canvasState.modelRevision)
+    if (currentEditorRevision !== appliedTransaction.afterEditorRevision
+      || projectState.currentProject?.id !== appliedTransaction.projectId) {
+      addToast('The editor changed after this AI transaction. Use normal editor history to review it.', 'error')
       return
     }
-    const node = nodes.find((item) => item.id === action.componentId)
-    if (!node) {
-      addToast('Could not find the target component.', 'error')
-      return
+    if (appliedTransaction.canvasChanged) useCanvasStore.getState().undo()
+    if (appliedTransaction.codeFileId && typeof appliedTransaction.beforeCode === 'string') {
+      updateCodeFileContent(appliedTransaction.codeFileId, appliedTransaction.beforeCode)
     }
-    if (readOnly) return
-    commitNodeUpdate(action.componentId, {
-      properties: {
-        ...node.properties,
-        [action.property]: parseActionValue(action.newValue ?? action.value),
-      },
-    })
-    addToast('AI value change applied.', 'success')
-  }
-
-  const applyCodeFix = (fix: AiCodeFix) => {
-    if (readOnly) return
-    if (!activeCodeFile) {
-      addToast('No active code file selected.', 'error')
-      return
-    }
-    if (fix.type !== 'replace' || !fix.from || !fix.to) {
-      addToast('This code fix can be reviewed manually.', 'info')
-      return
-    }
-    const next = activeCodeFile.content.replace(fix.from, fix.to)
-    if (next === activeCodeFile.content) {
-      addToast('Could not find the target code text.', 'error')
-      return
-    }
-    updateCodeFileContent(activeCodeFile.id, next)
-    addToast('AI code fix applied.', 'success')
+    setAppliedTransaction(undefined)
+    addToast('AI transaction undone.', 'success')
   }
 
   const getScoreColorClass = (score: number) => {
@@ -339,74 +305,24 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
               </div>
             )}
 
-            {validationResult.removals && validationResult.removals.length > 0 && (
-              <div className="vf-validator__issues">
-                <h5 className="vf-validator__issues-title">Removals</h5>
-                {validationResult.removals.map((action, i) => (
-                  <div key={`remove-${i}`} className="vf-ai-action">
-                    <span>{action.between?.join(' -> ') || action.reason || 'Remove unsafe item'}</span>
-                    <Button size="sm" variant="danger" icon={<Trash2 size={12} />} onClick={() => applyRemoval(action)}>
-                      Remove
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {validationResult.additions && validationResult.additions.length > 0 && (
-              <div className="vf-validator__issues">
-                <h5 className="vf-validator__issues-title">Additions</h5>
-                {validationResult.additions.map((action, i) => (
-                  <div key={`add-${i}`} className="vf-ai-action">
-                    <span>{action.componentType || action.type} {action.value ? `(${action.value})` : ''}</span>
-                    <Button size="sm" variant="secondary" icon={<Plus size={12} />} onClick={() => applyAddition(action)}>
-                      Add
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {validationResult.wireSuggestions && validationResult.wireSuggestions.length > 0 && (
-              <div className="vf-validator__issues">
-                <h5 className="vf-validator__issues-title">Wire Suggestions</h5>
-                {validationResult.wireSuggestions.slice(0, 8).map((suggestion, i) => (
-                  <div key={`wire-${i}`} className="vf-ai-action">
-                    <span>{suggestion.description}</span>
-                    <Button size="sm" variant="secondary" icon={<Zap size={12} />} onClick={() => applyWireSuggestion(suggestion)}>
-                      Wire
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {validationResult.valueChanges && validationResult.valueChanges.length > 0 && (
-              <div className="vf-validator__issues">
-                <h5 className="vf-validator__issues-title">Value Changes</h5>
-                {validationResult.valueChanges.map((action, i) => (
-                  <div key={`value-${i}`} className="vf-ai-action">
-                    <span>{action.reason || `${action.componentId}.${action.property} -> ${String(action.newValue ?? action.value ?? '')}`}</span>
-                    <Button size="sm" variant="secondary" icon={<Wrench size={12} />} onClick={() => applyValueChange(action)}>
-                      Change
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {validationResult.codeFixes && validationResult.codeFixes.length > 0 && (
-              <div className="vf-validator__issues">
-                <h5 className="vf-validator__issues-title">Code Fixes</h5>
-                {validationResult.codeFixes.map((fix, i) => (
-                  <div key={`code-${i}`} className="vf-ai-action">
-                    <span>{fix.description || `${fix.from} -> ${fix.to}`}</span>
-                    <Button size="sm" variant="secondary" icon={<Wrench size={12} />} onClick={() => applyCodeFix(fix)}>
-                      Apply
-                    </Button>
-                  </div>
-                ))}
-              </div>
+            {proposal && (
+              <AiProposalReview
+                isStale={!isAiProposalCurrent(proposal, {
+                  editorRevision: calculateEditorRevision(nodes, wires, currentProject?.codeFiles || [], modelRevision),
+                  projectId: currentProject?.id,
+                  projectRevision: currentProject?.updatedAt,
+                })}
+                isWorking={isApplyingProposal}
+                onApply={applyProposal}
+                onToggle={toggleProposalItem}
+                onUndo={undoAppliedProposal}
+                proposal={proposal}
+                selectedIds={proposalSelections}
+                undoAvailable={Boolean(
+                  appliedTransaction?.proposalId === proposal.id
+                  && appliedTransaction.afterEditorRevision === calculateEditorRevision(nodes, wires, currentProject?.codeFiles || [], modelRevision),
+                )}
+              />
             )}
 
             <Button

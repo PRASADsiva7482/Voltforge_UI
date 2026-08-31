@@ -192,6 +192,7 @@ export default function CircuitEditorPage() {
   const setDirty = useProjectStore((s) => s.setDirty)
   const isSaving = useProjectStore((s) => s.isSaving)
   const setSaving = useProjectStore((s) => s.setSaving)
+  const setProjectUpdatedAt = useProjectStore((s) => s.setProjectUpdatedAt)
   const activeCodeFile = useProjectStore((s) => s.activeCodeFile)
   const updateCodeFileContent = useProjectStore((s) => s.updateCodeFileContent)
 
@@ -483,7 +484,7 @@ export default function CircuitEditorPage() {
         language: f.language,
         sortOrder: f.sortOrder,
       }))
-      await projectApi.update(currentProject.id, {
+      const response = await projectApi.update(currentProject.id, {
         canvasLayout: {
           nodes,
           wires,
@@ -494,9 +495,12 @@ export default function CircuitEditorPage() {
           pcbLayout: usePcbStore.getState().getLayout(),
         },
         codeFiles,
+        expectedRevision: currentProject.updatedAt,
       })
+      return response.data.data
     },
-    onSuccess: () => {
+    onSuccess: (project) => {
+      if (!project) return
       canvasSnapshotRef.current = serializeCanvas(
         useCanvasStore.getState().nodes,
         useCanvasStore.getState().wires,
@@ -504,12 +508,16 @@ export default function CircuitEditorPage() {
       pcbSnapshotRef.current = serializePcb(usePcbStore.getState().getLayout())
       setDirty(false)
       setSaving(false)
+      setProjectUpdatedAt(project.updatedAt)
       addToast('Project saved successfully', 'success')
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
     },
-    onError: () => {
+    onError: (error) => {
       setSaving(false)
-      addToast('Failed to save project', 'error')
+      const errorCode = (error as { response?: { data?: { errorCode?: string } } })?.response?.data?.errorCode
+      addToast(errorCode === 'PROJECT_REVISION_STALE'
+        ? 'Project changed elsewhere. Reload before saving your local changes.'
+        : 'Failed to save project', 'error')
     },
   })
 
@@ -1689,14 +1697,6 @@ export default function CircuitEditorPage() {
                   isOpen
                   onClose={() => setShowAiChat(false)}
                   projectContext={projectName}
-                  onApplyCode={!isOwner ? undefined : (code) => {
-                    if (activeCodeFile) {
-                      updateCodeFileContent(activeCodeFile.id, code)
-                      addToast('Generated code applied to editor!', 'success')
-                    } else {
-                      addToast('No active code file selected', 'error')
-                    }
-                  }}
                   readOnly={!isOwner}
                 />
               </EditorFeatureBoundary>

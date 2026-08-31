@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Settings, Globe, Lock, Save, Trash2, Cpu, Search } from 'lucide-react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { projectApi } from '../../api/services'
+import { aiApi, projectApi } from '../../api/services'
 import { useProjectStore } from '../../store/projectStore'
 import { Modal } from '../../components/ui/Modal'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
@@ -10,6 +10,7 @@ import { FieldShell, TextInput, Textarea } from '../../components/ui/Field'
 import { Button } from '../../components/ui/Button'
 import { BOARD_CATALOG } from '../canvas/boardCatalog'
 import type { BoardType } from '../../types/domain'
+import { aiCoverageStatusClass, aiCoverageStatusLabel } from '../ai/aiHardwareCoverage'
 import { useToastStore } from '../../store/useToastStore'
 
 interface Props {
@@ -29,6 +30,12 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const addToast = useToastStore((s) => s.addToast)
+  const hardwareCoverageQuery = useQuery({
+    queryKey: ['ai', 'hardware-coverage'],
+    queryFn: () => aiApi.getHardwareCoverage().then((response) => response.data.data),
+    enabled: isOpen,
+    staleTime: 5 * 60 * 1000,
+  })
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -73,6 +80,11 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
     })
   }, [boardSearch, selectedFamily])
 
+  const hardwareCoverageByType = useMemo(
+    () => new Map((hardwareCoverageQuery.data?.entries ?? []).map((entry) => [entry.boardType, entry])),
+    [hardwareCoverageQuery.data],
+  )
+
   const updateMutation = useMutation({
     mutationFn: () =>
       projectApi.update(currentProject!.id, {
@@ -81,6 +93,7 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
         isPublic,
         boardType,
         tags,
+        expectedRevision: currentProject!.updatedAt,
       }),
     onSuccess: (res) => {
       setCurrentProject(res.data.data)
@@ -216,6 +229,17 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
                   >
                     <Cpu size={14} />
                     <span>{board.name}</span>
+                    {(() => {
+                      const coverage = hardwareCoverageByType.get(board.type)
+                      return coverage ? (
+                        <span
+                          className={`vf-settings-board-support ${aiCoverageStatusClass(coverage.status)}`}
+                          title={coverage.reason}
+                        >
+                          {aiCoverageStatusLabel(coverage.status)}
+                        </span>
+                      ) : null
+                    })()}
                   </button>
                 ))}
                 {filteredBoards.length === 0 && (
@@ -223,6 +247,13 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
                 )}
               </div>
             </div>
+            <p className="vf-settings-ai-coverage-note">
+              {hardwareCoverageQuery.isLoading
+                ? 'Loading AI hardware coverage…'
+                : hardwareCoverageQuery.isError
+                  ? 'AI coverage is unavailable; selecting a board does not imply electrical verification.'
+                  : `${hardwareCoverageQuery.data?.summary.verified ?? 0} exact variants verified · ${hardwareCoverageQuery.data?.summary.variantRequired ?? 0} require variant selection · ${hardwareCoverageQuery.data?.summary.unsupported ?? 0} not curated`}
+            </p>
           </FieldShell>
 
           <FieldShell

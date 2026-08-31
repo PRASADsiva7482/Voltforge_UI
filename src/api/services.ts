@@ -5,6 +5,8 @@ import type {
   AiChatResponse,
   AiGenerateRequest,
   AiGenerateResponse,
+  AiHardwareCoverageResponse,
+  AiMemoryState,
   AiValidationResponse,
   ApiResponse,
   CreateProjectRequest,
@@ -69,6 +71,7 @@ export const componentApi = {
 
 export const aiApi = {
   chat: (data: AiChatRequest) => api.post<ApiResponse<AiChatResponse>>('/ai/chat', data),
+  getHardwareCoverage: () => api.get<ApiResponse<AiHardwareCoverageResponse>>('/ai/hardware-coverage'),
   /** SSE streaming chat — returns a raw fetch Response for ReadableStream consumption. */
   chatStream: async (data: AiChatRequest, signal?: AbortSignal): Promise<Response> => {
     const headers: Record<string, string> = {
@@ -96,6 +99,18 @@ export const aiApi = {
     }
     return response
   },
+  inspectMemory: (projectId: string, sessionId?: string, projectRevision?: string) =>
+    api.get<ApiResponse<AiMemoryState>>('/ai/memory', { params: { projectId, sessionId, projectRevision } }),
+  setMemoryPreference: (projectId: string, enabled: boolean, sessionId?: string, clearOnDisable = false) =>
+    api.put<ApiResponse<AiMemoryState>>('/ai/memory/preferences', { enabled, clearOnDisable }, { params: { projectId, sessionId } }),
+  createMemoryEntry: (projectId: string, data: { approved: true; content: string; kind: 'fact' | 'decision' | 'summary'; projectRevision: string; scope: 'project' | 'session' }, sessionId?: string) =>
+    api.post<ApiResponse<{ entry: unknown; memory: AiMemoryState }>>('/ai/memory/entries', data, { params: { projectId, sessionId } }),
+  correctMemoryEntry: (projectId: string, memoryId: string, data: { approved: true; content: string; expectedVersion: number; projectRevision: string }, sessionId?: string) =>
+    api.patch<ApiResponse<unknown>>(`/ai/memory/entries/${encodeURIComponent(memoryId)}`, data, { params: { projectId, sessionId } }),
+  deleteMemoryEntry: (projectId: string, memoryId: string, sessionId?: string) =>
+    api.delete<ApiResponse<unknown>>(`/ai/memory/entries/${encodeURIComponent(memoryId)}`, { params: { projectId, sessionId } }),
+  clearMemory: (projectId: string, scope: 'project' | 'session', sessionId?: string) =>
+    api.delete<ApiResponse<unknown>>('/ai/memory', { params: { projectId, scope, sessionId } }),
   generateCircuit: (data: AiGenerateRequest) => api.post<ApiResponse<AiGenerateResponse>>('/ai/generate-circuit', data),
   generateCode: (data: AiGenerateRequest) => api.post<ApiResponse<AiGenerateResponse>>('/ai/generate-code', data),
   reviewCode: (data: { boardType?: string; code: string; componentTypes?: string[] }) => api.post<ApiResponse<unknown>>('/ai/review-code', data),

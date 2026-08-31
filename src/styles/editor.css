@@ -1923,6 +1923,7 @@
 .vf-settings-board-card {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 10px 14px;
   border: 1px solid var(--vf-border);
@@ -1941,6 +1942,33 @@
   border-color: var(--vf-teal);
   background: var(--vf-teal-soft);
   color: var(--vf-teal);
+}
+.vf-settings-board-support {
+  margin-left: auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.vf-settings-board-support.is-verified {
+  background: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+}
+.vf-settings-board-support.is-variant-required {
+  background: rgba(217, 119, 6, 0.14);
+  color: #a16207;
+}
+.vf-settings-board-support.is-unsupported {
+  background: rgba(100, 116, 139, 0.14);
+  color: var(--vf-text-muted);
+}
+.vf-settings-ai-coverage-note {
+  margin: 8px 2px 0;
+  color: var(--vf-text-muted);
+  font-size: 10px;
+  line-height: 1.45;
 }
 .vf-settings-board-empty {
   grid-column: 1 / -1;

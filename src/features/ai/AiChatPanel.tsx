@@ -1,22 +1,38 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Bot, Brain, Code2, Plus, Send, Sparkles, Trash2, User, Wrench, Zap } from 'lucide-react'
+import { Bot, Brain, Send, Sparkles, User } from 'lucide-react'
 import { useCanvasStore } from '../../store/canvasStore'
 import { useProjectStore } from '../../store/projectStore'
 import { useSimulationStore } from '../../store/simulationStore'
 import { useToastStore } from '../../store/useToastStore'
 import { aiApi } from '../../api/services'
 import { buildCircuitNetlist } from '../canvas/netlist'
-import { getPinsForComponent } from '../canvas/pinRegistry'
-import { validateAiWire } from './aiWireValidation'
 import { Textarea } from '../../components/ui/Field'
 import { SuggestionsList } from '../../components/ui/SuggestionsList'
 import { CodeBlock } from '../../components/ui/CodeBlock'
-import type { AiAction, AiCitation, AiCodeFix, AiWireSuggestion, CanvasNode, Wire } from '../../types/domain'
+import type { AiAction, AiArtifactIdentity, AiCitation, AiCodeFix, AiEngineeringAuthority, AiGroundingReport, AiInternetRetrievalStatus, AiLocalRetrievalStatus, AiMemoryState, AiWireSuggestion } from '../../types/domain'
+import { AiProposalReview } from './AiProposalReview'
+import {
+  buildAiProposal,
+  calculateEditorRevision,
+  defaultAiProposalSelection,
+  isAiProposalCurrent,
+  type AiProposal,
+} from './aiProposal'
+import { planAiProposalChanges } from './aiProposalTransaction'
+import {
+  classifyAiStart,
+  classifyAiTerminal,
+  collectAiSources,
+  describeAiRun,
+  safeAiErrorMessage,
+  type AiRunMetadata,
+  type AiRunState,
+  type AiUncertainty,
+} from './aiPresentation'
 
 interface Props {
   isOpen: boolean
   readOnly?: boolean
-  onApplyCode?: (code: string) => void
   onClose: () => void
   projectContext?: string
 }
@@ -27,66 +43,104 @@ interface Message {
   codeFixes?: AiCodeFix[]
   content: string
   confidence?: number
+  grounding?: AiGroundingReport
   isStreaming?: boolean
+  errorCode?: string
+  proposal?: AiProposal
   removals?: AiAction[]
   role: 'user' | 'assistant'
+  runDetail?: string
+  runState?: AiRunState
+  runStatus?: string
+  sourceMetadata?: AiRunMetadata
   thought?: string
+  uncertainty?: AiUncertainty
   valueChanges?: AiAction[]
   wireSuggestions?: AiWireSuggestion[]
 }
 
-function pinRef(ref?: string) {
-  const [nodeId, pinId] = String(ref || '').split('/')
-  return nodeId && pinId ? { nodeId, pinId } : null
+interface AppliedAiTransaction {
+  afterEditorRevision: string
+  beforeCode?: string
+  canvasChanged: boolean
+  codeFileId?: string
+  projectId?: string
+  proposalId: string
 }
 
-function resistanceValue(value?: string) {
-  const numeric = Number(String(value || '').replace(/[^0-9.]/g, ''))
-  return Number.isFinite(numeric) && numeric > 0 ? numeric : 220
+const evidenceKindLabels: Record<NonNullable<AiCitation['evidenceKind']>, string> = {
+  deterministic: 'Deterministic check',
+  internet: 'Internet source',
+  local: 'Local knowledge',
+  project: 'Project evidence',
 }
 
-function parseActionValue(value: unknown) {
-  if (typeof value === 'number' || typeof value === 'boolean') return value
-  const text = String(value ?? '').trim()
-  const numeric = Number(text.replace(/[^0-9.+-]/g, ''))
-  return Number.isFinite(numeric) && /[0-9]/.test(text) ? numeric : text
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
-function hasWire(wires: Wire[], fromNodeId: string, fromPinId: string, toNodeId: string, toPinId: string) {
-  return wires.some((wire) =>
-    (wire.fromNodeId === fromNodeId && wire.fromPinId === fromPinId && wire.toNodeId === toNodeId && wire.toPinId === toPinId) ||
-    (wire.fromNodeId === toNodeId && wire.fromPinId === toPinId && wire.toNodeId === fromNodeId && wire.toPinId === fromPinId)
-  )
-}
-
-function makeWire(suggestion: AiWireSuggestion): Wire {
-  return {
-    bendPoints: [],
-    color: suggestion.color || '#3b82f6',
-    fromNodeId: suggestion.fromComponentId,
-    fromPinId: suggestion.fromPin,
-    id: `ai_wire_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    routingMode: 'auto',
-    toNodeId: suggestion.toComponentId,
-    toPinId: suggestion.toPin,
+function mergeAiRunMetadata(event: Record<string, unknown>, previous: AiRunMetadata = {}): AiRunMetadata {
+  const next = { ...previous }
+  if (event.mode === 'neural-quality-gated' || event.mode === 'deterministic-fallback' || event.mode === 'unavailable') {
+    next.mode = event.mode
   }
+  if (event.model === 'voltforge-local-engine-v1') next.model = event.model
+  if (typeof event.projectRevision === 'string') next.projectRevision = event.projectRevision
+  if (typeof event.fallbackReasonCode === 'string') next.fallbackReasonCode = event.fallbackReasonCode
+  if (typeof event.fallbackUsed === 'boolean') next.fallbackUsed = event.fallbackUsed
+  if (isRecord(event.artifact)) next.artifact = event.artifact as AiArtifactIdentity
+  if (isRecord(event.engineeringAuthority)) next.engineeringAuthority = event.engineeringAuthority as AiEngineeringAuthority
+  if (isRecord(event.internetRetrieval)) next.internetRetrieval = event.internetRetrieval as AiInternetRetrievalStatus
+  if (isRecord(event.localRetrieval)) next.localRetrieval = event.localRetrieval as AiLocalRetrievalStatus
+  return next
+}
+
+function parseAiUncertainty(event: Record<string, unknown>): AiUncertainty | undefined {
+  const candidate = isRecord(event.uncertainty) ? event.uncertainty : event
+  const missingEvidence = Array.isArray(candidate.missingEvidence)
+    ? candidate.missingEvidence.filter((item): item is string => typeof item === 'string').slice(0, 12)
+    : undefined
+  const level = typeof candidate.level === 'string' ? candidate.level : undefined
+  const reasonCode = typeof candidate.reasonCode === 'string' ? candidate.reasonCode : undefined
+  if (!level && !reasonCode && !missingEvidence?.length) return undefined
+  return { level, missingEvidence, reasonCode }
+}
+
+function patchLastAssistant(messages: Message[], patch: Partial<Message>): Message[] {
+  const updated = [...messages]
+  const last = updated[updated.length - 1]
+  if (last?.role === 'assistant') updated[updated.length - 1] = { ...last, ...patch }
+  return updated
 }
 
 export default function AiChatPanel({
   isOpen,
   readOnly = false,
-  onApplyCode,
   onClose,
   projectContext,
 }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
+  const [runState, setRunState] = useState<AiRunState>('idle')
+  const [runMetadata, setRunMetadata] = useState<AiRunMetadata>({})
   const [sessionId, setSessionId] = useState<string>()
+  const [isMemoryOpen, setIsMemoryOpen] = useState(false)
+  const [memoryState, setMemoryState] = useState<AiMemoryState>()
+  const [memoryLoadState, setMemoryLoadState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle')
+  const [memoryDraft, setMemoryDraft] = useState('')
+  const [editingMemoryId, setEditingMemoryId] = useState<string>()
+  const [editingMemoryContent, setEditingMemoryContent] = useState('')
+  const [isMemoryBusy, setIsMemoryBusy] = useState(false)
+  const [proposalSelections, setProposalSelections] = useState<Record<string, string[]>>({})
+  const [appliedTransaction, setAppliedTransaction] = useState<AppliedAiTransaction>()
+  const [isApplyingProposal, setIsApplyingProposal] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const previousProjectIdRef = useRef<string | undefined>(undefined)
+  const requestSequenceRef = useRef(0)
   
-  const { addNode, addWire, nodes, removeWire, selectedNodeId, selectedWireId, commitNodeUpdate, viewport, wires } = useCanvasStore()
+  const { modelRevision, nodes, selectedNodeId, selectedWireId, viewport, wires } = useCanvasStore()
   const { currentProject, activeCodeFile, updateCodeFileContent } = useProjectStore()
   const addToast = useToastStore((s) => s.addToast)
   const setResultDataConsumer = useSimulationStore((s) => s.setResultDataConsumer)
@@ -95,6 +149,139 @@ export default function AiChatPanel({
     setResultDataConsumer('ai', isOpen)
     return () => setResultDataConsumer('ai', false)
   }, [isOpen, setResultDataConsumer])
+
+  useEffect(() => {
+    const projectId = currentProject?.id
+    const previousProjectId = previousProjectIdRef.current
+    if (previousProjectId !== undefined && previousProjectId !== projectId) {
+      requestSequenceRef.current += 1
+      abortRef.current?.abort()
+      setMessages([])
+      setSessionId(undefined)
+      setIsStreaming(false)
+      setRunState('idle')
+      setRunMetadata({})
+      setMemoryState(undefined)
+      setMemoryLoadState('idle')
+      setMemoryDraft('')
+      setEditingMemoryId(undefined)
+      setEditingMemoryContent('')
+      setProposalSelections({})
+      setAppliedTransaction(undefined)
+    }
+    previousProjectIdRef.current = projectId
+  }, [currentProject?.id])
+
+  const refreshMemory = useCallback(async () => {
+    if (!currentProject?.id) {
+      setMemoryState(undefined)
+      setMemoryLoadState('unavailable')
+      return
+    }
+    setMemoryLoadState('loading')
+    try {
+      const response = await aiApi.inspectMemory(currentProject.id, sessionId, currentProject.updatedAt)
+      setMemoryState(response.data.data)
+      setMemoryLoadState('ready')
+    } catch {
+      // Memory may be unavailable until private gateway authentication is configured.
+      setMemoryState(undefined)
+      setMemoryLoadState('unavailable')
+    }
+  }, [currentProject?.id, currentProject?.updatedAt, sessionId])
+
+  useEffect(() => {
+    if (isOpen && isMemoryOpen) void refreshMemory()
+  }, [isOpen, isMemoryOpen, refreshMemory])
+
+  const setMemoryEnabled = useCallback(async (enabled: boolean) => {
+    if (!currentProject?.id) return
+    setIsMemoryBusy(true)
+    try {
+      const response = await aiApi.setMemoryPreference(currentProject.id, enabled, sessionId)
+      setMemoryState(response.data.data)
+      addToast(enabled ? 'Project memory enabled.' : 'Project memory disabled.', 'success')
+    } catch {
+      addToast('Could not update project memory.', 'error')
+    } finally {
+      setIsMemoryBusy(false)
+    }
+  }, [addToast, currentProject?.id, sessionId])
+
+  const rememberFact = useCallback(async () => {
+    const content = memoryDraft.trim()
+    if (!currentProject?.id || !content) return
+    setIsMemoryBusy(true)
+    try {
+      const response = await aiApi.createMemoryEntry(currentProject.id, {
+        approved: true,
+        content,
+        kind: 'fact',
+        projectRevision: currentProject.updatedAt,
+        scope: 'project',
+      }, sessionId)
+      setMemoryState(response.data.data.memory)
+      setMemoryDraft('')
+      addToast('Approved project fact remembered.', 'success')
+    } catch {
+      addToast('This memory could not be stored. Check for secrets or instruction-like text.', 'error')
+    } finally {
+      setIsMemoryBusy(false)
+    }
+  }, [addToast, currentProject?.id, currentProject?.updatedAt, memoryDraft, sessionId])
+
+  const saveMemoryCorrection = useCallback(async () => {
+    const entry = memoryState?.entries.find((item) => item.memoryId === editingMemoryId)
+    const content = editingMemoryContent.trim()
+    if (!currentProject?.id || !entry || !content) return
+    setIsMemoryBusy(true)
+    try {
+      await aiApi.correctMemoryEntry(currentProject.id, entry.memoryId, {
+        approved: true,
+        content,
+        expectedVersion: entry.version,
+        projectRevision: currentProject.updatedAt,
+      }, sessionId)
+      setEditingMemoryId(undefined)
+      setEditingMemoryContent('')
+      await refreshMemory()
+      addToast('Memory corrected and rebound to the current project revision.', 'success')
+    } catch {
+      addToast('Memory changed or the correction was rejected. Inspect it again.', 'error')
+    } finally {
+      setIsMemoryBusy(false)
+    }
+  }, [addToast, currentProject?.id, currentProject?.updatedAt, editingMemoryContent, editingMemoryId, memoryState?.entries, refreshMemory, sessionId])
+
+  const deleteMemory = useCallback(async (memoryId: string) => {
+    if (!currentProject?.id) return
+    setIsMemoryBusy(true)
+    try {
+      await aiApi.deleteMemoryEntry(currentProject.id, memoryId, sessionId)
+      await refreshMemory()
+      addToast('Memory deleted.', 'success')
+    } catch {
+      addToast('Could not delete memory.', 'error')
+    } finally {
+      setIsMemoryBusy(false)
+    }
+  }, [addToast, currentProject?.id, refreshMemory, sessionId])
+
+  const clearMemory = useCallback(async (scope: 'project' | 'session') => {
+    if (!currentProject?.id) return
+    const label = scope === 'project' ? 'all project memory' : 'this session memory'
+    if (!window.confirm(`Clear ${label}? This cannot be undone.`)) return
+    setIsMemoryBusy(true)
+    try {
+      await aiApi.clearMemory(currentProject.id, scope, sessionId)
+      await refreshMemory()
+      addToast(`${scope === 'project' ? 'Project' : 'Session'} memory cleared.`, 'success')
+    } catch {
+      addToast('Could not clear memory.', 'error')
+    } finally {
+      setIsMemoryBusy(false)
+    }
+  }, [addToast, currentProject?.id, refreshMemory, sessionId])
 
   const buildPayload = useCallback(() => {
     const simState = useSimulationStore.getState()
@@ -169,6 +356,7 @@ export default function AiChatPanel({
       simulationState,
       sessionId,
       projectId: currentProject?.id,
+      projectRevision: currentProject?.updatedAt,
       files: (currentProject?.codeFiles || []).slice(0, 5).map((file) => ({
         content: file.content.slice(0, 60_000),
         filename: file.filename,
@@ -182,13 +370,43 @@ export default function AiChatPanel({
 
   const handleSendStream = useCallback(async (userMessage: string) => {
     const payload = buildPayload()
+    const sourceEditorRevision = calculateEditorRevision(nodes, wires, currentProject?.codeFiles || [], modelRevision)
+    const requestId = requestSequenceRef.current + 1
+    requestSequenceRef.current = requestId
+    let requestMetadata: AiRunMetadata = {}
+    let terminalState: AiRunState | undefined
+    let contentCharacters = 0
+    let sawDone = false
+
+    const updateMetadata = (event: Record<string, unknown>) => {
+      if (requestId !== requestSequenceRef.current) return requestMetadata
+      requestMetadata = mergeAiRunMetadata(event, requestMetadata)
+      setRunMetadata(requestMetadata)
+      return requestMetadata
+    }
+
+    const setAssistantStatus = (state: AiRunState, patch: Partial<Message> = {}) => {
+      if (requestId !== requestSequenceRef.current) return
+      const presentation = describeAiRun(state, requestMetadata)
+      setRunState(state)
+      setMessages((prev) => patchLastAssistant(prev, {
+        ...patch,
+        runDetail: presentation.detail,
+        runState: state,
+        runStatus: presentation.label,
+        sourceMetadata: requestMetadata,
+      }))
+    }
 
     // Add user message and empty assistant placeholder
     setMessages((prev) => [
       ...prev,
       { role: 'user', content: userMessage },
-      { role: 'assistant', content: '', thought: '', isStreaming: true },
+      { role: 'assistant', content: '', isStreaming: true, runState: 'connecting', runStatus: 'Connecting' },
     ])
+    setRunState('connecting')
+    setRunMetadata({})
+    setAppliedTransaction(undefined)
     setIsStreaming(true)
 
     const controller = new AbortController()
@@ -213,13 +431,14 @@ export default function AiChatPanel({
 
         const { done, value } = await reader.read()
         if (done) break
-        if (controller.signal.aborted) break
+        if (controller.signal.aborted || requestId !== requestSequenceRef.current) break
 
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
         buffer = lines.pop() || '' // Retain only incomplete trailing chunk
 
         for (const line of lines) {
+          if (requestId !== requestSequenceRef.current) break
           let trimmed = line.trim()
           if (!trimmed) continue
 
@@ -233,48 +452,88 @@ export default function AiChatPanel({
           }
 
           if (trimmed === '[DONE]') {
+            sawDone = true
             setIsStreaming(false)
             continue
           }
 
           try {
-            const event = JSON.parse(trimmed)
+            const envelope = JSON.parse(trimmed)
+            const canonicalPayload = envelope.payload && typeof envelope.payload === 'object'
+              ? envelope.payload
+              : {}
+            // VFAI-026 reads the canonical typed payload while retaining
+            // compatibility with pre-contract flat SSE events.
+            const event = { ...envelope, ...canonicalPayload }
             const eventType = currentEventType || event.type || ''
 
             if (eventType === 'start') {
+              const metadata = updateMetadata(event)
               if (event.sessionId) setSessionId(event.sessionId)
-              const source = event.mode === 'local-deterministic'
-                ? 'Using the offline VoltForge engineering engine. A release-approved neural model is not active yet.'
-                : `Using ${event.model || 'the local VoltForge model'}.`
-              setMessages((prev) => {
-                const updated = [...prev]
-                const last = updated[updated.length - 1]
-                if (last?.role === 'assistant') {
-                  updated[updated.length - 1] = { ...last, thought: `${source}\n` }
-                }
-                return updated
-              })
+              const state = classifyAiStart(metadata.mode)
+              const presentation = describeAiRun(state, metadata)
+              setRunState(state)
+              setMessages((prev) => patchLastAssistant(prev, {
+                runDetail: presentation.detail,
+                runState: state,
+                runStatus: presentation.label,
+                sourceMetadata: metadata,
+                thought: `${presentation.detail}\n`,
+              }))
             } else if (eventType === 'thought' || eventType === 'tool' || eventType === 'status') {
-              const thoughtText = event.summary || event.step || event.content || ''
+              const thoughtValue = event.summary || event.step || event.content
+              const thoughtText = typeof thoughtValue === 'string' ? thoughtValue : ''
               if (thoughtText) {
+                setMessages((prev) => {
+                  const last = prev[prev.length - 1]
+                  if (last?.role !== 'assistant') return prev
+                  const existingThought = last.thought || ''
+                  if (existingThought.includes(thoughtText)) return prev
+                  return patchLastAssistant(prev, {
+                    thought: existingThought + thoughtText + '\n',
+                    runDetail: describeAiRun('checking', requestMetadata).detail,
+                    runState: 'checking',
+                    runStatus: describeAiRun('checking', requestMetadata).label,
+                    sourceMetadata: requestMetadata,
+                  })
+                })
+                setRunState('checking')
+              }
+            } else if (eventType === 'uncertainty') {
+              const uncertainty = parseAiUncertainty(event)
+              if (uncertainty) {
+                const missing = uncertainty.missingEvidence?.length
+                  ? ` Missing: ${uncertainty.missingEvidence.join(', ').replaceAll('_', ' ').toLowerCase()}.`
+                  : ''
+                setAssistantStatus('checking', {
+                  thought: `Evidence review: ${uncertainty.reasonCode || 'additional support is required'}.${missing}\n`,
+                  uncertainty,
+                })
+              }
+            } else if (eventType === 'citation') {
+              if (event.title || event.citationId) {
                 setMessages((prev) => {
                   const updated = [...prev]
                   const last = updated[updated.length - 1]
                   if (last?.role === 'assistant') {
-                    const existingThought = last.thought || ''
-                    if (!existingThought.includes(thoughtText)) {
-                      updated[updated.length - 1] = {
-                        ...last,
-                        thought: existingThought + thoughtText + '\n',
-                      }
-                    }
+                    const citation = event as AiCitation
+                    const citations = [...(last.citations || [])]
+                    const existingIndex = citations.findIndex((item) =>
+                      item.citationId && item.citationId === citation.citationId
+                    )
+                    if (existingIndex >= 0) citations[existingIndex] = citation
+                    else citations.push(citation)
+                    updated[updated.length - 1] = { ...last, citations: citations.slice(0, 25) }
                   }
                   return updated
                 })
               }
             } else if (eventType === 'token' || eventType === 'delta') {
-              const tokenText = event.delta || event.token || event.content || ''
+              const tokenValue = event.delta ?? event.token ?? event.content
+              const tokenText = typeof tokenValue === 'string' ? tokenValue : ''
               if (tokenText) {
+                contentCharacters += tokenText.length
+                setRunState('streaming')
                 setMessages((prev) => {
                   const updated = [...prev]
                   const last = updated[updated.length - 1]
@@ -282,63 +541,96 @@ export default function AiChatPanel({
                     updated[updated.length - 1] = {
                       ...last,
                       content: (last.content || '') + tokenText,
+                      runDetail: describeAiRun('streaming', requestMetadata).detail,
+                      runState: 'streaming',
+                      runStatus: describeAiRun('streaming', requestMetadata).label,
+                      sourceMetadata: requestMetadata,
                     }
                   }
                   return updated
                 })
               }
             } else if (eventType === 'proposal') {
-              setMessages((prev) => {
-                const updated = [...prev]
-                const last = updated[updated.length - 1]
-                if (last?.role === 'assistant') {
-                  updated[updated.length - 1] = {
-                    ...last,
-                    additions: event.additions || last.additions,
-                    removals: event.removals || last.removals,
-                    valueChanges: event.valueChanges || last.valueChanges,
-                    wireSuggestions: event.wireSuggestions || last.wireSuggestions,
-                    codeFixes: event.codeFixes || last.codeFixes,
-                  }
-                }
-                return updated
+              const proposal = buildAiProposal({
+                additions: Array.isArray(event.additions) ? event.additions as AiAction[] : [],
+                codeFixes: Array.isArray(event.codeFixes) ? event.codeFixes as AiCodeFix[] : [],
+                id: typeof event.eventId === 'string' ? event.eventId : `ai-${requestId}-proposal`,
+                projectId: currentProject?.id,
+                removals: Array.isArray(event.removals) ? event.removals as AiAction[] : [],
+                sourceEditorRevision,
+                sourceProjectRevision: requestMetadata.projectRevision || currentProject?.updatedAt,
+                valueChanges: Array.isArray(event.valueChanges) ? event.valueChanges as AiAction[] : [],
+                wireSuggestions: Array.isArray(event.wireSuggestions) ? event.wireSuggestions as AiWireSuggestion[] : [],
+              })
+              setAssistantStatus('checking', {
+                additions: event.additions || undefined,
+                removals: event.removals || undefined,
+                valueChanges: event.valueChanges || undefined,
+                wireSuggestions: event.wireSuggestions || undefined,
+                codeFixes: event.codeFixes || undefined,
+                proposal,
               })
             } else if (eventType === 'error') {
-              const errorMessage = event.message || event.error || 'The AI response stopped unexpectedly.'
+              const code = typeof event.code === 'string' ? event.code : undefined
+              const state = classifyAiTerminal('error', code, contentCharacters)
+              const errorMessage = safeAiErrorMessage(code)
+              terminalState = state
               setIsStreaming(false)
+              const presentation = describeAiRun(state, requestMetadata)
+              setRunState(state)
               setMessages((prev) => {
-                const updated = [...prev]
-                const last = updated[updated.length - 1]
-                if (last?.role === 'assistant') {
-                  updated[updated.length - 1] = {
-                    ...last,
-                    content: last.content ? `${last.content}\n\n${errorMessage}` : errorMessage,
-                    isStreaming: false,
-                  }
-                }
-                return updated
+                const last = prev[prev.length - 1]
+                return patchLastAssistant(prev, {
+                  content: last?.content ? `${last.content}\n\n${errorMessage}` : errorMessage,
+                  errorCode: code,
+                  isStreaming: false,
+                  runDetail: presentation.detail,
+                  runState: state,
+                  runStatus: presentation.label,
+                  sourceMetadata: requestMetadata,
+                })
               })
-            } else if (eventType === 'metadata' || eventType === 'done' || eventType === 'complete' || event.reply) {
+            } else if (eventType === 'metadata') {
+              updateMetadata(event)
+            } else if (eventType === 'done' || eventType === 'complete' || event.reply) {
+              const metadata = updateMetadata(event)
               if (event.sessionId) setSessionId(event.sessionId)
+              terminalState = classifyAiTerminal('complete', undefined, contentCharacters)
               setIsStreaming(false)
+              const completeContent = typeof event.reply === 'string' ? event.reply : ''
+              if (completeContent) contentCharacters = Math.max(contentCharacters, completeContent.length)
+              const presentation = describeAiRun('complete', metadata)
+              const proposalFromEvent = buildAiProposal({
+                additions: Array.isArray(event.additions) ? event.additions as AiAction[] : [],
+                codeFixes: Array.isArray(event.codeFixes) ? event.codeFixes as AiCodeFix[] : [],
+                id: typeof event.eventId === 'string' ? event.eventId : `ai-${requestId}-complete`,
+                projectId: currentProject?.id,
+                removals: Array.isArray(event.removals) ? event.removals as AiAction[] : [],
+                sourceEditorRevision,
+                sourceProjectRevision: metadata.projectRevision || currentProject?.updatedAt,
+                valueChanges: Array.isArray(event.valueChanges) ? event.valueChanges as AiAction[] : [],
+                wireSuggestions: Array.isArray(event.wireSuggestions) ? event.wireSuggestions as AiWireSuggestion[] : [],
+              })
+              setRunState('complete')
               setMessages((prev) => {
-                const updated = [...prev]
-                const last = updated[updated.length - 1]
-                if (last?.role === 'assistant') {
-                  updated[updated.length - 1] = {
-                    ...last,
-                    isStreaming: false,
-                    content: event.reply || last.content || (event.error ? `Error: ${event.error}` : last.content),
-                    confidence: typeof event.confidence === 'number' ? event.confidence : last.confidence,
-                    citations: event.citations || last.citations,
-                    wireSuggestions: event.wireSuggestions || last.wireSuggestions,
-                    additions: event.additions || last.additions,
-                    removals: event.removals || last.removals,
-                    valueChanges: event.valueChanges || last.valueChanges,
-                    codeFixes: event.codeFixes || last.codeFixes,
-                  }
-                }
-                return updated
+                const last = prev[prev.length - 1]
+                return patchLastAssistant(prev, {
+                  additions: event.additions || undefined,
+                  citations: event.citations || undefined,
+                  codeFixes: event.codeFixes || undefined,
+                  confidence: typeof event.confidence === 'number' ? event.confidence : last?.confidence,
+                  content: completeContent || last?.content || '',
+                  grounding: event.grounding || undefined,
+                  isStreaming: false,
+                  proposal: proposalFromEvent || last?.proposal,
+                  removals: event.removals || undefined,
+                  runDetail: presentation.detail,
+                  runState: 'complete',
+                  runStatus: presentation.label,
+                  sourceMetadata: metadata,
+                  valueChanges: event.valueChanges || undefined,
+                  wireSuggestions: event.wireSuggestions || undefined,
+                })
               })
             }
             currentEventType = ''
@@ -349,35 +641,62 @@ export default function AiChatPanel({
       }
 
 
-    } catch (err) {
-      if (!controller.signal.aborted) {
-        console.error('Stream error:', err)
-        setMessages((prev) => {
-          const updated = [...prev]
-          const last = updated[updated.length - 1]
-          if (last?.role === 'assistant' && last.isStreaming) {
-            updated[updated.length - 1] = {
-              ...last,
-              content: last.content || 'Sorry, I encountered an error. Please try again.',
-              isStreaming: false,
-            }
-          }
-          return updated
-        })
+    } catch {
+      if (!controller.signal.aborted && requestId === requestSequenceRef.current) {
+        terminalState = 'offline'
+        const presentation = describeAiRun('offline', requestMetadata)
+        setRunState('offline')
+        setMessages((prev) => patchLastAssistant(prev, {
+          content: prev[prev.length - 1]?.content || safeAiErrorMessage(),
+          isStreaming: false,
+          runDetail: presentation.detail,
+          runState: 'offline',
+          runStatus: presentation.label,
+          sourceMetadata: requestMetadata,
+        }))
       }
     } finally {
-      setIsStreaming(false)
-      abortRef.current = null
-      // Mark streaming as complete for any remaining messages
-      setMessages((prev) =>
-        prev.map((m) => (m.isStreaming ? {
-          ...m,
-          content: m.content || (controller.signal.aborted ? 'Response stopped.' : 'No response was returned.'),
-          isStreaming: false,
-        } : m))
-      )
+      if (requestId === requestSequenceRef.current) {
+        const finalState: AiRunState = controller.signal.aborted
+          ? (contentCharacters > 0 ? 'partial' : 'cancelled')
+          : terminalState || (sawDone ? 'complete' : 'error')
+        const presentation = describeAiRun(finalState, requestMetadata)
+        setRunState(finalState)
+        setIsStreaming(false)
+        abortRef.current = null
+        if (isMemoryOpen) void refreshMemory()
+        setMessages((prev) =>
+          prev.map((m) => (m.isStreaming ? {
+            ...m,
+            content: m.content || (finalState === 'partial'
+              ? 'The response stopped before completion. Review it before using it.'
+              : finalState === 'cancelled'
+                ? 'The response was canceled. No project changes were made.'
+                : finalState === 'error'
+                  ? safeAiErrorMessage()
+                  : finalState === 'complete' ? 'No response was returned.' : m.content),
+            isStreaming: false,
+            runDetail: presentation.detail,
+            runState: finalState,
+            runStatus: presentation.label,
+            sourceMetadata: requestMetadata,
+          } : m))
+        )
+      }
     }
-  }, [buildPayload])
+  }, [buildPayload, currentProject?.codeFiles, currentProject?.id, currentProject?.updatedAt, isMemoryOpen, modelRevision, nodes, refreshMemory, wires])
+
+  const cancelStream = useCallback(() => {
+    if (!abortRef.current) return
+    abortRef.current.abort()
+    setRunState('cancelled')
+  }, [])
+
+  const closePanel = useCallback(() => {
+    abortRef.current?.abort()
+    setIsStreaming(false)
+    onClose()
+  }, [onClose])
 
   const handleSend = () => {
     const msg = input.trim()
@@ -406,128 +725,114 @@ export default function AiChatPanel({
     }
   }, [])
 
-  const applyWireSuggestion = (suggestion: AiWireSuggestion) => {
-    if (readOnly) return
-    const validationError = validateAiWire(nodes, suggestion)
-    if (validationError) {
-      addToast(validationError, 'error')
-      return
-    }
-    if (hasWire(wires, suggestion.fromComponentId, suggestion.fromPin, suggestion.toComponentId, suggestion.toPin)) {
-      addToast('Wire already exists.', 'info')
-      return
-    }
-    addWire(makeWire(suggestion))
-    addToast('AI wire suggestion applied.', 'success')
-  }
-
-  const applyRemoval = (action: AiAction) => {
-    if (readOnly) return
-    if (!action.wireId) {
-      addToast('This removal does not reference a specific wire.', 'error')
-      return
-    }
-    removeWire(action.wireId)
-    addToast('AI removal applied.', 'success')
-  }
-
-  const applyAddition = (action: AiAction) => {
-    if (readOnly) return
-    const componentType = String(action.componentType || '').toUpperCase()
-    if (!['RESISTOR', 'DIODE'].includes(componentType) || !action.between || action.between.length < 2) {
-      addToast('This addition can be reviewed manually.', 'info')
-      return
-    }
-    const first = pinRef(action.between[0])
-    const second = pinRef(action.between[1])
-    if (!first || !second) {
-      addToast('AI addition has incomplete pin references.', 'error')
-      return
-    }
-
-    const firstNode = nodes.find((node) => node.id === first.nodeId)
-    const secondNode = nodes.find((node) => node.id === second.nodeId)
-    const x = firstNode && secondNode ? (firstNode.x + secondNode.x) / 2 : 220
-    const y = firstNode && secondNode ? (firstNode.y + secondNode.y) / 2 : 220
-    const componentId = `ai_${componentType.toLowerCase()}_${Date.now()}`
-    const isResistor = componentType === 'RESISTOR'
-    const component: CanvasNode = {
-      componentId,
-      height: isResistor ? 24 : 28,
-      id: componentId,
-      name: isResistor ? `${resistanceValue(action.value)} Ohm Resistor` : 'Flyback Diode',
-      pins: getPinsForComponent(componentType, undefined, isResistor ? 90 : 72, isResistor ? 24 : 28),
-      properties: isResistor
-        ? { resistance: resistanceValue(action.value), power: '0.25W' }
-        : { partNumber: action.value || '1N4007' },
-      rotation: 0,
-      type: componentType,
-      width: isResistor ? 90 : 72,
-      x,
-      y,
-    }
-    addNode(component)
-    addWire({
-      bendPoints: [],
-      color: isResistor ? '#f59e0b' : '#6366f1',
-      fromNodeId: first.nodeId,
-      fromPinId: first.pinId,
-      id: `ai_wire_${Date.now()}_a`,
-      routingMode: 'auto',
-      toNodeId: componentId,
-      toPinId: isResistor ? 'p1' : 'anode',
+  const toggleProposalItem = (proposal: AiProposal, itemId: string) => {
+    setProposalSelections((previous) => {
+      const selected = previous[proposal.id] || defaultAiProposalSelection(proposal)
+      return {
+        ...previous,
+        [proposal.id]: selected.includes(itemId)
+          ? selected.filter((id) => id !== itemId)
+          : [...selected, itemId],
+      }
     })
-    addWire({
-      bendPoints: [],
-      color: isResistor ? '#f59e0b' : '#6366f1',
-      fromNodeId: componentId,
-      fromPinId: isResistor ? 'p2' : 'cathode',
-      id: `ai_wire_${Date.now()}_b`,
-      routingMode: 'auto',
-      toNodeId: second.nodeId,
-      toPinId: second.pinId,
-    })
-    addToast(`AI ${isResistor ? 'resistor' : 'diode'} addition applied.`, 'success')
   }
 
-  const applyValueChange = (action: AiAction) => {
-    if (!action.componentId || !action.property) {
-      addToast('This value change is missing a target property.', 'error')
+  const applyProposal = (proposal: AiProposal, selectedIds: string[]) => {
+    if (readOnly || isApplyingProposal) return
+    if (!currentProject?.id) {
+      addToast('No project is loaded for this proposal.', 'error')
       return
     }
-    const node = nodes.find((item) => item.id === action.componentId)
-    if (!node) {
-      addToast('Could not find the target component.', 'error')
+
+    const currentProjectState = useProjectStore.getState()
+    const currentCanvasState = useCanvasStore.getState()
+    const currentEditorRevision = calculateEditorRevision(
+      currentCanvasState.nodes,
+      currentCanvasState.wires,
+      currentProjectState.currentProject?.codeFiles || [],
+      currentCanvasState.modelRevision,
+    )
+    if (!isAiProposalCurrent(proposal, {
+      editorRevision: currentEditorRevision,
+      projectId: currentProjectState.currentProject?.id,
+      projectRevision: currentProjectState.currentProject?.updatedAt,
+    })) {
+      addToast('This AI proposal is stale. Regenerate it against the current project revision.', 'error')
       return
     }
-    const nextValue = parseActionValue(action.newValue ?? action.value)
-    if (readOnly) return
-    commitNodeUpdate(action.componentId, {
-      properties: {
-        ...node.properties,
-        [action.property]: nextValue,
-      },
+
+    const selected = proposal.items.filter((item) => selectedIds.includes(item.id))
+    if (selected.length === 0) {
+      addToast('Select at least one proposed change to apply.', 'info')
+      return
+    }
+
+    setIsApplyingProposal(true)
+    const plan = planAiProposalChanges(proposal, selectedIds, {
+      activeCodeFile: currentProjectState.activeCodeFile,
+      nodes: currentCanvasState.nodes,
+      wires: currentCanvasState.wires,
     })
-    addToast('AI value change applied.', 'success')
+
+    if (plan.errors.length > 0) {
+      setIsApplyingProposal(false)
+      addToast(`Proposal rejected: ${plan.errors[0]}`, 'error')
+      return
+    }
+
+    const { beforeCode, canvasChanged, codeChanged, nextCode, nextNodes, nextWires } = plan
+    if (!canvasChanged && !codeChanged) {
+      setIsApplyingProposal(false)
+      addToast('The selected proposal does not change the current project.', 'info')
+      return
+    }
+
+    if (canvasChanged) useCanvasStore.getState().commitCanvasSnapshot(nextNodes, nextWires)
+    if (codeChanged && currentProjectState.activeCodeFile && typeof nextCode === 'string') {
+      updateCodeFileContent(currentProjectState.activeCodeFile.id, nextCode)
+    }
+
+    const afterProjectState = useProjectStore.getState()
+    const afterCanvasState = useCanvasStore.getState()
+    const afterEditorRevision = calculateEditorRevision(
+      afterCanvasState.nodes,
+      afterCanvasState.wires,
+      afterProjectState.currentProject?.codeFiles || [],
+      afterCanvasState.modelRevision,
+    )
+    setAppliedTransaction({
+      afterEditorRevision,
+      beforeCode: codeChanged ? beforeCode : undefined,
+      canvasChanged,
+      codeFileId: codeChanged ? currentProjectState.activeCodeFile?.id : undefined,
+      projectId: currentProjectState.currentProject?.id,
+      proposalId: proposal.id,
+    })
+    setIsApplyingProposal(false)
+    addToast(`${selected.length} AI change${selected.length === 1 ? '' : 's'} applied as one reviewable transaction.`, 'success')
   }
 
-  const applyCodeFix = (fix: AiCodeFix) => {
-    if (readOnly) return
-    if (!activeCodeFile) {
-      addToast('No active code file selected.', 'error')
+  const undoAppliedProposal = (proposal: AiProposal) => {
+    if (!appliedTransaction || appliedTransaction.proposalId !== proposal.id) return
+    const projectState = useProjectStore.getState()
+    const canvasState = useCanvasStore.getState()
+    const currentEditorRevision = calculateEditorRevision(
+      canvasState.nodes,
+      canvasState.wires,
+      projectState.currentProject?.codeFiles || [],
+      canvasState.modelRevision,
+    )
+    if (currentEditorRevision !== appliedTransaction.afterEditorRevision
+      || projectState.currentProject?.id !== appliedTransaction.projectId) {
+      addToast('The editor changed after this AI transaction. Use the normal editor history to review it.', 'error')
       return
     }
-    if (fix.type !== 'replace' || !fix.from || !fix.to) {
-      addToast('This code fix can be reviewed manually.', 'info')
-      return
+    if (appliedTransaction.canvasChanged) useCanvasStore.getState().undo()
+    if (appliedTransaction.codeFileId && typeof appliedTransaction.beforeCode === 'string') {
+      updateCodeFileContent(appliedTransaction.codeFileId, appliedTransaction.beforeCode)
     }
-    const next = activeCodeFile.content.replace(fix.from, fix.to)
-    if (next === activeCodeFile.content) {
-      addToast('Could not find the target code text.', 'error')
-      return
-    }
-    updateCodeFileContent(activeCodeFile.id, next)
-    addToast('AI code fix applied.', 'success')
+    setAppliedTransaction(undefined)
+    addToast('AI transaction undone.', 'success')
   }
 
   // Inline Markdown parser (bold, italic, code, links)
@@ -684,16 +989,6 @@ export default function AiChatPanel({
         return (
           <div key={i} className="vf-ai-chat__code-wrap">
             <CodeBlock code={code} language="cpp" />
-            {onApplyCode && (
-              <button
-                onClick={() => onApplyCode(code)}
-                className="vf-ai-chat__apply-btn"
-                type="button"
-              >
-                <Code2 size={12} />
-                <span>Apply to Editor</span>
-              </button>
-            )}
           </div>
         )
       }
@@ -707,70 +1002,33 @@ export default function AiChatPanel({
 
 
   const renderMessageActions = (msg: Message) => {
-    if (msg.role !== 'assistant' || msg.isStreaming) return null
-    const hasActions = Boolean(
-      msg.wireSuggestions?.length ||
-      msg.additions?.length ||
-      msg.valueChanges?.length ||
-      msg.removals?.length ||
-      msg.codeFixes?.length
+    if (msg.role !== 'assistant' || msg.isStreaming || !msg.proposal) return null
+    const selectedIds = proposalSelections[msg.proposal.id] || defaultAiProposalSelection(msg.proposal)
+    const currentRevision = calculateEditorRevision(nodes, wires, currentProject?.codeFiles || [], modelRevision)
+    const isStale = !isAiProposalCurrent(msg.proposal, {
+      editorRevision: currentRevision,
+      projectId: currentProject?.id,
+      projectRevision: currentProject?.updatedAt,
+    })
+    const undoAvailable = Boolean(
+      appliedTransaction?.proposalId === msg.proposal.id
+      && appliedTransaction.afterEditorRevision === currentRevision,
     )
-    if (!hasActions) return null
-
     return (
-      <div className="vf-ai-chat__actions">
-        {msg.wireSuggestions?.slice(0, 6).map((suggestion, i) => (
-          <div key={`wire-${i}`} className="vf-ai-action">
-            <span>{suggestion.description || `${suggestion.fromComponentId}/${suggestion.fromPin} -> ${suggestion.toComponentId}/${suggestion.toPin}`}</span>
-            <button className="vf-ai-chat__apply-btn" type="button" onClick={() => applyWireSuggestion(suggestion)}>
-              <Zap size={12} />
-              <span>Apply Wire</span>
-            </button>
-          </div>
-        ))}
-
-        {msg.additions?.slice(0, 4).map((action, i) => (
-          <div key={`add-${i}`} className="vf-ai-action">
-            <span>{action.reason || `${action.componentType || action.type} ${action.value ? `(${action.value})` : ''}`}</span>
-            <button className="vf-ai-chat__apply-btn" type="button" onClick={() => applyAddition(action)}>
-              <Plus size={12} />
-              <span>Add</span>
-            </button>
-          </div>
-        ))}
-
-        {msg.valueChanges?.slice(0, 4).map((action, i) => (
-          <div key={`value-${i}`} className="vf-ai-action">
-            <span>{action.reason || `${action.componentId}.${action.property} -> ${String(action.newValue ?? action.value ?? '')}`}</span>
-            <button className="vf-ai-chat__apply-btn" type="button" onClick={() => applyValueChange(action)}>
-              <Wrench size={12} />
-              <span>Change</span>
-            </button>
-          </div>
-        ))}
-
-        {msg.removals?.slice(0, 4).map((action, i) => (
-          <div key={`remove-${i}`} className="vf-ai-action">
-            <span>{action.reason || action.between?.join(' -> ') || 'Remove unsafe item'}</span>
-            <button className="vf-ai-chat__apply-btn" type="button" onClick={() => applyRemoval(action)}>
-              <Trash2 size={12} />
-              <span>Remove</span>
-            </button>
-          </div>
-        ))}
-
-        {msg.codeFixes?.slice(0, 4).map((fix, i) => (
-          <div key={`code-${i}`} className="vf-ai-action">
-            <span>{fix.description || `${fix.from} -> ${fix.to}`}</span>
-            <button className="vf-ai-chat__apply-btn" type="button" onClick={() => applyCodeFix(fix)}>
-              <Code2 size={12} />
-              <span>Apply Code</span>
-            </button>
-          </div>
-        ))}
-      </div>
+      <AiProposalReview
+        isStale={isStale}
+        isWorking={isApplyingProposal}
+        onApply={() => applyProposal(msg.proposal!, selectedIds)}
+        onToggle={(itemId) => toggleProposalItem(msg.proposal!, itemId)}
+        onUndo={() => undoAppliedProposal(msg.proposal!)}
+        proposal={msg.proposal}
+        selectedIds={selectedIds}
+        undoAvailable={undoAvailable}
+      />
     )
   }
+
+  const runPresentation = describeAiRun(runState, runMetadata)
 
   if (!isOpen) return null
 
@@ -787,15 +1045,110 @@ export default function AiChatPanel({
             <span className="vf-ai-chat__brand-sub">Local project engineering assistant</span>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="vf-ai-chat__close"
-          type="button"
-          aria-label="Close assistant"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-        </button>
+        <div className="vf-ai-chat__header-actions">
+          <button
+            onClick={() => setIsMemoryOpen((value) => !value)}
+            className={`vf-ai-chat__memory-toggle${isMemoryOpen ? ' is-active' : ''}`}
+            type="button"
+            aria-label={`${isMemoryOpen ? 'Close' : 'Inspect'} project memory${memoryState?.enabled ? ` (${memoryState.entryCount} item${memoryState.entryCount === 1 ? '' : 's'})` : ''}`}
+            aria-expanded={isMemoryOpen}
+          >
+            <Brain size={13} />
+            <span>{memoryState?.enabled ? memoryState.entryCount : 0}</span>
+          </button>
+          <button
+            onClick={closePanel}
+            className="vf-ai-chat__close"
+            type="button"
+            aria-label="Close assistant"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </button>
+        </div>
       </header>
+
+      <div className={`vf-ai-chat__status vf-ai-chat__status--${runState}`} role="status" aria-live="polite" aria-atomic="true">
+        <span className="vf-ai-chat__status-indicator" aria-hidden="true" />
+        <div className="vf-ai-chat__status-copy">
+          <strong>{runPresentation.label}</strong>
+          <span className="vf-ai-chat__status-detail">{runPresentation.detail}</span>
+        </div>
+        {sessionId && <span className="vf-ai-chat__status-session">Session active</span>}
+        {isStreaming && (
+          <button type="button" className="vf-ai-chat__cancel" onClick={cancelStream} aria-label="Cancel VoltForge AI response">
+            Stop
+          </button>
+        )}
+      </div>
+
+      {isMemoryOpen && (
+        <section className="vf-ai-chat__memory" aria-labelledby="vf-ai-memory-heading">
+          <div className="vf-ai-chat__memory-heading">
+            <div>
+              <strong id="vf-ai-memory-heading">Bounded project memory</strong>
+              <span>{memoryState?.enabled ? `${memoryState.entryCount} inspectable item(s)` : 'Disabled by default'}</span>
+            </div>
+            <button
+              type="button"
+              className="vf-ai-chat__memory-action"
+              disabled={isMemoryBusy || !currentProject}
+              onClick={() => void setMemoryEnabled(!memoryState?.enabled)}
+            >
+              {memoryState?.enabled ? 'Disable' : 'Enable'}
+            </button>
+          </div>
+          <p className="vf-ai-chat__memory-note">
+            User memory is revision-bound context, never engineering evidence or training data.
+          </p>
+          {memoryLoadState === 'loading' && <div className="vf-ai-chat__memory-status" role="status">Loading project memory…</div>}
+          {memoryLoadState === 'unavailable' && (
+            <div className="vf-ai-chat__memory-status" role="status">
+              Project memory is unavailable. Chat remains available and no memory was changed.
+            </div>
+          )}
+          {memoryState && (
+            <>
+              {memoryState.enabled && (
+                <div className="vf-ai-chat__memory-compose">
+                  <input
+                    aria-label="Fact to remember for this project"
+                    value={memoryDraft}
+                    onChange={(event) => setMemoryDraft(event.target.value)}
+                    maxLength={1200}
+                    placeholder="Fact to remember for this project"
+                  />
+                  <button type="button" disabled={isMemoryBusy || !memoryDraft.trim()} onClick={() => void rememberFact()}>Remember</button>
+                </div>
+              )}
+              <div className="vf-ai-chat__memory-list">
+                {memoryState.entries.map((entry) => (
+                  <div key={entry.memoryId} className="vf-ai-chat__memory-entry">
+                    <div className="vf-ai-chat__memory-entry-meta">
+                      <span>{entry.kind}</span>
+                      {entry.staleForProjectRevision && <span className="is-stale">stale revision</span>}
+                    </div>
+                    {editingMemoryId === entry.memoryId ? (
+                      <div className="vf-ai-chat__memory-edit">
+                        <input aria-label={`Correct memory ${entry.memoryId}`} value={editingMemoryContent} maxLength={1200} onChange={(event) => setEditingMemoryContent(event.target.value)} />
+                        <button type="button" disabled={isMemoryBusy} aria-label={`Save correction for memory ${entry.memoryId}`} onClick={() => void saveMemoryCorrection()}>Save</button>
+                      </div>
+                    ) : <p>{entry.content}</p>}
+                    <div className="vf-ai-chat__memory-entry-actions">
+                      <button type="button" disabled={isMemoryBusy} aria-label={`Correct memory ${entry.memoryId}`} onClick={() => { setEditingMemoryId(entry.memoryId); setEditingMemoryContent(entry.content) }}>Correct</button>
+                      <button type="button" disabled={isMemoryBusy} aria-label={`Delete memory ${entry.memoryId}`} onClick={() => void deleteMemory(entry.memoryId)}>Delete</button>
+                    </div>
+                  </div>
+                ))}
+                {memoryState.entries.length === 0 && <span className="vf-ai-chat__memory-empty">No approved memory yet.</span>}
+              </div>
+              <div className="vf-ai-chat__memory-footer">
+                <button type="button" disabled={!sessionId || isMemoryBusy} onClick={() => void clearMemory('session')}>Clear session</button>
+                <button type="button" disabled={isMemoryBusy} onClick={() => void clearMemory('project')}>Clear project</button>
+              </div>
+            </>
+          )}
+        </section>
+      )}
 
       {/* Messages */}
       <div ref={scrollRef} className="vf-ai-chat__messages">
@@ -850,27 +1203,89 @@ export default function AiChatPanel({
               {/* Action buttons */}
               {renderMessageActions(msg)}
 
+              {msg.role === 'assistant' && msg.runState && ['partial', 'cancelled', 'offline', 'error'].includes(msg.runState) && (
+                <div className={`vf-ai-chat__message-status vf-ai-chat__message-status--${msg.runState}`} role="status">
+                  <strong>{msg.runStatus}</strong>
+                  <span>{msg.runDetail}</span>
+                </div>
+              )}
+
+              {msg.role === 'assistant' && msg.sourceMetadata && collectAiSources(msg.sourceMetadata).length > 0 && (
+                <div className="vf-ai-chat__sources" aria-label="Response source trail">
+                  <span className="vf-ai-chat__sources-label">Source trail</span>
+                  {collectAiSources(msg.sourceMetadata).map((source) => (
+                    <span key={source.kind} className={`vf-ai-chat__source vf-ai-chat__source--${source.kind}`} title={source.detail}>
+                      {source.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+
               {/* Confidence badge */}
               {msg.role === 'assistant' && !msg.isStreaming && typeof msg.confidence === 'number' && (
                 <div className="vf-ai-chat__meta">
                   Confidence {Math.round(msg.confidence * 100)}%
+                  {msg.confidence < 0.65 && <span className="vf-ai-chat__low-confidence">Low confidence — verify before use.</span>}
                 </div>
               )}
 
-              {/* Citation links */}
+              {msg.role === 'assistant' && !msg.isStreaming && msg.uncertainty && (
+                <div className="vf-ai-chat__uncertainty" role="status">
+                  <strong>Evidence uncertainty</strong>
+                  <span>{msg.uncertainty.reasonCode || 'Some supporting evidence is incomplete.'}</span>
+                  {msg.uncertainty.missingEvidence?.length ? (
+                    <span>Missing: {msg.uncertainty.missingEvidence.join(', ').replaceAll('_', ' ').toLowerCase()}</span>
+                  ) : null}
+                </div>
+              )}
+
+              {msg.role === 'assistant' && !msg.isStreaming && msg.grounding && ['uncertain', 'conflicted'].includes(msg.grounding.status) && (
+                <div className={`vf-ai-chat__grounding vf-ai-chat__grounding--${msg.grounding.status}`} role="status">
+                  <strong>{msg.grounding.status === 'conflicted' ? 'Evidence conflict' : 'Evidence unavailable'}</strong>
+                  <span>
+                    {msg.grounding.status === 'conflicted'
+                      ? 'Sources disagree, so VoltForge AI did not present the disputed claim as fact.'
+                      : 'An unsupported factual claim was replaced with explicit uncertainty.'}
+                  </span>
+                  {msg.grounding.uncertainty.missingEvidence.length > 0 && (
+                    <span>{msg.grounding.uncertainty.missingEvidence.join(', ').replaceAll('_', ' ').toLowerCase()}</span>
+                  )}
+                </div>
+              )}
+
+              {/* Exact bounded evidence, visibly separated by authority/source class. */}
               {msg.role === 'assistant' && !msg.isStreaming && msg.citations && msg.citations.length > 0 && (
-                <div className="vf-ai-chat__citations">
-                  {msg.citations.slice(0, 2).map((citation, citationIndex) => (
-                    <a
-                      key={`${citation.url || citation.title}-${citationIndex}`}
-                      href={citation.url || '#'}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="vf-ai-chat__citation"
-                    >
-                      {citation.title}
-                    </a>
-                  ))}
+                <div className="vf-ai-chat__citations" aria-label="Evidence and citations">
+                  {msg.citations.slice(0, 8).map((citation, citationIndex) => {
+                    const kind = citation.evidenceKind
+                    const content = (
+                      <>
+                        <span className={`vf-ai-chat__citation-kind vf-ai-chat__citation-kind--${kind || 'generic'}`}>
+                          {kind ? evidenceKindLabels[kind] : 'Evidence'}
+                        </span>
+                        <span>{citation.title || citation.citationId || 'Evidence item'}</span>
+                        {citation.supportStatus === 'conflicted' && <span className="vf-ai-chat__citation-state">conflicted</span>}
+                        {citation.untrustedContent && <span className="vf-ai-chat__citation-state">untrusted source</span>}
+                        {citation.snippet && <span className="vf-ai-chat__citation-snippet">{citation.snippet}</span>}
+                        {citation.locator && <span className="vf-ai-chat__citation-meta">{citation.locator}</span>}
+                      </>
+                    )
+                    return citation.url ? (
+                      <a
+                        key={citation.citationId || `${citation.url}-${citationIndex}`}
+                        href={citation.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="vf-ai-chat__citation"
+                      >
+                        {content}
+                      </a>
+                    ) : (
+                      <div key={citation.citationId || `${citation.title}-${citationIndex}`} className="vf-ai-chat__citation">
+                        {content}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -901,6 +1316,7 @@ export default function AiChatPanel({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask VoltForge AI..."
+            aria-label="Ask VoltForge AI about the current project"
             rows={1}
             className="vf-ai-chat__textarea"
           />

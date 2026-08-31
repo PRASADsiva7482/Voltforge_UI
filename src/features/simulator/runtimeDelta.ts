@@ -2,7 +2,7 @@ import type { CanvasNode } from '../../types/domain';
 
 export const RUNTIME_NUMERIC_DEADBAND = 0.001;
 
-const SIMULATION_RUNTIME_PROPERTY_KEYS = new Set([
+export const SIMULATION_RUNTIME_PROPERTY_KEYS = new Set([
   'boardPowered', 'builtInLedLit', 'isBlown', 'faultMessage', 'isLit', 'currentMa', 'measuredVoltage', 'measuredCurrent', 'measuredResistance', 'resistanceUnsafe',
   'isSpinning', 'isBeeping', 'isActive', 'isPressed', 'isClosed', 'motionDetected', 'powered',
   'outputHigh', 'moistureLevel', 'lightLevel', 'displaySupplyVoltage', 'lcdLine1', 'lcdLine2',

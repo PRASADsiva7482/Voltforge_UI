@@ -10,6 +10,7 @@ interface ProjectState {
   setCurrentProject: (project: Project | null) => void;
   setActiveCodeFile: (file: CodeFile | null) => void;
   updateCodeFileContent: (fileId: string, content: string) => void;
+  setProjectUpdatedAt: (updatedAt: string) => void;
   setDirty: (dirty: boolean) => void;
   setSaving: (saving: boolean) => void;
 }
@@ -44,6 +45,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
         isDirty: true,
       };
     }),
+
+  setProjectUpdatedAt: (updatedAt) =>
+    set((state) => state.currentProject
+      ? { currentProject: { ...state.currentProject, updatedAt } }
+      : state),
 
   setDirty: (isDirty) => set({ isDirty }),
   setSaving: (isSaving) => set({ isSaving }),
