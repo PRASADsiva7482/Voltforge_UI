@@ -13,65 +13,6 @@ function pin(id: string, name: string, x: number, y: number, type: PinType = 'bi
   return { id, name, x, y, type };
 }
 
-// ── Arduino Uno (200×150 SVG viewport) ──
-const ARDUINO_UNO_PINS: PinPosition[] = [
-  // Digital pins (top side)
-  pin('d0', 'D0/RX', 168, 0, 'bidirectional'),
-  pin('d1', 'D1/TX', 156, 0, 'bidirectional'),
-  pin('d2', 'D2', 144, 0, 'bidirectional'),
-  pin('d3', 'D3~', 132, 0, 'bidirectional'),
-  pin('d4', 'D4', 120, 0, 'bidirectional'),
-  pin('d5', 'D5~', 108, 0, 'bidirectional'),
-  pin('d6', 'D6~', 96, 0, 'bidirectional'),
-  pin('d7', 'D7', 84, 0, 'bidirectional'),
-  pin('d8', 'D8', 72, 0, 'bidirectional'),
-  pin('d9', 'D9~', 60, 0, 'bidirectional'),
-  pin('d10', 'D10~', 48, 0, 'bidirectional'),
-  pin('d11', 'D11~', 36, 0, 'bidirectional'),
-  pin('d12', 'D12', 24, 0, 'bidirectional'),
-  pin('d13', 'D13', 12, 0, 'bidirectional'),
-  // Power pins (bottom-left)
-  pin('5v', '5V', 24, 150, 'power'),
-  pin('3v3', '3.3V', 36, 150, 'power'),
-  pin('gnd1', 'GND', 48, 150, 'ground'),
-  pin('gnd2', 'GND', 60, 150, 'ground'),
-  pin('vin', 'VIN', 72, 150, 'power'),
-  pin('rst', 'RESET', 12, 150, 'input'),
-  // Analog pins (bottom-right)
-  pin('a0', 'A0', 108, 150, 'bidirectional'),
-  pin('a1', 'A1', 120, 150, 'bidirectional'),
-  pin('a2', 'A2', 132, 150, 'bidirectional'),
-  pin('a3', 'A3', 144, 150, 'bidirectional'),
-  pin('a4', 'A4/SDA', 156, 150, 'bidirectional'),
-  pin('a5', 'A5/SCL', 168, 150, 'bidirectional'),
-  pin('aref', 'AREF', 180, 150, 'input'),
-];
-
-// ── Arduino Mega (280×120 SVG viewBox) ──
-const ARDUINO_MEGA_PINS: PinPosition[] = (() => {
-  const pins: PinPosition[] = [];
-  // Digital 0-21 top
-  for (let i = 0; i <= 21; i++) {
-    pins.push(pin(`d${i}`, `D${i}`, 8 + i * 12.5, 0, 'bidirectional'));
-  }
-  // Digital 22-53 bottom (32 pins, 8px spacing)
-  for (let i = 22; i <= 53; i++) {
-    pins.push(pin(`d${i}`, `D${i}`, 8 + (i - 22) * 8, 120, 'bidirectional'));
-  }
-  // Analog 0-15 right (16 pins, 7px spacing)
-  for (let i = 0; i <= 15; i++) {
-    pins.push(pin(`a${i}`, `A${i}`, 280, 6 + i * 7, 'bidirectional'));
-  }
-  // Power (left side)
-  pins.push(pin('5v', '5V', 0, 15, 'power'));
-  pins.push(pin('3v3', '3.3V', 0, 30, 'power'));
-  pins.push(pin('gnd1', 'GND', 0, 45, 'ground'));
-  pins.push(pin('gnd2', 'GND', 0, 60, 'ground'));
-  pins.push(pin('vin', 'VIN', 0, 75, 'power'));
-  pins.push(pin('rst', 'RESET', 0, 90, 'input'));
-  return pins;
-})();
-
 // Arduino Nano (100x160 SVG viewport)
 const ARDUINO_NANO_PINS: PinPosition[] = (() => {
   const pins: PinPosition[] = [];
@@ -560,14 +501,12 @@ const OSCILLOSCOPE_PINS: PinPosition[] = [
 
 // ── Registry ──
 const catalogBoardPinRegistry = Object.fromEntries(
-  BOARD_CATALOG.map((boardItem) => [boardItem.type, createBoardPins(boardItem.footprint)]),
+  BOARD_CATALOG.map((boardItem) => [boardItem.type, createBoardPins(boardItem.footprint, boardItem.type)]),
 );
 
 export const boardPinRegistry: Record<string, PinPosition[]> = {
   ...catalogBoardPinRegistry,
 
-  ARDUINO_UNO: ARDUINO_UNO_PINS,
-  ARDUINO_MEGA: ARDUINO_MEGA_PINS,
   ARDUINO_NANO: ARDUINO_NANO_PINS,
   ESP32: ESP32_PINS,
   ESP32_S3: ESP32_PINS,

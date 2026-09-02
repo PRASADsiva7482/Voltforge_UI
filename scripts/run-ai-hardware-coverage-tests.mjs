@@ -16,6 +16,11 @@ try {
   assert.equal(coverage.aiCoverageStatusLabel('variant-required'), 'Variant required');
   assert.equal(coverage.aiCoverageStatusLabel('unsupported'), 'Not curated');
   assert.equal(coverage.aiCoverageStatusClass('variant-required'), 'is-variant-required');
+  assert.equal(coverage.aiComponentCoverageStatusLabel('verified'), 'AI exact');
+  assert.equal(coverage.aiComponentCoverageStatusLabel('variant-required'), 'Variant required');
+  assert.equal(coverage.aiComponentCoverageStatusLabel('simulation-only'), 'Simulation model');
+  assert.equal(coverage.aiComponentCoverageStatusLabel('unsupported'), 'Not curated');
+  assert.equal(coverage.aiComponentCoverageStatusClass('simulation-only'), 'is-simulation-only');
   console.log('AI hardware coverage presentation contract passed');
 } finally {
   await vite.close();

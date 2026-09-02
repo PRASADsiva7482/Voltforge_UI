@@ -1,4 +1,9 @@
 import type { BoardType, PinPosition } from '../../types/domain';
+import {
+  createVerifiedBoardPins,
+  getBoardGeometryMetadata,
+  type BoardGeometryMetadata,
+} from './boardGeometry';
 
 type PinType = PinPosition['type'];
 
@@ -30,6 +35,7 @@ export type BoardCatalogEntry = {
   clock: string;
   compiler: 'avr' | 'arduino-core' | 'linux' | 'external' | 'canvas-only';
   sortOrder: number;
+  geometry: BoardGeometryMetadata;
 };
 
 export const BOARD_FOOTPRINT_DIMENSIONS: Record<BoardFootprint, { w: number; h: number }> = {
@@ -71,6 +77,7 @@ const board = (
   clock,
   compiler,
   sortOrder,
+  geometry: getBoardGeometryMetadata(type, footprint),
 });
 
 export const BOARD_CATALOG: BoardCatalogEntry[] = [
@@ -683,7 +690,12 @@ function attiny8Pins(): PinPosition[] {
   );
 }
 
-export function createBoardPins(footprint: BoardFootprint): PinPosition[] {
+export function createBoardPins(footprint: BoardFootprint, boardType?: BoardType): PinPosition[] {
+  if (boardType) {
+    const verifiedPins = createVerifiedBoardPins(boardType);
+    if (verifiedPins) return verifiedPins;
+  }
+
   switch (footprint) {
     case 'uno':
       return unoPins();

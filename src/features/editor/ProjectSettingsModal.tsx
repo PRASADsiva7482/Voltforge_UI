@@ -9,6 +9,11 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { FieldShell, TextInput, Textarea } from '../../components/ui/Field'
 import { Button } from '../../components/ui/Button'
 import { BOARD_CATALOG } from '../canvas/boardCatalog'
+import {
+  boardGeometryStatusClass,
+  boardGeometryStatusLabel,
+  boardGeometryTooltip,
+} from '../canvas/boardGeometry'
 import type { BoardType } from '../../types/domain'
 import { aiCoverageStatusClass, aiCoverageStatusLabel } from '../ai/aiHardwareCoverage'
 import { useToastStore } from '../../store/useToastStore'
@@ -229,17 +234,25 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
                   >
                     <Cpu size={14} />
                     <span>{board.name}</span>
-                    {(() => {
-                      const coverage = hardwareCoverageByType.get(board.type)
-                      return coverage ? (
-                        <span
-                          className={`vf-settings-board-support ${aiCoverageStatusClass(coverage.status)}`}
-                          title={coverage.reason}
-                        >
-                          {aiCoverageStatusLabel(coverage.status)}
-                        </span>
-                      ) : null
-                    })()}
+                    <span className="vf-settings-board-statuses">
+                      <span
+                        className={`vf-settings-board-geometry ${boardGeometryStatusClass(board.geometry.pinoutStatus)}`}
+                        title={boardGeometryTooltip(board.geometry)}
+                      >
+                        {boardGeometryStatusLabel(board.geometry.pinoutStatus)}
+                      </span>
+                      {(() => {
+                        const coverage = hardwareCoverageByType.get(board.type)
+                        return coverage ? (
+                          <span
+                            className={`vf-settings-board-support ${aiCoverageStatusClass(coverage.status)}`}
+                            title={coverage.reason}
+                          >
+                            {aiCoverageStatusLabel(coverage.status)}
+                          </span>
+                        ) : null
+                      })()}
+                    </span>
                   </button>
                 ))}
                 {filteredBoards.length === 0 && (
@@ -252,7 +265,7 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
                 ? 'Loading AI hardware coverage…'
                 : hardwareCoverageQuery.isError
                   ? 'AI coverage is unavailable; selecting a board does not imply electrical verification.'
-                  : `${hardwareCoverageQuery.data?.summary.verified ?? 0} exact variants verified · ${hardwareCoverageQuery.data?.summary.variantRequired ?? 0} require variant selection · ${hardwareCoverageQuery.data?.summary.unsupported ?? 0} not curated`}
+                  : `${hardwareCoverageQuery.data?.summary.verified ?? 0} exact variants verified · ${hardwareCoverageQuery.data?.summary.variantRequired ?? 0} require variant selection · ${hardwareCoverageQuery.data?.summary.unsupported ?? 0} not curated. Electrical evidence and canvas pin/artwork fidelity are reported independently.`}
             </p>
           </FieldShell>
 

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Cpu, Zap, Thermometer, Monitor, Power, Settings2, Search, Radio, BatteryCharging, Plus, ChevronDown, ChevronRight, Gauge, Binary } from 'lucide-react';
-import { componentApi } from '../../api/services';
+import { aiApi, componentApi } from '../../api/services';
 import { useCanvasStore } from '../../store/canvasStore';
 import { createCanvasNodeFromComponent } from '../canvas/componentFactory';
 import { mergeComponentLibrary } from '../canvas/componentCatalog';
 import type { ElectronicComponent } from '../../types/domain';
 import CustomComponentStudio from '../components/CustomComponentStudio';
+import { aiComponentCoverageStatusClass, aiComponentCoverageStatusLabel } from '../ai/aiHardwareCoverage';
 
 const categoryIcons: Record<string, React.FC<{ size?: number }>> = {
   BOARD: Cpu, LOGIC: Binary, LED: Zap, SENSOR: Thermometer, DISPLAY: Monitor,
@@ -27,7 +28,18 @@ export default function ComponentPanel({ readOnly }: { readOnly?: boolean }) {
     queryFn: async () => { const r = await componentApi.getAll(); return r.data.data; }
   });
 
+  const componentCoverageQuery = useQuery({
+    queryKey: ['ai', 'component-coverage'],
+    queryFn: () => aiApi.getComponentCoverage().then((response) => response.data.data),
+  });
+
   const componentLibrary = useMemo(() => mergeComponentLibrary(data || []), [data]);
+  const componentCoverageByType = useMemo(
+    () => new Map(
+      (componentCoverageQuery.data?.entries ?? []).map((entry) => [entry.componentType, entry])
+    ),
+    [componentCoverageQuery.data]
+  );
 
   useEffect(() => { setComponentLibrary(componentLibrary); }, [componentLibrary, setComponentLibrary]);
 
@@ -92,6 +104,13 @@ export default function ComponentPanel({ readOnly }: { readOnly?: boolean }) {
           className="vf-component-panel__input"
         />
       </div>
+      <div className="vf-component-panel__coverage-summary" role="status" aria-live="polite">
+        {componentCoverageQuery.isLoading
+          ? 'Checking AI component coverage...'
+          : componentCoverageQuery.isError
+            ? 'AI component coverage unavailable'
+            : `${componentCoverageQuery.data?.summary.verified ?? 0} exact / ${componentCoverageQuery.data?.summary.variantRequired ?? 0} require a variant / ${componentCoverageQuery.data?.summary.simulationOnly ?? 0} simulation-only`}
+      </div>
       <div className="vf-component-panel__list">
         {sortedCategories.map((category) => {
           const components = grouped[category];
@@ -110,14 +129,17 @@ export default function ComponentPanel({ readOnly }: { readOnly?: boolean }) {
               </button>
               {!isCollapsed && (
                 <div className="vf-component-panel__items">
-                  {components.map((comp) => (
-                    <button
-                      key={comp.id}
-                      onClick={() => addToCanvas(comp)}
-                      disabled={readOnly}
-                      className="vf-component-panel__item"
-                      style={readOnly ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
-                    >
+                  {components.map((comp) => {
+                    const coverage = componentCoverageByType.get(comp.type);
+                    return (
+                      <button
+                        key={comp.id}
+                        onClick={() => addToCanvas(comp)}
+                        disabled={readOnly}
+                        className="vf-component-panel__item"
+                        style={readOnly ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
+                        title={coverage?.reason}
+                      >
                       <div className="vf-component-panel__item-icon">
                         <Cpu size={12} />
                       </div>
@@ -125,11 +147,19 @@ export default function ComponentPanel({ readOnly }: { readOnly?: boolean }) {
                         <span className="vf-component-panel__item-name">{comp.name}</span>
                         <span className="vf-component-panel__item-type">{comp.type.replace(/_/g, ' ')}</span>
                       </div>
+                      {coverage && (
+                        <span
+                          className={`vf-component-panel__coverage-badge ${aiComponentCoverageStatusClass(coverage.status)}`}
+                        >
+                          {aiComponentCoverageStatusLabel(coverage.status)}
+                        </span>
+                      )}
                       {comp.isPremium && (
                         <span className="vf-component-panel__pro-badge">PRO</span>
                       )}
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>

@@ -426,6 +426,53 @@ export type AiHardwareCoverageResponse = {
   reportSha256: string
 }
 
+export type AiComponentSupportStatus =
+  | 'verified'
+  | 'variant-required'
+  | 'simulation-only'
+  | 'unsupported'
+
+export type AiComponentCoverageEntry = {
+  componentType: string
+  displayName: string
+  category: string
+  status: AiComponentSupportStatus
+  reasonCode: string
+  reason: string
+  selectionGroup: string | null
+  selectionRequirements: string[]
+  physicalIdentitySelected: boolean
+  aiElectricalClaimsAllowed: boolean
+  variantGateRecordId?: string
+  curatedExactCandidates?: Array<{
+    recordId: string
+    supportStatus: 'supported' | 'variant-required' | 'reference-only'
+    variant: string
+  }>
+  candidateSelectionRequired?: boolean
+}
+
+export type AiComponentCoverageResponse = {
+  schemaVersion: 1
+  reportId: string
+  reportVersion: string
+  uiCatalogVersion: string
+  corpusVersion: string
+  corpusCatalogSha256: string
+  asOfDate: string
+  entryCount: number
+  summary: {
+    verified: number
+    variantRequired: number
+    simulationOnly: number
+    unsupported: number
+    distinctCuratedExactCandidates: number
+  }
+  genericLabelsMaySelectCandidate: false
+  entries: AiComponentCoverageEntry[]
+  reportSha256: string
+}
+
 export type AiArtifactIdentity = {
   artifactId?: string | null
   artifactVersion: string

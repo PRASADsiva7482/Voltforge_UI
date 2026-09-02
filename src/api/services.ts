@@ -3,6 +3,7 @@ import keycloak from '../auth/keycloak'
 import type {
   AiChatRequest,
   AiChatResponse,
+  AiComponentCoverageResponse,
   AiGenerateRequest,
   AiGenerateResponse,
   AiHardwareCoverageResponse,
@@ -71,6 +72,7 @@ export const componentApi = {
 
 export const aiApi = {
   chat: (data: AiChatRequest) => api.post<ApiResponse<AiChatResponse>>('/ai/chat', data),
+  getComponentCoverage: () => api.get<ApiResponse<AiComponentCoverageResponse>>('/ai/component-coverage'),
   getHardwareCoverage: () => api.get<ApiResponse<AiHardwareCoverageResponse>>('/ai/hardware-coverage'),
   /** SSE streaming chat — returns a raw fetch Response for ReadableStream consumption. */
   chatStream: async (data: AiChatRequest, signal?: AbortSignal): Promise<Response> => {

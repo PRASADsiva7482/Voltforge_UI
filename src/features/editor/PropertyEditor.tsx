@@ -11,6 +11,7 @@ const HIDDEN_KEYS = new Set(['svgData', 'locked']);
 const BOARD_READONLY_KEYS = new Set([
   'family', 'logicVoltage', 'clockSpeed', 'compilerSupport', 'features',
   'footprint', 'pinProfile', 'compiler', 'clock', 'sortOrder',
+  'canvasArtworkStatus', 'canvasGeometryRevision', 'canvasPinoutStatus',
 ]);
 
 /** Simulation state keys — always read-only on every component. */

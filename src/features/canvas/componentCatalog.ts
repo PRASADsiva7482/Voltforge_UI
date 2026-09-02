@@ -17,6 +17,9 @@ export const catalogBoardComponents: ElectronicComponent[] = BOARD_CATALOG.map((
   defaultProperties: {
     clockSpeed: board.clock,
     compilerSupport: board.compiler,
+    canvasArtworkStatus: board.geometry.artworkStatus,
+    canvasGeometryRevision: board.geometry.geometryRevision,
+    canvasPinoutStatus: board.geometry.pinoutStatus,
     family: board.family,
     features: board.features,
     logicVoltage: board.logicVoltage,

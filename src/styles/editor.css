@@ -834,6 +834,13 @@
   color: var(--vf-text-muted, #475569);
 }
 
+.vf-component-panel__coverage-summary {
+  margin: -2px 12px 7px;
+  color: var(--vf-text-muted, #475569);
+  font-size: 9px;
+  line-height: 1.35;
+}
+
 .vf-component-panel__list {
   flex: 1;
   overflow-y: auto;
@@ -922,6 +929,33 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+.vf-component-panel__coverage-badge {
+  margin-left: auto;
+  padding: 1px 4px;
+  border-radius: 4px;
+  color: var(--vf-text-muted, #475569);
+  background: rgba(0, 0, 0, 0.05);
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.vf-component-panel__coverage-badge.is-verified {
+  color: var(--vf-teal, #087f83);
+  background: var(--vf-teal-soft, #d9f2ef);
+}
+
+.vf-component-panel__coverage-badge.is-variant-required {
+  color: #8a5a00;
+  background: #fff2cc;
+}
+
+.vf-component-panel__coverage-badge.is-simulation-only {
+  color: #315d8a;
+  background: #e5f0ff;
 }
 
 .vf-component-panel__item-name {
@@ -1943,14 +1977,29 @@
   background: var(--vf-teal-soft);
   color: var(--vf-teal);
 }
-.vf-settings-board-support {
+.vf-settings-board-statuses {
   margin-left: auto;
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.vf-settings-board-support,
+.vf-settings-board-geometry {
   padding: 2px 6px;
   border-radius: 999px;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.02em;
   white-space: nowrap;
+}
+.vf-settings-board-geometry.is-pinout-verified {
+  background: rgba(14, 116, 144, 0.13);
+  color: #0e7490;
+}
+.vf-settings-board-geometry.is-shared-footprint {
+  background: rgba(100, 116, 139, 0.14);
+  color: var(--vf-text-muted);
 }
 .vf-settings-board-support.is-verified {
   background: rgba(22, 163, 74, 0.12);

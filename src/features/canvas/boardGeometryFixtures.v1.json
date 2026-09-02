@@ -1,0 +1,509 @@
+{
+  "schemaVersion": 1,
+  "fixtureVersion": "1.0.0",
+  "asOfDate": "2026-09-01",
+  "artworkMechanicallyVerified": false,
+  "fixtures": [
+    {
+      "boardType": "ARDUINO_UNO",
+      "recordId": "vf-knowledge-v1-board.arduino.uno-r3",
+      "geometryRevision": "arduino-uno-r3-a000066-pinout-v1",
+      "pinoutStatus": "manufacturer-verified",
+      "artworkStatus": "documented-limitation",
+      "source": {
+        "publisher": "Arduino",
+        "title": "Arduino UNO R3 full pinout",
+        "documentRevision": "A000066-current-at-2026-09-01",
+        "uri": "https://docs.arduino.cc/resources/pinouts/A000066-full-pinout.pdf"
+      },
+      "canvasDimensions": { "w": 200, "h": 150 },
+      "representedScope": "Primary power, analog, and digital shield headers.",
+      "artworkLimitation": "The generated canvas body is not a manufacturer mechanical drawing; connector pitch, mounting holes, board outline, ICSP, and USB geometry are not scale-verified.",
+      "unrepresentedConnectors": ["ICSP", "ATmega16U2 service headers"],
+      "legacyFallbackPinIds": [],
+      "connectors": [
+        {
+          "id": "power-analog",
+          "edge": "left",
+          "pins": [
+            { "id": "nc", "name": "NC", "type": "input" },
+            { "id": "ioref", "name": "IOREF", "type": "power" },
+            { "id": "rst", "name": "RESET", "type": "input" },
+            { "id": "3v3", "name": "3.3V", "type": "power" },
+            { "id": "5v", "name": "5V", "type": "power" },
+            { "id": "gnd1", "name": "GND", "type": "ground" },
+            { "id": "gnd2", "name": "GND", "type": "ground" },
+            { "id": "vin", "name": "VIN", "type": "power" },
+            { "id": "a0", "name": "A0/D14", "type": "bidirectional" },
+            { "id": "a1", "name": "A1/D15", "type": "bidirectional" },
+            { "id": "a2", "name": "A2/D16", "type": "bidirectional" },
+            { "id": "a3", "name": "A3/D17", "type": "bidirectional" },
+            { "id": "a4", "name": "A4/SDA/D18", "type": "bidirectional" },
+            { "id": "a5", "name": "A5/SCL/D19", "type": "bidirectional" }
+          ]
+        },
+        {
+          "id": "digital",
+          "edge": "right",
+          "pins": [
+            { "id": "scl", "name": "SCL/D19", "type": "bidirectional" },
+            { "id": "sda", "name": "SDA/D18", "type": "bidirectional" },
+            { "id": "aref", "name": "AREF", "type": "input" },
+            { "id": "gnd3", "name": "GND", "type": "ground" },
+            { "id": "d13", "name": "D13/SCK", "type": "bidirectional" },
+            { "id": "d12", "name": "D12/CIPO", "type": "bidirectional" },
+            { "id": "d11", "name": "D11/COPI", "type": "bidirectional" },
+            { "id": "d10", "name": "D10/SS", "type": "bidirectional" },
+            { "id": "d9", "name": "D9", "type": "bidirectional" },
+            { "id": "d8", "name": "D8", "type": "bidirectional" },
+            { "id": "d7", "name": "D7", "type": "bidirectional" },
+            { "id": "d6", "name": "D6", "type": "bidirectional" },
+            { "id": "d5", "name": "D5", "type": "bidirectional" },
+            { "id": "d4", "name": "D4", "type": "bidirectional" },
+            { "id": "d3", "name": "D3", "type": "bidirectional" },
+            { "id": "d2", "name": "D2", "type": "bidirectional" },
+            { "id": "d1", "name": "D1/TX", "type": "bidirectional" },
+            { "id": "d0", "name": "D0/RX", "type": "bidirectional" }
+          ]
+        }
+      ]
+    },
+    {
+      "boardType": "ARDUINO_UNO_R4",
+      "recordId": "vf-knowledge-v1-board.arduino.uno-r4-wifi",
+      "geometryRevision": "arduino-uno-r4-wifi-abx00087-pinout-v1",
+      "pinoutStatus": "manufacturer-verified",
+      "artworkStatus": "documented-limitation",
+      "source": {
+        "publisher": "Arduino",
+        "title": "Arduino UNO R4 WiFi full pinout",
+        "documentRevision": "ABX00087-2025-04-23",
+        "uri": "https://docs.arduino.cc/resources/pinouts/ABX00087-full-pinout.pdf"
+      },
+      "canvasDimensions": { "w": 200, "h": 150 },
+      "representedScope": "Primary shield headers and the 3.3 V Qwiic connector.",
+      "artworkLimitation": "The generated UNO-style body is not a scale-verified UNO R4 WiFi drawing; the ESP header, ICSP, CAN, LED matrix, mounting holes, and connector geometry remain unrepresented.",
+      "unrepresentedConnectors": ["ESP header", "ICSP", "CAN", "SWD"],
+      "legacyFallbackPinIds": [],
+      "connectors": [
+        {
+          "id": "power-analog",
+          "edge": "left",
+          "pins": [
+            { "id": "off", "name": "OFF", "type": "input" },
+            { "id": "vrtc", "name": "VBATT/VRTC", "type": "power" },
+            { "id": "boot", "name": "BOOT", "type": "input" },
+            { "id": "ioref", "name": "IOREF", "type": "power" },
+            { "id": "rst", "name": "RESET", "type": "input" },
+            { "id": "3v3", "name": "3.3V", "type": "power" },
+            { "id": "5v", "name": "5V", "type": "power" },
+            { "id": "gnd1", "name": "GND", "type": "ground" },
+            { "id": "gnd2", "name": "GND", "type": "ground" },
+            { "id": "vin", "name": "VIN", "type": "power" },
+            { "id": "a0", "name": "A0/DAC/D14", "type": "bidirectional" },
+            { "id": "a1", "name": "A1/D15", "type": "bidirectional" },
+            { "id": "a2", "name": "A2/D16", "type": "bidirectional" },
+            { "id": "a3", "name": "A3/D17", "type": "bidirectional" },
+            { "id": "a4", "name": "A4/SDA/D18", "type": "bidirectional" },
+            { "id": "a5", "name": "A5/SCL/D19", "type": "bidirectional" }
+          ]
+        },
+        {
+          "id": "digital",
+          "edge": "right",
+          "pins": [
+            { "id": "scl", "name": "SCL/D19", "type": "bidirectional" },
+            { "id": "sda", "name": "SDA/D18", "type": "bidirectional" },
+            { "id": "aref", "name": "AREF", "type": "input" },
+            { "id": "gnd3", "name": "GND", "type": "ground" },
+            { "id": "d13", "name": "D13/SCK", "type": "bidirectional" },
+            { "id": "d12", "name": "D12/CIPO", "type": "bidirectional" },
+            { "id": "d11", "name": "D11/COPI", "type": "bidirectional" },
+            { "id": "d10", "name": "D10/SS", "type": "bidirectional" },
+            { "id": "d9", "name": "D9", "type": "bidirectional" },
+            { "id": "d8", "name": "D8", "type": "bidirectional" },
+            { "id": "d7", "name": "D7", "type": "bidirectional" },
+            { "id": "d6", "name": "D6", "type": "bidirectional" },
+            { "id": "d5", "name": "D5", "type": "bidirectional" },
+            { "id": "d4", "name": "D4", "type": "bidirectional" },
+            { "id": "d3", "name": "D3", "type": "bidirectional" },
+            { "id": "d2", "name": "D2", "type": "bidirectional" },
+            { "id": "d1", "name": "D1/TX", "type": "bidirectional" },
+            { "id": "d0", "name": "D0/RX", "type": "bidirectional" }
+          ]
+        },
+        {
+          "id": "qwiic",
+          "edge": "bottom",
+          "pins": [
+            { "id": "qwiic_scl", "name": "QWIIC_SCL", "type": "bidirectional" },
+            { "id": "qwiic_sda", "name": "QWIIC_SDA", "type": "bidirectional" },
+            { "id": "qwiic_3v3", "name": "QWIIC_3V3", "type": "power" },
+            { "id": "qwiic_gnd", "name": "QWIIC_GND", "type": "ground" }
+          ]
+        }
+      ]
+    },
+    {
+      "boardType": "ARDUINO_MEGA",
+      "recordId": "vf-knowledge-v1-board.arduino.mega-2560-r3",
+      "geometryRevision": "arduino-mega-2560-r3-a000067-pinout-v1",
+      "pinoutStatus": "manufacturer-verified",
+      "artworkStatus": "documented-limitation",
+      "source": {
+        "publisher": "Arduino",
+        "title": "Arduino Mega 2560 Rev3 full pinout",
+        "documentRevision": "A000067-2020-12-16",
+        "uri": "https://docs.arduino.cc/resources/pinouts/A000067-full-pinout.pdf"
+      },
+      "canvasDimensions": { "w": 280, "h": 120 },
+      "representedScope": "Power, analog, primary digital, and double-row D22-D53 headers.",
+      "artworkLimitation": "Header membership and order are verified, but the generated body, row pitch, board outline, mounting holes, USB, power jack, and ICSP geometry are not scale-verified.",
+      "unrepresentedConnectors": ["ICSP", "ATmega16U2 service headers"],
+      "legacyFallbackPinIds": [],
+      "connectors": [
+        {
+          "id": "power-analog",
+          "edge": "left",
+          "pins": [
+            { "id": "nc", "name": "NC", "type": "input" },
+            { "id": "ioref", "name": "IOREF", "type": "power" },
+            { "id": "rst", "name": "RESET", "type": "input" },
+            { "id": "3v3", "name": "3.3V", "type": "power" },
+            { "id": "5v", "name": "5V", "type": "power" },
+            { "id": "gnd1", "name": "GND", "type": "ground" },
+            { "id": "gnd2", "name": "GND", "type": "ground" },
+            { "id": "vin", "name": "VIN", "type": "power" },
+            { "id": "a0", "name": "A0/D54", "type": "bidirectional" },
+            { "id": "a1", "name": "A1/D55", "type": "bidirectional" },
+            { "id": "a2", "name": "A2/D56", "type": "bidirectional" },
+            { "id": "a3", "name": "A3/D57", "type": "bidirectional" },
+            { "id": "a4", "name": "A4/D58", "type": "bidirectional" },
+            { "id": "a5", "name": "A5/D59", "type": "bidirectional" },
+            { "id": "a6", "name": "A6/D60", "type": "bidirectional" },
+            { "id": "a7", "name": "A7/D61", "type": "bidirectional" },
+            { "id": "a8", "name": "A8/D62", "type": "bidirectional" },
+            { "id": "a9", "name": "A9/D63", "type": "bidirectional" },
+            { "id": "a10", "name": "A10/D64", "type": "bidirectional" },
+            { "id": "a11", "name": "A11/D65", "type": "bidirectional" },
+            { "id": "a12", "name": "A12/D66", "type": "bidirectional" },
+            { "id": "a13", "name": "A13/D67", "type": "bidirectional" },
+            { "id": "a14", "name": "A14/D68", "type": "bidirectional" },
+            { "id": "a15", "name": "A15/D69", "type": "bidirectional" }
+          ]
+        },
+        {
+          "id": "primary-digital",
+          "edge": "right",
+          "pins": [
+            { "id": "scl", "name": "SCL/D21", "type": "bidirectional" },
+            { "id": "sda", "name": "SDA/D20", "type": "bidirectional" },
+            { "id": "aref", "name": "AREF", "type": "input" },
+            { "id": "gnd3", "name": "GND", "type": "ground" },
+            { "id": "d13", "name": "D13/SCK", "type": "bidirectional" },
+            { "id": "d12", "name": "D12/CIPO", "type": "bidirectional" },
+            { "id": "d11", "name": "D11/COPI", "type": "bidirectional" },
+            { "id": "d10", "name": "D10/SS", "type": "bidirectional" },
+            { "id": "d9", "name": "D9", "type": "bidirectional" },
+            { "id": "d8", "name": "D8", "type": "bidirectional" },
+            { "id": "d7", "name": "D7", "type": "bidirectional" },
+            { "id": "d6", "name": "D6", "type": "bidirectional" },
+            { "id": "d5", "name": "D5", "type": "bidirectional" },
+            { "id": "d4", "name": "D4", "type": "bidirectional" },
+            { "id": "d3", "name": "D3", "type": "bidirectional" },
+            { "id": "d2", "name": "D2", "type": "bidirectional" },
+            { "id": "d1", "name": "D1/TX0", "type": "bidirectional" },
+            { "id": "d0", "name": "D0/RX0", "type": "bidirectional" },
+            { "id": "d14", "name": "D14/TX3", "type": "bidirectional" },
+            { "id": "d15", "name": "D15/RX3", "type": "bidirectional" },
+            { "id": "d16", "name": "D16/TX2", "type": "bidirectional" },
+            { "id": "d17", "name": "D17/RX2", "type": "bidirectional" },
+            { "id": "d18", "name": "D18/TX1", "type": "bidirectional" },
+            { "id": "d19", "name": "D19/RX1", "type": "bidirectional" },
+            { "id": "d20", "name": "D20/SDA", "type": "bidirectional" },
+            { "id": "d21", "name": "D21/SCL", "type": "bidirectional" }
+          ]
+        },
+        {
+          "id": "aux-even",
+          "edge": "bottom",
+          "inset": 0,
+          "pins": [
+            { "id": "d22", "name": "D22", "type": "bidirectional" }, { "id": "d24", "name": "D24", "type": "bidirectional" },
+            { "id": "d26", "name": "D26", "type": "bidirectional" }, { "id": "d28", "name": "D28", "type": "bidirectional" },
+            { "id": "d30", "name": "D30", "type": "bidirectional" }, { "id": "d32", "name": "D32", "type": "bidirectional" },
+            { "id": "d34", "name": "D34", "type": "bidirectional" }, { "id": "d36", "name": "D36", "type": "bidirectional" },
+            { "id": "d38", "name": "D38", "type": "bidirectional" }, { "id": "d40", "name": "D40", "type": "bidirectional" },
+            { "id": "d42", "name": "D42", "type": "bidirectional" }, { "id": "d44", "name": "D44", "type": "bidirectional" },
+            { "id": "d46", "name": "D46", "type": "bidirectional" }, { "id": "d48", "name": "D48", "type": "bidirectional" },
+            { "id": "d50", "name": "D50/CIPO", "type": "bidirectional" }, { "id": "d52", "name": "D52/SCK", "type": "bidirectional" }
+          ]
+        },
+        {
+          "id": "aux-odd",
+          "edge": "bottom",
+          "inset": 8,
+          "pins": [
+            { "id": "d23", "name": "D23", "type": "bidirectional" }, { "id": "d25", "name": "D25", "type": "bidirectional" },
+            { "id": "d27", "name": "D27", "type": "bidirectional" }, { "id": "d29", "name": "D29", "type": "bidirectional" },
+            { "id": "d31", "name": "D31", "type": "bidirectional" }, { "id": "d33", "name": "D33", "type": "bidirectional" },
+            { "id": "d35", "name": "D35", "type": "bidirectional" }, { "id": "d37", "name": "D37", "type": "bidirectional" },
+            { "id": "d39", "name": "D39", "type": "bidirectional" }, { "id": "d41", "name": "D41", "type": "bidirectional" },
+            { "id": "d43", "name": "D43", "type": "bidirectional" }, { "id": "d45", "name": "D45", "type": "bidirectional" },
+            { "id": "d47", "name": "D47", "type": "bidirectional" }, { "id": "d49", "name": "D49", "type": "bidirectional" },
+            { "id": "d51", "name": "D51/COPI", "type": "bidirectional" }, { "id": "d53", "name": "D53/SS", "type": "bidirectional" }
+          ]
+        }
+      ]
+    },
+    {
+      "boardType": "ARDUINO_NANO_EVERY",
+      "recordId": "vf-knowledge-v1-board.arduino.nano-every-atmega4809",
+      "geometryRevision": "arduino-nano-every-abx00028-pinout-v1",
+      "pinoutStatus": "manufacturer-verified",
+      "artworkStatus": "documented-limitation",
+      "source": {
+        "publisher": "Arduino",
+        "title": "Arduino Nano Every full pinout",
+        "documentRevision": "ABX00028-2021-12-15",
+        "uri": "https://docs.arduino.cc/resources/pinouts/ABX00028-full-pinout.pdf"
+      },
+      "canvasDimensions": { "w": 100, "h": 160 },
+      "representedScope": "Both 15-pin castellated header rows.",
+      "artworkLimitation": "Header order is verified, but the generated Nano body, castellations, USB connector, component placement, pitch, and board outline are not scale-verified.",
+      "unrepresentedConnectors": ["UPDI test pads", "internal test points"],
+      "legacyFallbackPinIds": [],
+      "connectors": [
+        {
+          "id": "left-header",
+          "edge": "left",
+          "pins": [
+            { "id": "d13", "name": "D13/SCK", "type": "bidirectional" }, { "id": "3v3", "name": "3.3V", "type": "power" },
+            { "id": "aref", "name": "AREF", "type": "input" },
+            { "id": "a0", "name": "A0/D14", "type": "bidirectional" }, { "id": "a1", "name": "A1/D15", "type": "bidirectional" },
+            { "id": "a2", "name": "A2/D16", "type": "bidirectional" }, { "id": "a3", "name": "A3/D17", "type": "bidirectional" },
+            { "id": "a4", "name": "A4/SDA/D18", "type": "bidirectional" }, { "id": "a5", "name": "A5/SCL/D19", "type": "bidirectional" },
+            { "id": "a6", "name": "A6/D20", "type": "bidirectional" }, { "id": "a7", "name": "A7/D21", "type": "bidirectional" },
+            { "id": "5v", "name": "5V", "type": "power" }, { "id": "rst", "name": "RESET", "type": "input" },
+            { "id": "gnd1", "name": "GND", "type": "ground" }, { "id": "vin", "name": "VIN", "type": "power" }
+          ]
+        },
+        {
+          "id": "right-header",
+          "edge": "right",
+          "pins": [
+            { "id": "d12", "name": "D12/CIPO", "type": "bidirectional" }, { "id": "d11", "name": "D11/COPI", "type": "bidirectional" },
+            { "id": "d10", "name": "D10/SS", "type": "bidirectional" }, { "id": "d9", "name": "D9", "type": "bidirectional" },
+            { "id": "d8", "name": "D8", "type": "bidirectional" }, { "id": "d7", "name": "D7", "type": "bidirectional" },
+            { "id": "d6", "name": "D6", "type": "bidirectional" }, { "id": "d5", "name": "D5", "type": "bidirectional" },
+            { "id": "d4", "name": "D4", "type": "bidirectional" }, { "id": "d3", "name": "D3", "type": "bidirectional" },
+            { "id": "d2", "name": "D2", "type": "bidirectional" }, { "id": "gnd2", "name": "GND", "type": "ground" },
+            { "id": "rst2", "name": "RESET", "type": "input" }, { "id": "d0", "name": "D0/RX", "type": "bidirectional" },
+            { "id": "d1", "name": "D1/TX", "type": "bidirectional" }
+          ]
+        }
+      ]
+    },
+    {
+      "boardType": "ARDUINO_LEONARDO",
+      "recordId": "vf-knowledge-v1-board.arduino.leonardo-atmega32u4",
+      "geometryRevision": "arduino-leonardo-a000057-pinout-v1",
+      "pinoutStatus": "manufacturer-verified",
+      "artworkStatus": "documented-limitation",
+      "source": {
+        "publisher": "Arduino",
+        "title": "Arduino Leonardo full pinout",
+        "documentRevision": "A000057-2023-12-15",
+        "uri": "https://docs.arduino.cc/resources/pinouts/A000057-full-pinout.pdf"
+      },
+      "canvasDimensions": { "w": 200, "h": 150 },
+      "representedScope": "Primary power, analog, and digital headers.",
+      "artworkLimitation": "Leonardo now has its own pinout fixture, but the generated UNO-sized body is not a scale-verified Leonardo drawing and the ICSP header is not selectable.",
+      "unrepresentedConnectors": ["ICSP"],
+      "legacyFallbackPinIds": [],
+      "connectors": [
+        {
+          "id": "power-analog",
+          "edge": "left",
+          "pins": [
+            { "id": "nc", "name": "NC", "type": "input" }, { "id": "ioref", "name": "IOREF", "type": "power" },
+            { "id": "rst", "name": "RESET", "type": "input" }, { "id": "3v3", "name": "3.3V", "type": "power" },
+            { "id": "5v", "name": "5V", "type": "power" }, { "id": "gnd1", "name": "GND", "type": "ground" },
+            { "id": "gnd2", "name": "GND", "type": "ground" }, { "id": "vin", "name": "VIN", "type": "power" },
+            { "id": "a0", "name": "A0/D14", "type": "bidirectional" }, { "id": "a1", "name": "A1/D15", "type": "bidirectional" },
+            { "id": "a2", "name": "A2/D16", "type": "bidirectional" }, { "id": "a3", "name": "A3/D17", "type": "bidirectional" },
+            { "id": "a4", "name": "A4/D18", "type": "bidirectional" }, { "id": "a5", "name": "A5/D19", "type": "bidirectional" }
+          ]
+        },
+        {
+          "id": "digital",
+          "edge": "right",
+          "pins": [
+            { "id": "scl", "name": "SCL/D3", "type": "bidirectional" }, { "id": "sda", "name": "SDA/D2", "type": "bidirectional" },
+            { "id": "aref", "name": "AREF", "type": "input" }, { "id": "gnd3", "name": "GND", "type": "ground" },
+            { "id": "d13", "name": "D13", "type": "bidirectional" }, { "id": "d12", "name": "D12/A11", "type": "bidirectional" },
+            { "id": "d11", "name": "D11", "type": "bidirectional" }, { "id": "d10", "name": "D10/A10", "type": "bidirectional" },
+            { "id": "d9", "name": "D9/A9", "type": "bidirectional" }, { "id": "d8", "name": "D8/A8", "type": "bidirectional" },
+            { "id": "d7", "name": "D7", "type": "bidirectional" }, { "id": "d6", "name": "D6/A7", "type": "bidirectional" },
+            { "id": "d5", "name": "D5", "type": "bidirectional" }, { "id": "d4", "name": "D4/A6", "type": "bidirectional" },
+            { "id": "d3", "name": "D3/SCL", "type": "bidirectional" }, { "id": "d2", "name": "D2/SDA", "type": "bidirectional" },
+            { "id": "d1", "name": "D1/TX", "type": "bidirectional" }, { "id": "d0", "name": "D0/RX", "type": "bidirectional" }
+          ]
+        }
+      ]
+    },
+    {
+      "boardType": "ARDUINO_MICRO",
+      "recordId": "vf-knowledge-v1-board.arduino.micro-atmega32u4",
+      "geometryRevision": "arduino-micro-a000053-pinout-v1",
+      "pinoutStatus": "manufacturer-verified",
+      "artworkStatus": "documented-limitation",
+      "source": {
+        "publisher": "Arduino",
+        "title": "Arduino Micro full pinout",
+        "documentRevision": "A000053-2020-11-10",
+        "uri": "https://docs.arduino.cc/resources/pinouts/A000053-full-pinout.pdf"
+      },
+      "canvasDimensions": { "w": 100, "h": 160 },
+      "representedScope": "Both breadboard header rows; ICSP signals exposed on the side headers retain their Arduino aliases.",
+      "artworkLimitation": "Micro now has its own 34-pin fixture, but the generated Nano-sized body is not a scale-verified Micro drawing; saved nodes carrying the old nonphysical A6/A7 pin IDs retain their legacy pin array.",
+      "unrepresentedConnectors": ["ICSP duplicate header", "USB contacts"],
+      "legacyFallbackPinIds": ["a6", "a7"],
+      "connectors": [
+        {
+          "id": "left-header",
+          "edge": "left",
+          "pins": [
+            { "id": "d16", "name": "D16/COPI", "type": "bidirectional" }, { "id": "d17", "name": "D17/SS", "type": "bidirectional" },
+            { "id": "d1", "name": "D1/TX", "type": "bidirectional" }, { "id": "d0", "name": "D0/RX", "type": "bidirectional" },
+            { "id": "rst1", "name": "RESET", "type": "input" }, { "id": "gnd1", "name": "GND", "type": "ground" },
+            { "id": "d2", "name": "D2/SDA", "type": "bidirectional" }, { "id": "d3", "name": "D3/SCL", "type": "bidirectional" },
+            { "id": "d4", "name": "D4/A6", "type": "bidirectional" }, { "id": "d5", "name": "D5", "type": "bidirectional" },
+            { "id": "d6", "name": "D6/A7", "type": "bidirectional" }, { "id": "d7", "name": "D7", "type": "bidirectional" },
+            { "id": "d8", "name": "D8/A8", "type": "bidirectional" }, { "id": "d9", "name": "D9/A9", "type": "bidirectional" },
+            { "id": "d10", "name": "D10/A10", "type": "bidirectional" }, { "id": "d11", "name": "D11", "type": "bidirectional" },
+            { "id": "d12", "name": "D12/A11", "type": "bidirectional" }, { "id": "d15", "name": "D15/SCK", "type": "bidirectional" }
+          ]
+        },
+        {
+          "id": "right-header",
+          "edge": "right",
+          "pins": [
+            { "id": "d14", "name": "D14/CIPO", "type": "bidirectional" }, { "id": "vin", "name": "VIN", "type": "power" },
+            { "id": "gnd2", "name": "GND", "type": "ground" }, { "id": "rst", "name": "RESET", "type": "input" },
+            { "id": "5v", "name": "5V", "type": "power" }, { "id": "nc1", "name": "NC", "type": "input" },
+            { "id": "nc2", "name": "NC", "type": "input" }, { "id": "a5", "name": "A5/D23", "type": "bidirectional" },
+            { "id": "a4", "name": "A4/D22", "type": "bidirectional" }, { "id": "a3", "name": "A3/D21", "type": "bidirectional" },
+            { "id": "a2", "name": "A2/D20", "type": "bidirectional" }, { "id": "a1", "name": "A1/D19", "type": "bidirectional" },
+            { "id": "a0", "name": "A0/D18", "type": "bidirectional" }, { "id": "aref", "name": "AREF", "type": "input" },
+            { "id": "3v3", "name": "3.3V", "type": "power" }, { "id": "d13", "name": "D13", "type": "bidirectional" }
+          ]
+        }
+      ]
+    },
+    {
+      "boardType": "RASPBERRY_PI_PICO",
+      "recordId": "vf-knowledge-v1-board.raspberry-pi.pico-rp2040",
+      "geometryRevision": "raspberry-pi-pico-rp2040-pinout-v1",
+      "pinoutStatus": "manufacturer-verified",
+      "artworkStatus": "documented-limitation",
+      "source": {
+        "publisher": "Raspberry Pi",
+        "title": "Raspberry Pi Pico-series pinout",
+        "documentRevision": "Pico-series-current-at-2026-09-01",
+        "uri": "https://datasheets.raspberrypi.com/pico/Pico-2-Pinout.pdf"
+      },
+      "canvasDimensions": { "w": 100, "h": 180 },
+      "representedScope": "Pins 1-40 on the two castellated header rows.",
+      "artworkLimitation": "Header order is verified, but the generated body, castellations, debug pads, USB connector, pitch, and board outline are not scale-verified.",
+      "unrepresentedConnectors": ["SWD debug pads"],
+      "legacyFallbackPinIds": [],
+      "connectors": [
+        {
+          "id": "pins-1-20",
+          "edge": "left",
+          "pins": [
+            { "id": "d0", "name": "D0/GP0", "type": "bidirectional" }, { "id": "d1", "name": "D1/GP1", "type": "bidirectional" },
+            { "id": "gnd1", "name": "GND", "type": "ground" }, { "id": "d2", "name": "D2/GP2", "type": "bidirectional" },
+            { "id": "d3", "name": "D3/GP3", "type": "bidirectional" }, { "id": "d4", "name": "D4/GP4", "type": "bidirectional" },
+            { "id": "d5", "name": "D5/GP5", "type": "bidirectional" }, { "id": "gnd2", "name": "GND", "type": "ground" },
+            { "id": "d6", "name": "D6/GP6", "type": "bidirectional" }, { "id": "d7", "name": "D7/GP7", "type": "bidirectional" },
+            { "id": "d8", "name": "D8/GP8", "type": "bidirectional" }, { "id": "d9", "name": "D9/GP9", "type": "bidirectional" },
+            { "id": "gnd3", "name": "GND", "type": "ground" }, { "id": "d10", "name": "D10/GP10", "type": "bidirectional" },
+            { "id": "d11", "name": "D11/GP11", "type": "bidirectional" }, { "id": "d12", "name": "D12/GP12", "type": "bidirectional" },
+            { "id": "d13", "name": "D13/GP13", "type": "bidirectional" }, { "id": "gnd4", "name": "GND", "type": "ground" },
+            { "id": "d14", "name": "D14/GP14", "type": "bidirectional" }, { "id": "d15", "name": "D15/GP15", "type": "bidirectional" }
+          ]
+        },
+        {
+          "id": "pins-40-21",
+          "edge": "right",
+          "pins": [
+            { "id": "vbus", "name": "VBUS", "type": "power" }, { "id": "vsys", "name": "VSYS", "type": "power" },
+            { "id": "gnd5", "name": "GND", "type": "ground" }, { "id": "en", "name": "3V3_EN", "type": "input" },
+            { "id": "3v3", "name": "3V3_OUT", "type": "power" }, { "id": "aref", "name": "ADC_VREF", "type": "input" },
+            { "id": "a2", "name": "A2/GP28", "type": "bidirectional" }, { "id": "gnd6", "name": "AGND", "type": "ground" },
+            { "id": "a1", "name": "A1/GP27", "type": "bidirectional" }, { "id": "a0", "name": "A0/GP26", "type": "bidirectional" },
+            { "id": "run", "name": "RUN", "type": "input" }, { "id": "d22", "name": "D22/GP22", "type": "bidirectional" },
+            { "id": "gnd7", "name": "GND", "type": "ground" }, { "id": "d21", "name": "D21/GP21", "type": "bidirectional" },
+            { "id": "d20", "name": "D20/GP20", "type": "bidirectional" }, { "id": "d19", "name": "D19/GP19", "type": "bidirectional" },
+            { "id": "d18", "name": "D18/GP18", "type": "bidirectional" }, { "id": "gnd8", "name": "GND", "type": "ground" },
+            { "id": "d17", "name": "D17/GP17", "type": "bidirectional" }, { "id": "d16", "name": "D16/GP16", "type": "bidirectional" }
+          ]
+        }
+      ]
+    },
+    {
+      "boardType": "RASPBERRY_PI_PICO_2",
+      "recordId": "vf-knowledge-v1-board.raspberry-pi.pico2-rp2350",
+      "geometryRevision": "raspberry-pi-pico2-rp2350-pinout-v1",
+      "pinoutStatus": "manufacturer-verified",
+      "artworkStatus": "documented-limitation",
+      "source": {
+        "publisher": "Raspberry Pi",
+        "title": "Raspberry Pi Pico-series pinout",
+        "documentRevision": "Pico-series-current-at-2026-09-01",
+        "uri": "https://datasheets.raspberrypi.com/pico/Pico-2-Pinout.pdf"
+      },
+      "canvasDimensions": { "w": 100, "h": 180 },
+      "representedScope": "Pins 1-40 on the two castellated header rows.",
+      "artworkLimitation": "Header order is verified, but the generated body, castellations, debug pads, USB connector, pitch, and board outline are not scale-verified.",
+      "unrepresentedConnectors": ["SWD debug pads"],
+      "legacyFallbackPinIds": [],
+      "connectors": [
+        {
+          "id": "pins-1-20",
+          "edge": "left",
+          "pins": [
+            { "id": "d0", "name": "D0/GP0", "type": "bidirectional" }, { "id": "d1", "name": "D1/GP1", "type": "bidirectional" },
+            { "id": "gnd1", "name": "GND", "type": "ground" }, { "id": "d2", "name": "D2/GP2", "type": "bidirectional" },
+            { "id": "d3", "name": "D3/GP3", "type": "bidirectional" }, { "id": "d4", "name": "D4/GP4", "type": "bidirectional" },
+            { "id": "d5", "name": "D5/GP5", "type": "bidirectional" }, { "id": "gnd2", "name": "GND", "type": "ground" },
+            { "id": "d6", "name": "D6/GP6", "type": "bidirectional" }, { "id": "d7", "name": "D7/GP7", "type": "bidirectional" },
+            { "id": "d8", "name": "D8/GP8", "type": "bidirectional" }, { "id": "d9", "name": "D9/GP9", "type": "bidirectional" },
+            { "id": "gnd3", "name": "GND", "type": "ground" }, { "id": "d10", "name": "D10/GP10", "type": "bidirectional" },
+            { "id": "d11", "name": "D11/GP11", "type": "bidirectional" }, { "id": "d12", "name": "D12/GP12", "type": "bidirectional" },
+            { "id": "d13", "name": "D13/GP13", "type": "bidirectional" }, { "id": "gnd4", "name": "GND", "type": "ground" },
+            { "id": "d14", "name": "D14/GP14", "type": "bidirectional" }, { "id": "d15", "name": "D15/GP15", "type": "bidirectional" }
+          ]
+        },
+        {
+          "id": "pins-40-21",
+          "edge": "right",
+          "pins": [
+            { "id": "vbus", "name": "VBUS", "type": "power" }, { "id": "vsys", "name": "VSYS", "type": "power" },
+            { "id": "gnd5", "name": "GND", "type": "ground" }, { "id": "en", "name": "3V3_EN", "type": "input" },
+            { "id": "3v3", "name": "3V3_OUT", "type": "power" }, { "id": "aref", "name": "ADC_VREF", "type": "input" },
+            { "id": "a2", "name": "A2/GP28", "type": "bidirectional" }, { "id": "gnd6", "name": "AGND", "type": "ground" },
+            { "id": "a1", "name": "A1/GP27", "type": "bidirectional" }, { "id": "a0", "name": "A0/GP26", "type": "bidirectional" },
+            { "id": "run", "name": "RUN", "type": "input" }, { "id": "d22", "name": "D22/GP22", "type": "bidirectional" },
+            { "id": "gnd7", "name": "GND", "type": "ground" }, { "id": "d21", "name": "D21/GP21", "type": "bidirectional" },
+            { "id": "d20", "name": "D20/GP20", "type": "bidirectional" }, { "id": "d19", "name": "D19/GP19", "type": "bidirectional" },
+            { "id": "d18", "name": "D18/GP18", "type": "bidirectional" }, { "id": "gnd8", "name": "GND", "type": "ground" },
+            { "id": "d17", "name": "D17/GP17", "type": "bidirectional" }, { "id": "d16", "name": "D16/GP16", "type": "bidirectional" }
+          ]
+        }
+      ]
+    }
+  ]
+}
