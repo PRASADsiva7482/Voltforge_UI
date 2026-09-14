@@ -1,0 +1,36 @@
+{
+  "task": "VFOPT-UI-017",
+  "capturedAt": "2026-09-13T02:33:44.678Z",
+  "artifacts": [
+    {
+      "original": "Voltforge_UI/docs/reports/vfopt-ui-011-document-revision-tests.json",
+      "originalSha256": "83ac69d67ce30f3b830b0a6b66e1493735dce04dc531c2a6b5cbb2ee48ebd73d",
+      "rerun": "Voltforge_UI/docs/reports/vfopt-ui-017-rerun-vfopt-ui-011-document-revision-tests.json",
+      "rerunSha256": "fa6ac919a567d349022aa3c7c92855e855c617fa5c29586bb953ad8d8740cc87"
+    },
+    {
+      "original": "Voltforge_UI/docs/reports/vfopt-ui-012-palette-index-tests.json",
+      "originalSha256": "d24fd9db52b7f4f99bb2e2ee67ddeaca72a7f55d3073908a9ac763ca81ec223b",
+      "rerun": "Voltforge_UI/docs/reports/vfopt-ui-017-rerun-vfopt-ui-012-palette-index-tests.json",
+      "rerunSha256": "ff9a41f1928eaa0cf43e3c9a313e9f9f1f6c265ae95d647325f5258a7a43640b"
+    },
+    {
+      "original": "Voltforge_UI/docs/reports/vfopt-ui-016-routing-after.json",
+      "originalSha256": "992c4ed6da2b44249ae9bf43c4b771c5abe7822c8e24ddf8c4e598c57afa240e",
+      "rerun": "Voltforge_UI/docs/reports/vfopt-ui-017-rerun-vfopt-ui-016-routing-after.json",
+      "rerunSha256": "042defa7adee708fe2e90f315cd35898c2727c1479e587a4766ef196a729deda"
+    },
+    {
+      "original": "Voltforge_UI/docs/reports/vfopt-ui-016-routing-contract-tests.json",
+      "originalSha256": "e6c3cde1411b19dee3bb4b5c864e4d24289aca9682141164f19540ad863d874e",
+      "rerun": "Voltforge_UI/docs/reports/vfopt-ui-017-rerun-vfopt-ui-016-routing-contract-tests.json",
+      "rerunSha256": "cf9803a1fc2145be2f6b07c09af150989bfc97af3fe3cadaf44b01ba99007d1c"
+    },
+    {
+      "original": "Voltforge_UI/docs/reports/vfopt-ui-016-routing-editor-tests.json",
+      "originalSha256": "b9066293aac651bf097ca58891d829bc31f569e111747b016691e7f10146b120",
+      "rerun": "Voltforge_UI/docs/reports/vfopt-ui-017-rerun-vfopt-ui-016-routing-editor-tests.json",
+      "rerunSha256": "474fb9c0d3ce8e4cc1f22e27bb710fbaebe5e74b2531be9489f6cc0f7a75a46e"
+    }
+  ]
+}

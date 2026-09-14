@@ -243,15 +243,16 @@ const BRIDGE_RECTIFIER_PINS: PinPosition[] = [
 ];
 
 // IC_555: SVG viewBox 90×50, leads: left at x=8 (y=12,20,28,36), right at x=82 (y=12,20,28,36)
+// Physical DIP-8 standard: Pin 1 GND (top-left), Pin 4 RESET (bottom-left), Pin 5 CTRL (bottom-right), Pin 8 VCC (top-right)
 const IC_555_PINS: PinPosition[] = [
-  pin('gnd', 'GND', 8, 36, 'ground'),
-  pin('trig', 'TRIG', 8, 28, 'input'),
-  pin('out', 'OUT', 8, 20, 'output'),
-  pin('reset', 'RESET', 8, 12, 'input'),
-  pin('ctrl', 'CTRL', 82, 12, 'input'),
-  pin('thresh', 'THRESH', 82, 20, 'input'),
-  pin('disch', 'DISCH', 82, 28, 'output'),
-  pin('vcc', 'VCC', 82, 36, 'power'),
+  pin('gnd', 'GND', 8, 12, 'ground'),
+  pin('trig', 'TRIG', 8, 20, 'input'),
+  pin('out', 'OUT', 8, 28, 'output'),
+  pin('reset', 'RESET', 8, 36, 'input'),
+  pin('ctrl', 'CTRL', 82, 36, 'input'),
+  pin('thresh', 'THRESH', 82, 28, 'input'),
+  pin('disch', 'DISCH', 82, 20, 'output'),
+  pin('vcc', 'VCC', 82, 12, 'power'),
 ];
 
 // IC_74HC595: SVG viewBox 120×50

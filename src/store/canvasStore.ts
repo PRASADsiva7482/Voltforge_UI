@@ -1,9 +1,13 @@
 import { create } from 'zustand';
-import type { CanvasNode, Wire, ElectronicComponent, WireBendPoint, PinPosition } from '../types/domain';
+import type { CanvasNode, CanvasRouteCache, Wire, ElectronicComponent, WireBendPoint, PinPosition } from '../types/domain';
 import { rerouteAutoWires, routeWireBetweenNodes, getWireAutoColor } from '../utils/wireRouting';
 import { hydrateCanvasNode, type CanvasNodeSeed } from '../features/canvas/componentFactory';
 import { nextModelChange, type CanvasModelChange } from './modelRevision';
 import { applyIndexedRuntimeNodeUpdates } from './runtimeNodeMutation';
+import { reconcileAuthoredNodes, shallowDocumentEqual } from './documentMutation';
+import { isCanvasRouteCacheValid } from '../features/canvas/canvasRouteCache';
+import { startCanvasRoutingJob, type CanvasRoutingStatus } from '../features/canvas/canvasRoutingJob';
+import { indexIncidentWires, sameNodeGeometry } from '../features/canvas/dragRouting';
 
 export type { CanvasModelChange } from './modelRevision';
 
@@ -67,11 +71,25 @@ const GEOMETRY_KEYS = new Set(['x', 'y', 'width', 'height', 'rotation', 'pins'])
 
 interface CanvasState {
   nodes: CanvasNode[];
+  /** Authored/imported nodes; runtime feedback never changes this snapshot. */
+  documentNodes: CanvasNode[];
+  documentRevision: number;
+  localDocumentRevision: number;
   /** O(1) lookup map — kept in sync with `nodes` array on every mutation. */
   nodesById: Map<string, CanvasNode>;
   /** O(1) array-position lookup for sparse runtime and targeted model writes. */
   nodeIndexById: Map<string, number>;
   wires: Wire[];
+  routeCache?: CanvasRouteCache;
+  routingStatus: CanvasRoutingStatus;
+  cancelCanvasRouting: () => void;
+  retryCanvasRouting: () => void;
+  draggingNodeId: string | null;
+  geometryCommitRevision: number;
+  beginNodeGesture: (id: string) => void;
+  queueNodeGesture: (id: string, updates: Partial<CanvasNode>) => void;
+  endNodeGesture: (id: string, updates: Partial<CanvasNode>) => void;
+  cancelNodeGesture: (id: string) => void;
   /** Increments only for electrical-model or topology mutations. */
   modelRevision: number;
   lastModelChange: CanvasModelChange | null;
@@ -97,10 +115,9 @@ interface CanvasState {
    * updateNode — used during DRAG (geometry changes are transient).
    *
    * Performance contract:
-   *  - If geometry keys (x, y, width, height, rotation, pins) changed, ONLY
-   *    reroute wires that are directly connected to this node.  This is O(W_node)
-   *    instead of O(W_total) and keeps 60 fps smooth on large schematics.
-   *  - Full rerouteAutoWires() is intentionally deferred to updateNodeDragEnd().
+   *  - Gesture frames preserve wires; incident endpoints render cheap previews.
+   *  - Other geometry writes use cached node-to-wire adjacency.
+   *  - Expensive drag-end routing is scheduled in a cancellable worker.
    *  - If ONLY non-geometry keys changed (e.g. properties), the wires array
    *    reference is preserved entirely — no rerouting, no downstream re-renders.
    */
@@ -113,9 +130,8 @@ interface CanvasState {
   /**
    * updateNodeDragEnd — call this from onDragEnd / onTransformEnd only.
    *
-   * Pushes to history and runs the full global rerouteAutoWires so every
-   * wire (including those routed around the moved component) is recalculated
-   * exactly once per user gesture.
+   * Final geometry and breadboard topology commit before worker routing.
+   * Gesture history is captured once, on the first actual geometry change.
    */
   updateNodeDragEnd: (id: string, updates: Partial<CanvasNode>) => void;
 
@@ -144,7 +160,7 @@ interface CanvasState {
   setComponentLibrary: (components: ElectronicComponent[]) => void;
   clearCanvas: () => void;
   resetCanvas: () => void;
-  loadCanvas: (nodes: CanvasNodeSeed[], wires: Wire[], viewport?: { x: number; y: number; scale: number }) => void;
+  loadCanvas: (nodes: CanvasNodeSeed[], wires: Wire[], viewport?: { x: number; y: number; scale: number }, routeCache?: CanvasRouteCache) => void;
   /** Commit a fully planned editor change as exactly one undoable canvas edit. */
   commitCanvasSnapshot: (nodes: CanvasNode[], wires: Wire[]) => void;
   autoArrangeLayout: () => void;
@@ -160,12 +176,25 @@ const WIRE_COLORS = ['#22c55e', '#ef4444', '#3b82f6', '#f59e0b', '#a855f7', '#ec
 let wireCounter = 0;
 
 /** Re-route only the wires that touch a specific node — O(W_node) not O(W_total). */
+const incidentWireIndexes = new WeakMap<Wire[], Map<string, number[]>>();
 function rerouteConnectedWires(nodeId: string, nodes: CanvasNode[], wires: Wire[]): Wire[] {
-  return wires.map(w => {
-    const touches = w.fromNodeId === nodeId || w.toNodeId === nodeId;
-    if (!touches || w.routingMode !== 'auto') return w;
-    return { ...w, bendPoints: routeWireBetweenNodes(w, nodes) };
-  });
+  let index = incidentWireIndexes.get(wires);
+  if (!index) { index = indexIncidentWires(wires); incidentWireIndexes.set(wires, index); }
+  let routed = wires;
+  for (const position of index.get(nodeId) ?? []) {
+    const wire = wires[position];
+    if (wire.routingMode !== 'auto') continue;
+    if (routed === wires) routed = wires.slice();
+    routed[position] = { ...wire, bendPoints: routeWireBetweenNodes(wire, nodes) };
+  }
+  incidentWireIndexes.set(routed, index);
+  return routed;
+}
+
+function sameNodeUpdates(node: CanvasNode, updates: Partial<CanvasNode>): boolean {
+  return Object.entries(updates).every(([key, value]) => key === 'pins'
+    ? sameNodeGeometry(node, { ...node, pins: value as PinPosition[] })
+    : shallowDocumentEqual(node[key as keyof CanvasNode], value));
 }
 
 /** Helper: build nodesById map from array. */
@@ -181,11 +210,137 @@ function buildNodeIndex(nodes: CanvasNode[]): Map<string, number> {
   return index;
 }
 
-export const useCanvasStore = create<CanvasState>((set, get) => ({
+export const useCanvasStore = create<CanvasState>((baseSet, get) => {
+  let routingGeneration = 0;
+  let cancelRoutingJob: (() => void) | undefined;
+  const idleRouting: CanvasRoutingStatus = { phase: 'idle', completed: 0, total: 0, reused: 0 };
+  let gesture: { id: string; initial: CanvasNode; started: boolean; previousNodes?: CanvasNode[]; pending?: Partial<CanvasNode>; frame?: number } | undefined;
+  let applyingGesture = false;
+  const pendingNodeGeometry = new Map<string, CanvasNode>();
+  const clearGesture = () => {
+    if (gesture?.frame !== undefined) cancelAnimationFrame(gesture.frame);
+    gesture = undefined;
+    if (get().draggingNodeId !== null) baseSet({ draggingNodeId: null });
+  };
+  const gestureHistory = (state: CanvasState): Partial<CanvasState> => {
+    if (!applyingGesture || !gesture || gesture.started) return {};
+    gesture.started = true;
+    if (isCanvasRouteCacheValid(state.routeCache, state.documentNodes, state.wires)) gesture.previousNodes = state.documentNodes;
+    const history = state.history.slice(0, state.historyIndex + 1);
+    history.push({ nodes: JSON.parse(JSON.stringify(state.documentNodes)), wires: JSON.parse(JSON.stringify(state.wires)) });
+    if (history.length > 50) history.shift();
+    return { history, historyIndex: history.length - 1, redoHistory: [] };
+  };
+  const stopRouting = () => { routingGeneration++; cancelRoutingJob?.(); cancelRoutingJob = undefined; };
+  const requestRouting = (previousNodes?: CanvasNode[]) => {
+    stopRouting();
+    const generation = routingGeneration;
+    const { documentNodes: nodes, wires } = get();
+    if (!wires.some(wire => wire.routingMode === 'auto')) {
+      baseSet({ routingStatus: { phase: 'ready', completed: wires.length, total: wires.length, reused: 0 } });
+      return;
+    }
+    baseSet({ routeCache: undefined, routingStatus: { phase: 'routing', completed: 0, total: wires.length, reused: 0 } });
+    const isCurrent = () => generation === routingGeneration && get().documentNodes === nodes && get().wires === wires;
+    const error = () => {
+      if (isCurrent()) baseSet({ routingStatus: { ...get().routingStatus, phase: 'error' } });
+    };
+    try {
+      cancelRoutingJob = startCanvasRoutingJob(nodes, wires, {
+        progress: completed => { if (isCurrent()) baseSet({ routingStatus: { ...get().routingStatus, completed } }); },
+        complete: (routed, cache) => {
+          if (!isCurrent()) return;
+          cancelRoutingJob = undefined;
+          // Layout completion is derived state: no local dirty revision, undo
+          // entry or electrical-model rebuild, and no replacement of live nodes.
+          setLoaded({ wires: routed, routeCache: cache, routingStatus: { phase: 'ready', completed: wires.length, total: wires.length, reused: 0 } });
+        },
+        error,
+      }, previousNodes);
+    } catch { error(); }
+  };
+  type Update = Partial<CanvasState> | ((state: CanvasState) => Partial<CanvasState>);
+  const apply = (update: Update, origin: 'local' | 'load' | 'restore') => {
+    const before = get();
+    baseSet((state) => {
+    const patch = typeof update === 'function' ? update(state) : update;
+    if (patch === state) return state;
+    const documentNodes = patch.nodes === undefined ? state.documentNodes
+      : origin === 'local' ? reconcileAuthoredNodes(state.documentNodes, state.nodes, patch.nodes, state.nodeIndexById) : patch.nodes;
+    const changed = documentNodes !== state.documentNodes
+      || (patch.wires !== undefined && patch.wires !== state.wires)
+      || (patch.viewport !== undefined && !shallowDocumentEqual(patch.viewport, state.viewport));
+    return { ...patch, documentNodes,
+      ...(origin !== 'load' && (documentNodes !== state.documentNodes || (patch.wires !== undefined && patch.wires !== state.wires)) ? {
+        routeCache: undefined,
+        routingStatus: !applyingGesture && state.routingStatus.phase === 'routing'
+          ? { ...state.routingStatus, completed: 0 } : idleRouting,
+      } : {}),
+      documentRevision: state.documentRevision + Number(changed),
+      localDocumentRevision: state.localDocumentRevision + Number(changed && origin !== 'load'),
+    };
+    });
+    const current = get();
+    if (origin !== 'load' && (current.documentNodes !== before.documentNodes || current.wires !== before.wires)) {
+      if (!applyingGesture) clearGesture();
+      stopRouting();
+      // Coalesce edits to unfinished routing. Gesture previews wait for release
+      // so no worker is restarted for each movement frame.
+      if (!applyingGesture && before.routingStatus.phase === 'routing') {
+        const generation = routingGeneration;
+        queueMicrotask(() => { if (generation === routingGeneration) requestRouting(); });
+      }
+    }
+  };
+  const set = (update: Update) => apply(update, 'local');
+  const setLoaded = (update: Update) => apply(update, 'load');
+  const setRestored = (update: Update) => apply(update, 'restore');
+  return ({
   nodes: [],
+  documentNodes: [],
+  documentRevision: 0,
+  localDocumentRevision: 0,
   nodesById: new Map(),
   nodeIndexById: new Map(),
   wires: [],
+  routeCache: undefined,
+  routingStatus: idleRouting,
+  cancelCanvasRouting: () => { clearGesture(); pendingNodeGeometry.clear(); stopRouting(); baseSet({ routingStatus: idleRouting }); },
+  retryCanvasRouting: () => requestRouting(),
+  draggingNodeId: null,
+  geometryCommitRevision: 0,
+  beginNodeGesture: (id) => {
+    clearGesture();
+    const initial = get().nodesById.get(id);
+    if (!initial || initial.properties?.locked) return;
+    gesture = { id, initial, started: false };
+    baseSet({ draggingNodeId: id });
+  },
+  queueNodeGesture: (id, updates) => {
+    if (!gesture || gesture.id !== id) return;
+    gesture.pending = { ...gesture.pending, ...updates };
+    if (gesture.frame !== undefined) return;
+    const current = gesture;
+    gesture.frame = requestAnimationFrame(() => {
+      if (gesture !== current) return;
+      current.frame = undefined;
+      const pending = current.pending; current.pending = undefined;
+      if (!pending) return;
+      applyingGesture = true;
+      try { get().updateNode(id, pending); } finally { applyingGesture = false; }
+    });
+  },
+  endNodeGesture: (id, updates) => {
+    if (!gesture || gesture.id !== id) return;
+    if (gesture.frame !== undefined) cancelAnimationFrame(gesture.frame);
+    gesture.frame = undefined;
+    get().updateNodeDragEnd(id, { ...gesture.pending, ...updates });
+  },
+  cancelNodeGesture: (id) => {
+    if (!gesture || gesture.id !== id) return;
+    gesture.pending = undefined;
+    get().endNodeGesture(id, {});
+  },
   modelRevision: 0,
   lastModelChange: null,
   selectedNodeId: null,
@@ -227,19 +382,22 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set((state) => {
       const nodeIndex = state.nodeIndexById.get(id);
       if (nodeIndex === undefined) return state;
-      const geometryChanged = Object.keys(updates).some((k) => GEOMETRY_KEYS.has(k));
+      if (sameNodeUpdates(state.nodes[nodeIndex], updates)) return state;
+      const geometryChanged = !sameNodeGeometry(state.nodes[nodeIndex], { ...state.nodes[nodeIndex], ...updates });
+      if (geometryChanged && !pendingNodeGeometry.has(id)) pendingNodeGeometry.set(id, state.nodes[nodeIndex]);
       const updatedNode = { ...state.nodes[nodeIndex], ...updates };
       const nodes = [...state.nodes];
       nodes[nodeIndex] = updatedNode;
       const nodesById = new Map(state.nodesById).set(id, updatedNode);
       const modelChanged = Object.keys(updates).some((key) => key === 'properties' || key === 'type' || key === 'pins');
       return {
+        ...gestureHistory(state),
         nodes,
         nodesById,
         // PERF: When only properties changed (simulation updates), skip wire
         // rerouting entirely and preserve the wires array reference.  This
         // prevents thousands of downstream re-renders per simulation tick.
-        wires: geometryChanged
+        wires: geometryChanged && !applyingGesture
           ? rerouteConnectedWires(id, nodes, state.wires)
           : state.wires,
         ...(modelChanged ? nextModelChange(state, {
@@ -252,7 +410,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }),
 
   updateRuntimeNode: (id, updates) =>
-    set((state) => {
+    baseSet((state) => {
       const result = applyIndexedRuntimeNodeUpdates(state, [{ id, changes: updates }]);
       if (!result.changed) return state;
       return {
@@ -291,18 +449,29 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     });
   },
 
-  // ── DragEnd commit: push history + full global reroute ───────────────────
+  // Final geometry commits before cancellable worker routing.
   updateNodeDragEnd: (id, updates) => {
+    const before = get(), initial = before.nodesById.get(id);
+    if (!initial) return;
+    const currentGesture = gesture?.id === id ? gesture : undefined;
+    const finalNode = { ...initial, ...updates };
+    const geometryChanged = !sameNodeGeometry(currentGesture?.initial ?? pendingNodeGeometry.get(id) ?? initial, finalNode);
+    pendingNodeGeometry.delete(id);
+    const changed = !sameNodeUpdates(initial, updates);
+    if (!changed && !geometryChanged) { if (currentGesture) clearGesture(); return; }
+    let previousNodes = !currentGesture && isCanvasRouteCacheValid(before.routeCache, before.documentNodes, before.wires) ? before.documentNodes : undefined;
+    applyingGesture = true;
+    try {
     set((state) => {
       const nodeIndex = state.nodeIndexById.get(id);
       if (nodeIndex === undefined) return state;
-      const nodes = [...state.nodes];
-      nodes[nodeIndex] = { ...nodes[nodeIndex], ...updates };
-      const geometryChanged = Object.keys(updates).some((key) => GEOMETRY_KEYS.has(key));
+      const nodes = changed ? [...state.nodes] : state.nodes;
+      if (changed) nodes[nodeIndex] = finalNode;
       return {
+        ...gestureHistory(state),
         nodes,
-        nodesById: new Map(state.nodesById).set(id, nodes[nodeIndex]),
-        wires: rerouteAutoWires(nodes, state.wires),
+        nodesById: changed ? new Map(state.nodesById).set(id, nodes[nodeIndex]) : state.nodesById,
+        geometryCommitRevision: state.geometryCommitRevision + Number(geometryChanged),
         // Breadboard proximity is part of MNA connectivity. Drag frames stay
         // lightweight, but the committed drag must invalidate that topology
         // once so a component moved onto/off a rail is recompiled correctly.
@@ -316,11 +485,14 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
           : {}),
       };
     });
+    previousNodes ??= currentGesture?.previousNodes;
+    } finally { applyingGesture = false; if (currentGesture) clearGesture(); }
+    if (geometryChanged || currentGesture?.started) requestRouting(previousNodes);
   },
 
   // ── Batch update: merge N simulation updates into 1 store mutation ────────
   batchUpdateRuntimeNodes: (updates) =>
-    set((state) => {
+    baseSet((state) => {
       const result = applyIndexedRuntimeNodeUpdates(state, updates);
       if (!result.changed) return state;
       // Batch updates are property-only (simulation), so wires are preserved.
@@ -328,6 +500,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }),
 
   removeNode: (id) => {
+    pendingNodeGeometry.delete(id);
     get().pushHistory();
     set((state) => {
       const nodes = state.nodes.filter((n) => n.id !== id);
@@ -515,6 +688,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setComponentLibrary: (components) => set({ componentLibrary: components }),
 
   clearCanvas: () => {
+    pendingNodeGeometry.clear();
     get().pushHistory();
     set((state) => ({
       nodes: [],
@@ -532,7 +706,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }));
   },
 
-  resetCanvas: () => set((state) => ({
+  resetCanvas: () => {
+    clearGesture(); pendingNodeGeometry.clear();
+    stopRouting();
+    setLoaded((state) => ({
     nodes: [],
     nodesById: new Map(),
     nodeIndexById: new Map(),
@@ -545,15 +722,20 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     history: [],
     historyIndex: -1,
     redoHistory: [],
+    routeCache: undefined,
+    routingStatus: idleRouting,
     ...nextModelChange(state, {
       kind: 'reset',
       nodeIds: [],
       wireIds: [],
       topologyChanged: true,
     }),
-  })),
+    }));
+  },
 
-  loadCanvas: (nodes, wires, viewport = { x: 0, y: 0, scale: 1 }) => {
+  loadCanvas: (nodes, wires, viewport = { x: 0, y: 0, scale: 1 }, routeCache) => {
+    clearGesture(); pendingNodeGeometry.clear();
+    stopRouting();
     const componentLibrary = get().componentLibrary;
     const populatedNodes = nodes.map((node) => hydrateCanvasNode(node, componentLibrary));
 
@@ -583,16 +765,23 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       const shouldUpgrade = mode === 'straight' && (!w.bendPoints || w.bendPoints.length === 0);
       return {
         ...w,
-        bendPoints: shouldUpgrade || mode === 'auto' ? [] : w.bendPoints || [],
+        bendPoints: shouldUpgrade ? [] : Array.isArray(w.bendPoints) ? w.bendPoints : [],
         routingMode: shouldUpgrade ? 'auto' as RoutingMode : mode,
       };
     });
     const finalNodes = populatedNodes;
-    set({
+    const cached = isCanvasRouteCacheValid(routeCache, finalNodes, migratedWires);
+    const autoCount = migratedWires.filter(wire => wire.routingMode === 'auto').length;
+    // Invalid saved bends are never treated as computed routes. Connectivity
+    // and the existing auto-wire render preview remain available immediately.
+    const initialWires = cached ? migratedWires : migratedWires.map(wire => wire.routingMode === 'auto' ? { ...wire, bendPoints: [] } : wire);
+    setLoaded({
       nodes: finalNodes,
       nodesById: buildNodesMap(finalNodes),
       nodeIndexById: buildNodeIndex(finalNodes),
-      wires: rerouteAutoWires(finalNodes, migratedWires),
+      wires: initialWires,
+      routeCache: cached ? routeCache : undefined,
+      routingStatus: { phase: 'ready', completed: initialWires.length, total: initialWires.length, reused: cached ? autoCount : 0 },
       selectedNodeId: null,
       selectedWireId: null,
       isWiring: false,
@@ -612,6 +801,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         topologyChanged: true,
       }),
     });
+    if (!cached && autoCount > 0) requestRouting();
   },
 
   commitCanvasSnapshot: (nextNodes, nextWires) => {
@@ -645,7 +835,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   // History Implementation
   pushHistory: () => {
-    const { nodes, wires, history, historyIndex } = get();
+    const { documentNodes: nodes, wires, history, historyIndex } = get();
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push({ nodes: JSON.parse(JSON.stringify(nodes)), wires: JSON.parse(JSON.stringify(wires)) });
 
@@ -735,11 +925,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   undo: () => {
+    clearGesture(); pendingNodeGeometry.clear();
 
-    const { history, historyIndex, nodes, wires, redoHistory } = get();
+    const { history, historyIndex, documentNodes: nodes, wires, redoHistory } = get();
     if (historyIndex < 0) return;
     const prevState = history[historyIndex];
-    set({
+    setRestored({
       nodes: prevState.nodes,
       nodesById: buildNodesMap(prevState.nodes),
       nodeIndexById: buildNodeIndex(prevState.nodes),
@@ -756,10 +947,11 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   redo: () => {
+    clearGesture(); pendingNodeGeometry.clear();
     const { history, historyIndex, redoHistory } = get();
     if (redoHistory.length === 0) return;
     const nextState = redoHistory[redoHistory.length - 1];
-    set({
+    setRestored({
       nodes: nextState.nodes,
       nodesById: buildNodesMap(nextState.nodes),
       nodeIndexById: buildNodeIndex(nextState.nodes),
@@ -774,7 +966,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       }),
     });
   }
-}));
+  });
+});
 
 export { WIRE_COLORS };
 

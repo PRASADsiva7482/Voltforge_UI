@@ -31,7 +31,7 @@ const BOARD_FAMILIES = Array.from(
   .map(([family]) => family)
 
 export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
-  const { currentProject, setCurrentProject } = useProjectStore()
+  const { currentProject, setCurrentProject, mergeProjectMetadata } = useProjectStore()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const addToast = useToastStore((s) => s.addToast)
@@ -101,7 +101,7 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
         expectedRevision: currentProject!.updatedAt,
       }),
     onSuccess: (res) => {
-      setCurrentProject(res.data.data)
+      mergeProjectMetadata(res.data.data)
       queryClient.invalidateQueries({ queryKey: ['project', currentProject?.id] })
       onClose()
     },

@@ -1,0 +1,499 @@
+{
+  "phase": "before",
+  "pads": 128,
+  "iteration": 1,
+  "samplingInterval": 1024,
+  "totalEstimatedBytes": 5521144,
+  "engineEstimatedBytes": 5506324,
+  "totalSamples": 5350,
+  "engineSamples": 5337,
+  "head": {
+    "callFrame": {
+      "functionName": "(root)",
+      "scriptId": "0",
+      "url": "",
+      "lineNumber": -1,
+      "columnNumber": -1
+    },
+    "selfSize": 0,
+    "id": 1,
+    "children": [
+      {
+        "callFrame": {
+          "functionName": "",
+          "scriptId": "166",
+          "url": "",
+          "lineNumber": 0,
+          "columnNumber": 1
+        },
+        "selfSize": 0,
+        "id": 5,
+        "children": [
+          {
+            "callFrame": {
+              "functionName": "evaluate",
+              "scriptId": "13",
+              "url": "",
+              "lineNumber": 304,
+              "columnNumber": 10
+            },
+            "selfSize": 2596,
+            "id": 6,
+            "children": [
+              {
+                "callFrame": {
+                  "functionName": "",
+                  "scriptId": "167",
+                  "url": "",
+                  "lineNumber": 0,
+                  "columnNumber": 0
+                },
+                "selfSize": 0,
+                "id": 7,
+                "children": [
+                  {
+                    "callFrame": {
+                      "functionName": "computeRatlines",
+                      "scriptId": "7",
+                      "url": "http://localhost:3110/scripts/fixtures/legacyRatlineEngine.ts",
+                      "lineNumber": 4,
+                      "columnNumber": 23
+                    },
+                    "selfSize": 0,
+                    "id": 8,
+                    "children": [
+                      {
+                        "callFrame": {
+                          "functionName": "Map",
+                          "scriptId": "0",
+                          "url": "",
+                          "lineNumber": -1,
+                          "columnNumber": -1
+                        },
+                        "selfSize": 1064,
+                        "id": 9,
+                        "children": []
+                      },
+                      {
+                        "callFrame": {
+                          "functionName": "forEach",
+                          "scriptId": "0",
+                          "url": "",
+                          "lineNumber": -1,
+                          "columnNumber": -1
+                        },
+                        "selfSize": 0,
+                        "id": 10,
+                        "children": [
+                          {
+                            "callFrame": {
+                              "functionName": "",
+                              "scriptId": "7",
+                              "url": "http://localhost:3110/scripts/fixtures/legacyRatlineEngine.ts",
+                              "lineNumber": 7,
+                              "columnNumber": 21
+                            },
+                            "selfSize": 0,
+                            "id": 11,
+                            "children": [
+                              {
+                                "callFrame": {
+                                  "functionName": "set",
+                                  "scriptId": "0",
+                                  "url": "",
+                                  "lineNumber": -1,
+                                  "columnNumber": -1
+                                },
+                                "selfSize": 1812,
+                                "id": 12,
+                                "children": []
+                              }
+                            ]
+                          },
+                          {
+                            "callFrame": {
+                              "functionName": "",
+                              "scriptId": "7",
+                              "url": "http://localhost:3110/scripts/fixtures/legacyRatlineEngine.ts",
+                              "lineNumber": 23,
+                              "columnNumber": 16
+                            },
+                            "selfSize": 6204,
+                            "id": 13,
+                            "children": [
+                              {
+                                "callFrame": {
+                                  "functionName": "forEach",
+                                  "scriptId": "0",
+                                  "url": "",
+                                  "lineNumber": -1,
+                                  "columnNumber": -1
+                                },
+                                "selfSize": 0,
+                                "id": 14,
+                                "children": [
+                                  {
+                                    "callFrame": {
+                                      "functionName": "",
+                                      "scriptId": "7",
+                                      "url": "http://localhost:3110/scripts/fixtures/legacyRatlineEngine.ts",
+                                      "lineNumber": 23,
+                                      "columnNumber": 44
+                                    },
+                                    "selfSize": 0,
+                                    "id": 15,
+                                    "children": [
+                                      {
+                                        "callFrame": {
+                                          "functionName": "key",
+                                          "scriptId": "7",
+                                          "url": "http://localhost:3110/scripts/fixtures/legacyRatlineEngine.ts",
+                                          "lineNumber": 9,
+                                          "columnNumber": 14
+                                        },
+                                        "selfSize": 4140,
+                                        "id": 18,
+                                        "children": []
+                                      },
+                                      {
+                                        "callFrame": {
+                                          "functionName": "find",
+                                          "scriptId": "7",
+                                          "url": "http://localhost:3110/scripts/fixtures/legacyRatlineEngine.ts",
+                                          "lineNumber": 10,
+                                          "columnNumber": 15
+                                        },
+                                        "selfSize": 0,
+                                        "id": 16,
+                                        "children": [
+                                          {
+                                            "callFrame": {
+                                              "functionName": "set",
+                                              "scriptId": "0",
+                                              "url": "",
+                                              "lineNumber": -1,
+                                              "columnNumber": -1
+                                            },
+                                            "selfSize": 3644,
+                                            "id": 17,
+                                            "children": []
+                                          },
+                                          {
+                                            "callFrame": {
+                                              "functionName": "has",
+                                              "scriptId": "0",
+                                              "url": "",
+                                              "lineNumber": -1,
+                                              "columnNumber": -1
+                                            },
+                                            "selfSize": 3100,
+                                            "id": 19,
+                                            "children": []
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "callFrame": {
+                              "functionName": "",
+                              "scriptId": "7",
+                              "url": "http://localhost:3110/scripts/fixtures/legacyRatlineEngine.ts",
+                              "lineNumber": 24,
+                              "columnNumber": 16
+                            },
+                            "selfSize": 0,
+                            "id": 20,
+                            "children": [
+                              {
+                                "callFrame": {
+                                  "functionName": "key",
+                                  "scriptId": "7",
+                                  "url": "http://localhost:3110/scripts/fixtures/legacyRatlineEngine.ts",
+                                  "lineNumber": 9,
+                                  "columnNumber": 14
+                                },
+                                "selfSize": 10340,
+                                "id": 21,
+                                "children": []
+                              }
+                            ]
+                          },
+                          {
+                            "callFrame": {
+                              "functionName": "",
+                              "scriptId": "7",
+                              "url": "http://localhost:3110/scripts/fixtures/legacyRatlineEngine.ts",
+                              "lineNumber": 26,
+                              "columnNumber": 21
+                            },
+                            "selfSize": 3100,
+                            "id": 22,
+                            "children": [
+                              {
+                                "callFrame": {
+                                  "functionName": "forEach",
+                                  "scriptId": "0",
+                                  "url": "",
+                                  "lineNumber": -1,
+                                  "columnNumber": -1
+                                },
+                                "selfSize": 0,
+                                "id": 23,
+                                "children": [
+                                  {
+                                    "callFrame": {
+                                      "functionName": "",
+                                      "scriptId": "7",
+                                      "url": "http://localhost:3110/scripts/fixtures/legacyRatlineEngine.ts",
+                                      "lineNumber": 27,
+                                      "columnNumber": 26
+                                    },
+                                    "selfSize": 28936,
+                                    "id": 24,
+                                    "children": [
+                                      {
+                                        "callFrame": {
+                                          "functionName": "key",
+                                          "scriptId": "7",
+                                          "url": "http://localhost:3110/scripts/fixtures/legacyRatlineEngine.ts",
+                                          "lineNumber": 9,
+                                          "columnNumber": 14
+                                        },
+                                        "selfSize": 2060,
+                                        "id": 25,
+                                        "children": []
+                                      },
+                                      {
+                                        "callFrame": {
+                                          "functionName": "push",
+                                          "scriptId": "0",
+                                          "url": "",
+                                          "lineNumber": -1,
+                                          "columnNumber": -1
+                                        },
+                                        "selfSize": 1136,
+                                        "id": 26,
+                                        "children": []
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "callFrame": {
+                              "functionName": "",
+                              "scriptId": "7",
+                              "url": "http://localhost:3110/scripts/fixtures/legacyRatlineEngine.ts",
+                              "lineNumber": 53,
+                              "columnNumber": 15
+                            },
+                            "selfSize": 25904,
+                            "id": 27,
+                            "children": [
+                              {
+                                "callFrame": {
+                                  "functionName": "isRouted",
+                                  "scriptId": "7",
+                                  "url": "http://localhost:3110/scripts/fixtures/legacyRatlineEngine.ts",
+                                  "lineNumber": 45,
+                                  "columnNumber": 19
+                                },
+                                "selfSize": 6220,
+                                "id": 35,
+                                "children": []
+                              },
+                              {
+                                "callFrame": {
+                                  "functionName": "push",
+                                  "scriptId": "0",
+                                  "url": "",
+                                  "lineNumber": -1,
+                                  "columnNumber": -1
+                                },
+                                "selfSize": 2424,
+                                "id": 36,
+                                "children": []
+                              },
+                              {
+                                "callFrame": {
+                                  "functionName": "add",
+                                  "scriptId": "0",
+                                  "url": "",
+                                  "lineNumber": -1,
+                                  "columnNumber": -1
+                                },
+                                "selfSize": 1300,
+                                "id": 37,
+                                "children": []
+                              },
+                              {
+                                "callFrame": {
+                                  "functionName": "forEach",
+                                  "scriptId": "0",
+                                  "url": "",
+                                  "lineNumber": -1,
+                                  "columnNumber": -1
+                                },
+                                "selfSize": 0,
+                                "id": 28,
+                                "children": [
+                                  {
+                                    "callFrame": {
+                                      "functionName": "",
+                                      "scriptId": "7",
+                                      "url": "http://localhost:3110/scripts/fixtures/legacyRatlineEngine.ts",
+                                      "lineNumber": 58,
+                                      "columnNumber": 22
+                                    },
+                                    "selfSize": 384556,
+                                    "id": 29,
+                                    "children": [
+                                      {
+                                        "callFrame": {
+                                          "functionName": "",
+                                          "scriptId": "7",
+                                          "url": "http://localhost:3110/scripts/fixtures/legacyRatlineEngine.ts",
+                                          "lineNumber": 59,
+                                          "columnNumber": 20
+                                        },
+                                        "selfSize": 1696528,
+                                        "id": 33,
+                                        "children": [
+                                          {
+                                            "callFrame": {
+                                              "functionName": "hypot",
+                                              "scriptId": "0",
+                                              "url": "",
+                                              "lineNumber": -1,
+                                              "columnNumber": -1
+                                            },
+                                            "selfSize": 3129180,
+                                            "id": 34,
+                                            "children": []
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "callFrame": {
+                                          "functionName": "forEach",
+                                          "scriptId": "0",
+                                          "url": "",
+                                          "lineNumber": -1,
+                                          "columnNumber": -1
+                                        },
+                                        "selfSize": 0,
+                                        "id": 30,
+                                        "children": [
+                                          {
+                                            "callFrame": {
+                                              "functionName": "",
+                                              "scriptId": "7",
+                                              "url": "http://localhost:3110/scripts/fixtures/legacyRatlineEngine.ts",
+                                              "lineNumber": 59,
+                                              "columnNumber": 20
+                                            },
+                                            "selfSize": 139056,
+                                            "id": 31,
+                                            "children": [
+                                              {
+                                                "callFrame": {
+                                                  "functionName": "hypot",
+                                                  "scriptId": "0",
+                                                  "url": "",
+                                                  "lineNumber": -1,
+                                                  "columnNumber": -1
+                                                },
+                                                "selfSize": 55620,
+                                                "id": 32,
+                                                "children": []
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "callFrame": {
+          "functionName": "",
+          "scriptId": "0",
+          "url": "",
+          "lineNumber": -1,
+          "columnNumber": -1
+        },
+        "selfSize": 1032,
+        "id": 38,
+        "children": []
+      },
+      {
+        "callFrame": {
+          "functionName": "(V8 API)",
+          "scriptId": "0",
+          "url": "",
+          "lineNumber": -1,
+          "columnNumber": -1
+        },
+        "selfSize": 4732,
+        "id": 2,
+        "children": []
+      },
+      {
+        "callFrame": {
+          "functionName": "(PARSER)",
+          "scriptId": "0",
+          "url": "",
+          "lineNumber": -1,
+          "columnNumber": -1
+        },
+        "selfSize": 1220,
+        "id": 3,
+        "children": []
+      },
+      {
+        "callFrame": {
+          "functionName": "(BYTECODE_COMPILER)",
+          "scriptId": "0",
+          "url": "",
+          "lineNumber": -1,
+          "columnNumber": -1
+        },
+        "selfSize": 4200,
+        "id": 4,
+        "children": []
+      },
+      {
+        "callFrame": {
+          "functionName": "(IDLE_EXTERNAL)",
+          "scriptId": "0",
+          "url": "",
+          "lineNumber": -1,
+          "columnNumber": -1
+        },
+        "selfSize": 1040,
+        "id": 39,
+        "children": []
+      }
+    ]
+  }
+}

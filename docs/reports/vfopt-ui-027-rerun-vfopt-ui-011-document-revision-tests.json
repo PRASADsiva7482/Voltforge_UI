@@ -1,0 +1,39 @@
+{
+  "task": "VFOPT-UI-011",
+  "capturedAt": "2026-09-14T00:31:01.098Z",
+  "checks": [
+    {
+      "name": "Runtime and irrelevant PCB writes do not revise or serialize the authored document",
+      "passed": true
+    },
+    {
+      "name": "Real edits preserve authored properties without copying runtime feedback",
+      "passed": true
+    },
+    {
+      "name": "Viewport edits revise the document; selection and wiring tools do not",
+      "passed": true
+    },
+    {
+      "name": "Load and derived PCB generation do not become local edits",
+      "passed": true
+    },
+    {
+      "name": "PCB document fields participate; transient route/DRC selection does not",
+      "passed": true
+    },
+    {
+      "name": "Undo and redo restore authored state instead of simulated values",
+      "passed": true
+    },
+    {
+      "name": "Save snapshot remains immutable and only local edits invalidate its acknowledgement",
+      "passed": true
+    },
+    {
+      "name": "Code no-ops and metadata acknowledgements preserve local code and dirty state",
+      "passed": true
+    }
+  ],
+  "status": "passed"
+}

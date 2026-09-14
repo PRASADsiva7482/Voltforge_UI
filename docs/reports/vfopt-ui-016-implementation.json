@@ -1,0 +1,444 @@
+{
+  "task": "VFOPT-UI-016",
+  "capturedAt": "2026-09-12T20:49:41.200Z",
+  "status": "implemented_pending_render_and_live_validation",
+  "authorization": "User requested VFOPT-UI-016 implementation followed by the next recommendation, and continued the task.",
+  "changes": [
+    "Publish hydrated topology immediately; move existing automatic route calculation to a cancellable module worker with bounded progress, timeout and visible Retry.",
+    "Add exact versioned route-cache validity across geometry, all obstacles, pins, connections, modes and bends; unchanged saved routes reuse their layout without launching a worker.",
+    "Guard completion by job generation and authored node/wire references; cancel superseded or unmounted work and coalesce unfinished-load replacements after edits.",
+    "Keep derived routing completion out of local dirty revisions, model rebuilds, undo history and collaboration echoes; preserve runtime node values.",
+    "Carry optional cache metadata through save/load, share, collaboration and lab restoration; restore authored lab snapshots instead of runtime feedback.",
+    "Keep routing status invalidation in the same local store publication to avoid adding extra publications to normal drag updates."
+  ],
+  "sourceEvidence": [
+    {
+      "file": "Voltforge_UI/package.json",
+      "sha256": "e916905699175f178f124e6f17a98d5536e5d634d9a975510d035c256bda6021",
+      "startLine": 1,
+      "endLine": 62
+    },
+    {
+      "file": "Voltforge_UI/src/types/domain.ts",
+      "sha256": "30b9ce3821649adff166cbc1ffb66385534c8e71678e453bedf0a70943c3dc72",
+      "startLine": 1,
+      "endLine": 748
+    },
+    {
+      "file": "Voltforge_UI/src/store/canvasStore.ts",
+      "sha256": "b864908bb3e67caa728a498c502c513a77783cfd404e159595963b7b4a83b145",
+      "startLine": 1,
+      "endLine": 879
+    },
+    {
+      "file": "Voltforge_UI/src/features/editor/editorDocumentSnapshots.ts",
+      "sha256": "50f36b159a94a6cdcc402400269c1751992773c090f82e6395379d6ab59974e5",
+      "startLine": 1,
+      "endLine": 30
+    },
+    {
+      "file": "Voltforge_UI/src/features/editor/CircuitEditorPage.tsx",
+      "sha256": "8e91528709c2a35f12bc89246e641b1db06aae554ea9dde4a41b7f7b673c47a9",
+      "startLine": 1,
+      "endLine": 1731
+    },
+    {
+      "file": "Voltforge_UI/src/hooks/useCollaboration.ts",
+      "sha256": "53cb7f63fca7f3516ae7c698b8e0b242d49f8d76726eefff155fc95926410147",
+      "startLine": 1,
+      "endLine": 350
+    },
+    {
+      "file": "Voltforge_UI/src/features/labs/LabChallengeRunner.tsx",
+      "sha256": "af53490d96127584f4b5128859561f1400dfb4cc56a8c78119b8b1f190d27868",
+      "startLine": 1,
+      "endLine": 297
+    },
+    {
+      "file": "Voltforge_UI/src/features/canvas/CircuitCanvas.tsx",
+      "sha256": "ed17741532aeef8ae10c65ca6b0faaa19114753e93c02b875f2985191979edbd",
+      "startLine": 1,
+      "endLine": 687
+    },
+    {
+      "file": "Voltforge_UI/src/styles/editor.css",
+      "sha256": "71f494578420db3bd96603a7df94c2a6a3a9e66e9e8cfb9ff28419554eb6bef2",
+      "startLine": 1,
+      "endLine": 2796
+    },
+    {
+      "file": "Voltforge_UI/src/features/canvas/CanvasRoutingWorker.ts",
+      "sha256": "c4597b8af1ca9fb3f235246b1b9f62781fa6fa90beb91162ca7800730707c62e",
+      "startLine": 1,
+      "endLine": 32
+    },
+    {
+      "file": "Voltforge_UI/src/features/canvas/canvasRoutingJob.ts",
+      "sha256": "75fa81f6006125b7c12ce23654535e047f86cf1313a18b86e6d31aaae03a79a5",
+      "startLine": 1,
+      "endLine": 42
+    },
+    {
+      "file": "Voltforge_UI/src/features/canvas/canvasRouteCache.ts",
+      "sha256": "2d8062973c6ac99fab27334b6067c642d25e6f818826a3fc446cb4b2ad74e054",
+      "startLine": 1,
+      "endLine": 32
+    },
+    {
+      "file": "Voltforge_UI/src/features/canvas/CanvasRoutingStatus.tsx",
+      "sha256": "da5b1acf67ec5c551aab65b59d909cededc1a7092c8c4af3f90580e3041c8051",
+      "startLine": 1,
+      "endLine": 13
+    },
+    {
+      "file": "Voltforge_UI/scripts/run-routing-contract-tests.mjs",
+      "sha256": "befb081257b785ea0cf1c10724e6637f32a668fe49f5ca9f138c1e9b26cd7e29",
+      "startLine": 1,
+      "endLine": 125
+    },
+    {
+      "file": "Voltforge_UI/scripts/run-routing-browser-tests.mjs",
+      "sha256": "e76e64e8d6141bae6118e0e59f8606917ec3086cbf78951eb9ab14c91427ce5c",
+      "startLine": 1,
+      "endLine": 116
+    },
+    {
+      "file": "Voltforge_UI/scripts/run-routing-editor-tests.mjs",
+      "sha256": "1babfdbd6cfeb8f9e2810f3f009e4b1b95ff8d6d5f6f3a615e8fd5db4022b868",
+      "startLine": 1,
+      "endLine": 124
+    },
+    {
+      "file": "Voltforge_UI/scripts/fixtures/routing-entry.tsx",
+      "sha256": "19c87a451db0d4f7fa4e34ec05356a26ef5d39cc8a49276fd5f0173c732a4405",
+      "startLine": 1,
+      "endLine": 34
+    },
+    {
+      "file": "Voltforge_UI/scripts/fixtures/routing-editor-entry.tsx",
+      "sha256": "f2adb496b0ae67223387315834ce8df44593b465b27b54940901d025355c7465",
+      "startLine": 1,
+      "endLine": 31
+    },
+    {
+      "file": "Voltforge_UI/docs/VFOPT_UI_016_ASYNC_ROUTING.md",
+      "sha256": "275324cccf4327fdb02336460a263068d3b085adbc637a5bfa3367ead92cf53d",
+      "startLine": 1,
+      "endLine": 42
+    }
+  ],
+  "before": {
+    "file": "Voltforge_UI/docs/reports/vfopt-ui-016-routing-before.json",
+    "sha256": "2458de234d3719afa145a302156254b461d9f6afb061aacf202b4e93d94955c8"
+  },
+  "after": {
+    "file": "Voltforge_UI/docs/reports/vfopt-ui-016-routing-after.json",
+    "sha256": "992c4ed6da2b44249ae9bf43c4b771c5abe7822c8e24ddf8c4e598c57afa240e"
+  },
+  "measurements": {
+    "fixture": "100 hydrated resistor nodes and 99 auto wires on a 10x10 grid; actual canvas; no backend",
+    "fixtureSha256": "19c87a451db0d4f7fa4e34ec05356a26ef5d39cc8a49276fd5f0173c732a4405",
+    "browser": "153.0.8010.36",
+    "synchronousLoadMs": {
+      "before": {
+        "samples": 5,
+        "min": 159.09999999403954,
+        "median": 163.6000000089407,
+        "max": 217.29999999701977,
+        "values": [
+          159.09999999403954,
+          160.1000000089407,
+          163.6000000089407,
+          188.69999998807907,
+          217.29999999701977
+        ]
+      },
+      "after": {
+        "samples": 5,
+        "min": 1.7000000029802322,
+        "median": 1.9000000059604645,
+        "max": 2.5,
+        "values": [
+          1.7000000029802322,
+          1.7999999970197678,
+          1.9000000059604645,
+          1.9000000059604645,
+          2.5
+        ]
+      }
+    },
+    "firstYieldMs": {
+      "before": {
+        "samples": 5,
+        "min": 323.90000000596046,
+        "median": 342.09999999403954,
+        "max": 453.5,
+        "values": [
+          323.90000000596046,
+          329.79999999701977,
+          342.09999999403954,
+          404.5,
+          453.5
+        ]
+      },
+      "after": {
+        "samples": 5,
+        "min": 165.40000000596046,
+        "median": 187.20000000298023,
+        "max": 321.6000000089407,
+        "values": [
+          165.40000000596046,
+          167.6000000089407,
+          187.20000000298023,
+          202.8999999910593,
+          321.6000000089407
+        ]
+      }
+    },
+    "cachedReload": {
+      "name": "cached reload",
+      "workersBefore": 5,
+      "workersAfter": 5,
+      "loadMs": 1.2999999970197678,
+      "status": {
+        "phase": "ready",
+        "completed": 99,
+        "total": 99,
+        "reused": 99
+      },
+      "cacheBytes": 13537,
+      "savedLayoutBytes": 58217
+    },
+    "interpretation": "Synchronous loadMs covers hydration, cache validation and worker dispatch, excluding subsequent React/Konva work. First yield is a scheduling proxy, not hardware pointer-to-paint. This does not establish total CPU savings or a sub-50-ms first interaction. Long-task lists may omit a task starting just before a sample."
+  },
+  "acceptance": [
+    {
+      "criterion": "Same-fixture first interaction is not blocked by one routing task over 50 ms.",
+      "status": "routing_dispatch_verified_full_interaction_pending",
+      "evidence": [
+        "Voltforge_UI/docs/reports/vfopt-ui-016-routing-before.json",
+        "Voltforge_UI/docs/reports/vfopt-ui-016-routing-after.json"
+      ],
+      "detail": "Five same-fixture synchronous loads are below 50 ms and return while real-worker routing is pending. The old global router no longer runs in loadCanvas on the main thread. First-yield remains 165.4-321.6 ms with canvas long tasks, so total first-interaction responsiveness is not accepted."
+    },
+    {
+      "criterion": "Valid saved routes are reused; invalid/legacy routes are recomputed with equivalent pin endpoints and obstacle behavior.",
+      "status": "passed_on_contract_and_browser_fixtures",
+      "evidence": [
+        "Voltforge_UI/docs/reports/vfopt-ui-016-routing-contract-tests.json",
+        "Voltforge_UI/docs/reports/vfopt-ui-016-routing-after.json",
+        "Voltforge_UI/docs/reports/vfopt-ui-016-routing-editor-tests.json"
+      ],
+      "detail": "99 cached routes reused without another worker; invalid cache recomputes. Actual worker bends exactly match the original algorithm; pin aliases/manual bends and geometry/obstacle/pin/endpoint invalidation pass. Saved/shared/collaboration/lab paths pass with isolated services."
+    },
+    {
+      "criterion": "Leaving during load cancels work and cannot overwrite the next project.",
+      "status": "passed_on_contract_and_browser_fixtures",
+      "evidence": [
+        "Voltforge_UI/docs/reports/vfopt-ui-016-routing-contract-tests.json",
+        "Voltforge_UI/docs/reports/vfopt-ui-016-routing-after.json",
+        "Voltforge_UI/docs/reports/vfopt-ui-016-routing-editor-tests.json"
+      ],
+      "detail": "Replacement, reset, cancellation, local edits/undo and real route unmount terminate or invalidate old jobs; late completion cannot replace the next document. Runtime updates do not invalidate the authored job."
+    }
+  ],
+  "verification": {
+    "routingContract": {
+      "file": "Voltforge_UI/docs/reports/vfopt-ui-016-routing-contract-tests.json",
+      "sha256": "e6c3cde1411b19dee3bb4b5c864e4d24289aca9682141164f19540ad863d874e",
+      "command": "npm run test:routing-contract",
+      "passed": 8,
+      "failed": 0,
+      "errors": 0
+    },
+    "routingBrowser": {
+      "file": "Voltforge_UI/docs/reports/vfopt-ui-016-routing-after.json",
+      "sha256": "992c4ed6da2b44249ae9bf43c4b771c5abe7822c8e24ddf8c4e598c57afa240e",
+      "command": "npm run test:routing-browser",
+      "passed": 8,
+      "failed": 0,
+      "errors": 0
+    },
+    "routingEditor": {
+      "file": "Voltforge_UI/docs/reports/vfopt-ui-016-routing-editor-tests.json",
+      "sha256": "b9066293aac651bf097ca58891d829bc31f569e111747b016691e7f10146b120",
+      "command": "node scripts/run-routing-editor-tests.mjs",
+      "passed": 6,
+      "failed": 0,
+      "errors": 0
+    },
+    "editorBrowser": {
+      "file": "Voltforge_UI/docs/reports/vfopt-ui-016-editor-render-after.json",
+      "sha256": "f274b454a15eebaf3c22088ac4dbb2817843ebd8f06a62a0d51b94778cab276d",
+      "command": "node scripts/run-editor-render-tests.mjs --report-prefix=vfopt-ui-016-editor",
+      "passed": 17,
+      "failed": 0,
+      "errors": 0
+    },
+    "documentBrowser": {
+      "file": "Voltforge_UI/docs/reports/vfopt-ui-016-rerun-vfopt-ui-011-dirty-after.json",
+      "sha256": "e81886aadf6ab448e7807fec4558bd9cb892ad3442716aa1f188eb8d91ca011c",
+      "command": "npm run test:document-dirty-browser",
+      "passed": 16,
+      "failed": 0,
+      "errors": 0
+    },
+    "fullTest": {
+      "command": "npm test",
+      "exitCode": 0,
+      "scope": "TypeScript, lint, worker/result/runtime/model, existing AI presentation/proposal contracts, board geometry, MNA, scope, canvas, AVR, document, palette and routing tests.",
+      "warnings": [
+        "Existing scripts/fixtures/palette-entry.tsx react/only-export-components lint warning; no new lint warning.",
+        "Existing AI presentation/hardware SSR harnesses printed Vite dependency-scan shutdown warnings (server being restarted or closed); their assertions and the command completed successfully."
+      ]
+    },
+    "build": {
+      "command": "npm run build",
+      "exitCode": 0,
+      "typeScript": "passed",
+      "productionBuild": "passed",
+      "bundleBudget": {
+        "status": "passed",
+        "entryKiB": 98.2,
+        "entryLimitKiB": 150,
+        "initialStaticJsKiB": 504.6,
+        "initialStaticJsLimitKiB": 550,
+        "initialChunks": 13,
+        "initialChunkLimit": 16,
+        "largestChunkKiB": 178.5,
+        "largestChunkLimitKiB": 450
+      },
+      "worker": {
+        "file": "Voltforge_UI/dist/assets/CanvasRoutingWorker-BTVRbtxO.js",
+        "sha256": "5f07ba753ed387d7d9d15416b022c761bb7195232dd6563d36bcd5c6fd438341",
+        "bytes": 3913
+      },
+      "manifest": {
+        "file": "Voltforge_UI/dist/.vite/manifest.json",
+        "sha256": "72c50ce71710c86abcac2725f93228204bf284d3d73fa8e63c2d476ce54b48ff"
+      }
+    },
+    "whitespace": {
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    "cleanup": {
+      "capturedAt": "2026-09-12T20:49:18.976Z",
+      "fixturePorts": [
+        {
+          "port": 3102,
+          "listening": false
+        },
+        {
+          "port": 3103,
+          "listening": false
+        },
+        {
+          "port": 3105,
+          "listening": false
+        },
+        {
+          "port": 3106,
+          "listening": false
+        }
+      ],
+      "userServicesStopped": false
+    }
+  },
+  "scope": {
+    "baselineInventory": {
+      "file": ".voltforge-logs/vfopt-ui-016-before/source-inventory.json",
+      "sha256": "30861ca709b4ace6844572154dd63aa76d11588ed900d790fc54c572ed5135f3"
+    },
+    "inventoriedFiles": 335,
+    "changedInventoriedSources": [
+      {
+        "file": "Voltforge_UI/package.json",
+        "beforeSha256": "e497242b21128b4c332970edb32ea877a3b6dcfce5b05505405ee4d45ab5b2b9",
+        "afterSha256": "e916905699175f178f124e6f17a98d5536e5d634d9a975510d035c256bda6021"
+      },
+      {
+        "file": "Voltforge_UI/src/features/canvas/CircuitCanvas.tsx",
+        "beforeSha256": "83418e3ba80a1bd9292f4111e6e17c000623191cdf87cebfe333894e5ab88bf8",
+        "afterSha256": "ed17741532aeef8ae10c65ca6b0faaa19114753e93c02b875f2985191979edbd"
+      },
+      {
+        "file": "Voltforge_UI/src/features/editor/CircuitEditorPage.tsx",
+        "beforeSha256": "84f2965b1fe46fcc41ec4ed04a08f0ecf0896967d1240e8d87a178c7a2e0fd68",
+        "afterSha256": "8e91528709c2a35f12bc89246e641b1db06aae554ea9dde4a41b7f7b673c47a9"
+      },
+      {
+        "file": "Voltforge_UI/src/features/editor/editorDocumentSnapshots.ts",
+        "beforeSha256": "b5d4bd99ecc65981b18d529d133a257651eea706b0acdaf810eed4119a1995cb",
+        "afterSha256": "50f36b159a94a6cdcc402400269c1751992773c090f82e6395379d6ab59974e5"
+      },
+      {
+        "file": "Voltforge_UI/src/features/labs/LabChallengeRunner.tsx",
+        "beforeSha256": "affb10e2fcb81b115f249b1ab96252206cd3d7f856296cb9312dafa43c4b3f32",
+        "afterSha256": "af53490d96127584f4b5128859561f1400dfb4cc56a8c78119b8b1f190d27868"
+      },
+      {
+        "file": "Voltforge_UI/src/hooks/useCollaboration.ts",
+        "beforeSha256": "235c8322d07831c976ed8d10cfa99d2bc300eba5f04617366d19787257b1df69",
+        "afterSha256": "53cb7f63fca7f3516ae7c698b8e0b242d49f8d76726eefff155fc95926410147"
+      },
+      {
+        "file": "Voltforge_UI/src/store/canvasStore.ts",
+        "beforeSha256": "42aed0330c3b2974315f3a2487c22a99a71e3101ad2f57583ac082b8f7ec7e38",
+        "afterSha256": "b864908bb3e67caa728a498c502c513a77783cfd404e159595963b7b4a83b145"
+      },
+      {
+        "file": "Voltforge_UI/src/styles/editor.css",
+        "beforeSha256": "450e7d9de255d31ae4e9c5d29f99ba818ba2dcee48fcca755c39b035d400d5a2",
+        "afterSha256": "71f494578420db3bd96603a7df94c2a6a3a9e66e9e8cfb9ff28419554eb6bef2"
+      },
+      {
+        "file": "Voltforge_UI/src/types/domain.ts",
+        "beforeSha256": "786ac0434194c71ebd23d27ab73b0f60c747176a0f62dafc6ba0da26f8fda6eb",
+        "afterSha256": "30b9ce3821649adff166cbc1ffb66385534c8e71678e453bedf0a70943c3dc72"
+      }
+    ],
+    "preservedFileCount": 325,
+    "originalRouter": {
+      "file": "Voltforge_UI/src/utils/wireRouting.ts",
+      "sha256": "8805f28c49de4d5ddb888372de5e4ba331d41992e6d71cede44539fa68c69dcc"
+    },
+    "historicalReportsPreserved": 26,
+    "historicalReruns": {
+      "file": "Voltforge_UI/docs/reports/vfopt-ui-016-rerun-artifacts.json",
+      "sha256": "c996869c257028d9ab72348bf6a3e3b93a01f0708fcf852878e0ec4dbbaee0d9"
+    },
+    "backend": "All inventoried backend source/configuration unchanged; no backend implementation or live write.",
+    "userChanges": "Pre-existing staged pinRegistry.ts and modified backend application.yml bytes preserved; no staging or commits.",
+    "ai": "No AI implementation changes."
+  },
+  "remainingValidation": [
+    {
+      "status": "pending",
+      "items": [
+        "VFOPT-UI-014",
+        "VFOPT-UI-015",
+        "VFOPT-UI-018",
+        "VFOPT-UI-019"
+      ],
+      "detail": "React/Konva scene construction and the unchanged smartOrthogonalRoute display path still produce long tasks. getWireRenderPoints does not use stored automatic bends. Full first-interaction responsiveness remains above the target; profile/optimize these owning items."
+    },
+    {
+      "status": "next_recommended",
+      "items": [
+        "VFOPT-UI-017"
+      ],
+      "detail": "Normal drag and drag-end still use synchronous connected/global routing. UI-016 provides cancellable worker/cache foundations, while its remaining render/live checks stay open."
+    },
+    {
+      "status": "unverified",
+      "detail": "No real authenticated account/database/STOMP writes or production CSP browser execution. Existing backend map preservation verified from source only. Larger circuits, complete endpoint/obstacle topology space and sustained whole-application CPU/heap remain unmeasured."
+    },
+    {
+      "status": "documented_tradeoff",
+      "detail": "Exact serialized cache keys add 13537 bytes to the 58217-byte saved fixture (including cache). Authored edits conservatively invalidate cache; saving before routing completes omits cache and safely reroutes on next load. No autosave is triggered solely to persist derived cache metadata."
+    }
+  ],
+  "documentation": "Voltforge_UI/docs/VFOPT_UI_016_ASYNC_ROUTING.md",
+  "nextRecommendedItem": "VFOPT-UI-017"
+}

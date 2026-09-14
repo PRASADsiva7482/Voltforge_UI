@@ -1,49 +1,71 @@
+import { memo, useLayoutEffect, useRef } from 'react';
+import Konva from 'konva';
 import { Group, Rect, Circle, Text } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { PcbFootprint } from '../../store/pcbStore';
+import { BOARD_OFFSET_PX } from './pcbSceneGeometry';
+import { cachePcbNode, type PcbRasterBudget } from './pcbRasterBudget';
 
 interface Props {
   footprint: PcbFootprint;
   isSelected: boolean;
   scaleMmToPx: number;
-  onSelect: () => void;
-  onDragEnd: (x_mm: number, y_mm: number) => void;
-  onPadClick: (padId: string, padX_mm: number, padY_mm: number) => void;
+  onSelect: (id: string) => void;
+  onDragStart: (id: string) => void;
+  onDragEnd: (id: string, x_mm: number, y_mm: number) => void;
+  onPadClick: (footprint: PcbFootprint, padId: string, padX_mm: number, padY_mm: number) => void;
+  detailed: boolean;
+  rasterBudget: PcbRasterBudget;
   showCopper?: boolean;
   showSilk?: boolean;
   readOnly?: boolean;
 }
 
-export default function PcbFootprintRenderer({
+const PcbFootprintRenderer = memo(function PcbFootprintRenderer({
   footprint,
   isSelected,
   scaleMmToPx,
   onSelect,
+  onDragStart,
   onDragEnd,
   onPadClick,
+  detailed,
+  rasterBudget,
   showCopper = true,
   showSilk = true,
   readOnly = false,
 }: Props) {
-  const x = footprint.x * scaleMmToPx;
-  const y = footprint.y * scaleMmToPx;
+  const x = footprint.x * scaleMmToPx + BOARD_OFFSET_PX;
+  const y = footprint.y * scaleMmToPx + BOARD_OFFSET_PX;
   const w = footprint.width * scaleMmToPx;
   const h = footprint.height * scaleMmToPx;
+  const groupRef = useRef<Konva.Group>(null);
+  useLayoutEffect(() => {
+    const group = groupRef.current;
+    if (!group || (!showCopper && !showSilk)) return;
+    // Cover supported zoom up to 3 without re-rasterizing on every wheel event.
+    return cachePcbNode(group, rasterBudget, 3 * Konva.pixelRatio);
+  }, [footprint.name, footprint.width, footprint.height, footprint.pads, scaleMmToPx, detailed, showCopper, showSilk, isSelected, rasterBudget]);
 
   return (
     <Group
+      ref={groupRef}
+      name="pcb-footprint"
+      id={footprint.id}
       x={x}
       y={y}
       rotation={footprint.rotation}
       draggable={!readOnly}
       onClick={(e: KonvaEventObject<MouseEvent>) => {
         e.cancelBubble = true;
-        onSelect();
+        onSelect(footprint.id);
       }}
+      onDragStart={() => onDragStart(footprint.id)}
       onDragEnd={(e: KonvaEventObject<DragEvent>) => {
-        const newX_mm = e.target.x() / scaleMmToPx;
-        const newY_mm = e.target.y() / scaleMmToPx;
-        onDragEnd(newX_mm, newY_mm);
+        const newX_mm = (e.target.x() - BOARD_OFFSET_PX) / scaleMmToPx;
+        const newY_mm = (e.target.y() - BOARD_OFFSET_PX) / scaleMmToPx;
+        onDragEnd(footprint.id, newX_mm, newY_mm);
+        if (readOnly) e.target.position({ x, y });
       }}
     >
       <Group visible={showSilk}>
@@ -60,10 +82,10 @@ export default function PcbFootprintRenderer({
         />
 
         {/* Pin 1 orientation indicator notch / dot */}
-        <Circle x={-w / 2 + 4} y={-h / 2 + 4} radius={2} fill="#ffffff" />
+        {detailed && <Circle x={-w / 2 + 4} y={-h / 2 + 4} radius={2} fill="#ffffff" />}
 
         {/* Reference Designator Text */}
-        <Text
+        {detailed && <Text
           text={footprint.name}
           x={-w / 2}
           y={-h / 2 - 12}
@@ -71,7 +93,7 @@ export default function PcbFootprintRenderer({
           fontFamily="'JetBrains Mono', monospace"
           fontStyle="bold"
           fill="#ffffff"
-        />
+        />}
       </Group>
 
       {/* Copper Pads */}
@@ -86,6 +108,8 @@ export default function PcbFootprintRenderer({
           return (
             <Group
               key={pad.id}
+              name="pcb-pad"
+              id={`${footprint.id}:${pad.id}`}
               x={padX}
               y={padY}
               onClick={(e: KonvaEventObject<MouseEvent>) => {
@@ -93,7 +117,7 @@ export default function PcbFootprintRenderer({
                 const radians = (footprint.rotation * Math.PI) / 180;
                 const rotatedX = pad.x * Math.cos(radians) - pad.y * Math.sin(radians);
                 const rotatedY = pad.x * Math.sin(radians) + pad.y * Math.cos(radians);
-                onPadClick(pad.id, footprint.x + rotatedX, footprint.y + rotatedY);
+                onPadClick(footprint, pad.id, footprint.x + rotatedX, footprint.y + rotatedY);
               }}
             >
             {/* Outer Copper Pad */}
@@ -109,7 +133,7 @@ export default function PcbFootprintRenderer({
             />
 
             {/* Drill Hole for Through-Hole Pads */}
-            {isTht && (
+            {isTht && detailed && (
               <Circle
                 radius={((pad.drillDiameter || 0.8) * scaleMmToPx) / 2}
                 fill="#0f172a"
@@ -119,7 +143,7 @@ export default function PcbFootprintRenderer({
             )}
 
             {/* Pad Label */}
-            <Text
+            {detailed && <Text
               text={pad.name}
               x={-padW / 2}
               y={-padH / 2 + 2}
@@ -129,11 +153,13 @@ export default function PcbFootprintRenderer({
               fontFamily="monospace"
               fontStyle="bold"
               fill="#713f12"
-            />
+            />}
             </Group>
           );
         })}
       </Group>
     </Group>
   );
-}
+});
+
+export default PcbFootprintRenderer;

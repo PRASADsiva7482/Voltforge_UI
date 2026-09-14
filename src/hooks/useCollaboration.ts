@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import keycloak from '../auth/keycloak';
 import { useCanvasStore } from '../store/canvasStore';
-import { usePcbStore, type PcbLayout } from '../store/pcbStore';
-import type { CanvasNode, Wire } from '../types/domain';
+import { usePcbStore } from '../store/pcbStore';
+import { useProjectStore } from '../store/projectStore';
+import { useToastStore } from '../store/useToastStore';
 
 export interface CollaboratorInfo {
   color: string;
@@ -74,20 +75,15 @@ export function useCollaboration(projectId: string) {
   const [activeUsers, setActiveUsers] = useState<Record<string, CollaboratorInfo>>({});
 
   const wsRef = useRef<WebSocket | null>(null);
-  const isRemoteSyncing = useRef(false);
   const lastCursorAt = useRef(0);
   const heartbeatRef = useRef<number | null>(null);
   const canvasSyncTimer = useRef<number | null>(null);
   const reconnectTimer = useRef<number | null>(null);
   const reconnectBlocked = useRef(false);
   const reconnectAttempts = useRef(0);
-  const pendingCanvasSync = useRef<{
-    nodes: CanvasNode[];
-    wires: Wire[];
-    viewport?: { x: number; y: number; scale: number };
-    pcbLayout?: PcbLayout;
-  } | null>(null);
-  const lastCanvasPayload = useRef<string>('');
+  const pendingCanvasSync = useRef(false);
+  const lastCanvasRevision = useRef<string>('');
+  const remoteConflictReported = useRef(false);
   const userColor = useRef(COLLABORATOR_COLORS[Math.floor(Math.random() * COLLABORATOR_COLORS.length)]);
 
   const loadCanvas = useCanvasStore((s) => s.loadCanvas);
@@ -204,14 +200,18 @@ export function useCollaboration(projectId: string) {
             }
 
             if (data.eventType === 'CANVAS_SYNC' && data.payload && data.userId !== currentUserId) {
-              isRemoteSyncing.current = true;
-              loadCanvas(data.payload.nodes || [], data.payload.wires || [], data.payload.viewport);
+              // A peer frame must not overwrite a local edit or in-flight save.
+              const project = useProjectStore.getState();
+              if (project.isDirty || project.isSaving) {
+                if (!remoteConflictReported.current) useToastStore.getState().addToast('Remote changes arrived while you have local edits. Reload to resolve the latest project version.', 'info');
+                remoteConflictReported.current = true;
+                continue;
+              }
+              remoteConflictReported.current = false;
+              loadCanvas(data.payload.nodes || [], data.payload.wires || [], data.payload.viewport, data.payload.routeCache);
               if (data.payload.pcbLayout) {
                 loadPcb(data.payload.pcbLayout);
               }
-              window.setTimeout(() => {
-                isRemoteSyncing.current = false;
-              }, 120);
             }
           } catch {
             // Ignore malformed third-party frames.
@@ -254,6 +254,9 @@ export function useCollaboration(projectId: string) {
         socket.close();
       }
       wsRef.current = null;
+      pendingCanvasSync.current = false;
+      lastCanvasRevision.current = '';
+      remoteConflictReported.current = false;
       setIsConnected(false);
     };
   }, [currentUserId, loadCanvas, loadPcb, projectId, sendFrame, subscribeToProject]);
@@ -274,22 +277,23 @@ export function useCollaboration(projectId: string) {
 
   const flushCanvasSync = useCallback(() => {
     const pending = pendingCanvasSync.current;
-    pendingCanvasSync.current = null;
+    pendingCanvasSync.current = false;
     canvasSyncTimer.current = null;
 
-    if (!pending || isRemoteSyncing.current) return;
+    if (!pending) return;
+    const project = useProjectStore.getState().currentProject;
+    if (project?.id !== projectId || project.owner?.keycloakId !== currentUserId) return;
+    const canvas = useCanvasStore.getState(), pcb = usePcbStore.getState();
+    const revision = `${canvas.documentRevision}:${pcb.documentRevision}`;
+    if (lastCanvasRevision.current === revision) return;
     const payload = {
       eventType: 'CANVAS_SYNC',
-      payload: pending,
+      payload: { nodes: canvas.documentNodes, wires: canvas.wires, viewport: canvas.viewport, routeCache: canvas.routeCache, pcbLayout: pcb.getLayout() },
       projectId,
       timestamp: Date.now(),
       userId: currentUserId,
     };
-    const serialized = JSON.stringify(payload);
-    if (serialized === lastCanvasPayload.current) return;
-
-    lastCanvasPayload.current = serialized;
-    sendFrame(
+    const sent = sendFrame(
       'SEND',
       {
         'content-type': 'application/json',
@@ -297,18 +301,13 @@ export function useCollaboration(projectId: string) {
       },
       payload
     );
+    if (sent) lastCanvasRevision.current = revision;
   }, [currentUserId, projectId, sendFrame]);
 
   const broadcastCanvasSync = useCallback(
-    (
-      nodes: CanvasNode[],
-      wires: Wire[],
-      viewport?: { x: number; y: number; scale: number },
-      pcbLayout?: PcbLayout,
-    ) => {
-      if (isRemoteSyncing.current || !isConnected) return;
-
-      pendingCanvasSync.current = { nodes, wires, viewport, pcbLayout };
+    () => {
+      if (!isConnected) return;
+      pendingCanvasSync.current = true;
       if (canvasSyncTimer.current) return;
       canvasSyncTimer.current = window.setTimeout(flushCanvasSync, CANVAS_SYNC_DEBOUNCE_MS);
     },

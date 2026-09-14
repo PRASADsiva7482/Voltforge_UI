@@ -1,0 +1,223 @@
+{
+  "task": "VFOPT-UI-026",
+  "capturedAt": "2026-09-13T08:51:29.180Z",
+  "status": "passed",
+  "browser": "153.0.8010.36",
+  "samples": [
+    {
+      "pads": 32,
+      "phase": "before",
+      "samplingInterval": 128,
+      "medianEstimatedEngineAllocationBytes": 72124,
+      "values": [
+        {
+          "estimatedEngineAllocationBytes": 72124,
+          "engineSamples": 507,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-before-32-0.json",
+          "sha256": "3619200b6e355a9e210331a31adcb1fc5241e4390c1dc72cff241ac931c3ae89"
+        },
+        {
+          "estimatedEngineAllocationBytes": 73096,
+          "engineSamples": 516,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-before-32-1.json",
+          "sha256": "fdab768d0c9b09005b9e9ebc910533591a7424a37c5a2d0ca778b61d4b207d27"
+        },
+        {
+          "estimatedEngineAllocationBytes": 70440,
+          "engineSamples": 495,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-before-32-2.json",
+          "sha256": "f72e9d903e7200478f190a117c0ad1ebbd57a0ce32cd88bce9604e47d3d864f2"
+        }
+      ]
+    },
+    {
+      "pads": 32,
+      "phase": "after",
+      "samplingInterval": 128,
+      "medianEstimatedEngineAllocationBytes": 31400,
+      "values": [
+        {
+          "estimatedEngineAllocationBytes": 86448,
+          "engineSamples": 626,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-after-32-0.json",
+          "sha256": "31d1eaaac1a49933d591aa0268bf892428291507db7d67da320773eb5aa03033"
+        },
+        {
+          "estimatedEngineAllocationBytes": 31400,
+          "engineSamples": 218,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-after-32-1.json",
+          "sha256": "5c6124ed892fd6873e25066965f6b119271c5dc8673c131c109faaefd0f52e8b"
+        },
+        {
+          "estimatedEngineAllocationBytes": 29048,
+          "engineSamples": 199,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-after-32-2.json",
+          "sha256": "c724bb02096f33e51e171682cf7a4d425e6d31cc9599acf6ce86398fd76ec4ee"
+        }
+      ]
+    },
+    {
+      "pads": 64,
+      "phase": "before",
+      "samplingInterval": 128,
+      "medianEstimatedEngineAllocationBytes": 565908,
+      "values": [
+        {
+          "estimatedEngineAllocationBytes": 565908,
+          "engineSamples": 4088,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-before-64-0.json",
+          "sha256": "3ff83b3bd0ce613d7a43d446e761d27aa489a4c3a1741460152ebac7d3d95c1c"
+        },
+        {
+          "estimatedEngineAllocationBytes": 568364,
+          "engineSamples": 4109,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-before-64-1.json",
+          "sha256": "53c5f535ee94579e817d6bf01fd14a6abdb684d8f92c0a83ad9906a886870d85"
+        },
+        {
+          "estimatedEngineAllocationBytes": 559412,
+          "engineSamples": 4043,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-before-64-2.json",
+          "sha256": "3c74e6b9e6af0277def5db1825bda41db40d3d95eaff55789572121b58f59885"
+        }
+      ]
+    },
+    {
+      "pads": 64,
+      "phase": "after",
+      "samplingInterval": 128,
+      "medianEstimatedEngineAllocationBytes": 67800,
+      "values": [
+        {
+          "estimatedEngineAllocationBytes": 67800,
+          "engineSamples": 465,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-after-64-0.json",
+          "sha256": "54a10f3a0324c3ffc4b7f5537c3dbe5cb45f25fd54d042864a1181e3cd857c43"
+        },
+        {
+          "estimatedEngineAllocationBytes": 70980,
+          "engineSamples": 486,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-after-64-1.json",
+          "sha256": "713f33da620504d6c50169eee316fdc96c5bb2eeada5079fc47feed56a249cf1"
+        },
+        {
+          "estimatedEngineAllocationBytes": 65504,
+          "engineSamples": 451,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-after-64-2.json",
+          "sha256": "944d26a835954cecafa46e7125ca1275a9290cbd00daf0e00c50a138c088f6d7"
+        }
+      ]
+    },
+    {
+      "pads": 128,
+      "phase": "before",
+      "samplingInterval": 1024,
+      "medianEstimatedEngineAllocationBytes": 5566136,
+      "values": [
+        {
+          "estimatedEngineAllocationBytes": 5626300,
+          "engineSamples": 5453,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-before-128-0.json",
+          "sha256": "282755f29bb864cb94de2343a7460d641954bc75c720817f313075c0751ae832"
+        },
+        {
+          "estimatedEngineAllocationBytes": 5506324,
+          "engineSamples": 5337,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-before-128-1.json",
+          "sha256": "20549e64b0fedb974f3149ba2eff2b8b2f9d296b123e9b4c3f680156fb4cd44b"
+        },
+        {
+          "estimatedEngineAllocationBytes": 5566136,
+          "engineSamples": 5395,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-before-128-2.json",
+          "sha256": "c121e9463fd6206c92fcc4776645f46589939246d97e75a1e6fc61407e2cf7a3"
+        }
+      ]
+    },
+    {
+      "pads": 128,
+      "phase": "after",
+      "samplingInterval": 1024,
+      "medianEstimatedEngineAllocationBytes": 197664,
+      "values": [
+        {
+          "estimatedEngineAllocationBytes": 196932,
+          "engineSamples": 189,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-after-128-0.json",
+          "sha256": "5c1b7dbc8cfc85209b6dc51303e740a724d7f7741e4228c604a845ed143e00aa"
+        },
+        {
+          "estimatedEngineAllocationBytes": 227180,
+          "engineSamples": 218,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-after-128-1.json",
+          "sha256": "1d44b3ff43b6e65aea3f506dd72d63ff6e06f9701c6a45b0235ed058acf73ad6"
+        },
+        {
+          "estimatedEngineAllocationBytes": 197664,
+          "engineSamples": 189,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-after-128-2.json",
+          "sha256": "1b6eb0c110249d5204aa9cf26e036aaf6c02659595bbc525b592c682d13ae130"
+        }
+      ]
+    },
+    {
+      "pads": 512,
+      "phase": "before",
+      "samplingInterval": 16384,
+      "medianEstimatedEngineAllocationBytes": 266779592,
+      "values": [
+        {
+          "estimatedEngineAllocationBytes": 269104232,
+          "engineSamples": 16418,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-before-512-0.json",
+          "sha256": "ddfa109522fcd408218f36d0f8b420293bb1b91e07ed2e914f608be3076ea968"
+        },
+        {
+          "estimatedEngineAllocationBytes": 266316944,
+          "engineSamples": 16248,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-before-512-1.json",
+          "sha256": "7a533fbdad03049f909949f7412a567e999b94732bc6b90a704151e928ccffbf"
+        },
+        {
+          "estimatedEngineAllocationBytes": 266779592,
+          "engineSamples": 16276,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-before-512-2.json",
+          "sha256": "34e9ba09275fb768bb91582fe70edc4847b1967e777e944b567f9e8cb7ac18f9"
+        }
+      ]
+    },
+    {
+      "pads": 512,
+      "phase": "after",
+      "samplingInterval": 16384,
+      "medianEstimatedEngineAllocationBytes": 1909576,
+      "values": [
+        {
+          "estimatedEngineAllocationBytes": 1819572,
+          "engineSamples": 111,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-after-512-0.json",
+          "sha256": "36fba7b00d87ed176e63d564d59f94042b34091bcedfb7b747d09ca1387673c1"
+        },
+        {
+          "estimatedEngineAllocationBytes": 2104264,
+          "engineSamples": 128,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-after-512-1.json",
+          "sha256": "adedfe8c3058461871eb120991fdd954491404b028ab367787559b325ccd44bc"
+        },
+        {
+          "estimatedEngineAllocationBytes": 1909576,
+          "engineSamples": 116,
+          "artifact": "docs/reports/vfopt-ui-026-allocation-after-512-2.json",
+          "sha256": "9e2be2f1109f5c50a1d62ebff9669b2ce9d6c7080687b00df6e96ea37d1d37db"
+        }
+      ]
+    }
+  ],
+  "fixtureSha256": "d5007dcf684b6aaa563797ce7d48e1c3f8f039ba88809a503c1ea34159bb1ed9",
+  "conditions": [
+    "Separate Chrome CDP HeapProfiler sampling lane, three fresh-cache measurements per size/implementation after two warmups; includes allocations collected by minor and major GC.",
+    "Profile heads and sample counts retained; sampled byte totals are estimates, not exact allocation counts, retained heap or peak laptop RAM. Only allocations on engine call stacks are attributed; harness/fixture allocation is excluded.",
+    "Intervals vary by pad count to keep overhead bounded, with the same interval for each before/after pair. Profiler timings are deliberately excluded from latency measurements.",
+    "Before uses the preserved pre-change engine; current and legacy execute on the same fixture in the same browser process. No external HTTP or backend work."
+  ]
+}

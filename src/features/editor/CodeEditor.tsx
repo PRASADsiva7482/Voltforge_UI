@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, useMemo } from 'react';
+import { lazy, memo, Suspense, useEffect, useRef, useState, useMemo } from 'react';
 import { useProjectStore } from '../../store/projectStore';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useSimulationStore } from '../../store/simulationStore';
@@ -97,9 +97,10 @@ function generateFullCode(userCode: string, boardType?: string): string {
   return header + userCode;
 }
 
-export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
+function CodeEditor({ readOnly }: { readOnly?: boolean }) {
   const activeCodeFile = useProjectStore((s) => s.activeCodeFile);
-  const codeFiles = useProjectStore((s) => s.currentProject?.codeFiles || []);
+  // Keep the subscribed snapshot stable while a project is absent or denied.
+  const codeFiles = useProjectStore((s) => s.currentProject?.codeFiles) ?? [];
   const updateCodeFileContent = useProjectStore((s) => s.updateCodeFileContent);
   const setActiveCodeFile = useProjectStore((s) => s.setActiveCodeFile);
   const boardType = useProjectStore((s) => s.currentProject?.boardType);
@@ -352,3 +353,5 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
     </div>
   );
 }
+
+export default memo(CodeEditor);

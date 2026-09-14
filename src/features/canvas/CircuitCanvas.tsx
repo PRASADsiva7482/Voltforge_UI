@@ -1,10 +1,11 @@
-import { useCallback, useRef, useEffect, useMemo, useState } from 'react';
+import { useCallback, useRef, useEffect, useMemo, useState, memo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Stage, Layer, Rect, Group, Text, Circle, Line, Shape } from 'react-konva';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { Download, Layers, LayoutGrid, Zap } from 'lucide-react';
 import { useCanvasStore, WIRE_COLORS } from '../../store/canvasStore';
+import CanvasRoutingStatus from './CanvasRoutingStatus';
 import { useSimulationStore } from '../../store/simulationStore';
 
 import { useThemeStore } from '../../store/themeStore';
@@ -33,6 +34,7 @@ import {
 import type { Collaborator, ActiveBendPoint, Wire } from './canvasTypes';
 import { createCurrentFlowRenderBudget, cullWiresToViewport } from './renderBudget';
 import { canvasLayoutBudgetFields, recordCanvasLayout } from './canvasRenderInstrumentation';
+import { indexIncidentWires } from './dragRouting';
 
 interface Props {
   width: number;
@@ -238,7 +240,7 @@ const PcbTraceLayer = ({
 };
 
 // ── Component Node Wrapper (isolates state changes to a single component) ──
-const ComponentNodeWrapper = ({
+const ComponentNodeWrapper = memo(({
   id,
   isDark,
   onComponentInteraction,
@@ -265,6 +267,8 @@ const ComponentNodeWrapper = ({
   const startWiring = useCanvasStore((state) => state.startWiring);
   const finishWiring = useCanvasStore((state) => state.finishWiring);
 
+  useEffect(() => () => useCanvasStore.getState().cancelNodeGesture(id), [id, readOnly]);
+
   if (!node) return null;
 
   return (
@@ -274,10 +278,11 @@ const ComponentNodeWrapper = ({
       isDark={isDark}
       onSelect={() => selectNode(node.id)}
       onChange={(a) => updateNode(node.id, a)}
+      onDragMove={(a) => { if (!readOnly) useCanvasStore.getState().queueNodeGesture(node.id, a); }}
       onGestureStart={() => {
-        if (!readOnly) useCanvasStore.getState().pushHistory();
+        if (!readOnly) useCanvasStore.getState().beginNodeGesture(node.id);
       }}
-      onDragEnd={(a) => useCanvasStore.getState().updateNodeDragEnd(node.id, a)}
+      onDragEnd={(a) => { if (!readOnly) useCanvasStore.getState().endNodeGesture(node.id, a); }}
       isWiring={isWiring}
       wiringFromNodeId={wiringFromNodeId}
       startWiring={readOnly ? () => {} : startWiring}
@@ -289,7 +294,7 @@ const ComponentNodeWrapper = ({
       isSimulating={isSimulating}
     />
   );
-};
+});
 
 // ── Main Canvas ──
 export default function CircuitCanvas({
@@ -310,6 +315,9 @@ export default function CircuitCanvas({
     useShallow((state) => state.nodes.map((n) => n.id))
   );
   const wires = useCanvasStore((state) => state.wires);
+  const draggingNodeId = useCanvasStore((state) => state.draggingNodeId);
+  const geometryCommitRevision = useCanvasStore((state) => state.geometryCommitRevision);
+  const incidentWires = useMemo(() => indexIncidentWires(wires), [wires]);
   const selectedWireId = useCanvasStore((state) => state.selectedWireId);
   const viewport = useCanvasStore((state) => state.viewport);
   const selectNode = useCanvasStore((state) => state.selectNode);
@@ -332,11 +340,18 @@ export default function CircuitCanvas({
 
   const wireRenderContext = useMemo(() => {
     const nodesById = useCanvasStore.getState().nodesById;
+    const visible = cullWiresToViewport(wires, nodesById, viewport, width, height);
+    // Keep moving connections mounted even if their original bounds were offscreen.
+    const visibleIds = new Set(visible.map(wire => wire.id));
+    if (draggingNodeId) for (const index of incidentWires.get(draggingNodeId) ?? []) {
+      if (!visibleIds.has(wires[index].id)) visible.push(wires[index]);
+    }
     return {
+      geometryCommitRevision,
       nodesById,
-      visibleWires: cullWiresToViewport(wires, nodesById, viewport, width, height),
+      visibleWires: visible,
     };
-  }, [wires, viewport, width, height]);
+  }, [wires, viewport, width, height, draggingNodeId, geometryCommitRevision, incidentWires]);
 
   const currentFlowBudget = useMemo(
     () => createCurrentFlowRenderBudget(
@@ -456,6 +471,7 @@ export default function CircuitCanvas({
 
   return (
     <div className="vf-canvas-container">
+      <CanvasRoutingStatus />
       <CanvasErrorBoundary>
         <Stage
           ref={stageRef}
@@ -575,6 +591,7 @@ export default function CircuitCanvas({
 
           {/* Animated Current Flow Layer (renders particles on active wires) */}
           <CurrentFlowLayer
+            previewNodeId={draggingNodeId}
             isSimulating={isSimulating}
             visibleWires={wireRenderContext.visibleWires}
             allWires={wires}

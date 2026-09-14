@@ -1,14 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import Konva from 'konva';
-import { Circle, Group, Layer, Line, Rect, Stage, Text } from 'react-konva';
+import { Layer, Line, Rect, Stage, Text } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
-import { Plus, ShieldCheck } from 'lucide-react';
 import { useCanvasStore } from '../../store/canvasStore';
 import { usePcbStore, type PcbFootprint } from '../../store/pcbStore';
 import PcbExportModal from './PcbExportModal';
 import PcbFootprintRenderer from './PcbFootprintRenderer';
-import { RatlineEngine } from './RatlineEngine';
+import { usePcbSchematicSync } from './usePcbSchematicSync';
 import { TraceRouter } from './TraceRouter';
+import { usePcbSceneElements } from './usePcbSceneElements';
+import { BOARD_OFFSET_PX, SCALE_MM_TO_PX, PCB_DETAIL_SCALE, PCB_RETAIN_PX, PcbSceneGeometry, PcbVisibilityWindow, pcbPoints, pcbViewportBounds } from './pcbSceneGeometry';
+import { PcbRatline, PcbTraceShape, PcbViaShape } from './PcbSceneObjects';
+import { PcbRasterBudget } from './pcbRasterBudget';
+import { PcbToolbar } from './PcbToolbar';
 
 interface Props {
   height: number;
@@ -17,9 +22,10 @@ interface Props {
   width: number;
 }
 
-const BOARD_OFFSET_PX = 40;
-const SCALE_MM_TO_PX = 4;
-const TRACE_WIDTH_OPTIONS = [6, 8, 10, 12, 24];
+const PcbExportBridge = memo(function PcbExportBridge(props: { isOpen: boolean; onClose: () => void; projectName?: string }) {
+  const wires = useCanvasStore(s => s.wires);
+  return <PcbExportModal {...props} wires={wires} />;
+});
 
 export default function PcbCanvas({ width, height, projectName, readOnly = false }: Props) {
   const {
@@ -31,106 +37,101 @@ export default function PcbCanvas({ width, height, projectName, readOnly = false
     isRoutingTrace,
     ratlines,
     selectedFootprintId,
+    selectedTraceId,
     traceWidth_mil,
     traces,
     vias,
     visibleLayers,
     viewport,
-    addVia,
     cancelRouting,
-    finishRouting,
     selectFootprint,
     selectTrace,
-    setActiveLayer,
-    setFootprints,
-    setRatlines,
-    setTraceWidth,
     setViewport,
-    toggleLayerVisibility,
-    startRouting,
     updateActiveRoute,
     updateFootprintPosition,
     updateViaPosition,
-  } = usePcbStore();
+  } = usePcbStore(useShallow(s => ({
+    activeLayer: s.activeLayer, activeRoute: s.activeRoute,
+    boardHeight_mm: s.boardHeight_mm, boardWidth_mm: s.boardWidth_mm,
+    footprints: s.footprints, isRoutingTrace: s.isRoutingTrace, ratlines: s.ratlines,
+    selectedFootprintId: s.selectedFootprintId, selectedTraceId: s.selectedTraceId, traceWidth_mil: s.traceWidth_mil,
+    traces: s.traces, vias: s.vias, visibleLayers: s.visibleLayers, viewport: s.viewport,
+    cancelRouting: s.cancelRouting,
+    selectFootprint: s.selectFootprint, selectTrace: s.selectTrace,
+    setViewport: s.setViewport,
+    updateActiveRoute: s.updateActiveRoute, updateFootprintPosition: s.updateFootprintPosition,
+    updateViaPosition: s.updateViaPosition,
+  })));
 
-  const nodes = useCanvasStore((s) => s.nodes);
-  const wires = useCanvasStore((s) => s.wires);
+  usePcbSchematicSync();
   const [showExportModal, setShowExportModal] = useState(false);
+  const openExport = useCallback(() => setShowExportModal(true), []);
+  const closeExport = useCallback(() => setShowExportModal(false), []);
   const stageRef = useRef<Konva.Stage>(null);
-
-  useEffect(() => {
-    const createFootprint = (node: typeof nodes[number], index: number): PcbFootprint => {
-      const col = index % 5;
-      const row = Math.floor(index / 5);
-      const pads = (node.pins || []).map((pin, pinIndex) => ({
-        id: pin.id,
-        name: pin.name,
-        x: (pinIndex - ((node.pins?.length || 1) - 1) / 2) * 2.54,
-        y: 3.5,
-        width: 1.4,
-        height: 1.4,
-        shape: 'rect' as const,
-        drillDiameter: 0.8,
-        netId: wires.find((wire) =>
-          (wire.fromNodeId === node.id && wire.fromPinId === pin.id) ||
-          (wire.toNodeId === node.id && wire.toPinId === pin.id)
-        )?.id,
-      }));
-
-      return {
-        id: `fp_${node.id}`,
-        componentId: node.id,
-        componentType: node.type,
-        height: 10,
-        name: node.name,
-        packageType: String(node.properties?.footprint || (node.pins.length > 20 ? 'QFP' : 'DIP')),
-        pads,
-        rotation: 0,
-        width: Math.max(12, pads.length * 2.54 + 4),
-        x: 20 + col * 18,
-        y: 20 + row * 18,
-      };
-    };
-
-    const existingByComponent = new Map(footprints.map((footprint) => [footprint.componentId, footprint]));
-    const occupiedPlacements = new Set(footprints.map((footprint) => `${footprint.x}:${footprint.y}`));
-    let nextPlacementIndex = footprints.length;
-    const reconciled = nodes.map((node) => {
-      const existing = existingByComponent.get(node.id);
-      let generated = createFootprint(node, nextPlacementIndex);
-      while (!existing && occupiedPlacements.has(`${generated.x}:${generated.y}`)) {
-        nextPlacementIndex += 1;
-        generated = createFootprint(node, nextPlacementIndex);
-      }
-      if (!existing) {
-        occupiedPlacements.add(`${generated.x}:${generated.y}`);
-        nextPlacementIndex += 1;
-      }
-      if (!existing) return generated;
-
-      // Preserve the user's PCB placement/rotation while refreshing the
-      // schematic-derived identity, package, pad list, and net assignments.
-      return {
-        ...generated,
-        id: existing.id,
-        x: existing.x,
-        y: existing.y,
-        rotation: existing.rotation,
-      };
-    });
-
-    if (JSON.stringify(reconciled) !== JSON.stringify(footprints)) {
-      setFootprints(reconciled);
+  const geometry = useMemo(() => new PcbSceneGeometry(), []);
+  const visibility = useMemo(() => ({ footprints: new PcbVisibilityWindow(), traces: new PcbVisibilityWindow(), vias: new PcbVisibilityWindow(), ratlines: new PcbVisibilityWindow() }), []);
+  const rasterBudget = useMemo(() => new PcbRasterBudget(), []);
+  // Starting a native drag changes no rendered props. These IDs only matter
+  // when a later pan/zoom recomputes the visible set during the gesture.
+  const draggedFootprint = useRef<string | null>(null);
+  const draggedVia = useRef<string | null>(null);
+  const startFootprintDrag = useCallback((id: string) => { draggedFootprint.current = id; }, []);
+  const startViaDrag = useCallback((id: string) => { draggedVia.current = id; }, []);
+  const [pan, setPan] = useState<{ base: typeof viewport; view: typeof viewport } | null>(null);
+  const panFrame = useRef<number | null>(null);
+  const pendingPan = useRef<typeof pan>(null);
+  const cancelPan = useCallback(() => {
+    if (panFrame.current !== null) cancelAnimationFrame(panFrame.current);
+    panFrame.current = null;
+    pendingPan.current = null;
+  }, []);
+  useEffect(() => { cancelPan(); return cancelPan; }, [viewport, cancelPan]);
+  // Native Stage motion is transient until release. An external viewport/load
+  // invalidates a stale pan immediately, without dirtying the document per frame.
+  const sceneViewport = pan?.base === viewport ? pan.view : viewport;
+  const bounds = pcbViewportBounds(sceneViewport, width, height);
+  const retainBounds = pcbViewportBounds(sceneViewport, width, height, PCB_RETAIN_PX);
+  const detailed = sceneViewport.scale >= PCB_DETAIL_SCALE;
+  const visibleFootprints = visibility.footprints.select(footprints, bounds, retainBounds, fp => geometry.footprint(fp),
+    fp => fp.id === selectedFootprintId || fp.id === draggedFootprint.current || fp.componentId === activeRoute?.startPad?.componentId);
+  const visibleTraces = visibility.traces.select(traces.filter(trace => visibleLayers[trace.layer]), bounds, retainBounds,
+    trace => geometry.trace(trace).bounds, trace => trace.id === selectedTraceId);
+  const visibleRatlines = visibility.ratlines.select(ratlines, bounds, retainBounds, line => geometry.ratline(line).bounds);
+  const visibleVias = visibility.vias.select(vias, bounds, retainBounds, via => geometry.via(via), via => via.id === draggedVia.current);
+  const handleFootprintDragEnd = useCallback((id: string, x: number, y: number) => {
+    draggedFootprint.current = null;
+    if (!readOnly) updateFootprintPosition(id, x, y);
+  }, [readOnly, updateFootprintPosition]);
+  const handleViaDragEnd = useCallback((id: string, x: number, y: number) => {
+    draggedVia.current = null;
+    if (!readOnly) updateViaPosition(id, x, y);
+  }, [readOnly, updateViaPosition]);
+  const handlePadClick = useCallback((footprint: PcbFootprint, padId: string, x: number, y: number) => {
+    if (readOnly) return;
+    const state = usePcbStore.getState();
+    const pad = { componentId: footprint.componentId, padId, x, y, netId: footprint.pads.find(p => p.id === padId)?.netId };
+    if (!state.isRoutingTrace) state.startRouting(pad);
+    else {
+      const start = state.activeRoute?.startPad;
+      state.finishRouting(pad, TraceRouter.route45Degree(start ? { x: start.x, y: start.y } : { x, y }, { x, y }));
     }
-  }, [footprints, nodes, setFootprints, wires]);
+  }, [readOnly]);
 
-  useEffect(() => {
-    if (footprints.length === 0) return;
-    setRatlines(RatlineEngine.computeRatlines(nodes, wires, footprints, traces));
-  }, [footprints, nodes, setRatlines, traces, wires]);
+  const footprintElements = usePcbSceneElements(visibleFootprints, footprint => ({
+    footprint, isSelected: footprint.id === selectedFootprintId, scaleMmToPx: SCALE_MM_TO_PX,
+    detailed, rasterBudget, showCopper: visibleLayers['F.Cu'], showSilk: visibleLayers['F.Silk'], readOnly,
+    onSelect: selectFootprint, onDragStart: startFootprintDrag, onDragEnd: handleFootprintDragEnd, onPadClick: handlePadClick,
+  }), (footprint, props) => <PcbFootprintRenderer key={footprint.id} {...props} />);
+  const traceElements = usePcbSceneElements(visibleTraces, trace => ({ trace, points: geometry.trace(trace).points, onSelect: selectTrace, rasterBudget }),
+    (trace, props) => <PcbTraceShape key={trace.id} {...props} />);
+  const ratlineElements = usePcbSceneElements(visibleRatlines, line => ({ points: geometry.ratline(line).points }),
+    (line, props) => <PcbRatline key={line.id} {...props} />,
+    (a, b) => a.points === b.points || a.points.every((value, i) => value === b.points[i]));
+  const viaElements = usePcbSceneElements(visibleVias, via => ({ via, readOnly, detailed, onDragStart: startViaDrag, onDragEnd: handleViaDragEnd }),
+    (via, props) => <PcbViaShape key={via.id} {...props} />);
 
   const handleStageMouseMove = (e: KonvaEventObject<MouseEvent>) => {
-    if (!isRoutingTrace || !activeRoute) return;
+    if (readOnly || !isRoutingTrace || !activeRoute) return;
 
     const stage = e.target.getStage();
     const pos = stage?.getRelativePointerPosition();
@@ -142,23 +143,14 @@ export default function PcbCanvas({ width, height, projectName, readOnly = false
     });
   };
 
-  const addCenteredVia = () => {
-    if (readOnly) return;
-    addVia({
-      id: `via_${Date.now()}`,
-      x: boardWidth_mm / 2,
-      y: boardHeight_mm / 2,
-      drill_mm: 0.3,
-      pad_mm: 0.6,
-    });
-  };
-
   const handleWheel = (e: KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
     const stage = stageRef.current;
     if (!stage) return;
     const pointer = stage.getPointerPosition();
-    const oldScale = viewport.scale;
+    const oldScale = stage.scaleX();
+    cancelPan();
+    setPan(null);
     const direction = e.evt.deltaY > 0 ? -1 : 1;
     const nextScale = Math.max(0.5, Math.min(2.5, direction > 0 ? oldScale * 1.1 : oldScale / 1.1));
     const local = stage.getRelativePointerPosition() || { x: 0, y: 0 };
@@ -171,90 +163,31 @@ export default function PcbCanvas({ width, height, projectName, readOnly = false
 
   return (
     <div className="vf-pcb-canvas">
-      <div className="vf-pcb-toolbar">
-        <span className="vf-pcb-toolbar__label">Active Layer</span>
-        <div className="vf-pcb-segment">
-          <button
-            type="button"
-            className={`vf-pcb-segment__item vf-pcb-segment__item--top ${activeLayer === 'F.Cu' ? 'is-active' : ''}`}
-            onClick={() => setActiveLayer('F.Cu')}
-            disabled={readOnly}
-          >
-            F.Cu
-          </button>
-          <button
-            type="button"
-            className={`vf-pcb-segment__item vf-pcb-segment__item--bottom ${activeLayer === 'B.Cu' ? 'is-active' : ''}`}
-            onClick={() => setActiveLayer('B.Cu')}
-            disabled={readOnly}
-          >
-            B.Cu
-          </button>
-        </div>
-
-        <span className="vf-pcb-toolbar__divider" />
-
-        <span className="vf-pcb-toolbar__label">Layers</span>
-        <div className="vf-pcb-chip-group">
-          {(['F.Cu', 'B.Cu', 'F.Silk', 'B.Silk', 'Edge.Cuts'] as const).map((layer) => (
-            <button
-              key={layer}
-              type="button"
-              className={`vf-pcb-chip ${visibleLayers[layer] ? 'is-active' : ''}`}
-              onClick={() => toggleLayerVisibility(layer)}
-              title={`${visibleLayers[layer] ? 'Hide' : 'Show'} ${layer}`}
-            >
-              {layer}
-            </button>
-          ))}
-        </div>
-
-        <span className="vf-pcb-toolbar__divider" />
-
-        <span className="vf-pcb-toolbar__label">Width</span>
-        <div className="vf-pcb-chip-group">
-          {TRACE_WIDTH_OPTIONS.map((mil) => (
-            <button
-              key={mil}
-              type="button"
-              className={`vf-pcb-chip ${traceWidth_mil === mil ? 'is-active' : ''}`}
-              onClick={() => setTraceWidth(mil)}
-              disabled={readOnly}
-            >
-              {mil} mil
-            </button>
-          ))}
-        </div>
-
-        <span className="vf-pcb-toolbar__divider" />
-
-        <button type="button" className="vf-pcb-tool-btn vf-pcb-tool-btn--warning" onClick={addCenteredVia} disabled={readOnly}>
-          <Plus size={12} />
-          <span>Via</span>
-        </button>
-
-        <button
-          type="button"
-          className="vf-pcb-tool-btn vf-pcb-tool-btn--primary"
-          onClick={() => setShowExportModal(true)}
-        >
-          <ShieldCheck size={13} />
-          <span>DRC / Export</span>
-        </button>
-      </div>
+      <PcbToolbar readOnly={readOnly} onExport={openExport} />
 
       <Stage
         ref={stageRef}
         width={width}
         height={height}
         draggable
-        x={viewport.x}
-        y={viewport.y}
-        scaleX={viewport.scale}
-        scaleY={viewport.scale}
+        x={sceneViewport.x}
+        y={sceneViewport.y}
+        scaleX={sceneViewport.scale}
+        scaleY={sceneViewport.scale}
         onWheel={handleWheel}
+        onDragMove={(e: KonvaEventObject<DragEvent>) => {
+          if (e.target !== e.target.getStage()) return;
+          pendingPan.current = { base: viewport, view: { scale: e.target.scaleX(), x: e.target.x(), y: e.target.y() } };
+          if (panFrame.current === null) panFrame.current = requestAnimationFrame(() => {
+            panFrame.current = null;
+            setPan(pendingPan.current);
+          });
+        }}
         onDragEnd={(e: KonvaEventObject<DragEvent>) => {
-          setViewport({ ...viewport, x: e.target.x(), y: e.target.y() });
+          if (e.target !== e.target.getStage()) return;
+          cancelPan();
+          setPan(null);
+          setViewport({ scale: e.target.scaleX(), x: e.target.x(), y: e.target.y() });
         }}
         onMouseMove={handleStageMouseMove}
         onClick={(e: KonvaEventObject<MouseEvent>) => {
@@ -291,56 +224,15 @@ export default function PcbCanvas({ width, height, projectName, readOnly = false
         </Layer>
 
         <Layer listening={false}>
-          {ratlines.map((ratline) => (
-            <Line
-              key={ratline.id}
-              points={[
-                ratline.from.x * SCALE_MM_TO_PX + BOARD_OFFSET_PX,
-                ratline.from.y * SCALE_MM_TO_PX + BOARD_OFFSET_PX,
-                ratline.to.x * SCALE_MM_TO_PX + BOARD_OFFSET_PX,
-                ratline.to.y * SCALE_MM_TO_PX + BOARD_OFFSET_PX,
-              ]}
-              stroke="#cbd5e1"
-              strokeWidth={1}
-              dash={[4, 4]}
-              opacity={0.6}
-            />
-          ))}
+          {ratlineElements}
         </Layer>
 
         <Layer>
-          {traces.map((trace) => {
-            const isTopLayer = trace.layer === 'F.Cu';
-            if (!visibleLayers[trace.layer]) return null;
-
-            return (
-              <Line
-                key={trace.id}
-                points={trace.points.flatMap((point) => [
-                  point.x * SCALE_MM_TO_PX + BOARD_OFFSET_PX,
-                  point.y * SCALE_MM_TO_PX + BOARD_OFFSET_PX,
-                ])}
-                stroke={isTopLayer ? '#ef4444' : '#38bdf8'}
-                strokeWidth={trace.width_mm * SCALE_MM_TO_PX * 2.5}
-                lineCap="round"
-                lineJoin="round"
-                opacity={0.85}
-                shadowColor={isTopLayer ? '#ef4444' : '#38bdf8'}
-                shadowBlur={4}
-                onClick={(e: KonvaEventObject<MouseEvent>) => {
-                  e.cancelBubble = true;
-                  selectTrace(trace.id);
-                }}
-              />
-            );
-          })}
-
+          {traceElements}
           {isRoutingTrace && activeRoute && (
             <Line
-              points={activeRoute.currentPoints.flatMap((point) => [
-                point.x * SCALE_MM_TO_PX + BOARD_OFFSET_PX,
-                point.y * SCALE_MM_TO_PX + BOARD_OFFSET_PX,
-              ])}
+              name="pcb-active-route"
+              points={pcbPoints(activeRoute.currentPoints)}
               stroke={activeLayer === 'F.Cu' ? '#f87171' : '#7dd3fc'}
               strokeWidth={traceWidth_mil * 0.0254 * SCALE_MM_TO_PX * 2.5}
               lineCap="round"
@@ -348,73 +240,18 @@ export default function PcbCanvas({ width, height, projectName, readOnly = false
               dash={[6, 3]}
             />
           )}
-
-          {vias.map((via) => (
-            <Group
-              key={via.id}
-              x={via.x * SCALE_MM_TO_PX + BOARD_OFFSET_PX}
-              y={via.y * SCALE_MM_TO_PX + BOARD_OFFSET_PX}
-              draggable={!readOnly}
-              onDragEnd={(e: KonvaEventObject<DragEvent>) => {
-                updateViaPosition(
-                  via.id,
-                  TraceRouter.snapToGrid((e.target.x() - BOARD_OFFSET_PX) / SCALE_MM_TO_PX),
-                  TraceRouter.snapToGrid((e.target.y() - BOARD_OFFSET_PX) / SCALE_MM_TO_PX)
-                );
-              }}
-            >
-              <Circle radius={via.pad_mm * SCALE_MM_TO_PX * 2} fill="#facc15" stroke="#ca8a04" strokeWidth={1} />
-              <Circle radius={via.drill_mm * SCALE_MM_TO_PX * 2} fill="#090d16" />
-            </Group>
-          ))}
+          {viaElements}
         </Layer>
 
-        <Layer visible={visibleLayers['F.Silk']}>
-          {footprints.map((footprint) => (
-            <Group key={footprint.id} x={BOARD_OFFSET_PX} y={BOARD_OFFSET_PX}>
-              <PcbFootprintRenderer
-                footprint={footprint}
-                isSelected={footprint.id === selectedFootprintId}
-                scaleMmToPx={SCALE_MM_TO_PX}
-                showCopper={visibleLayers['F.Cu']}
-                showSilk={visibleLayers['F.Silk']}
-                readOnly={readOnly}
-                onSelect={() => selectFootprint(footprint.id)}
-                onDragEnd={(x_mm, y_mm) => updateFootprintPosition(footprint.id, x_mm, y_mm)}
-                onPadClick={(padId, padX_mm, padY_mm) => {
-                  if (readOnly) return;
-                  if (!isRoutingTrace) {
-                    startRouting({
-                      componentId: footprint.componentId,
-                      padId,
-                      x: padX_mm,
-                      y: padY_mm,
-                      netId: footprint.pads.find((pad) => pad.id === padId)?.netId,
-                    });
-                  } else {
-                    finishRouting({
-                      componentId: footprint.componentId,
-                      padId,
-                      x: padX_mm,
-                      y: padY_mm,
-                      netId: footprint.pads.find((pad) => pad.id === padId)?.netId,
-                    }, TraceRouter.route45Degree(
-                      activeRoute?.startPad ? { x: activeRoute.startPad.x, y: activeRoute.startPad.y } : { x: padX_mm, y: padY_mm },
-                      { x: padX_mm, y: padY_mm },
-                    ));
-                  }
-                }}
-              />
-            </Group>
-          ))}
+        <Layer visible={visibleLayers['F.Silk'] || visibleLayers['F.Cu']}>
+          {footprintElements}
         </Layer>
       </Stage>
 
-      <PcbExportModal
+      <PcbExportBridge
         isOpen={showExportModal}
-        onClose={() => setShowExportModal(false)}
+        onClose={closeExport}
         projectName={projectName}
-        wires={wires}
       />
     </div>
   );

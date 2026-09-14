@@ -1,0 +1,202 @@
+{
+  "task": "VFOPT-UI-016",
+  "phase": "after",
+  "capturedAt": "2026-09-12T20:43:07.237Z",
+  "status": "passed",
+  "fixtureSha256": "19c87a451db0d4f7fa4e34ec05356a26ef5d39cc8a49276fd5f0173c732a4405",
+  "fixture": "100 hydrated resistor nodes and 99 auto wires on a 10x10 grid; actual canvas; no backend",
+  "browser": "153.0.8010.36",
+  "samples": [
+    {
+      "loadMs": 2.5,
+      "firstYieldMs": 321.6000000089407,
+      "statusOnReturn": {
+        "phase": "routing",
+        "completed": 0,
+        "total": 99,
+        "reused": 0
+      },
+      "start": 2101.2000000029802,
+      "nodeCount": 100,
+      "modelRevision": 2,
+      "localDocumentRevision": 0,
+      "modelRevisionAfterRouting": 2,
+      "localDocumentRevisionAfterRouting": 0,
+      "longTasks": [
+        {
+          "start": 2330.2000000029802,
+          "duration": 85
+        },
+        {
+          "start": 2897,
+          "duration": 101
+        },
+        {
+          "start": 3075.6000000089407,
+          "duration": 77
+        }
+      ]
+    },
+    {
+      "loadMs": 1.7999999970197678,
+      "firstYieldMs": 202.8999999910593,
+      "statusOnReturn": {
+        "phase": "routing",
+        "completed": 0,
+        "total": 99,
+        "reused": 0
+      },
+      "start": 3420.1000000089407,
+      "nodeCount": 100,
+      "modelRevision": 4,
+      "localDocumentRevision": 0,
+      "modelRevisionAfterRouting": 4,
+      "localDocumentRevisionAfterRouting": 0,
+      "longTasks": [
+        {
+          "start": 3560.800000011921,
+          "duration": 56
+        },
+        {
+          "start": 3940.4000000059605,
+          "duration": 95
+        },
+        {
+          "start": 4074.7000000029802,
+          "duration": 81
+        }
+      ]
+    },
+    {
+      "loadMs": 1.9000000059604645,
+      "firstYieldMs": 187.20000000298023,
+      "statusOnReturn": {
+        "phase": "routing",
+        "completed": 0,
+        "total": 99,
+        "reused": 0
+      },
+      "start": 4418.9000000059605,
+      "nodeCount": 100,
+      "modelRevision": 6,
+      "localDocumentRevision": 0,
+      "modelRevisionAfterRouting": 6,
+      "localDocumentRevisionAfterRouting": 0,
+      "longTasks": [
+        {
+          "start": 4862.20000000298,
+          "duration": 88
+        },
+        {
+          "start": 4987.70000000298,
+          "duration": 58
+        }
+      ]
+    },
+    {
+      "loadMs": 1.7000000029802322,
+      "firstYieldMs": 167.6000000089407,
+      "statusOnReturn": {
+        "phase": "routing",
+        "completed": 0,
+        "total": 99,
+        "reused": 0
+      },
+      "start": 5320,
+      "nodeCount": 100,
+      "modelRevision": 8,
+      "localDocumentRevision": 0,
+      "modelRevisionAfterRouting": 8,
+      "localDocumentRevisionAfterRouting": 0,
+      "longTasks": [
+        {
+          "start": 5725.5,
+          "duration": 72
+        },
+        {
+          "start": 5838.20000000298,
+          "duration": 60
+        }
+      ]
+    },
+    {
+      "loadMs": 1.9000000059604645,
+      "firstYieldMs": 165.40000000596046,
+      "statusOnReturn": {
+        "phase": "routing",
+        "completed": 0,
+        "total": 99,
+        "reused": 0
+      },
+      "start": 6169.9000000059605,
+      "nodeCount": 100,
+      "modelRevision": 10,
+      "localDocumentRevision": 0,
+      "modelRevisionAfterRouting": 10,
+      "localDocumentRevisionAfterRouting": 0,
+      "longTasks": [
+        {
+          "start": 6636.20000000298,
+          "duration": 75
+        },
+        {
+          "start": 6736.800000011921,
+          "duration": 58
+        }
+      ]
+    },
+    {
+      "name": "cached reload",
+      "workersBefore": 5,
+      "workersAfter": 5,
+      "loadMs": 1.2999999970197678,
+      "status": {
+        "phase": "ready",
+        "completed": 99,
+        "total": 99,
+        "reused": 99
+      },
+      "cacheBytes": 13537,
+      "savedLayoutBytes": 58217
+    }
+  ],
+  "checks": [
+    {
+      "name": "Five legacy loads hydrate below 50 ms and route in a real worker",
+      "passed": true
+    },
+    {
+      "name": "Worker routes exactly match the existing router with no dirty/model rebuild on completion",
+      "passed": true
+    },
+    {
+      "name": "Unchanged versioned saved routes are reused without launching a worker",
+      "passed": true
+    },
+    {
+      "name": "Changing geometry invalidates saved cache and recomputes the routes",
+      "passed": true
+    },
+    {
+      "name": "A replacement document cannot be overwritten by the preceding worker",
+      "passed": true
+    },
+    {
+      "name": "Local edits during routing survive and use current geometry",
+      "passed": true
+    },
+    {
+      "name": "Explicit cancellation stops routing without publishing late results",
+      "passed": true
+    },
+    {
+      "name": "Worker startup failure leaves a usable canvas and Retry starts routing again",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "limitations": [
+    "loadMs measures synchronous hydration/caching/dispatch only; firstYieldMs and long tasks also include React/canvas work.",
+    "Browser fixture measurements do not establish total laptop CPU, all circuit sizes or live account correctness."
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "task": "VFOPT-UI-025",
+  "phase": "after",
+  "capturedAt": "2026-09-13T08:24:05.915Z",
+  "status": "failed",
+  "fixtureSha256": "5924c5dcf50ffb88b4d6916f63522719f3958e902d48ed394bb801b95345626b",
+  "browser": "153.0.8010.36",
+  "samples": [
+    {
+      "name": "60 runtime updates",
+      "generated": 0,
+      "ratlineComputations": 0,
+      "footprintComparisons": 0,
+      "netIndexBuilds": 0,
+      "elapsedMs": 1011.7000000001863,
+      "footprintCount": 100,
+      "preserved": 100
+    },
+    {
+      "name": "60 schematic geometry updates",
+      "generated": 0,
+      "ratlineComputations": 0,
+      "footprintComparisons": 0,
+      "netIndexBuilds": 0,
+      "elapsedMs": 1028,
+      "footprintCount": 100,
+      "preserved": 100
+    },
+    {
+      "name": "Add one disconnected part",
+      "generated": 1,
+      "ratlineComputations": 0,
+      "footprintComparisons": 0,
+      "netIndexBuilds": 0,
+      "elapsedMs": 180.70000000018626,
+      "footprintCount": 101,
+      "preserved": 100
+    },
+    {
+      "name": "Change one footprint package",
+      "generated": 0,
+      "ratlineComputations": 0,
+      "footprintComparisons": 0,
+      "netIndexBuilds": 0,
+      "elapsedMs": 184.29999999981374,
+      "footprintCount": 101,
+      "preserved": 100
+    },
+    {
+      "name": "Move one PCB footprint",
+      "generated": 0,
+      "ratlineComputations": 1,
+      "footprintComparisons": 0,
+      "netIndexBuilds": 0,
+      "elapsedMs": 260.19999999925494,
+      "footprintCount": 101,
+      "preserved": 100
+    },
+    {
+      "name": "Remove one wire",
+      "generated": 0,
+      "ratlineComputations": 1,
+      "footprintComparisons": 0,
+      "netIndexBuilds": 1,
+      "elapsedMs": 128.79999999981374,
+      "footprintCount": 101,
+      "preserved": 99
+    }
+  ],
+  "checks": [
+    {
+      "name": "Runtime and schematic geometry updates do no PCB generation, comparison or ratline work",
+      "passed": true
+    },
+    {
+      "name": "Adding one disconnected part creates one footprint and preserves existing objects",
+      "passed": true
+    },
+    {
+      "name": "Package edits and PCB movement preserve placement without whole-list regeneration",
+      "passed": true
+    },
+    {
+      "name": "A changed wire updates only incident footprints and one net index",
+      "passed": true
+    },
+    {
+      "name": "Delete and undo restore placed PCB identity, pads, traces and vias",
+      "passed": true
+    },
+    {
+      "name": "Immediate save layout and reload include latest package without changing placed pads or copper",
+      "passed": true
+    },
+    {
+      "name": "Scene remount reconciles edits while closed and retains previous PCB positions",
+      "passed": true
+    },
+    {
+      "name": "Mouse drag commits PCB placement without moving the viewport or regenerating footprints",
+      "passed": false,
+      "error": "Expected values to be strictly deep-equal:\n+ actual - expected\n\n  {\n    scale: 1,\n+   x: 176,\n+   y: 96\n-   x: 0,\n-   y: 0\n  }"
+    },
+    {
+      "name": "Read-only scene disables routing controls and retains saved footprint identity",
+      "passed": true
+    },
+    {
+      "name": "Empty and same-ID replacement documents clear stale ratlines and archived placements",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "limitations": [
+    "100-component isolated PCB scene; HTTP is blocked. Counters instrument actual footprint generation, footprint-array stringify and ratline entrypoints.",
+    "Elapsed windows include browser scheduling/rendering and automation; no whole-laptop CPU or hardware pointer-to-paint claim."
+  ]
+}

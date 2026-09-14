@@ -1,0 +1,499 @@
+{
+  "task": "VFOPT-UI-027",
+  "capturedAt": "2026-09-14T00:40:43.457Z",
+  "status": "implemented_verified_on_pcb_scene_production_fixtures_tail_and_live_followups_pending",
+  "authorization": "User requested VFOPT-UI-027 and continued its implementation and required checks, then asked for the next work item.",
+  "changes": [
+    "Add weak geometry caches and conservative PCB viewport bounds for footprints, traces, ratlines and vias, including rotated pads, text overhang, stroke/shadow and crossing-line visibility.",
+    "Use 64-screen-pixel entry overscan and a 256-pixel removal margin to reuse boundary objects during reversed pan/zoom; retain current selection, active routing source and active native drag targets.",
+    "Memoize shape components, stabilize action callbacks and reuse unchanged React elements. Separate toolbar subscriptions and retain the full-layout DRC/export bridge.",
+    "Track native Stage panning through one cancellable RAF and commit the document viewport only at release. Keep child drag events from moving the viewport.",
+    "Cache visible footprints and short static copper with a shared 32 MiB retained RGBA budget and 256 KiB per-object limit; use local trace coordinates, release caches on invalidation/unmount and fall back to vectors for oversized objects.",
+    "Reduce labels, orientation dots and tiny drill drawings below scale 0.7 while preserving pad hit targets and all stored physical geometry.",
+    "Make front copper visibility independent of front silkscreen visibility, and retain current routing/read-only semantics across memoized callbacks."
+  ],
+  "sourceEvidence": [
+    {
+      "file": "Voltforge_UI/package.json",
+      "sha256": "6ed3b8160bd8d94988cbf186cad065c6a578d36e7e9c0d880f326d1bd44ec8ed",
+      "startLine": 1,
+      "endLine": 73
+    },
+    {
+      "file": "Voltforge_UI/src/features/pcb/PcbCanvas.tsx",
+      "sha256": "31e52f6c503b054abc267642c0caffc989fa2c61204b2c41132dd5e56b039eb3",
+      "startLine": 1,
+      "endLine": 258
+    },
+    {
+      "file": "Voltforge_UI/src/features/pcb/PcbFootprintRenderer.tsx",
+      "sha256": "99fba0dd3c3f3140132b47fbf0da460be2fc1faa0411f0705b25b58366b02a2d",
+      "startLine": 1,
+      "endLine": 165
+    },
+    {
+      "file": "Voltforge_UI/src/features/pcb/pcbSceneGeometry.ts",
+      "sha256": "47850f8412df56e0a11cfb182fb6ae71189364af1caa18f4b6a5fc4cb15fc273",
+      "startLine": 1,
+      "endLine": 100
+    },
+    {
+      "file": "Voltforge_UI/src/features/pcb/pcbRasterBudget.ts",
+      "sha256": "c89d36c5a587b430549c8f419371524445321cdfa69baf188c77b1a3d9d19718",
+      "startLine": 1,
+      "endLine": 23
+    },
+    {
+      "file": "Voltforge_UI/src/features/pcb/usePcbSceneElements.ts",
+      "sha256": "18aef7f6715b9455365ec8517b9c0c482cb1a34eec24e4cfb1d2a3ce12085621",
+      "startLine": 1,
+      "endLine": 25
+    },
+    {
+      "file": "Voltforge_UI/src/features/pcb/PcbToolbar.tsx",
+      "sha256": "65dd949e3f6bc56e388cb3998b3676bb3a36ac6a141effbf9b1fd3d69804fc66",
+      "startLine": 1,
+      "endLine": 88
+    },
+    {
+      "file": "Voltforge_UI/src/features/pcb/PcbSceneObjects.tsx",
+      "sha256": "0c0fe0372918828dd1f915766baa21d25c53aff9269c00d0d582b7e226998035",
+      "startLine": 1,
+      "endLine": 47
+    },
+    {
+      "file": "Voltforge_UI/scripts/run-pcb-scene-contract-tests.mjs",
+      "sha256": "77f15fb1b85db67a9988fb5767fc7db48842d76c4f4e90ce25ee622e4d3c20b2",
+      "startLine": 1,
+      "endLine": 81
+    },
+    {
+      "file": "Voltforge_UI/scripts/run-pcb-scene-browser-tests.mjs",
+      "sha256": "0c5225b98b7e4d573911eeac6a9e49b5926ec13b7f2bedc206ed3df193ae0989",
+      "startLine": 1,
+      "endLine": 275
+    },
+    {
+      "file": "Voltforge_UI/scripts/fixtures/pcb-scene-entry.tsx",
+      "sha256": "58507092a189883c75cca178db228004549c8651dca88109de9a20f1fccc3e92",
+      "startLine": 1,
+      "endLine": 29
+    },
+    {
+      "file": "Voltforge_UI/scripts/fixtures/ratline-fixture.mjs",
+      "sha256": "d5007dcf684b6aaa563797ce7d48e1c3f8f039ba88809a503c1ea34159bb1ed9",
+      "startLine": 1,
+      "endLine": 15
+    },
+    {
+      "file": "Voltforge_UI/docs/VFOPT_UI_027_PCB_SCENE.md",
+      "sha256": "0b9bc6f658fbcd9a3b16a15a463e7ab8de61eafea3dfe91e5c7343facf0b5983",
+      "startLine": 1,
+      "endLine": 61
+    }
+  ],
+  "measurements": {
+    "fixture": {
+      "sha256": "d901c3e5a6b9c194741e73317ac6813b3f1fae1ab669fb564abddaeb85afb1c3",
+      "browser": "153.0.8010.36",
+      "viewport": {
+        "width": 1366,
+        "height": 800
+      },
+      "externalHttp": "blocked",
+      "dense": {
+        "footprints": 512,
+        "padsPerFootprint": 1
+      },
+      "mixed": {
+        "footprints": 1024,
+        "traces": 1025,
+        "vias": 1024
+      }
+    },
+    "production": {
+      "before": {
+        "file": "Voltforge_UI/docs/reports/vfopt-ui-027-scene-before-production.json",
+        "sha256": "0580b0f85930074353802e8a27c26bc42443adef16aa0c7e4c33b96d05952ba6"
+      },
+      "after": {
+        "file": "Voltforge_UI/docs/reports/vfopt-ui-027-scene-after-production.json",
+        "sha256": "123af9927fd8a8207f76ee337152590329cc22aacdb9ff24be86976ac8c11b8e"
+      },
+      "beforeColdReleaseMs": {
+        "count": 20,
+        "median": 124,
+        "p95": 247.4,
+        "max": 580.3
+      },
+      "afterColdReleaseMs": {
+        "count": 20,
+        "median": 29.7,
+        "p95": 48.5,
+        "max": 53.5
+      },
+      "beforeWarmReleaseMs": {
+        "count": 40,
+        "median": 141.1,
+        "p95": 224.2,
+        "max": 328.9
+      },
+      "afterWarmReleaseMs": {
+        "count": 40,
+        "median": 28.1,
+        "p95": 35.1,
+        "max": 41.5
+      },
+      "renderedFootprintsBefore": 512,
+      "renderedFootprintsAfter": 1,
+      "mountedBefore": {
+        "name": "1024-footprint mixed board",
+        "totalKonvaObjects": 16383,
+        "footprints": 1024,
+        "ratlines": 1016,
+        "copperObjects": 2049,
+        "storedFootprints": 1024,
+        "storedTraces": 1025,
+        "storedVias": 1024
+      },
+      "mountedAfter": {
+        "name": "1024-footprint mixed board",
+        "totalKonvaObjects": 3845,
+        "footprints": 256,
+        "ratlines": 254,
+        "copperObjects": 513,
+        "storedFootprints": 1024,
+        "storedTraces": 1025,
+        "storedVias": 1024
+      },
+      "mountedObjectReductionPercent": 76.5,
+      "endurance": {
+        "pan": {
+          "durationMs": 20034,
+          "drawMs": {
+            "count": 289,
+            "median": 9.4,
+            "p95": 43.5,
+            "max": 164.3
+          }
+        },
+        "wheel": {
+          "durationMs": 20028,
+          "drawMs": {
+            "count": 232,
+            "median": 19.2,
+            "p95": 23.3,
+            "max": 49.9
+          }
+        },
+        "routing": {
+          "durationMs": 20006,
+          "drawMs": {
+            "count": 397,
+            "median": 7.1,
+            "p95": 8.8,
+            "max": 14.3
+          }
+        }
+      },
+      "raster": {
+        "name": "mounted PCB raster buffers",
+        "bytes": 16223680,
+        "cached": 512,
+        "all": 1024
+      }
+    },
+    "development": {
+      "before": {
+        "file": "Voltforge_UI/docs/reports/vfopt-ui-027-scene-before.json",
+        "sha256": "139e9c580dd167156142b8407b6665f776d7a38a6f0442b0366ec2ebefa9f44b"
+      },
+      "after": {
+        "file": "Voltforge_UI/docs/reports/vfopt-ui-027-scene-after.json",
+        "sha256": "fc1f3f122dae931a590b563a3f874dde5ca11d2e09eb1823094f8f75129f46e7"
+      },
+      "beforeColdReleaseMs": {
+        "count": 5,
+        "median": 962.1,
+        "p95": 1023.4,
+        "max": 1023.4
+      },
+      "afterColdReleaseMs": {
+        "count": 5,
+        "median": 38.1,
+        "p95": 52.3,
+        "max": 52.3
+      },
+      "beforeWarmReleaseMs": {
+        "count": 20,
+        "median": 1051.2,
+        "p95": 1136.2,
+        "max": 1243.5
+      },
+      "afterWarmReleaseMs": {
+        "count": 20,
+        "median": 36.2,
+        "p95": 37.6,
+        "max": 44.1
+      },
+      "firstUseBudget": "pending_above_50_ms"
+    },
+    "screenshots": {
+      "before": {
+        "file": "Voltforge_UI/docs/reports/vfopt-ui-027-scene-before-production.png",
+        "sha256": "51193543acd38fa6c921ac8506ffcabbd33ed160ea7f24ebdcb88f07439cfa72"
+      },
+      "after": {
+        "file": "Voltforge_UI/docs/reports/vfopt-ui-027-scene-after-production.png",
+        "sha256": "56c5a96a93176151df9158d582883aad5209d1d03d93c0911ab8f4a59cd1b7f0"
+      },
+      "review": "Visually reviewed: same visible board, footprint rows, copper and crossing trace. Raster antialiasing differs; no pixel-identical claim."
+    },
+    "interpretation": "Matching fixture hashes and separate production/development lanes. Browser event-to-layer-draw timing excludes physical display scanout. Endurance observes the last relevant draw across two animation frames per delivered input. The separate 30-wheel windows include automation/pacing. Load-separated samples reload document state, not a new browser/JS engine. One workload runs at a time, but unrelated host load and power settings are not controlled."
+  },
+  "acceptance": [
+    {
+      "criterion": "Mounted PCB objects scale with visible area and active interactions.",
+      "status": "passed_on_mixed_fixture",
+      "detail": "16,383 mounted Konva objects become 3,845 at the initial view; the stored 1,024/1,025/1,024 footprint/trace/via arrays remain complete. Culling, hysteresis, selection and active-interaction retention are checked.",
+      "evidence": [
+        "Voltforge_UI/docs/reports/vfopt-ui-027-scene-before-production.json",
+        "Voltforge_UI/docs/reports/vfopt-ui-027-scene-after-production.json",
+        "Voltforge_UI/docs/reports/vfopt-ui-027-scene-contract-tests.json"
+      ]
+    },
+    {
+      "criterion": "Pan/zoom and routing pass the same laptop frame targets as the schematic.",
+      "status": "passed_production_stress_p95_development_first_use_and_tail_followups_open",
+      "detail": "Production 20/40 release samples and the 60-second pan/zoom/routing window pass the 50 ms stress p95 gate. Development first-use p95 is still 52.3 ms, and production pan maximum is 164.3 ms; neither is called fully closed. Normal-sized whole-app 16.7 ms behavior is not established by this stress fixture.",
+      "evidence": [
+        "Voltforge_UI/docs/reports/vfopt-ui-027-scene-before-production.json",
+        "Voltforge_UI/docs/reports/vfopt-ui-027-scene-after-production.json",
+        "Voltforge_UI/docs/reports/vfopt-ui-027-scene-before.json",
+        "Voltforge_UI/docs/reports/vfopt-ui-027-scene-after.json"
+      ]
+    },
+    {
+      "criterion": "No missing pads, traces, ratlines or selection at viewport edges.",
+      "status": "passed_contract_and_browser_checks",
+      "detail": "Inclusive/crossing bounds, rotated/external pads, independent layers, offscreen route source, selected trace/footprint, active drags, read-only and late events, cache refresh/cleanup and complete layout roundtrip pass. Prior PCB undo/reload and ratline regressions also pass.",
+      "evidence": [
+        "Voltforge_UI/docs/reports/vfopt-ui-027-scene-contract-tests.json",
+        "Voltforge_UI/docs/reports/vfopt-ui-027-scene-after-production.json",
+        "Voltforge_UI/docs/reports/vfopt-ui-027-rerun-vfopt-ui-025-pcb-sync-after.json",
+        "Voltforge_UI/docs/reports/vfopt-ui-027-rerun-vfopt-ui-026-ratline-browser-after.json"
+      ]
+    }
+  ],
+  "verification": {
+    "pcbSceneContracts": {
+      "file": "Voltforge_UI/docs/reports/vfopt-ui-027-scene-contract-tests.json",
+      "sha256": "c655a1c4283dcc5612633ac9e26d70f6a683a3fe149efa274d04f6a3f5268cfb",
+      "passed": 8,
+      "failed": 0
+    },
+    "pcbSceneProductionBrowser": {
+      "file": "Voltforge_UI/docs/reports/vfopt-ui-027-scene-after-production.json",
+      "sha256": "123af9927fd8a8207f76ee337152590329cc22aacdb9ff24be86976ac8c11b8e",
+      "passed": 13,
+      "failed": 0
+    },
+    "pcbSyncContracts": {
+      "file": "Voltforge_UI/docs/reports/vfopt-ui-027-rerun-vfopt-ui-025-pcb-sync-contract-tests.json",
+      "sha256": "68c9a05d5fe446530f8b0c52ea72561f8235adfdd84626c9d557592145f6a05d",
+      "passed": 15,
+      "failed": 0
+    },
+    "ratlineContracts": {
+      "file": "Voltforge_UI/docs/reports/vfopt-ui-027-rerun-vfopt-ui-026-ratline-contract-tests.json",
+      "sha256": "2e3f88e629a7aacf61ab2d5b8df0de9deeec9b5af15bfa6614302aad5228844d",
+      "passed": 15,
+      "failed": 0
+    },
+    "pcbSyncBrowser": {
+      "file": "Voltforge_UI/docs/reports/vfopt-ui-027-rerun-vfopt-ui-025-pcb-sync-after.json",
+      "sha256": "c17ae56d696c9ec014300eeaa5195c1358b42b0a23c591ad529a56c916f023d3",
+      "passed": 10,
+      "failed": 0,
+      "execution": {
+        "task": "VFOPT-UI-027",
+        "command": "rtk proxy npm run test:pcb-sync-browser",
+        "startedAt": "2026-09-14T00:32:17.876Z",
+        "finishedAt": "2026-09-14T00:32:26.547Z",
+        "exitCode": 0,
+        "signal": null,
+        "log": ".voltforge-logs/vfopt-ui-027-verification/pcb.log",
+        "sha256": "33a1d04f8e3138bf05bae15854700de3810fb325917192877f4920b5f7bbeab1",
+        "receipt": {
+          "file": ".voltforge-logs/vfopt-ui-027-verification/pcb.json",
+          "sha256": "c802392903795716e82c6caab263f4474a049a5160ae05d1b9d38df17ba9c522"
+        }
+      }
+    },
+    "ratlineBrowser": {
+      "file": "Voltforge_UI/docs/reports/vfopt-ui-027-rerun-vfopt-ui-026-ratline-browser-after.json",
+      "sha256": "f8b764ddb0514a032103696fa60dfac1c292d0f38d145916c8ed5da254c01616",
+      "passed": 6,
+      "failed": 0,
+      "execution": {
+        "task": "VFOPT-UI-027",
+        "command": "rtk proxy npm run test:ratline-browser",
+        "startedAt": "2026-09-14T00:32:36.745Z",
+        "finishedAt": "2026-09-14T00:33:48.247Z",
+        "exitCode": 0,
+        "signal": null,
+        "log": ".voltforge-logs/vfopt-ui-027-verification/ratline.log",
+        "sha256": "ef224e5ef3d29ce091ae2b3de18eadd75084d2a6a57f428d993b9cf0d7eec7fd",
+        "receipt": {
+          "file": ".voltforge-logs/vfopt-ui-027-verification/ratline.json",
+          "sha256": "7f70b521607a37fb53af630a675e4a43632f677f07c9603cd95235dedea366c6"
+        }
+      }
+    },
+    "targetedPassingChecks": 67,
+    "developmentBrowser": {
+      "file": "Voltforge_UI/docs/reports/vfopt-ui-027-scene-after.json",
+      "sha256": "fc1f3f122dae931a590b563a3f874dde5ca11d2e09eb1823094f8f75129f46e7",
+      "status": "failed_first_use_latency_gate",
+      "exitCode": 1,
+      "checksPassed": 11,
+      "checksFailed": 1,
+      "detail": "All behavior checks pass and only one footprint re-renders. The five-sample first-use p95 remains above 50 ms. This gate has not been weakened or marked passed."
+    },
+    "fullTest": {
+      "task": "VFOPT-UI-027",
+      "command": "rtk proxy npm test",
+      "startedAt": "2026-09-14T00:30:19.827Z",
+      "finishedAt": "2026-09-14T00:31:12.815Z",
+      "exitCode": 0,
+      "signal": null,
+      "log": ".voltforge-logs/vfopt-ui-027-verification/test.log",
+      "sha256": "ecf330636584141807fa7f7e17b0cfb637cc438d35de50c44ab86b395ef0cfc3",
+      "receipt": {
+        "file": ".voltforge-logs/vfopt-ui-027-verification/test.json",
+        "sha256": "d5a0ecccae95cac84bc51ab93074aa2db84db01ed4657747498c07a95f5c4821"
+      }
+    },
+    "build": {
+      "task": "VFOPT-UI-027",
+      "command": "rtk proxy npm run build",
+      "startedAt": "2026-09-14T00:34:18.844Z",
+      "finishedAt": "2026-09-14T00:34:33.771Z",
+      "exitCode": 0,
+      "signal": null,
+      "log": ".voltforge-logs/vfopt-ui-027-verification/build.log",
+      "sha256": "6090e082a8fea42c5399c28075a4ad7920833912b4575706ae55ed91d3e3aabf",
+      "receipt": {
+        "file": ".voltforge-logs/vfopt-ui-027-verification/build.json",
+        "sha256": "b9ecb3e604502e5190d95cbaf735ae280fd90eb2765a151cde940747fe452ac5"
+      }
+    },
+    "whitespace": {
+      "task": "VFOPT-UI-027",
+      "command": "rtk proxy git -c core.safecrlf=false diff --check",
+      "startedAt": "2026-09-14T00:36:19.650Z",
+      "finishedAt": "2026-09-14T00:36:19.920Z",
+      "exitCode": 0,
+      "signal": null,
+      "log": ".voltforge-logs/vfopt-ui-027-verification/whitespace.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt": {
+        "file": ".voltforge-logs/vfopt-ui-027-verification/whitespace.json",
+        "sha256": "8c13daf70f6e492e34042ec0a37f6fbbf6891e3c874f5a05444ad53be633f72f"
+      }
+    },
+    "existingWarnings": [
+      "Existing palette-entry.tsx react/only-export-components warning.",
+      "Two existing Vite SSR dependency-scan shutdown warnings in the full suite; assertions and overall exit code pass."
+    ],
+    "bundleBudget": {
+      "status": "passed",
+      "entryKiB": 98.2,
+      "initialStaticJsKiB": 504.6,
+      "initialChunks": 13,
+      "largestChunkKiB": 181.4,
+      "manifest": {
+        "file": "Voltforge_UI/dist/.vite/manifest.json",
+        "sha256": "8e3cdd40ae3a927114d9c228cdaa4fc2f6022ef2bc55afd0ce7714d435760ff4"
+      }
+    },
+    "cleanup": {
+      "checkedAt": "2026-09-14T00:40:43.556Z",
+      "fixturePorts": [
+        {
+          "port": 3108,
+          "listening": false
+        },
+        {
+          "port": 3109,
+          "listening": false
+        },
+        {
+          "port": 3110,
+          "listening": false
+        },
+        {
+          "port": 3111,
+          "listening": false
+        }
+      ],
+      "userServicesStopped": false
+    }
+  },
+  "scope": {
+    "baselineInventory": {
+      "file": ".voltforge-logs/vfopt-ui-027-before/source-inventory.json",
+      "sha256": "69dac315280ce2eaba76f4445ee6045f54a28036deecc318278927cbd9cd903d"
+    },
+    "inventoriedFiles": 426,
+    "changedInventoriedSources": [
+      {
+        "file": "Voltforge_UI/package.json",
+        "beforeSha256": "84635ad3f5e7ceb167d112a181a602104ee7ffaeb5dd3f17c749077837990c81",
+        "afterSha256": "6ed3b8160bd8d94988cbf186cad065c6a578d36e7e9c0d880f326d1bd44ec8ed"
+      },
+      {
+        "file": "Voltforge_UI/src/features/pcb/PcbCanvas.tsx",
+        "beforeSha256": "31880c2f2680f7472c71ebe9fda73bfc46150d628504d135ef36ad8d1ec1074d",
+        "afterSha256": "31e52f6c503b054abc267642c0caffc989fa2c61204b2c41132dd5e56b039eb3"
+      },
+      {
+        "file": "Voltforge_UI/src/features/pcb/PcbFootprintRenderer.tsx",
+        "beforeSha256": "550f3a6e0944425be471016d25f02a6801427d18483e1bb4750c843fae59d812",
+        "afterSha256": "99fba0dd3c3f3140132b47fbf0da460be2fc1faa0411f0705b25b58366b02a2d"
+      }
+    ],
+    "historicalReportsPreserved": 110,
+    "rerunArtifacts": {
+      "file": "Voltforge_UI/docs/reports/vfopt-ui-027-rerun-artifacts.json",
+      "sha256": "158ddbf8a9d82b97c2e58dae5dd4c9a5ea6206e6754cb9ef5de2c557815c1056"
+    },
+    "preserved": "Only PCB Canvas/FootprintRenderer and package scripts differ among inventoried source files. PCB scene helper/renderer/test files are new. Ratline engine, PCB/schematic stores and synchronization, simulator, backend source/configuration, lockfile, staged pinRegistry and historical reports match task start. No commits, staging, backend/AI writes or user-service shutdowns."
+  },
+  "remainingValidation": [
+    {
+      "status": "measured_followup",
+      "scope": "development first-use and production tail latency",
+      "detail": "Development first-use p95 52.3 ms exceeds the 50 ms gate (5 samples); its command remains failed. Production pan p95 passes at 43.5 ms but maximum remains 164.3 ms. No claim of consistently hitch-free interaction or universal frame limits."
+    },
+    {
+      "status": "unverified",
+      "scope": "live and whole-application validation",
+      "detail": "Authenticated persistence/STOMP, real manufacturing requests, whole-laptop CPU/working set, physical pointer-to-display timing, high-DPI displays, much larger/complex boards and the normal 16.7 ms frame target are not established by these isolated fixtures. The broader VFOPT-X-001 baseline remains open."
+    },
+    {
+      "status": "documented_tradeoffs",
+      "detail": "Viewport filtering still scans current objects linearly. Conservative bounds and a wider removal margin retain some extra objects. Bitmaps change antialiasing, require bounded memory and can produce allocation spikes when entering new regions; browser overhead/temporary rasterization buffers are additional to the retained RGBA cap."
+    },
+    {
+      "status": "separate_backlog_work",
+      "items": [
+        "VFOPT-UI-014",
+        "VFOPT-UI-015"
+      ],
+      "detail": "Schematic component/pin culling and remaining memoization work remain separate. Current CircuitCanvas still maps every nodeId. Their audit records and prior implementation evidence are unchanged."
+    }
+  ],
+  "documentation": "Voltforge_UI/docs/VFOPT_UI_027_PCB_SCENE.md",
+  "nextRecommendedItem": "VFOPT-UI-014"
+}

@@ -433,7 +433,7 @@ private scopeCaptureRevision = 0;
     this.digitalIcPrimeRequests.clear();
 
     // Initialize board properties: power on! And clear/reset other nodes to their initial simulation state.
-    const { updateNode } = useCanvasStore.getState();
+    const { updateRuntimeNode } = useCanvasStore.getState();
     nodes.forEach(node => {
       const updates: Record<string, any> = {};
       let changed = false;
@@ -521,7 +521,7 @@ private scopeCaptureRevision = 0;
       }
 
       if (changed) {
-        updateNode(node.id, {
+        updateRuntimeNode(node.id, {
           properties: {
             ...node.properties,
             ...updates,
@@ -530,7 +530,7 @@ private scopeCaptureRevision = 0;
       }
     });
 
-    // updateNode() is synchronous, but the nodes passed by React still refer to
+    // updateRuntimeNode() is synchronous, but the nodes passed by React still refer to
     // the pre-reset snapshot (often boardPowered=false after a previous stop).
     // Always initialize the electrical runtime from the refreshed store state.
     const initializedNodes = useCanvasStore.getState().nodes;
@@ -1958,7 +1958,7 @@ private scopeCaptureRevision = 0;
   }
 
   private updateEscConnectedBldcMotors(escId: string, rpm: number) {
-    const { nodes, wires, updateNode } = useCanvasStore.getState();
+    const { nodes, wires, updateRuntimeNode } = useCanvasStore.getState();
     const connectedMotorIds = new Set<string>();
 
     for (const phasePin of ['phase_a', 'phase_b', 'phase_c']) {
@@ -1977,7 +1977,7 @@ private scopeCaptureRevision = 0;
 
       const isSpinning = rpm > 0;
       if (motor.properties?.bldcRpm !== rpm || motor.properties?.isSpinning !== isSpinning) {
-        updateNode(motor.id, {
+        updateRuntimeNode(motor.id, {
           properties: {
             ...motor.properties,
             bldcRpm: rpm,
@@ -1998,7 +1998,7 @@ private scopeCaptureRevision = 0;
   }
 
   private updateEscDrive(escNode: CanvasNode, measuredSupplyVoltage: number) {
-    const { nodesById, updateNode } = useCanvasStore.getState();
+    const { nodesById, updateRuntimeNode } = useCanvasStore.getState();
     const esc = nodesById.get(escNode.id) || escNode;
     const props = esc.properties || {};
     const supplyVoltage = Math.round(Math.max(0, measuredSupplyVoltage) * 1000) / 1000;
@@ -2028,7 +2028,7 @@ private scopeCaptureRevision = 0;
       props.escRpm !== rpm ||
       props.isActive !== (powered && throttle > 0)
     ) {
-      updateNode(esc.id, {
+      updateRuntimeNode(esc.id, {
         properties: {
           ...props,
           powered,
@@ -2639,9 +2639,9 @@ private scopeCaptureRevision = 0;
     this.runtimeDeltaCollector.reset();
 
     const store = useCanvasStore.getState() as any;
-    this.originalUpdateNode = store.updateNode;
+    this.originalUpdateNode = store.updateRuntimeNode;
 
-    store.updateNode = (id: string, updates: Partial<CanvasNode>) => {
+    store.updateRuntimeNode = (id: string, updates: Partial<CanvasNode>) => {
       const hasGeometry = Object.keys(updates).some(k =>
         k === 'x' || k === 'y' || k === 'width' || k === 'height' || k === 'rotation' || k === 'pins'
       );
@@ -2659,7 +2659,7 @@ private scopeCaptureRevision = 0;
     } finally {
       this.isBatching = false;
       if (this.originalUpdateNode) {
-        store.updateNode = this.originalUpdateNode;
+        store.updateRuntimeNode = this.originalUpdateNode;
         this.originalUpdateNode = null;
       }
 
@@ -2702,7 +2702,7 @@ private scopeCaptureRevision = 0;
     }
     // Turn off board LEDs & reset all component states to unpowered/inactive
     this.runBatched(() => {
-      const { updateNode, nodes } = useCanvasStore.getState();
+      const { updateRuntimeNode, nodes } = useCanvasStore.getState();
       nodes.forEach(node => {
         const updates: Record<string, any> = {};
         let changed = false;
@@ -2775,7 +2775,7 @@ private scopeCaptureRevision = 0;
         }
 
         if (changed) {
-          updateNode(node.id, {
+          updateRuntimeNode(node.id, {
             properties: {
               ...node.properties,
               ...updates,
@@ -3311,7 +3311,7 @@ private scopeCaptureRevision = 0;
     };
     const changed = Object.entries(nextProperties).some(([key, value]) => node.properties?.[key] !== value);
     if (changed) {
-      useCanvasStore.getState().updateNode(node.id, { properties: nextProperties });
+      useCanvasStore.getState().updateRuntimeNode(node.id, { properties: nextProperties });
     }
 
     const currentNode = useCanvasStore.getState().nodesById.get(node.id) || node;
@@ -3647,7 +3647,7 @@ private scopeCaptureRevision = 0;
 
       const currentPoweredState = Boolean(mcuNode.properties?.boardPowered);
       if (currentPoweredState !== powered) {
-        useCanvasStore.getState().updateNode(mcuNode.id, {
+        useCanvasStore.getState().updateRuntimeNode(mcuNode.id, {
           properties: {
             ...mcuNode.properties,
             boardPowered: powered,
@@ -3715,7 +3715,7 @@ private scopeCaptureRevision = 0;
           const pinState = pinInfo?.state || 'LOW';
           const isHigh = pinState === 'HIGH';
           if (mcuNode.properties?.builtInLedLit !== isHigh) {
-            useCanvasStore.getState().updateNode(mcuNode.id, {
+            useCanvasStore.getState().updateRuntimeNode(mcuNode.id, {
               properties: {
                 ...mcuNode.properties,
                 builtInLedLit: isHigh,
@@ -3759,7 +3759,7 @@ private scopeCaptureRevision = 0;
           node.properties?.resistanceUnsafe !== resistanceUnsafe ||
           node.properties?.displayValue !== displayValue
         ) {
-          useCanvasStore.getState().updateNode(node.id, {
+          useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: {
               ...node.properties,
               measuredVoltage: voltage,
@@ -3794,7 +3794,7 @@ private scopeCaptureRevision = 0;
         const hexColor = `#${rVal.toString(16).padStart(2, '0')}${gVal.toString(16).padStart(2, '0')}${bVal.toString(16).padStart(2, '0')}`;
 
         if (node.properties?.isLit !== isLit || node.properties?.ledColor !== hexColor) {
-          useCanvasStore.getState().updateNode(node.id, {
+          useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: {
               ...node.properties,
               isLit,
@@ -3816,7 +3816,7 @@ private scopeCaptureRevision = 0;
         const maxCurrent = ledMaximumCurrent_mA(node.properties || {});
         const currentMa = Math.abs(current) * 1000;
         if (currentMa > maxCurrent * 2) {
-          useCanvasStore.getState().updateNode(node.id, {
+          useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: {
               ...node.properties,
               isBlown: true,
@@ -3825,7 +3825,7 @@ private scopeCaptureRevision = 0;
             },
           });
         } else if (!node.properties?.isBlown && node.properties?.isLit !== isLit) {
-          useCanvasStore.getState().updateNode(node.id, {
+          useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: { ...node.properties, isLit },
           });
         }
@@ -3837,7 +3837,7 @@ private scopeCaptureRevision = 0;
         const current = result.branchCurrents[elemId] ?? 0;
         const isBeeping = Math.abs(current) > 0.001;
         if (node.properties?.isBeeping !== isBeeping) {
-          useCanvasStore.getState().updateNode(node.id, {
+          useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: { ...node.properties, isBeeping },
           });
         }
@@ -3877,7 +3877,7 @@ private scopeCaptureRevision = 0;
           node.properties?.appliedVoltage !== appliedVoltage ||
           node.properties?.currentMa !== currentMa
         ) {
-          useCanvasStore.getState().updateNode(node.id, {
+          useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: {
               ...node.properties,
               isSpinning,
@@ -3912,7 +3912,7 @@ private scopeCaptureRevision = 0;
           node.properties?.inputVoltage !== vinVoltage ||
           node.properties?.actualOutputVoltage !== outputVoltage
         ) {
-          useCanvasStore.getState().updateNode(node.id, {
+          useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: {
               ...node.properties,
               inputVoltage: vinVoltage,
@@ -3949,7 +3949,7 @@ private scopeCaptureRevision = 0;
           node.properties?.lcdLine2 !== lcdLine2 ||
           node.properties?.lcdBacklight !== lcdBacklight
         ) {
-          useCanvasStore.getState().updateNode(node.id, {
+          useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: {
               ...node.properties,
               powered,
@@ -3982,7 +3982,7 @@ private scopeCaptureRevision = 0;
         });
 
         if (node.properties?.powered !== powered || node.properties?.outputHigh !== outputHigh) {
-          useCanvasStore.getState().updateNode(node.id, {
+          useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: {
               ...node.properties,
               powered,
@@ -3998,7 +3998,7 @@ private scopeCaptureRevision = 0;
         const supplyVoltage = (result.nodeVoltages[vccNode] ?? 0) - (result.nodeVoltages[gndNode] ?? 0);
         const powered = supplyVoltage >= 3.5;
         if (node.properties?.powered !== powered) {
-          useCanvasStore.getState().updateNode(node.id, {
+          useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: {
               ...node.properties,
               powered,
@@ -4041,7 +4041,7 @@ private scopeCaptureRevision = 0;
           });
 
           if (node.properties?.powered !== powered) {
-            useCanvasStore.getState().updateNode(node.id, {
+            useCanvasStore.getState().updateRuntimeNode(node.id, {
               properties: { ...node.properties, powered },
             });
           }
@@ -4080,7 +4080,7 @@ private scopeCaptureRevision = 0;
           const newSteps = currentSteps + dir;
           const rotation = ((newSteps % stepsPerRev) / stepsPerRev) * 360;
 
-          useCanvasStore.getState().updateNode(node.id, {
+          useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: {
               ...node.properties,
               stepperSteps: newSteps,
@@ -4156,7 +4156,7 @@ private scopeCaptureRevision = 0;
           || node.properties?.isSpinning !== energized
           || node.properties?.stepperRotation !== rotation;
         if (changed) {
-          useCanvasStore.getState().updateNode(node.id, {
+          useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: nextProperties,
           });
         }
@@ -4172,7 +4172,7 @@ private scopeCaptureRevision = 0;
         if (node.properties?.isActive !== isActive) {
           this.solverWorker?.postMessage({ type: 'UPDATE_PIN', elementId: `r_contact_no_${node.id}`, voltage: isActive ? 0.05 : 1e8 });
           this.solverWorker?.postMessage({ type: 'UPDATE_PIN', elementId: `r_contact_nc_${node.id}`, voltage: isActive ? 1e8 : 0.05 });
-          useCanvasStore.getState().updateNode(node.id, {
+          useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: { ...node.properties, isActive },
           });
         }
@@ -4210,7 +4210,7 @@ private scopeCaptureRevision = 0;
         }
 
         if (changed || node.properties?.isActive !== anySwitched || node.properties?.powered !== powered) {
-          useCanvasStore.getState().updateNode(node.id, {
+          useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: {
               ...node.properties,
               ...updates,
@@ -4246,7 +4246,7 @@ private scopeCaptureRevision = 0;
           const displayDigit = digitMap[pattern] ?? '';
           const isActive = Object.values(segStates).some(v => v);
 
-          useCanvasStore.getState().updateNode(node.id, {
+          useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: {
               ...node.properties,
               segments: segStates,
@@ -4325,7 +4325,7 @@ private scopeCaptureRevision = 0;
       }
 
       if (changed || props.prevSrclk !== isSrclkHigh || props.prevRclk !== isRclkHigh) {
-        useCanvasStore.getState().updateNode(ic.id, {
+        useCanvasStore.getState().updateRuntimeNode(ic.id, {
           properties: {
             ...ic.properties,
             shiftRegValue: shiftVal,
@@ -4395,7 +4395,7 @@ private scopeCaptureRevision = 0;
       });
 
       if (props.timerState !== state) {
-        useCanvasStore.getState().updateNode(ic.id, {
+        useCanvasStore.getState().updateRuntimeNode(ic.id, {
           properties: {
             ...ic.properties,
             timerState: state,
@@ -4453,7 +4453,7 @@ private scopeCaptureRevision = 0;
       const currentProperties = useCanvasStore.getState().nodesById.get(node.id)?.properties || node.properties || {};
       const changed = Object.entries(updates).some(([key, value]) => currentProperties[key] !== value);
       if (changed) {
-        useCanvasStore.getState().updateNode(node.id, {
+        useCanvasStore.getState().updateRuntimeNode(node.id, {
           properties: {
             ...currentProperties,
             ...updates,

@@ -41,6 +41,7 @@ function getParticleColor(absCurrentA: number): string {
 }
 
 interface CurrentFlowLayerProps {
+  previewNodeId?: string | null;
   /** The editor owns the visual simulation lifecycle. */
   isSimulating?: boolean;
   visibleWires: Wire[];
@@ -51,6 +52,7 @@ interface CurrentFlowLayerProps {
 }
 
 export default function CurrentFlowLayer({
+  previewNodeId,
   isSimulating: simulationProp,
   visibleWires,
   allWires,
@@ -83,8 +85,10 @@ export default function CurrentFlowLayer({
   // zooming swaps this bounded path set; solver current values remain intact.
   const flowEnabled = isSimulating && showCurrentFlow;
   const staticWirePaths = useMemo<CurrentFlowPath[]>(
-    () => flowEnabled ? compileCurrentFlowPaths(visibleWires, nodesById, allWires) : [],
-    [flowEnabled, visibleWires, allWires, nodesById],
+    () => flowEnabled ? compileCurrentFlowPaths(
+      previewNodeId ? visibleWires.filter(wire => wire.fromNodeId !== previewNodeId && wire.toNodeId !== previewNodeId) : visibleWires,
+      nodesById, allWires) : [],
+    [flowEnabled, visibleWires, allWires, nodesById, previewNodeId],
   );
 
   const pathsRef = useRef(staticWirePaths);

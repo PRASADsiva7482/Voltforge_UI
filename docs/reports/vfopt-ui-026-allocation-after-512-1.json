@@ -1,0 +1,260 @@
+{
+  "phase": "after",
+  "pads": 512,
+  "iteration": 1,
+  "samplingInterval": 16384,
+  "totalEstimatedBytes": 2121380,
+  "engineEstimatedBytes": 2104264,
+  "totalSamples": 129,
+  "engineSamples": 128,
+  "head": {
+    "callFrame": {
+      "functionName": "(root)",
+      "scriptId": "0",
+      "url": "",
+      "lineNumber": -1,
+      "columnNumber": -1
+    },
+    "selfSize": 0,
+    "id": 1,
+    "children": [
+      {
+        "callFrame": {
+          "functionName": "",
+          "scriptId": "253",
+          "url": "",
+          "lineNumber": 0,
+          "columnNumber": 1
+        },
+        "selfSize": 0,
+        "id": 3,
+        "children": [
+          {
+            "callFrame": {
+              "functionName": "evaluate",
+              "scriptId": "13",
+              "url": "",
+              "lineNumber": 304,
+              "columnNumber": 10
+            },
+            "selfSize": 0,
+            "id": 4,
+            "children": [
+              {
+                "callFrame": {
+                  "functionName": "",
+                  "scriptId": "254",
+                  "url": "",
+                  "lineNumber": 0,
+                  "columnNumber": 0
+                },
+                "selfSize": 0,
+                "id": 5,
+                "children": [
+                  {
+                    "callFrame": {
+                      "functionName": "computeRatlines",
+                      "scriptId": "6",
+                      "url": "http://localhost:3110/src/features/pcb/RatlineEngine.ts",
+                      "lineNumber": 131,
+                      "columnNumber": 23
+                    },
+                    "selfSize": 0,
+                    "id": 6,
+                    "children": [
+                      {
+                        "callFrame": {
+                          "functionName": "update",
+                          "scriptId": "6",
+                          "url": "http://localhost:3110/src/features/pcb/RatlineEngine.ts",
+                          "lineNumber": 146,
+                          "columnNumber": 7
+                        },
+                        "selfSize": 114764,
+                        "id": 7,
+                        "children": [
+                          {
+                            "callFrame": {
+                              "functionName": "pinKey",
+                              "scriptId": "6",
+                              "url": "http://localhost:3110/src/features/pcb/RatlineEngine.ts",
+                              "lineNumber": 0,
+                              "columnNumber": 15
+                            },
+                            "selfSize": 32780,
+                            "id": 8,
+                            "children": []
+                          },
+                          {
+                            "callFrame": {
+                              "functionName": "buildTree",
+                              "scriptId": "6",
+                              "url": "http://localhost:3110/src/features/pcb/RatlineEngine.ts",
+                              "lineNumber": 83,
+                              "columnNumber": 18
+                            },
+                            "selfSize": 163904,
+                            "id": 17,
+                            "children": [
+                              {
+                                "callFrame": {
+                                  "functionName": "hypot",
+                                  "scriptId": "0",
+                                  "url": "",
+                                  "lineNumber": -1,
+                                  "columnNumber": -1
+                                },
+                                "selfSize": 1573440,
+                                "id": 18,
+                                "children": []
+                              }
+                            ]
+                          },
+                          {
+                            "callFrame": {
+                              "functionName": "find",
+                              "scriptId": "6",
+                              "url": "http://localhost:3110/src/features/pcb/RatlineEngine.ts",
+                              "lineNumber": 134,
+                              "columnNumber": 5
+                            },
+                            "selfSize": 0,
+                            "id": 9,
+                            "children": [
+                              {
+                                "callFrame": {
+                                  "functionName": "has",
+                                  "scriptId": "0",
+                                  "url": "",
+                                  "lineNumber": -1,
+                                  "columnNumber": -1
+                                },
+                                "selfSize": 16400,
+                                "id": 10,
+                                "children": []
+                              }
+                            ]
+                          },
+                          {
+                            "callFrame": {
+                              "functionName": "set",
+                              "scriptId": "0",
+                              "url": "",
+                              "lineNumber": -1,
+                              "columnNumber": -1
+                            },
+                            "selfSize": 21564,
+                            "id": 16,
+                            "children": []
+                          },
+                          {
+                            "callFrame": {
+                              "functionName": "values",
+                              "scriptId": "0",
+                              "url": "",
+                              "lineNumber": -1,
+                              "columnNumber": -1
+                            },
+                            "selfSize": 16392,
+                            "id": 14,
+                            "children": []
+                          },
+                          {
+                            "callFrame": {
+                              "functionName": "next",
+                              "scriptId": "0",
+                              "url": "",
+                              "lineNumber": -1,
+                              "columnNumber": -1
+                            },
+                            "selfSize": 32780,
+                            "id": 15,
+                            "children": []
+                          },
+                          {
+                            "callFrame": {
+                              "functionName": "map",
+                              "scriptId": "0",
+                              "url": "",
+                              "lineNumber": -1,
+                              "columnNumber": -1
+                            },
+                            "selfSize": 32792,
+                            "id": 11,
+                            "children": [
+                              {
+                                "callFrame": {
+                                  "functionName": "",
+                                  "scriptId": "6",
+                                  "url": "http://localhost:3110/src/features/pcb/RatlineEngine.ts",
+                                  "lineNumber": 169,
+                                  "columnNumber": 32
+                                },
+                                "selfSize": 49208,
+                                "id": 12,
+                                "children": [
+                                  {
+                                    "callFrame": {
+                                      "functionName": "pinKey",
+                                      "scriptId": "6",
+                                      "url": "http://localhost:3110/src/features/pcb/RatlineEngine.ts",
+                                      "lineNumber": 0,
+                                      "columnNumber": 15
+                                    },
+                                    "selfSize": 16400,
+                                    "id": 13,
+                                    "children": []
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "callFrame": {
+                              "functionName": "push",
+                              "scriptId": "0",
+                              "url": "",
+                              "lineNumber": -1,
+                              "columnNumber": -1
+                            },
+                            "selfSize": 17280,
+                            "id": 20,
+                            "children": []
+                          },
+                          {
+                            "callFrame": {
+                              "functionName": "filter",
+                              "scriptId": "0",
+                              "url": "",
+                              "lineNumber": -1,
+                              "columnNumber": -1
+                            },
+                            "selfSize": 16560,
+                            "id": 19,
+                            "children": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "callFrame": {
+          "functionName": "(V8 API)",
+          "scriptId": "0",
+          "url": "",
+          "lineNumber": -1,
+          "columnNumber": -1
+        },
+        "selfSize": 17116,
+        "id": 2,
+        "children": []
+      }
+    ]
+  }
+}

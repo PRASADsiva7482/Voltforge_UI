@@ -138,6 +138,14 @@ export type CanvasLayout = {
   nodes: CanvasNode[]
   viewport: { scale: number; x: number; y: number }
   wires: Wire[]
+  routeCache?: CanvasRouteCache
+}
+
+/** Derived routing cache. Exact keys bind the router version, geometry and routes. */
+export type CanvasRouteCache = {
+  version: 'vf-grid-route-1'
+  geometryKey: string
+  wiresKey: string
 }
 
 export type CodeFile = {

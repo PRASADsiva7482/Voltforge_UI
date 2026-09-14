@@ -316,6 +316,7 @@ interface ComponentNodeProps {
   isDark: boolean;
   onSelect: () => void;
   onChange: (updates: Partial<CanvasNode>) => void;
+  onDragMove: (updates: Partial<CanvasNode>) => void;
   onGestureStart: () => void;
   onDragEnd: (updates: Partial<CanvasNode>) => void;
   isWiring: boolean;
@@ -336,6 +337,7 @@ const ComponentNode = ({
   isDark,
   onSelect,
   onChange,
+  onDragMove,
   onGestureStart,
   onDragEnd,
   isWiring,
@@ -688,7 +690,8 @@ const ComponentNode = ({
           e.cancelBubble = true;
           onSelect();
         }}
-        onDragStart={() => {
+        onDragStart={(e) => {
+          if (e.target !== e.currentTarget || readOnly) return;
           onGestureStart();
           // Cache snap anchors ONCE at the start of the drag gesture
           const state = useCanvasStore.getState();
@@ -704,6 +707,7 @@ const ComponentNode = ({
             ]);
         }}
         onDragMove={(e: KonvaEventObject<DragEvent>) => {
+          if (e.target !== e.currentTarget || readOnly) return;
           // Use cached anchors — zero allocation per frame
           const anchors = snapAnchorsRef.current;
           const snapped = snapToRoutingGuides(
@@ -720,12 +724,11 @@ const ComponentNode = ({
             : Math.round(snapped.y / MAT_GRID_MINOR) * MAT_GRID_MINOR;
           e.target.x(sx);
           e.target.y(sy);
-          if (sx !== node.x || sy !== node.y) {
-            onChange({ x: sx, y: sy });
-          }
+          onDragMove({ x: sx, y: sy });
         }}
         onDragEnd={(e: KonvaEventObject<DragEvent>) => {
-          // Full global wire reroute runs exactly ONCE per drag gesture
+          if (e.target !== e.currentTarget || readOnly) return;
+          // Commit the latest position before scheduling final worker routing.
           onDragEnd({ x: e.target.x(), y: e.target.y() });
           snapAnchorsRef.current = [];
         }}

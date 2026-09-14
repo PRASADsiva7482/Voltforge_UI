@@ -1,31 +1,33 @@
 import { Activity, Braces, Cable, Cpu, Gauge, PackageCheck, Play, Zap } from 'lucide-react'
 import { Badge, Button } from '../ui'
 import { useAuth } from '../../auth/useAuth'
+import { useNavigate } from 'react-router-dom'
 
 const pins = ['D2', 'D8', '5V', 'GND']
 
 export function HeroCircuitScene() {
   const auth = useAuth()
+  const navigate = useNavigate()
 
   return (
     <section className="landing-hero" aria-labelledby="landing-title">
       <div className="landing-hero__copy">
         <Badge dot tone="success">
-          Fresh UI2 rebuild
+          Your electronics workspace
         </Badge>
         <h1 id="landing-title">Build, simulate, ship circuits.</h1>
         <p>Interactive wiring, firmware development, BOM lists, and transient simulation in one flow.</p>
         <div className="landing-hero__actions">
           {auth.isAuthenticated ? (
-            <Button onClick={() => window.location.assign('/dashboard')} size="lg" variant="primary">
+            <Button onClick={() => navigate('/dashboard')} size="lg" variant="primary">
               Open dashboard
             </Button>
           ) : (
             <>
-              <Button onClick={auth.signup} size="lg" variant="primary">
+            <Button onClick={auth.signup} disabled={auth.isRedirecting} size="lg" variant="primary">
                 Start free
               </Button>
-              <Button onClick={auth.login} size="lg">
+            <Button onClick={auth.login} disabled={auth.isRedirecting} size="lg">
                 Login
               </Button>
             </>
@@ -44,7 +46,7 @@ export function HeroCircuitScene() {
           <span />
           <span />
           <span />
-          <Badge tone="info">Live simulation</Badge>
+          <Badge tone="info">Workspace preview</Badge>
         </div>
         <div className="hero-scene__board">
           <svg viewBox="0 0 720 420" role="presentation" preserveAspectRatio="none">
@@ -80,7 +82,7 @@ export function HeroCircuitScene() {
           </div>
           <div className="hero-code-card">
             <Braces size={15} />
-            <span>humidity &gt; 60</span>
+            <span>lightLevel &lt; 300</span>
           </div>
           <div className="hero-scope">
             <Activity size={15} />
@@ -92,11 +94,11 @@ export function HeroCircuitScene() {
         <div className="hero-scene__footer">
           <span>
             <Cable size={15} />
-            Auto-routed signal path
+            Connect components
           </span>
           <span>
             <Play size={15} />
-            Compile ready
+            Test your circuit
           </span>
         </div>
       </div>

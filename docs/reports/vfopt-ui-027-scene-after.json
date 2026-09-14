@@ -1,0 +1,683 @@
+{
+  "task": "VFOPT-UI-027",
+  "phase": "after",
+  "mode": "development StrictMode",
+  "capturedAt": "2026-09-14T00:36:52.868Z",
+  "status": "failed",
+  "fixtureSha256": "d901c3e5a6b9c194741e73317ac6813b3f1fae1ab669fb564abddaeb85afb1c3",
+  "browser": "153.0.8010.36",
+  "samples": [
+    {
+      "name": "512-pad actual mouse release",
+      "cold": [
+        {
+          "ms": 52.30000000074506,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.399999998509884,
+            0.7999999970197678,
+            5
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 5.600000001490116
+            },
+            {
+              "layer": 1,
+              "ms": 2.300000000745058
+            }
+          ]
+        },
+        {
+          "ms": 38.100000001490116,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.799999997019768,
+            0.8999999985098839,
+            3.800000000745058
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 5.300000000745058
+            },
+            {
+              "layer": 1,
+              "ms": 1.8999999985098839
+            }
+          ]
+        },
+        {
+          "ms": 38.100000001490116,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.300000000745058,
+            0.8000000007450581,
+            3.800000000745058
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 5.600000001490116
+            },
+            {
+              "layer": 1,
+              "ms": 1.9000000022351742
+            }
+          ]
+        },
+        {
+          "ms": 36.69999999925494,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            4.800000000745058,
+            0.8000000007450581,
+            3.599999997764826
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 5.5
+            },
+            {
+              "layer": 1,
+              "ms": 2
+            }
+          ]
+        },
+        {
+          "ms": 34.599999997764826,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.50000000372529,
+            0.6999999992549419,
+            4
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 4.599999997764826
+            },
+            {
+              "layer": 1,
+              "ms": 1.5
+            }
+          ]
+        }
+      ],
+      "warm": [
+        {
+          "ms": 35.899999998509884,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.199999999254942,
+            0.8000000007450581,
+            3.599999997764826
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 5
+            },
+            {
+              "layer": 1,
+              "ms": 1.699999999254942
+            }
+          ]
+        },
+        {
+          "ms": 36.899999998509884,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            7.99999999627471,
+            0.7000000029802322,
+            3.199999999254942
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 4.899999998509884
+            },
+            {
+              "layer": 1,
+              "ms": 1.699999999254942
+            }
+          ]
+        },
+        {
+          "ms": 36.19999999925494,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.300000000745058,
+            0.8000000007450581,
+            3.699999999254942
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 5.199999999254942
+            },
+            {
+              "layer": 1,
+              "ms": 1.699999999254942
+            }
+          ]
+        },
+        {
+          "ms": 34.19999999925494,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.399999998509884,
+            0.8000000007450581,
+            3.399999998509884
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 5.399999998509884
+            },
+            {
+              "layer": 1,
+              "ms": 1.699999999254942
+            }
+          ]
+        },
+        {
+          "ms": 36.900000002235174,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.200000002980232,
+            0.8000000007450581,
+            3.699999999254942
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 5.100000001490116
+            },
+            {
+              "layer": 1,
+              "ms": 1.800000000745058
+            }
+          ]
+        },
+        {
+          "ms": 44.099999997764826,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            6,
+            1.5,
+            3.699999999254942
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 7.299999997019768
+            },
+            {
+              "layer": 1,
+              "ms": 1.699999999254942
+            }
+          ]
+        },
+        {
+          "ms": 36,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.599999997764826,
+            0.6999999992549419,
+            3.7000000029802322
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 4.800000000745058
+            },
+            {
+              "layer": 1,
+              "ms": 1.7999999970197678
+            }
+          ]
+        },
+        {
+          "ms": 35.19999999925494,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.600000001490116,
+            0.7999999970197678,
+            3.5
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 5
+            },
+            {
+              "layer": 1,
+              "ms": 1.6000000014901161
+            }
+          ]
+        },
+        {
+          "ms": 37.600000001490116,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.699999999254942,
+            0.6999999992549419,
+            4
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 5
+            },
+            {
+              "layer": 1,
+              "ms": 1.9000000022351742
+            }
+          ]
+        },
+        {
+          "ms": 35.20000000298023,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.599999997764826,
+            0.8000000007450581,
+            3.399999998509884
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 5
+            },
+            {
+              "layer": 1,
+              "ms": 1.7000000029802322
+            }
+          ]
+        },
+        {
+          "ms": 36.600000001490116,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            4.099999997764826,
+            0.9000000022351742,
+            3.300000000745058
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 8.199999999254942
+            },
+            {
+              "layer": 1,
+              "ms": 1.7000000029802322
+            }
+          ]
+        },
+        {
+          "ms": 33.69999999925494,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.800000000745058,
+            0.6999999992549419,
+            3.300000000745058
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 4.5
+            },
+            {
+              "layer": 1,
+              "ms": 1.5999999977648258
+            }
+          ]
+        },
+        {
+          "ms": 37.30000000074506,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.199999999254942,
+            0.8000000007450581,
+            4
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 4.800000000745058
+            },
+            {
+              "layer": 1,
+              "ms": 1.699999999254942
+            }
+          ]
+        },
+        {
+          "ms": 35.70000000298023,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.700000002980232,
+            0.9000000022351742,
+            3.5
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 5
+            },
+            {
+              "layer": 1,
+              "ms": 1.6000000014901161
+            }
+          ]
+        },
+        {
+          "ms": 37.399999998509884,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.599999997764826,
+            0.8000000007450581,
+            4.600000001490116
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 4.899999998509884
+            },
+            {
+              "layer": 1,
+              "ms": 1.699999999254942
+            }
+          ]
+        },
+        {
+          "ms": 35.5,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.00000000372529,
+            0.8999999985098839,
+            3.900000002235174
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 4.899999998509884
+            },
+            {
+              "layer": 1,
+              "ms": 1.6000000014901161
+            }
+          ]
+        },
+        {
+          "ms": 37,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.300000000745058,
+            0.8000000007450581,
+            3.899999998509884
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 5.099999997764826
+            },
+            {
+              "layer": 1,
+              "ms": 1.800000000745058
+            }
+          ]
+        },
+        {
+          "ms": 36,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.5,
+            0.8000000007450581,
+            4
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 5
+            },
+            {
+              "layer": 1,
+              "ms": 1.5999999977648258
+            }
+          ]
+        },
+        {
+          "ms": 36.30000000074506,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.400000002235174,
+            0.8000000007450581,
+            3.300000000745058
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 4.899999998509884
+            },
+            {
+              "layer": 1,
+              "ms": 1.800000000745058
+            }
+          ]
+        },
+        {
+          "ms": 35.30000000074506,
+          "renderedFootprints": 1,
+          "renderCalls": 1,
+          "commitMs": [
+            5.199999999254942,
+            0.7999999970197678,
+            3.600000001490116
+          ],
+          "draws": [
+            {
+              "layer": 3,
+              "ms": 4.900000002235174
+            },
+            {
+              "layer": 1,
+              "ms": 2
+            }
+          ]
+        }
+      ],
+      "coldDrawMs": {
+        "count": 5,
+        "median": 38.100000001490116,
+        "p95": 52.30000000074506,
+        "max": 52.30000000074506,
+        "values": [
+          52.30000000074506,
+          38.100000001490116,
+          38.100000001490116,
+          36.69999999925494,
+          34.599999997764826
+        ]
+      },
+      "warmDrawMs": {
+        "count": 20,
+        "median": 36.19999999925494,
+        "p95": 37.600000001490116,
+        "max": 44.099999997764826,
+        "values": [
+          35.899999998509884,
+          36.899999998509884,
+          36.19999999925494,
+          34.19999999925494,
+          36.900000002235174,
+          44.099999997764826,
+          36,
+          35.19999999925494,
+          37.600000001490116,
+          35.20000000298023,
+          36.600000001490116,
+          33.69999999925494,
+          37.30000000074506,
+          35.70000000298023,
+          37.399999998509884,
+          35.5,
+          37,
+          36,
+          36.30000000074506,
+          35.30000000074506
+        ]
+      }
+    },
+    {
+      "name": "1024-footprint mixed board",
+      "totalKonvaObjects": 3845,
+      "footprints": 256,
+      "ratlines": 254,
+      "copperObjects": 513,
+      "storedFootprints": 1024,
+      "storedTraces": 1025,
+      "storedVias": 1024
+    },
+    {
+      "name": "wheel update through two animation frames",
+      "ms": {
+        "count": 30,
+        "median": 95.89999999850988,
+        "p95": 99.5,
+        "max": 100.80000000074506,
+        "values": [
+          59.599999997764826,
+          98.59999999776483,
+          97.89999999850988,
+          82.20000000298023,
+          98.60000000149012,
+          98.69999999925494,
+          98.10000000149012,
+          98.60000000149012,
+          97.80000000074506,
+          81.39999999850988,
+          80.80000000074506,
+          82.19999999925494,
+          81.60000000149012,
+          82.40000000223517,
+          100.80000000074506,
+          95.89999999850988,
+          97.09999999776483,
+          98.10000000149012,
+          81.59999999776483,
+          98.80000000074506,
+          81.09999999776483,
+          81.89999999850988,
+          81.60000000149012,
+          86.19999999925494,
+          77.09999999776483,
+          98.5,
+          81.70000000298023,
+          81.40000000223517,
+          99.5,
+          97.5
+        ]
+      }
+    },
+    {
+      "name": "panned mixed board",
+      "totalKonvaObjects": 3844,
+      "footprints": 256,
+      "ratlines": 254,
+      "copperObjects": 512,
+      "storedFootprints": 1024,
+      "storedTraces": 1025,
+      "storedVias": 1024
+    },
+    {
+      "name": "mounted PCB raster buffers",
+      "bytes": 16223680,
+      "cached": 512,
+      "all": 1024
+    }
+  ],
+  "checks": [
+    {
+      "name": "One footprint release retains unchanged render groups and stays below 50 ms p95",
+      "passed": false,
+      "error": "AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:\n\n  assert(samples[0].coldDrawMs.p95 <= 50)\n\n    at file:///D:/Project/voltforge/Voltforge_UI/scripts/run-pcb-scene-browser-tests.mjs:99:100\n    at check (file:///D:/Project/voltforge/Voltforge_UI/scripts/run-pcb-scene-browser-tests.mjs:39:49)\n    at file:///D:/Project/voltforge/Voltforge_UI/scripts/run-pcb-scene-browser-tests.mjs:98:11"
+    },
+    {
+      "name": "Mounted scene scales with visible area while the full saved layout remains intact",
+      "passed": true
+    },
+    {
+      "name": "Native Stage pan reveals new objects before release and writes the saved viewport only once",
+      "passed": true
+    },
+    {
+      "name": "Selection and a trace crossing the entire viewport survive culling; hidden copper remains hidden",
+      "passed": true
+    },
+    {
+      "name": "Cached pad hit targets route between visible endpoints with the starting footprint offscreen",
+      "passed": true
+    },
+    {
+      "name": "Copper and silkscreen visibility are independent, including cached pad hit testing",
+      "passed": true
+    },
+    {
+      "name": "Distant zoom reduces labels while keeping pads and the complete physical layout",
+      "passed": true
+    },
+    {
+      "name": "Via dragging commits snapped coordinates without changing the viewport",
+      "passed": true
+    },
+    {
+      "name": "Read-only mode prevents pad routing and late footprint/via drag writes",
+      "passed": true
+    },
+    {
+      "name": "An active footprint or via stays mounted when a viewport change crosses its stored bounds",
+      "passed": true
+    },
+    {
+      "name": "Rotated cached pads use physical world coordinates, and renaming/selection refresh cached content",
+      "passed": true
+    },
+    {
+      "name": "Cache buffers stay bounded and release on scene detach; reload retains all offscreen manufacturing geometry",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "conditions": [
+    "Actual PCB scene; installed headless Chrome at 1366x800; external HTTP blocked.",
+    "Five load-separated and twenty warm actual mouse releases. Latency starts before Konva capture-phase mouseup and ends at ratline-layer draw; physical display scanout is not measured.",
+    "Mixed board contains 1024 footprints, 1025 traces and 1024 vias. React render-call counters are test-only. Wheel windows include automation/two-frame pacing and are not input-to-paint."
+  ]
+}

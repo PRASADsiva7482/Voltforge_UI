@@ -1,0 +1,105 @@
+{
+  "task": "VFOPT-UI-012",
+  "phase": "before",
+  "capturedAt": "2026-09-12T14:50:19.237Z",
+  "status": "passed",
+  "fixtureSha256": "bea934378858e7f436c7add8aafa7ca14a0df9209abde142290ad3ed931b6277",
+  "browser": "153.0.8010.36",
+  "node": "v20.19.6",
+  "measurements": {
+    "initial": {
+      "rows": 1000,
+      "categories": 11,
+      "sorts": 2,
+      "studioRequested": true
+    },
+    "runtime": {
+      "updates": 60,
+      "commits": {},
+      "sorts": 0
+    },
+    "drag": {
+      "updates": 60,
+      "commits": {},
+      "sorts": 0
+    },
+    "selection": {
+      "updates": 60,
+      "commits": {},
+      "sorts": 0
+    },
+    "viewport": {
+      "updates": 60,
+      "commits": {},
+      "sorts": 0
+    },
+    "search": {
+      "keystrokes": 20,
+      "eventToSecondFrameMs": [
+        409,
+        198.5,
+        182.59999999403954,
+        160.20000000298023,
+        348.29999999701977,
+        159.8999999910593,
+        170.80000001192093,
+        158.5,
+        415.29999999701977,
+        162.5,
+        159.40000000596046,
+        161.90000000596046,
+        363.59999999403954,
+        157.40000000596046,
+        157.79999999701977,
+        159.70000000298023,
+        361.70000000298023,
+        157.40000000596046,
+        158.6000000089407,
+        46.400000005960464
+      ],
+      "p95Ms": 409,
+      "sorts": 40,
+      "rows": 100
+    }
+  },
+  "checks": [
+    {
+      "name": "Record mounted rows for the 1000-component baseline",
+      "passed": true
+    },
+    {
+      "name": "runtime updates cause no palette commits or sorting",
+      "passed": true
+    },
+    {
+      "name": "drag updates cause no palette commits or sorting",
+      "passed": true
+    },
+    {
+      "name": "selection updates cause no palette commits or sorting",
+      "passed": true
+    },
+    {
+      "name": "viewport updates cause no palette commits or sorting",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "sourceEvidence": [
+    {
+      "file": "src/features/editor/ComponentPanel.tsx",
+      "sha256": "14edef3529f0a02ee780169a4f6064007acb38b1d89fd0cf0a7ea28b346ad438"
+    },
+    {
+      "file": "src/styles/editor.css",
+      "sha256": "2c705d883a2983e34f25ea152c61d345a4d785ad9820cd098c7e100c03e30854"
+    }
+  ],
+  "conditions": {
+    "catalogueSize": 1000,
+    "mode": "Vite development with StrictMode; actual ComponentPanel, canvas store and custom studio; isolated query cache and blocked external requests",
+    "timing": "Actual input event to second animation frame is a scheduling proxy, not pixel paint or total CPU attribution",
+    "powerMode": "not recorded",
+    "backgroundActivity": "not controlled"
+  }
+}

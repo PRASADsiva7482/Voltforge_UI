@@ -1,0 +1,102 @@
+{
+  "task": "VFOPT-UI-011",
+  "phase": "after",
+  "capturedAt": "2026-09-13T08:28:44.982Z",
+  "browser": "153.0.8010.36",
+  "node": "v20.19.6",
+  "fixtureSha256": "30295f7236b6d5acaba83c33355f4d79fdf2542e71cfd337db944c94dd8aaa09",
+  "fixture": "25 LED nodes; real editor/Monaco/engine running interpreter loop, plus 20 Hz injected runtime feedback and irrelevant PCB selection. Isolated API and STOMP fixtures; no live writes.",
+  "windows": [
+    {
+      "elapsedMs": 60025.5,
+      "runtimeUpdates": 1200,
+      "serializations": {},
+      "canvasSends": 0,
+      "dirtyTransitions": 0,
+      "dirty": false,
+      "modelRevisionDelta": 0,
+      "documentRevisionDelta": 0,
+      "simulationTime": 75.43500000000388,
+      "saveRequests": 0
+    },
+    {
+      "name": "Mounted PCB",
+      "runtimeUpdates": 100,
+      "serializations": {},
+      "dirty": false,
+      "revisionDelta": 0
+    }
+  ],
+  "checks": [
+    {
+      "name": "Starting simulation does not dirty a clean document",
+      "passed": true
+    },
+    {
+      "name": "60-second running editor has zero runtime dirty/save/broadcast/serialization work",
+      "passed": true
+    },
+    {
+      "name": "Stopping simulation keeps the document clean",
+      "passed": true
+    },
+    {
+      "name": "Mounted PCB ignores runtime feedback without document serialization or dirty work",
+      "passed": true
+    },
+    {
+      "name": "Real edits become dirty synchronously and save authored code, canvas and PCB",
+      "passed": true
+    },
+    {
+      "name": "Saved real edits survive browser reload",
+      "passed": true
+    },
+    {
+      "name": "A delayed save cannot acknowledge or reload a newer edit",
+      "passed": true
+    },
+    {
+      "name": "A stale background GET cannot replace a newly saved document",
+      "passed": true
+    },
+    {
+      "name": "Failed saves retain dirty edits and permit retry",
+      "passed": true
+    },
+    {
+      "name": "Clean remote application creates no dirty event, save or echo",
+      "passed": true
+    },
+    {
+      "name": "Local edit immediately after remote application is dirty and publishes once",
+      "passed": true
+    },
+    {
+      "name": "Incoming remote data cannot overwrite pending local edits",
+      "passed": true
+    },
+    {
+      "name": "Autosave saves the latest real edit after ten seconds",
+      "passed": true
+    },
+    {
+      "name": "Permission revocation blocks queued collaboration and save shortcuts",
+      "passed": true
+    },
+    {
+      "name": "Background permission changes preserve edits and the save conflict baseline",
+      "passed": true
+    },
+    {
+      "name": "Navigating away cancels autosave and document listeners",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "status": "passed",
+  "limitations": [
+    "Does not establish compiled firmware fidelity, remote-host performance or real-account collaboration.",
+    "Serialization counters instrument document-shaped JSON.stringify calls only in this browser fixture."
+  ]
+}

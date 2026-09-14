@@ -1,0 +1,66 @@
+{
+  "task": "VFOPT-UI-025",
+  "phase": "before",
+  "capturedAt": "2026-09-13T08:14:16.809Z",
+  "status": "passed",
+  "fixtureSha256": "5924c5dcf50ffb88b4d6916f63522719f3958e902d48ed394bb801b95345626b",
+  "browser": "153.0.8010.36",
+  "samples": [
+    {
+      "name": "60 runtime updates",
+      "generated": 0,
+      "ratlineComputations": 0,
+      "footprintComparisons": 0,
+      "netIndexBuilds": 0,
+      "elapsedMs": 1124.6000000005588,
+      "footprintCount": 100,
+      "preserved": 100
+    },
+    {
+      "name": "60 schematic geometry updates",
+      "generated": 6000,
+      "ratlineComputations": 60,
+      "footprintComparisons": 120,
+      "netIndexBuilds": 0,
+      "elapsedMs": 17674.300000000745,
+      "footprintCount": 100,
+      "preserved": 100
+    },
+    {
+      "name": "Add one disconnected part",
+      "generated": 202,
+      "ratlineComputations": 2,
+      "footprintComparisons": 4,
+      "netIndexBuilds": 0,
+      "elapsedMs": 379.80000000074506,
+      "footprintCount": 101,
+      "preserved": 0
+    },
+    {
+      "name": "Change one footprint package",
+      "generated": 202,
+      "ratlineComputations": 2,
+      "footprintComparisons": 4,
+      "netIndexBuilds": 0,
+      "elapsedMs": 479,
+      "footprintCount": 101,
+      "preserved": 0
+    },
+    {
+      "name": "Move one PCB footprint",
+      "generated": 101,
+      "ratlineComputations": 1,
+      "footprintComparisons": 2,
+      "netIndexBuilds": 0,
+      "elapsedMs": 331.09999999962747,
+      "footprintCount": 101,
+      "preserved": 100
+    }
+  ],
+  "checks": [],
+  "errors": [],
+  "limitations": [
+    "100-component isolated PCB scene; HTTP is blocked. Counters instrument actual footprint generation, footprint-array stringify and ratline entrypoints.",
+    "Elapsed windows include browser scheduling/rendering and automation; no whole-laptop CPU or hardware pointer-to-paint claim."
+  ]
+}

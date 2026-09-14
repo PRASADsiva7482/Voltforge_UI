@@ -37,7 +37,7 @@ function getStreamBaseURL(): string {
 
 export const authApi = {
   getCurrentUser: () => api.get<ApiResponse<User>>('/auth/me'),
-  syncUser: () => api.post<ApiResponse<User>>('/auth/sync'),
+  syncUser: (signal?: AbortSignal) => api.post<ApiResponse<User>>('/auth/sync', undefined, { signal }),
 }
 
 export const userApi = {

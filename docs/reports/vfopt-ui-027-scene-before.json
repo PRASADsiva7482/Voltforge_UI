@@ -1,0 +1,376 @@
+{
+  "task": "VFOPT-UI-027",
+  "phase": "before",
+  "capturedAt": "2026-09-13T14:00:54.789Z",
+  "status": "passed",
+  "fixtureSha256": "d901c3e5a6b9c194741e73317ac6813b3f1fae1ab669fb564abddaeb85afb1c3",
+  "browser": "153.0.8010.36",
+  "samples": [
+    {
+      "name": "512-pad actual mouse release",
+      "cold": [
+        {
+          "ms": 996.3999999994412,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            114.79999999981374,
+            1.2999999998137355,
+            90.29999999981374
+          ]
+        },
+        {
+          "ms": 1023.4000000003725,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            118.6000000005588,
+            1.5,
+            71.20000000018626
+          ]
+        },
+        {
+          "ms": 962.1000000005588,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            143.40000000037253,
+            1,
+            64.70000000018626
+          ]
+        },
+        {
+          "ms": 889.0999999996275,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            123.59999999962747,
+            1,
+            62.49999999906868
+          ]
+        },
+        {
+          "ms": 843.2999999998137,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            112,
+            0.900000000372529,
+            51
+          ]
+        }
+      ],
+      "warm": [
+        {
+          "ms": 878.7000000001863,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            122.40000000037253,
+            1.599999999627471,
+            75.40000000037253
+          ]
+        },
+        {
+          "ms": 843.9000000003725,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            128.8999999994412,
+            1.2999999998137355,
+            57.5
+          ]
+        },
+        {
+          "ms": 770.2999999998137,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            91.79999999981374,
+            1.2999999998137355,
+            59.30000000074506
+          ]
+        },
+        {
+          "ms": 802.8999999994412,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            13,
+            1.400000000372529,
+            115.20000000018626
+          ]
+        },
+        {
+          "ms": 1032.4000000003725,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            120.5,
+            0.09999999962747097,
+            5.6000000005587935
+          ]
+        },
+        {
+          "ms": 1051.2000000001863,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            108.19999999925494,
+            0.09999999962747097,
+            12
+          ]
+        },
+        {
+          "ms": 1082.9000000003725,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            131.80000000074506,
+            0.19999999925494194,
+            10.5
+          ]
+        },
+        {
+          "ms": 1076.5999999996275,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            115.20000000018626,
+            0.09999999962747097,
+            9.5
+          ]
+        },
+        {
+          "ms": 1116.5,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            114.99999999906868,
+            0.19999999925494194,
+            9.599999999627471
+          ]
+        },
+        {
+          "ms": 917.7999999998137,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            102.1000000005588,
+            0.10000000055879354,
+            7.1000000005587935
+          ]
+        },
+        {
+          "ms": 1004.2999999998137,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            109.29999999888241,
+            0.2999999998137355,
+            10.200000000186265
+          ]
+        },
+        {
+          "ms": 1117.3999999994412,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            108.6000000005588,
+            0.20000000018626451,
+            7.1000000005587935
+          ]
+        },
+        {
+          "ms": 965.5,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            108.6000000005588,
+            0.20000000018626451,
+            8.899999999441206
+          ]
+        },
+        {
+          "ms": 1090.3999999994412,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            114.70000000018626,
+            0.09999999962747097,
+            9.799999999813735
+          ]
+        },
+        {
+          "ms": 1001.6999999992549,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            103.70000000018626,
+            0.20000000018626451,
+            7.1000000005587935
+          ]
+        },
+        {
+          "ms": 987.3999999994412,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            119.90000000037253,
+            0.2999999998137355,
+            7
+          ]
+        },
+        {
+          "ms": 1057.4000000003725,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            108.29999999981374,
+            0.20000000018626451,
+            7.2000000001862645
+          ]
+        },
+        {
+          "ms": 1243.5,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            131.40000000037253,
+            0.20000000018626451,
+            8.5
+          ]
+        },
+        {
+          "ms": 1136.2000000001863,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            133.20000000018626,
+            0.20000000018626451,
+            11.199999999254942
+          ]
+        },
+        {
+          "ms": 1100.5,
+          "renderedFootprints": 512,
+          "renderCalls": 1024,
+          "commitMs": [
+            107.59999999962747,
+            0.20000000018626451,
+            9.300000000745058
+          ]
+        }
+      ],
+      "coldDrawMs": {
+        "count": 5,
+        "median": 962.1000000005588,
+        "p95": 1023.4000000003725,
+        "max": 1023.4000000003725,
+        "values": [
+          996.3999999994412,
+          1023.4000000003725,
+          962.1000000005588,
+          889.0999999996275,
+          843.2999999998137
+        ]
+      },
+      "warmDrawMs": {
+        "count": 20,
+        "median": 1051.2000000001863,
+        "p95": 1136.2000000001863,
+        "max": 1243.5,
+        "values": [
+          878.7000000001863,
+          843.9000000003725,
+          770.2999999998137,
+          802.8999999994412,
+          1032.4000000003725,
+          1051.2000000001863,
+          1082.9000000003725,
+          1076.5999999996275,
+          1116.5,
+          917.7999999998137,
+          1004.2999999998137,
+          1117.3999999994412,
+          965.5,
+          1090.3999999994412,
+          1001.6999999992549,
+          987.3999999994412,
+          1057.4000000003725,
+          1243.5,
+          1136.2000000001863,
+          1100.5
+        ]
+      }
+    },
+    {
+      "name": "1024-footprint mixed board",
+      "totalKonvaObjects": 16383,
+      "footprints": 1024,
+      "ratlines": 1016,
+      "copperObjects": 2049,
+      "storedFootprints": 1024,
+      "storedTraces": 1025,
+      "storedVias": 1024
+    },
+    {
+      "name": "wheel update through two animation frames",
+      "ms": {
+        "count": 30,
+        "median": 1410.5999999996275,
+        "p95": 1587.7999999998137,
+        "max": 1651.5,
+        "values": [
+          1498.4000000003725,
+          1417.4000000003725,
+          1330,
+          1268.5999999996275,
+          1476.3999999994412,
+          1212.1000000005588,
+          1248.5,
+          1275.1000000005588,
+          1440.9000000003725,
+          1385.2000000001863,
+          1515.3999999994412,
+          1521.5,
+          1529.2999999998137,
+          1507.7999999998137,
+          1457.1000000005588,
+          1651.5,
+          1393,
+          1220.5999999996275,
+          1134.800000000745,
+          1410.5999999996275,
+          1347.5999999996275,
+          1587.7999999998137,
+          1458.8999999994412,
+          1414.7000000001863,
+          1317.7000000001863,
+          1343.5,
+          1410.0999999996275,
+          1330,
+          1528,
+          1396.7000000001863
+        ]
+      }
+    },
+    {
+      "name": "panned mixed board",
+      "totalKonvaObjects": 16383,
+      "footprints": 1024,
+      "ratlines": 1016,
+      "copperObjects": 2049,
+      "storedFootprints": 1024,
+      "storedTraces": 1025,
+      "storedVias": 1024
+    }
+  ],
+  "checks": [],
+  "errors": [],
+  "conditions": [
+    "Actual StrictMode PCB scene; installed headless Chrome at 1366x800; external HTTP blocked.",
+    "Five load-separated and twenty warm actual mouse releases. Latency starts before Konva capture-phase mouseup and ends at ratline-layer draw; physical display scanout is not measured.",
+    "Mixed board contains 1024 footprints, 1025 traces and 1024 vias. React render-call counters are test-only. Wheel windows include automation/two-frame pacing and are not input-to-paint."
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "task": "VFOPT-UI-026",
+  "capturedAt": "2026-09-14T00:31:10.312Z",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "32/64/128/512-pad MSTs exactly match the original edges, ordering, net IDs and coordinates",
+      "passed": true
+    },
+    {
+      "name": "Equal-distance grids, overlapping pads, rotations and shuffled footprint orders retain insertion-order ties",
+      "passed": true
+    },
+    {
+      "name": "Deterministic random branching, disconnected, self-loop and duplicate-wire graphs match the legacy oracle",
+      "passed": true
+    },
+    {
+      "name": "Subpixel, negative and large coordinates preserve Math.hypot comparison and deterministic output",
+      "passed": true
+    },
+    {
+      "name": "Malformed nonfinite geometry uses deterministic compatibility fallback without hanging",
+      "passed": true
+    },
+    {
+      "name": "Trace suppression preserves strict 0.05 tolerance, either direction, endpoint-only semantics and legacy net labels",
+      "passed": true
+    },
+    {
+      "name": "Trace spatial buckets work across zero and negative boundaries with duplicate coincident routes",
+      "passed": true
+    },
+    {
+      "name": "Unchanged and metadata-only nets reuse output without distance evaluations",
+      "passed": true
+    },
+    {
+      "name": "One footprint movement rebuilds just its affected net and reuses other ratline objects",
+      "passed": true
+    },
+    {
+      "name": "A footprint spanning several nets invalidates each changed pad net while reusing unrelated nets",
+      "passed": true
+    },
+    {
+      "name": "Adding, editing, reordering and removing traces reuse MSTs and refresh only displayed suppression",
+      "passed": true
+    },
+    {
+      "name": "Connectivity merge, split, reorder, missing endpoints and deleted pads invalidate safely",
+      "passed": true
+    },
+    {
+      "name": "Cache keeps only current nets and footprints across repeated document replacement",
+      "passed": true
+    },
+    {
+      "name": "Schematic synchronization retains per-net cache while preserving authored placement and trace arrays",
+      "passed": true
+    },
+    {
+      "name": "An empty schematic releases its owned ratline caches before a same-ID replacement",
+      "passed": true
+    }
+  ],
+  "oracle": {
+    "file": "scripts/fixtures/legacyRatlineEngine.ts",
+    "sha256": "11b9c2af9ac06912db8e5a814d760b2aec8c79fa6cf10eeb78b54379725e69f4",
+    "provenance": "Preserved pre-VFOPT-UI-026 engine; only class name and type-import paths changed."
+  }
+}

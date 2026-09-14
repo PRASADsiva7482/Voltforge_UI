@@ -1,0 +1,424 @@
+{
+  "task": "VFOPT-UI-001",
+  "capturedAt": "2026-09-12T07:13:03.291Z",
+  "browser": "153.0.8010.36",
+  "fullSuite": true,
+  "expectedFullSuiteScenarios": 20,
+  "buildMode": "production-preview",
+  "viewport": {
+    "width": 1366,
+    "height": 768
+  },
+  "methodology": "Real Chromium and installed Keycloak adapter. Network/protocol responses are fixtures except the explicitly labeled configured-endpoint scenario. Synthetic tokens are test-only and never accepted by a real backend. No real account sign-in or live backend authorization claim.",
+  "passed": 20,
+  "failed": 0,
+  "results": [
+    {
+      "name": "Real configured identity: public homepage remains usable",
+      "passed": true,
+      "identity": "configured real endpoint",
+      "api": [],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 0,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [],
+      "signInRedirect": null,
+      "headingVisibleMs": 607,
+      "performance": {
+        "longTasks": [],
+        "lcpMs": 992
+      },
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      }
+    },
+    {
+      "name": "DNS failure: public content stays visible without redirect",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 0,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [],
+      "signInRedirect": null,
+      "headingVisibleMs": 578
+    },
+    {
+      "name": "HTTP 404: public content stays visible without redirect",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 0,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "signInRedirect": null,
+      "headingVisibleMs": 587
+    },
+    {
+      "name": "stalled discovery: public content stays visible without redirect",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 0,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [],
+      "signInRedirect": null,
+      "headingVisibleMs": 618
+    },
+    {
+      "name": "stalled silent check: public content stays visible without redirect",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 0,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [],
+      "signInRedirect": null,
+      "headingVisibleMs": 572
+    },
+    {
+      "name": "blocked third-party cookies: public content stays visible without redirect",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 0,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [],
+      "signInRedirect": null,
+      "headingVisibleMs": 585
+    },
+    {
+      "name": "Offline explicit login and signup retain retry controls",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [
+        {
+          "path": "/auth/identity-health",
+          "method": "GET",
+          "hasBearer": false
+        },
+        {
+          "path": "/auth/identity-health",
+          "method": "GET",
+          "hasBearer": false
+        }
+      ],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 0,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+        "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+      ],
+      "signInRedirect": null
+    },
+    {
+      "name": "Private route stays gated and can return home",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 0,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [],
+      "signInRedirect": null
+    },
+    {
+      "name": "Mismatched issuer: explicit sign-in stays bounded and retryable",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [
+        {
+          "path": "/auth/identity-health",
+          "method": "GET",
+          "hasBearer": false
+        }
+      ],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 0,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [],
+      "signInRedirect": null
+    },
+    {
+      "name": "Stalled availability probe: explicit sign-in stays bounded and retryable",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [
+        {
+          "path": "/auth/identity-health",
+          "method": "GET",
+          "hasBearer": false
+        }
+      ],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 0,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [],
+      "signInRedirect": null
+    },
+    {
+      "name": "Explicit login preserves deep link and processes real adapter callback",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [
+        {
+          "path": "/auth/identity-health",
+          "method": "GET",
+          "hasBearer": false
+        },
+        {
+          "path": "/auth/sync",
+          "method": "POST",
+          "hasBearer": true
+        },
+        {
+          "path": "/projects",
+          "method": "GET",
+          "hasBearer": true
+        }
+      ],
+      "topLevelExternalNavigations": 1,
+      "tokenExchanges": 1,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [],
+      "signInRedirect": "http://localhost:3101/projects?sort=recent"
+    },
+    {
+      "name": "Successful silent SSO keeps homepage visible",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [
+        {
+          "path": "/auth/sync",
+          "method": "POST",
+          "hasBearer": true
+        }
+      ],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 1,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [],
+      "signInRedirect": null
+    },
+    {
+      "name": "Public encoded share loads without identity or bearer token",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [
+        {
+          "path": "/components",
+          "method": "GET",
+          "hasBearer": false
+        },
+        {
+          "path": "/ai/component-coverage",
+          "method": "GET",
+          "hasBearer": false
+        },
+        {
+          "path": "/ai/component-coverage",
+          "method": "GET",
+          "hasBearer": false
+        }
+      ],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 0,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+        "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+      ],
+      "signInRedirect": null
+    },
+    {
+      "name": "Public database project loads anonymously; backend data is a fixture",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [
+        {
+          "path": "/projects/auth-audit-public",
+          "method": "GET",
+          "hasBearer": false
+        },
+        {
+          "path": "/components",
+          "method": "GET",
+          "hasBearer": false
+        },
+        {
+          "path": "/ai/component-coverage",
+          "method": "GET",
+          "hasBearer": false
+        },
+        {
+          "path": "/ai/component-coverage",
+          "method": "GET",
+          "hasBearer": false
+        }
+      ],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 0,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+        "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+      ],
+      "signInRedirect": null
+    },
+    {
+      "name": "Account sync failure does not open private content",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [
+        {
+          "path": "/auth/sync",
+          "method": "POST",
+          "hasBearer": true
+        }
+      ],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 1,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+      ],
+      "signInRedirect": null
+    },
+    {
+      "name": "Account sync timeout does not open private content",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [
+        {
+          "path": "/auth/sync",
+          "method": "POST",
+          "hasBearer": true
+        }
+      ],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 1,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [],
+      "signInRedirect": null
+    },
+    {
+      "name": "Late token response cannot authenticate after the discovery deadline",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 1,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [],
+      "signInRedirect": null
+    },
+    {
+      "name": "Public 401 and failed refresh do not force navigation",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [
+        {
+          "path": "/auth/sync",
+          "method": "POST",
+          "hasBearer": true
+        },
+        {
+          "path": "/projects/auth-audit-public",
+          "method": "GET",
+          "hasBearer": true
+        },
+        {
+          "path": "/projects/auth-audit-public",
+          "method": "GET",
+          "hasBearer": false
+        },
+        {
+          "path": "/components",
+          "method": "GET",
+          "hasBearer": false
+        },
+        {
+          "path": "/ai/component-coverage",
+          "method": "GET",
+          "hasBearer": false
+        },
+        {
+          "path": "/ai/component-coverage",
+          "method": "GET",
+          "hasBearer": false
+        }
+      ],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 1,
+      "refreshes": 1,
+      "errors": [],
+      "consoleErrors": [
+        "WebSocket connection to 'ws://localhost:2001/voltForge-app/ws-native' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+        "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+        "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+        "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+      ],
+      "signInRedirect": null
+    },
+    {
+      "name": "Periodic refresh failure keeps public content on screen",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [
+        {
+          "path": "/auth/sync",
+          "method": "POST",
+          "hasBearer": true
+        }
+      ],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 1,
+      "refreshes": 1,
+      "errors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+      ],
+      "signInRedirect": null
+    },
+    {
+      "name": "Unknown callback state cannot bypass authentication",
+      "passed": true,
+      "identity": "simulated protocol/network; real Keycloak adapter",
+      "api": [],
+      "topLevelExternalNavigations": 0,
+      "tokenExchanges": 0,
+      "refreshes": 0,
+      "errors": [],
+      "consoleErrors": [],
+      "signInRedirect": null
+    }
+  ]
+}

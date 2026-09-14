@@ -10,6 +10,7 @@ import SerialMonitor from '../editor/SerialMonitor';
 import { SimulationEngineLoadCancelledError, useDeferredSimulationEngine } from '../simulator/useDeferredSimulationEngine';
 import labCatalog from './labCatalog.json';
 import { LabCriteriaEvaluator, type EvaluationResult, type LabChallenge } from './labCriteriaEvaluator';
+import type { CanvasRouteCache } from '../../types/domain';
 
 export function LabChallengeRunner() {
   const { labId } = useParams<{ labId: string }>();
@@ -41,6 +42,7 @@ export function LabChallengeRunner() {
     nodes: typeof nodes;
     wires: typeof wires;
     viewport: { x: number; y: number; scale: number };
+    routeCache?: CanvasRouteCache;
   } | null>(null);
   const { getSimulationEngine, stopSimulationEngine } = useDeferredSimulationEngine({
     onError: (error) => writeSerial(`[ERROR] ${error}`),
@@ -55,14 +57,16 @@ export function LabChallengeRunner() {
   useEffect(() => {
     if (!challenge) return;
     previousCanvasRef.current = {
-      nodes: useCanvasStore.getState().nodes,
+      nodes: useCanvasStore.getState().documentNodes,
       wires: useCanvasStore.getState().wires,
       viewport: useCanvasStore.getState().viewport,
+      routeCache: useCanvasStore.getState().routeCache,
     };
     loadCanvas(challenge.initialCircuit.nodes || [], challenge.initialCircuit.wires || []);
     return () => {
       const previous = previousCanvasRef.current;
-      if (previous) loadCanvas(previous.nodes, previous.wires, previous.viewport);
+      if (previous) loadCanvas(previous.nodes, previous.wires, previous.viewport, previous.routeCache);
+      useCanvasStore.getState().cancelCanvasRouting();
     };
   }, [challenge, loadCanvas]);
 

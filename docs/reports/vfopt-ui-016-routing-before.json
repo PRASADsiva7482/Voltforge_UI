@@ -1,0 +1,89 @@
+{
+  "task": "VFOPT-UI-016",
+  "phase": "before",
+  "capturedAt": "2026-09-12T15:22:31.468Z",
+  "status": "passed",
+  "fixtureSha256": "19c87a451db0d4f7fa4e34ec05356a26ef5d39cc8a49276fd5f0173c732a4405",
+  "fixture": "100 hydrated resistor nodes and 99 auto wires on a 10x10 grid; actual canvas; no backend",
+  "browser": "153.0.8010.36",
+  "samples": [
+    {
+      "loadMs": 188.69999998807907,
+      "firstYieldMs": 453.5,
+      "start": 2026.3999999910593,
+      "nodeCount": 100,
+      "longTasks": [
+        {
+          "start": 2399.2999999970198,
+          "duration": 74
+        },
+        {
+          "start": 2669.5999999940395,
+          "duration": 86
+        }
+      ]
+    },
+    {
+      "loadMs": 159.09999999403954,
+      "firstYieldMs": 342.09999999403954,
+      "start": 3025,
+      "nodeCount": 100,
+      "longTasks": [
+        {
+          "start": 3304.8999999910593,
+          "duration": 56
+        },
+        {
+          "start": 3419.7999999970198,
+          "duration": 69
+        }
+      ]
+    },
+    {
+      "loadMs": 163.6000000089407,
+      "firstYieldMs": 329.79999999701977,
+      "start": 3757.8999999910593,
+      "nodeCount": 100,
+      "longTasks": [
+        {
+          "start": 4161.29999999702,
+          "duration": 81
+        }
+      ]
+    },
+    {
+      "loadMs": 217.29999999701977,
+      "firstYieldMs": 404.5,
+      "start": 4543.5999999940395,
+      "nodeCount": 100,
+      "longTasks": [
+        {
+          "start": 4888.5999999940395,
+          "duration": 52
+        },
+        {
+          "start": 5011.5999999940395,
+          "duration": 67
+        }
+      ]
+    },
+    {
+      "loadMs": 160.1000000089407,
+      "firstYieldMs": 323.90000000596046,
+      "start": 5357.899999991059,
+      "nodeCount": 100,
+      "longTasks": [
+        {
+          "start": 5739.5,
+          "duration": 60
+        }
+      ]
+    }
+  ],
+  "checks": [],
+  "errors": [],
+  "limitations": [
+    "loadMs measures synchronous hydration/caching/dispatch only; firstYieldMs and long tasks also include React/canvas work.",
+    "Browser fixture measurements do not establish total laptop CPU, all circuit sizes or live account correctness."
+  ]
+}

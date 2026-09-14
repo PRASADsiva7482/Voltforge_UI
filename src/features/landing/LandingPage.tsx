@@ -10,13 +10,13 @@ import {
   Play,
   ShieldCheck,
 } from 'lucide-react'
-import { CapabilityCard, HeroCircuitScene, LandingNav, WorkflowStrip } from '../../components/landing'
+import { CapabilityCard, HeroCircuitScene, LandingNav, MenuPreview, WorkflowStrip } from '../../components/landing'
 
 const capabilities = [
   { icon: CircuitBoard, label: 'Circuit Editor', text: 'Interactive canvas for placing boards, components, and custom wiring.' },
   { icon: Code2, label: 'Firmware Studio', text: 'Write, compile, and debug microcontroller sketch code directly in the app.' },
   { icon: Gauge, label: 'Signal Simulation', text: 'Run real-time electrical transient solvers and inspect GPIO waveforms.' },
-  { icon: PackageCheck, label: 'BOM Exports', text: 'Generate precise parts lists and export files for physical production.' },
+  { icon: PackageCheck, label: 'BOM Exports', text: 'Review your parts list and export your project for the next stage.' },
 ]
 
 const workflow = [
@@ -47,9 +47,18 @@ export function LandingPage() {
       <section className="landing-section landing-section--split" id="workflow">
         <div>
           <p className="vf-eyebrow">Workflow</p>
-          <h2>Go from schematic to production in four steps.</h2>
+          <h2>Design, code, test, and export.</h2>
         </div>
         <WorkflowStrip steps={workflow} />
+      </section>
+
+      <section className="landing-section workspace-preview" id="workspace">
+        <div className="landing-section__heading">
+          <p className="vf-eyebrow">Workspace</p>
+          <h2>Keep your circuits and ideas together.</h2>
+          <p>Create projects, explore community circuits, and practice with guided labs.</p>
+        </div>
+        <MenuPreview />
       </section>
 
       <footer className="landing-footer">

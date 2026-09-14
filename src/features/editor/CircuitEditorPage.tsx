@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useCallback, useState, useRef, type ReactNode } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useShallow } from 'zustand/react/shallow'
 import {
   ArrowLeft,
   Save,
@@ -53,6 +54,9 @@ import CircuitCanvas from '../canvas/CircuitCanvas'
 import ComponentPanel from './ComponentPanel'
 import PropertyEditor from './PropertyEditor'
 import SerialMonitor from './SerialMonitor'
+import EditorDocumentSync, { EditorAutosave, EditorDirtyIndicator } from './EditorDocumentSync'
+import { captureEditorDocument, hasEditsSince, isCurrentDocumentSession } from './editorDocumentSnapshots'
+import { EditorSimulationTime, EditorAvrWorkload } from './EditorSimulationStatus'
 
 import { ContextMenu } from '../../components/ui/ContextMenu'
 import { SplitPane } from '../../components/ui/SplitPane'
@@ -154,14 +158,6 @@ function bundleCodeFiles(activeFile: CodeFile | null, files: CodeFile[]): string
   return content
 }
 
-function serializeCanvas(nodes: unknown[], wires: unknown[]) {
-  return JSON.stringify({ nodes, wires })
-}
-
-function serializePcb(layout: unknown) {
-  return JSON.stringify(layout)
-}
-
 function encodeShareState(value: unknown) {
   const bytes = new TextEncoder().encode(JSON.stringify(value))
   let binary = ''
@@ -187,27 +183,35 @@ export default function CircuitEditorPage() {
 
   // Project state
   const setCurrentProject = useProjectStore((s) => s.setCurrentProject)
-  const currentProject = useProjectStore((s) => s.currentProject)
-  const isDirty = useProjectStore((s) => s.isDirty)
+  // Command handlers read complete documents at invocation. Only metadata used
+  // by the ribbon belongs in this subscription; code edits keep it unchanged.
+  const projectSummary = useProjectStore(useShallow((state) => {
+    const project = state.currentProject
+    return project ? {
+      id: project.id,
+      name: project.name,
+      ownerKeycloakId: project.owner?.keycloakId,
+      forkedFromId: project.forkedFromId,
+      forkedFromName: project.forkedFromName,
+      userForkId: project.userForkId,
+    } : null
+  }))
   const setDirty = useProjectStore((s) => s.setDirty)
   const isSaving = useProjectStore((s) => s.isSaving)
   const setSaving = useProjectStore((s) => s.setSaving)
-  const setProjectUpdatedAt = useProjectStore((s) => s.setProjectUpdatedAt)
-  const activeCodeFile = useProjectStore((s) => s.activeCodeFile)
+  const mergeProjectMetadata = useProjectStore((s) => s.mergeProjectMetadata)
+  const activeCodeFileId = useProjectStore((s) => s.activeCodeFile?.id)
   const updateCodeFileContent = useProjectStore((s) => s.updateCodeFileContent)
 
   // Canvas state
   const loadCanvas = useCanvasStore((s) => s.loadCanvas)
   const resetCanvas = useCanvasStore((s) => s.resetCanvas)
-  const nodes = useCanvasStore((s) => s.nodes)
-  const wires = useCanvasStore((s) => s.wires)
-  const viewport = useCanvasStore((s) => s.viewport)
+  const cancelCanvasRouting = useCanvasStore((s) => s.cancelCanvasRouting)
   const undo = useCanvasStore((s) => s.undo)
   const redo = useCanvasStore((s) => s.redo)
-  const clearCanvas = useCanvasStore((s) => s.clearCanvas || (() => loadCanvas([], [])))
+  const clearCanvas = useCanvasStore((s) => s.clearCanvas)
   const resetPcb = usePcbStore((s) => s.resetPcb)
   const loadPcb = usePcbStore((s) => s.loadPcb)
-  const pcbSnapshot = usePcbStore((s) => serializePcb(s.getLayout()))
 
   // Visual/Panel toggles
   const [viewMode, setViewMode] = useState<ViewMode>('split')
@@ -216,9 +220,7 @@ export default function CircuitEditorPage() {
   const [isSimulationPaused, setIsSimulationPaused] = useState(false)
   const canvasContainerRef = useRef<HTMLDivElement>(null)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
-  const canvasSnapshotRef = useRef<string | null>(null)
-  const pcbSnapshotRef = useRef<string | null>(null)
-  const skipCanvasDirtyRef = useRef(false)
+  const hydratedVersionRef = useRef<{ id: string; updatedAt: string } | null>(null)
   const sharedCanvasStateRef = useRef<string | null>(null)
   const sharedCodeStateRef = useRef<string | null>(null)
   const simulationRequestRef = useRef(0)
@@ -250,7 +252,8 @@ export default function CircuitEditorPage() {
     y: number
   }>({ isOpen: false, x: 0, y: 0 })
 
-  // Simulation store triggers (individual atomic selectors to prevent 60fps re-render thrashing)
+  // Stable actions and user-controlled mode flags; live samples are consumed by
+  // the status/diagnostics components rather than the entire editor shell.
   const writeSerial = useSimulationStore((s) => s.writeSerial)
   const clearSerial = useSimulationStore((s) => s.clearSerial)
   const setBaudRate = useSimulationStore((s) => s.setBaudRate)
@@ -259,11 +262,7 @@ export default function CircuitEditorPage() {
   const setSimulating = useSimulationStore((s) => s.setSimulating)
   const fidelityMode = useSimulationStore((s) => s.fidelityMode)
   const setFidelityMode = useSimulationStore((s) => s.setFidelityMode)
-  const simulationTime = useSimulationStore((s) => s.simulationTime)
-  const executionMode = useSimulationStore((s) => s.executionMode)
-  const avrWorkload = useSimulationStore((s) => s.avrWorkload)
   const solverDiagnosticsOpen = useSimulationStore((s) => s.solverDiagnosticsOpen)
-  const solverDiagnostics = useSimulationStore((s) => s.solverDiagnostics)
   const setSolverDiagnosticsOpen = useSimulationStore((s) => s.setSolverDiagnosticsOpen)
   const clearSolverDiagnostics = useSimulationStore((s) => s.clearSolverDiagnostics)
   const toggleMeterProbe = useSimulationStore((s) => s.toggleMeterProbe)
@@ -271,6 +270,7 @@ export default function CircuitEditorPage() {
   const setOscilloscopePanelOpen = useSimulationStore((s) => s.setOscilloscopePanelOpen)
   const { theme, toggleTheme } = useThemeStore()
   const updateNode = useCanvasStore((s) => s.updateNode)
+  const updateRuntimeNode = useCanvasStore((s) => s.updateRuntimeNode)
   const { engineRef, getSimulationEngine, stopSimulationEngine } = useDeferredSimulationEngine({
     onSerialOutput: (text, options) => writeSerial(text, options),
     onBaudRateChange: setBaudRate,
@@ -306,9 +306,9 @@ export default function CircuitEditorPage() {
   const isSharedView = !projectId
   const isOwner = isPreset || Boolean(
     projectId &&
-    currentProject &&
+    projectSummary?.id === projectId &&
     user &&
-    currentProject.owner?.keycloakId === user.keycloakId
+    projectSummary?.ownerKeycloakId === user.keycloakId
   )
 
   // Collaboration integration
@@ -330,12 +330,12 @@ export default function CircuitEditorPage() {
     resetCanvas()
     resetPcb()
     setCurrentProject(null)
-    canvasSnapshotRef.current = null
-    pcbSnapshotRef.current = null
+    hydratedVersionRef.current = null
     sharedCanvasStateRef.current = null
     sharedCodeStateRef.current = null
     setDirty(false)
-  }, [projectId, resetCanvas, resetPcb, setCurrentProject, setDirty])
+    return cancelCanvasRouting
+  }, [projectId, resetCanvas, resetPcb, setCurrentProject, setDirty, cancelCanvasRouting])
 
   // ── Load project ──
   const { data: fetchedProject, isLoading } = useQuery({
@@ -355,34 +355,39 @@ export default function CircuitEditorPage() {
         ? fetchedProject
         : null
     if (project) {
+      const store = useProjectStore.getState()
+      const current = store.currentProject
+      if (current?.id === project.id) {
+        // An older in-flight GET may finish after a newer save acknowledgement.
+        if (Date.parse(project.updatedAt) < Date.parse(current.updatedAt)) return
+        const alreadyHydrated = hydratedVersionRef.current?.id === project.id
+          && hydratedVersionRef.current.updatedAt === project.updatedAt
+        if (alreadyHydrated || store.isDirty) {
+          // Permissions/metadata stay observable, but an unreviewed remote
+          // document cannot advance the local optimistic-save baseline.
+          mergeProjectMetadata({ ...project, updatedAt: current.updatedAt })
+          return
+        }
+      }
+      hydratedVersionRef.current = { id: project.id, updatedAt: project.updatedAt }
       setCurrentProject(project as Project)
       const layout = project.canvasLayout
-      loadCanvas(layout?.nodes || [], layout?.wires || [], layout?.viewport)
+      loadCanvas(layout?.nodes || [], layout?.wires || [], layout?.viewport, layout?.routeCache)
       const storedPcb = (project.componentConfig as { pcbLayout?: unknown } | undefined)?.pcbLayout
       loadPcb(storedPcb && typeof storedPcb === 'object' ? storedPcb as any : undefined)
-      canvasSnapshotRef.current = serializeCanvas(
-        useCanvasStore.getState().nodes,
-        useCanvasStore.getState().wires,
-      )
-      pcbSnapshotRef.current = serializePcb(usePcbStore.getState().getLayout())
-      skipCanvasDirtyRef.current = true
       setDirty(false)
     }
-  }, [fetchedProject, projectId, isPreset, setCurrentProject, loadCanvas, loadPcb, setDirty])
+  }, [fetchedProject, projectId, isPreset, setCurrentProject, loadCanvas, loadPcb, setDirty, mergeProjectMetadata])
 
   // Parse share parameters if available
   useEffect(() => {
+    const activeCodeFile = useProjectStore.getState().activeCodeFile
     const stateParam = searchParams.get('state')
     if (stateParam && sharedCanvasStateRef.current !== stateParam) {
       try {
         const decoded = decodeShareState(stateParam)
         if (decoded.nodes && decoded.wires) {
-          loadCanvas(decoded.nodes, decoded.wires, decoded.viewport)
-          canvasSnapshotRef.current = serializeCanvas(
-            useCanvasStore.getState().nodes,
-            useCanvasStore.getState().wires,
-          )
-          skipCanvasDirtyRef.current = true
+          loadCanvas(decoded.nodes, decoded.wires, decoded.viewport, decoded.routeCache)
           sharedCanvasStateRef.current = stateParam
         }
         if (isSharedView) {
@@ -443,76 +448,29 @@ export default function CircuitEditorPage() {
         // The first branch reports malformed links to the user.
       }
     }
-  }, [searchParams, loadCanvas, loadPcb, activeCodeFile, updateCodeFileContent, addToast, isSharedView, setCurrentProject])
-
-  // Canvas and PCB mutations do not pass through the project store, so track
-  // both against the last loaded/saved snapshots for autosave and the dirty marker.
-  useEffect(() => {
-    if (skipCanvasDirtyRef.current) {
-      skipCanvasDirtyRef.current = false
-      return
-    }
-    const canvasChanged = canvasSnapshotRef.current !== null
-      && serializeCanvas(nodes, wires) !== canvasSnapshotRef.current
-    const pcbChanged = pcbSnapshotRef.current !== null
-      && pcbSnapshot !== pcbSnapshotRef.current
-    if (isOwner && (canvasChanged || pcbChanged)) {
-      setDirty(true)
-    }
-  }, [isOwner, nodes, pcbSnapshot, setDirty, wires])
-
-  // Broadcast layout changes during collaboration
-  useEffect(() => {
-    // Public/shared projects may be subscribed to for presence and remote
-    // updates, but only owners/editors may publish canvas changes. Sending a
-    // canvas update from a read-only project makes the backend reject the
-    // STOMP frame, which used to trigger a reconnect loop and re-render this
-    // toolbar on every connection attempt.
-    if (isLiveSyncConnected && isOwner && !isPreset && regressionMode === null && !canvasRenderTraceRunning && !avrCompiledTraceRunning) {
-      broadcastCanvasSync(nodes, wires, viewport, usePcbStore.getState().getLayout())
-    }
-  }, [avrCompiledTraceRunning, broadcastCanvasSync, canvasRenderTraceRunning, isLiveSyncConnected, isOwner, isPreset, nodes, pcbSnapshot, regressionMode, viewport, wires])
+  }, [searchParams, loadCanvas, loadPcb, activeCodeFileId, updateCodeFileContent, addToast, isSharedView, setCurrentProject])
 
   // ── Save mutation ──
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      if (!currentProject || isPreset || !isOwner) return
-      setSaving(true)
-      const codeFiles = currentProject.codeFiles.map((f) => ({
-        content: f.content,
-        filename: f.filename,
-        language: f.language,
-        sortOrder: f.sortOrder,
-      }))
-      const response = await projectApi.update(currentProject.id, {
-        canvasLayout: {
-          nodes,
-          wires,
-          viewport: useCanvasStore.getState().viewport,
-        },
-        componentConfig: {
-          ...(currentProject.componentConfig || {}),
-          pcbLayout: usePcbStore.getState().getLayout(),
-        },
-        codeFiles,
-        expectedRevision: currentProject.updatedAt,
-      })
+  const { mutate: saveProject } = useMutation({
+    mutationFn: async (snapshot: NonNullable<ReturnType<typeof captureEditorDocument>>) => {
+      const { currentProject } = useProjectStore.getState()
+      if (!currentProject || isPreset || !isOwner || currentProject.id !== projectId
+        || currentProject.owner?.keycloakId !== user?.keycloakId || !isCurrentDocumentSession(snapshot)) return
+      const response = await projectApi.update(currentProject.id, snapshot.payload)
       return response.data.data
     },
-    onSuccess: (project) => {
-      if (!project) return
-      canvasSnapshotRef.current = serializeCanvas(
-        useCanvasStore.getState().nodes,
-        useCanvasStore.getState().wires,
-      )
-      pcbSnapshotRef.current = serializePcb(usePcbStore.getState().getLayout())
-      setDirty(false)
+    onSuccess: (project, snapshot) => {
+      if (!isCurrentDocumentSession(snapshot)) return
       setSaving(false)
-      setProjectUpdatedAt(project.updatedAt)
+      if (!project) return
+      setDirty(hasEditsSince(snapshot))
+      mergeProjectMetadata(project)
+      hydratedVersionRef.current = { id: project.id, updatedAt: project.updatedAt }
+      queryClient.setQueryData(['project', project.id], project)
       addToast('Project saved successfully', 'success')
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
     },
-    onError: (error) => {
+    onError: (error, snapshot) => {
+      if (!isCurrentDocumentSession(snapshot)) return
       setSaving(false)
       const errorCode = (error as { response?: { data?: { errorCode?: string } } })?.response?.data?.errorCode
       addToast(errorCode === 'PROJECT_REVISION_STALE'
@@ -522,21 +480,17 @@ export default function CircuitEditorPage() {
   })
 
   const handleSave = useCallback(() => {
-    if (!isPreset && isOwner) saveMutation.mutate()
-  }, [isPreset, isOwner, saveMutation])
-
-  // ── Auto-save logic (every 10s when dirty) ──
-  useEffect(() => {
-    if (!isDirty || isPreset || !isOwner) return
-    const timer = setInterval(() => {
-      handleSave()
-    }, 10000)
-    return () => clearInterval(timer)
-  }, [isDirty, isPreset, isOwner, handleSave])
+    const project = useProjectStore.getState()
+    if (isPreset || !isOwner || project.isSaving || project.currentProject?.id !== projectId
+      || project.currentProject?.owner?.keycloakId !== user?.keycloakId) return
+    const snapshot = captureEditorDocument()
+    if (snapshot) { setSaving(true); saveProject(snapshot) }
+  }, [isPreset, isOwner, projectId, user?.keycloakId, setSaving, saveProject])
 
   // ── Fork mutation ──
   const forkMutation = useMutation({
     mutationFn: async () => {
+      const { currentProject } = useProjectStore.getState()
       if (!currentProject) return
       setSaving(true)
       const res = await projectApi.fork(currentProject.id)
@@ -557,10 +511,13 @@ export default function CircuitEditorPage() {
 
   // ── Share project ──
   const handleShare = async () => {
+    const { currentProject, activeCodeFile } = useProjectStore.getState()
+    const { documentNodes: nodes, wires, viewport, routeCache } = useCanvasStore.getState()
     try {
       const state = {
         nodes,
         wires,
+        routeCache,
         code: activeCodeFile?.content || '',
         codeFiles: currentProject?.codeFiles || (activeCodeFile ? [activeCodeFile] : []),
         componentConfig: {
@@ -582,6 +539,7 @@ export default function CircuitEditorPage() {
 
   // ── Export handlers ──
   const handleExportZip = async () => {
+    const { currentProject } = useProjectStore.getState()
     if (!currentProject) return
     try {
       const res = await projectExportApi.exportZip(currentProject.id)
@@ -599,6 +557,8 @@ export default function CircuitEditorPage() {
   }
 
   const handleExportGerber = async () => {
+    const { currentProject } = useProjectStore.getState()
+    const { wires } = useCanvasStore.getState()
     if (!currentProject) return
     try {
       // Keep the toolbar export on the same DRC-gated manufacturing pipeline
@@ -681,6 +641,7 @@ export default function CircuitEditorPage() {
   // ── Component Interaction (button press, relay activation, etc.) ──
   const handleComponentInteraction = useCallback(
     (nodeId: string, event: 'press' | 'release') => {
+      const { nodes, wires } = useCanvasStore.getState()
       const node = nodes.find((n) => n.id === nodeId)
       if (!node) return
 
@@ -719,11 +680,13 @@ export default function CircuitEditorPage() {
         }
       })
     },
-    [engineRef, nodes, wires, isSimulating, updateNode]
+    [engineRef, isSimulating, updateNode]
   )
 
   // ── Simulation toggle ──
   const toggleSimulation = async () => {
+    const { nodes, wires } = useCanvasStore.getState()
+    const { currentProject, activeCodeFile } = useProjectStore.getState()
     if (!isSimulating) {
       const requestId = ++simulationRequestRef.current
       setIsSimulating(true)
@@ -736,7 +699,7 @@ export default function CircuitEditorPage() {
       const safety = analyzeCircuitSafety(nodes, wires)
       Object.entries(safety.nodeStates).forEach(([nodeId, properties]) => {
         const node = nodes.find((n) => n.id === nodeId)
-        if (node) updateNode(nodeId, { properties: { ...node.properties, ...properties } })
+        if (node) updateRuntimeNode(nodeId, { properties })
       })
       if (safety.issues.length > 0) {
         safety.issues.forEach((issue) =>
@@ -812,9 +775,8 @@ export default function CircuitEditorPage() {
       engineRef.current?.stop()
       writeSerial('> Simulation stopped')
       nodes.forEach((n) =>
-        updateNode(n.id, {
+        updateRuntimeNode(n.id, {
           properties: {
-            ...n.properties,
             isLit: false,
             isSpinning: false,
             isBeeping: false,
@@ -855,7 +817,7 @@ export default function CircuitEditorPage() {
       return
     }
 
-    const originalNodes = useCanvasStore.getState().nodes
+    const originalNodes = useCanvasStore.getState().documentNodes
     const originalWires = useCanvasStore.getState().wires
     const originalViewport = useCanvasStore.getState().viewport
     const originalFidelity = useSimulationStore.getState().fidelityMode
@@ -899,7 +861,6 @@ export default function CircuitEditorPage() {
       for (const mode of ['adaptive', 'full-fidelity'] as const) {
         if (regressionTokenRef.current !== token) break
         loadCanvas(preset.nodes, preset.wires, { x: -240, y: -120, scale: 0.72 })
-        skipCanvasDirtyRef.current = true
         clearSolverDiagnostics()
         const trace = await runMaximumComponentRegression(preset, mode, runtime, {
           shouldStop: () => regressionTokenRef.current !== token,
@@ -915,7 +876,6 @@ export default function CircuitEditorPage() {
       setIsSimulationPaused(false)
       setSimulating(false)
       loadCanvas(originalNodes, originalWires, originalViewport)
-      skipCanvasDirtyRef.current = true
       setDirty(originalDirty)
       setFidelityMode(originalFidelity)
       setRegressionMode(null)
@@ -951,7 +911,7 @@ export default function CircuitEditorPage() {
 
     const originalCanvas = useCanvasStore.getState()
     const originalSimulation = useSimulationStore.getState()
-    const originalNodes = originalCanvas.nodes
+    const originalNodes = originalCanvas.documentNodes
     const originalWires = originalCanvas.wires
     const originalViewport = originalCanvas.viewport
     const originalViewMode = viewMode
@@ -974,7 +934,6 @@ export default function CircuitEditorPage() {
     setSolverDiagnosticsOpen(true)
     setViewMode('canvas')
     loadCanvas(preset.nodes, preset.wires, { x: -80, y: -40, scale: 1 })
-    skipCanvasDirtyRef.current = true
     useSimulationStore.getState().setCircuitState({}, {}, {}, {}, true)
     setIsSimulating(true)
     setSimulating(true)
@@ -1013,7 +972,6 @@ export default function CircuitEditorPage() {
     } finally {
       setIsSimulating(false)
       loadCanvas(originalNodes, originalWires, originalViewport)
-      skipCanvasDirtyRef.current = true
       const state = useSimulationStore.getState()
       state.setCircuitState(
         originalSimulation.nodeVoltages,
@@ -1064,7 +1022,7 @@ export default function CircuitEditorPage() {
 
     const originalCanvas = useCanvasStore.getState()
     const originalSimulation = useSimulationStore.getState()
-    const originalNodes = originalCanvas.nodes
+    const originalNodes = originalCanvas.documentNodes
     const originalWires = originalCanvas.wires
     const originalViewport = originalCanvas.viewport
     const originalViewMode = viewMode
@@ -1078,7 +1036,6 @@ export default function CircuitEditorPage() {
     setSolverDiagnosticsOpen(true)
     setViewMode('canvas')
     loadCanvas(fixture.nodes, fixture.wires, { x: 40, y: 20, scale: 0.9 })
-    skipCanvasDirtyRef.current = true
 
     try {
       const compile = await simulationApi.compileFirmware({
@@ -1165,7 +1122,6 @@ export default function CircuitEditorPage() {
       setIsSimulationPaused(false)
       setSimulating(false)
       loadCanvas(originalNodes, originalWires, originalViewport)
-      skipCanvasDirtyRef.current = true
       const state = useSimulationStore.getState()
       state.resetSimulationTime()
       state.setCircuitState(
@@ -1223,7 +1179,7 @@ export default function CircuitEditorPage() {
     )
   }
 
-  const projectName = currentProject?.name || 'Untitled Project'
+  const projectName = projectSummary?.name || 'Untitled Project'
 
   const exportDropdownItems = [
     { label: 'Export ZIP archive', icon: <FileArchive size={15} />, onClick: handleExportZip },
@@ -1251,6 +1207,12 @@ export default function CircuitEditorPage() {
 
   return (
     <div className="vf-editor">
+      <EditorDocumentSync
+        isOwner={isOwner}
+        broadcastEnabled={isLiveSyncConnected && isOwner && !isPreset && regressionMode === null && !canvasRenderTraceRunning && !avrCompiledTraceRunning}
+        broadcastCanvasSync={broadcastCanvasSync}
+      />
+      <EditorAutosave enabled={!isPreset && isOwner} onSave={handleSave} />
       {/* ── Prioritized command ribbon ── */}
       <header className={`vf-editor__ribbon ${secondaryToolsOpen ? 'is-expanded' : ''}`}>
         <div className="vf-editor__toolbar">
@@ -1265,7 +1227,7 @@ export default function CircuitEditorPage() {
           <div className="vf-editor__project-info">
             <div className="vf-editor__project-primary">
               <h1 className="vf-editor__project-name">{projectName}</h1>
-              {isDirty && <span className="vf-editor__dirty-dot" />}
+              <EditorDirtyIndicator />
               {!isPreset && (
                 <span className="vf-status-badge" aria-hidden={!isLiveSyncConnected}>
                   <span className="vf-status-badge__dot" />
@@ -1273,17 +1235,17 @@ export default function CircuitEditorPage() {
                 </span>
               )}
             </div>
-            {currentProject?.forkedFromId && currentProject?.forkedFromName && (
+            {projectSummary?.forkedFromId && projectSummary?.forkedFromName && (
               <span className="vf-editor__forked-from">
                 forked from{' '}
                 <a
-                  href={`/editor/${currentProject.forkedFromId}`}
+                  href={`/editor/${projectSummary.forkedFromId}`}
                   onClick={(e) => {
                     e.preventDefault();
-                    navigate(`/editor/${currentProject.forkedFromId}`);
+                    navigate(`/editor/${projectSummary.forkedFromId}`);
                   }}
                 >
-                  {currentProject.forkedFromName}
+                  {projectSummary.forkedFromName}
                 </a>
               </span>
             )}
@@ -1362,23 +1324,10 @@ export default function CircuitEditorPage() {
             </select>
           </label>
           {isSimulating && !canvasRenderTraceRunning && !avrCompiledTraceRunning && (
-            <span className="vf-editor__simulation-time" title="Monotonic physical simulation time">
-              t={simulationTime.toFixed(3)}s
-            </span>
-          )}
-          {isSimulating && !canvasRenderTraceRunning && !avrCompiledTraceRunning && executionMode === 'avr8js' && avrWorkload.active && (
-            <span
-              className={`vf-editor__avr-workload ${avrWorkload.budgetLimited ? 'is-limited' : ''}`}
-              title={[
-                `${avrWorkload.fidelityMode === 'full-fidelity' ? 'Full fidelity' : 'Adaptive'} AVR execution`,
-                `${avrWorkload.averageSliceMs.toFixed(2)} ms average of ${avrWorkload.sliceBudgetMs.toFixed(0)} ms slice budget`,
-                `${Math.round(avrWorkload.instructionsPerSecond).toLocaleString()} instructions/s`,
-                `${avrWorkload.pendingCycleLagMs.toFixed(1)} ms retained cycle debt`,
-                'Firmware instructions and peripheral ticks are never skipped',
-              ].join(' · ')}
-            >
-              {avrWorkload.budgetLimited ? 'AVR capped' : 'AVR'} · {(avrWorkload.emulatedClockHz / 1_000_000).toFixed(2)} MHz · {avrWorkload.mainThreadUtilizationPercent.toFixed(0)}%
-            </span>
+            <>
+              <EditorSimulationTime />
+              <EditorAvrWorkload />
+            </>
           )}
 
           <button
@@ -1457,14 +1406,14 @@ export default function CircuitEditorPage() {
               <Save size={14} />
               <span className="vf-editor__action-label">{isSaving ? 'Saving...' : 'Save'}</span>
             </button>
-          ) : currentProject?.userForkId ? (
+          ) : projectSummary?.userForkId ? (
             <button
               className="vf-editor__save-btn"
               style={{
                 background: 'linear-gradient(135deg, #10b981, #059669)',
                 borderColor: '#10b981',
               }}
-              onClick={() => navigate(`/editor/${currentProject.userForkId}`)}
+              onClick={() => navigate(`/editor/${projectSummary.userForkId}`)}
               type="button"
               aria-label="Go to your fork"
             >
@@ -1721,7 +1670,6 @@ export default function CircuitEditorPage() {
                     if (avrCompiledTraceRunning) stopAvrCompiledFirmwareTrace()
                     setSolverDiagnosticsOpen(false)
                   }}
-                  diagnostics={solverDiagnostics}
                   regressionMode={regressionMode}
                   regressionRuns={regressionRuns}
                   onRunRegression={runRegression}

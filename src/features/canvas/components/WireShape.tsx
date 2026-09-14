@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Circle, Line, Text, Group, Rect } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
-import { getPinAbsPos, distToSegment, getWireRenderPoints } from '../../../utils/wireRouting';
+import { getPinAbsPos, distToSegment, getWireRenderPoints, getWiringPreviewPoints } from '../../../utils/wireRouting';
 import type { Wire, ActiveBendPoint } from '../canvasTypes';
 import BendPointHandle from './BendPointHandle';
 import {
@@ -45,6 +45,8 @@ const WireShape = ({
   const [hovered, setHovered] = useState(false);
   const from = useCanvasStore((state) => state.nodesById.get(wire.fromNodeId));
   const to = useCanvasStore((state) => state.nodesById.get(wire.toNodeId));
+  const preview = useCanvasStore((state) => state.draggingNodeId !== null
+    && (state.draggingNodeId === wire.fromNodeId || state.draggingNodeId === wire.toNodeId));
   if (!from || !to) return null;
   const nodes = [from, to];
 
@@ -60,7 +62,9 @@ const WireShape = ({
     });
   }
 
-  const allPoints = getWireRenderPoints(wire, nodes, currentBendPoints, wires);
+  const allPoints = preview && (wire.routingMode === 'auto' || (wire.routingMode === 'orthogonal' && currentBendPoints.length === 0))
+    ? getWiringPreviewPoints(startPos, endPos)
+    : getWireRenderPoints(wire, nodes, currentBendPoints, wires);
 
   const handleMouseDown = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
     e.cancelBubble = true;

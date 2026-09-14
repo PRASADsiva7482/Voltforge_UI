@@ -289,6 +289,7 @@
 }
 
 .landing-section {
+  scroll-margin-top: 150px;
   display: grid;
   gap: 22px;
   padding: clamp(32px, 5vw, 70px) clamp(16px, 4vw, 44px);
@@ -305,7 +306,7 @@
 .capability-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .capability-card .vf-card__body {
@@ -338,7 +339,7 @@
 .workflow-strip {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .workflow-strip__item {
@@ -555,4 +556,3 @@ html.dark .hero-node i {
 html.dark .hero-node i {
   background: rgba(255, 255, 255, 0.06);
 }
-

@@ -1,0 +1,35 @@
+{
+  "task": "VFOPT-UI-011",
+  "phase": "before",
+  "capturedAt": "2026-09-12T10:10:44.758Z",
+  "browser": "153.0.8010.36",
+  "node": "v20.19.6",
+  "fixtureSha256": "30295f7236b6d5acaba83c33355f4d79fdf2542e71cfd337db944c94dd8aaa09",
+  "fixture": "25 LED nodes; real editor/Monaco/engine running interpreter loop, plus 20 Hz injected runtime feedback and irrelevant PCB selection. Isolated API and STOMP fixtures; no live writes.",
+  "windows": [
+    {
+      "elapsedMs": 60033.79999999702,
+      "runtimeUpdates": 1195,
+      "serializations": {
+        "pcb": 9045,
+        "canvas": 1577,
+        "collaboration": 596,
+        "save": 5
+      },
+      "canvasSends": 298,
+      "dirtyTransitions": 11,
+      "dirty": true,
+      "modelRevisionDelta": 5,
+      "documentRevisionDelta": null,
+      "simulationTime": 11.140000000000342,
+      "saveRequests": 5
+    }
+  ],
+  "checks": [],
+  "errors": [],
+  "status": "passed",
+  "limitations": [
+    "Does not establish compiled firmware fidelity, remote-host performance or real-account collaboration.",
+    "Serialization counters instrument document-shaped JSON.stringify calls only in this browser fixture."
+  ]
+}

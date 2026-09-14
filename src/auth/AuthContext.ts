@@ -4,6 +4,8 @@ import type { AppUser } from '../types/auth'
 export type AuthContextValue = {
   isAuthenticated: boolean
   isLoading: boolean
+  isRedirecting: boolean
+  error: string | null
   login: () => void
   logout: () => void
   signup: () => void

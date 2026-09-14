@@ -1,0 +1,23 @@
+{
+  "task": "VFOPT-UI-012",
+  "capturedAt": "2026-09-14T00:31:02.076Z",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "Canonical category and per-category ordering is stable without mutating source data",
+      "passed": true
+    },
+    {
+      "name": "All 1000 items remain reachable once with bounded pages including unknown categories",
+      "passed": true
+    },
+    {
+      "name": "Empty, last and shrinking pages have valid bounds",
+      "passed": true
+    },
+    {
+      "name": "Normalized name, type and description search is global and catalogue updates are reflected",
+      "passed": true
+    }
+  ]
+}

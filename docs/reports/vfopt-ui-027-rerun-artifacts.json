@@ -1,0 +1,60 @@
+{
+  "task": "VFOPT-UI-027",
+  "capturedAt": "2026-09-14T00:37:36.704Z",
+  "artifacts": [
+    {
+      "original": "Voltforge_UI/docs/reports/vfopt-ui-011-document-revision-tests.json",
+      "originalSha256": "83ac69d67ce30f3b830b0a6b66e1493735dce04dc531c2a6b5cbb2ee48ebd73d",
+      "rerun": "Voltforge_UI/docs/reports/vfopt-ui-027-rerun-vfopt-ui-011-document-revision-tests.json",
+      "rerunSha256": "f560093ddd5c5e8796305a36aec5b8b37eca0de8deef228644bb1001e727c946"
+    },
+    {
+      "original": "Voltforge_UI/docs/reports/vfopt-ui-012-palette-index-tests.json",
+      "originalSha256": "d24fd9db52b7f4f99bb2e2ee67ddeaca72a7f55d3073908a9ac763ca81ec223b",
+      "rerun": "Voltforge_UI/docs/reports/vfopt-ui-027-rerun-vfopt-ui-012-palette-index-tests.json",
+      "rerunSha256": "296090936ac907cdbf60bdf5762d594872623d05583f1f3c06d1494ec6be862f"
+    },
+    {
+      "original": "Voltforge_UI/docs/reports/vfopt-ui-016-routing-contract-tests.json",
+      "originalSha256": "e6c3cde1411b19dee3bb4b5c864e4d24289aca9682141164f19540ad863d874e",
+      "rerun": "Voltforge_UI/docs/reports/vfopt-ui-027-rerun-vfopt-ui-016-routing-contract-tests.json",
+      "rerunSha256": "6131dad70df76aa14655cb4c55e172d799edc4c951c76d4409f62ef9ef531a4f"
+    },
+    {
+      "original": "Voltforge_UI/docs/reports/vfopt-ui-017-drag-contract-tests.json",
+      "originalSha256": "0b7fe9529817bcabb5d89ab822a0f11add59939396dc265407ad00ca5b9b80a6",
+      "rerun": "Voltforge_UI/docs/reports/vfopt-ui-027-rerun-vfopt-ui-017-drag-contract-tests.json",
+      "rerunSha256": "5923bf17855a3c66e7f2b63edb102c7bd3a75928cd3662065372afae502477e1"
+    },
+    {
+      "original": "Voltforge_UI/docs/reports/vfopt-ui-025-pcb-sync-contract-tests.json",
+      "originalSha256": "1fda812569177179a6d89623d74c985a983ed00a0295d99a4807ab863dce85cc",
+      "rerun": "Voltforge_UI/docs/reports/vfopt-ui-027-rerun-vfopt-ui-025-pcb-sync-contract-tests.json",
+      "rerunSha256": "68c9a05d5fe446530f8b0c52ea72561f8235adfdd84626c9d557592145f6a05d"
+    },
+    {
+      "original": "Voltforge_UI/docs/reports/vfopt-ui-026-ratline-contract-tests.json",
+      "originalSha256": "ea3c72f6c5bb6739dae310606a15070595ca9e3f43e78d34c69b84a522448c23",
+      "rerun": "Voltforge_UI/docs/reports/vfopt-ui-027-rerun-vfopt-ui-026-ratline-contract-tests.json",
+      "rerunSha256": "2e3f88e629a7aacf61ab2d5b8df0de9deeec9b5af15bfa6614302aad5228844d"
+    },
+    {
+      "original": "Voltforge_UI/docs/reports/vfopt-ui-025-pcb-sync-after.json",
+      "originalSha256": "5e0cb37a18965a9fb49a3e64969c067c232db575e333757c452dd7ddef28b559",
+      "rerun": "Voltforge_UI/docs/reports/vfopt-ui-027-rerun-vfopt-ui-025-pcb-sync-after.json",
+      "rerunSha256": "c17ae56d696c9ec014300eeaa5195c1358b42b0a23c591ad529a56c916f023d3"
+    },
+    {
+      "original": "Voltforge_UI/docs/reports/vfopt-ui-025-pcb-sync-after.png",
+      "originalSha256": "f666b72f0167cb10ffda16b4e3632494892e71eb09688afedad1ddb450209584",
+      "rerun": "Voltforge_UI/docs/reports/vfopt-ui-027-rerun-vfopt-ui-025-pcb-sync-after.png",
+      "rerunSha256": "d5f548465f92f59fcb1604dd18c8c5b87342907a911805c49aa3b71615f9eebb"
+    },
+    {
+      "original": "Voltforge_UI/docs/reports/vfopt-ui-026-ratline-browser-after.json",
+      "originalSha256": "d09817f79c6bb06426a9900edf65eaaffec890678d22baf67a2ac47127ad926d",
+      "rerun": "Voltforge_UI/docs/reports/vfopt-ui-027-rerun-vfopt-ui-026-ratline-browser-after.json",
+      "rerunSha256": "f8b764ddb0514a032103696fa60dfac1c292d0f38d145916c8ed5da254c01616"
+    }
+  ]
+}

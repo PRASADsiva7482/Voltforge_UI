@@ -1,7 +1,6 @@
 import { Download, Gauge, Play, Square } from 'lucide-react';
 import { FloatingPanel } from '../../components/ui/FloatingPanel';
 import type { SimulationFidelityMode } from '../simulator/simulationModels';
-import type { SolverDiagnosticsSnapshot } from '../simulator/solverDiagnostics';
 import type { MaximumComponentRegressionTrace } from '../simulator/regression/maxComponentRegression';
 import type { MaximumCanvasRenderTrace } from '../canvas/regression/canvasRenderRegression';
 import type { AvrCompiledFirmwareTrace } from '../simulator/regression/avrCompiledFirmwareTrace';
@@ -19,7 +18,6 @@ import { useSimulationStore } from '../../store/simulationStore';
 export interface SolverDiagnosticsPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  diagnostics: SolverDiagnosticsSnapshot | null;
   regressionMode: SimulationFidelityMode | 'both' | null;
   regressionRuns: MaximumComponentRegressionTrace[];
   onRunRegression: () => void;
@@ -57,7 +55,6 @@ function downloadTrace(trace: unknown, filename: string): void {
 export default function SolverDiagnosticsPanel({
   isOpen,
   onClose,
-  diagnostics,
   regressionMode,
   regressionRuns,
   onRunRegression,
@@ -71,6 +68,7 @@ export default function SolverDiagnosticsPanel({
   onRunAvrCompiledTrace,
   onStopAvrCompiledTrace,
 }: SolverDiagnosticsPanelProps) {
+  const diagnostics = useSimulationStore((state) => state.solverDiagnostics);
   const avrWorkload = useSimulationStore((state) => state.avrWorkload);
   const preset = createMaximumComponentRegressionPreset();
   const latestRun = regressionRuns[regressionRuns.length - 1];
