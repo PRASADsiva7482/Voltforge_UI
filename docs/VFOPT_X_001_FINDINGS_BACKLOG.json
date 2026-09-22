@@ -1,0 +1,1587 @@
+{
+  "schemaVersion": 1,
+  "auditId": "VFOPT-X-001",
+  "updatedAt": "2026-09-21T03:39:25.708Z",
+  "scope": [
+    "Voltforge_UI",
+    "Voltforge_BL"
+  ],
+  "status": "open_findings",
+  "idPolicy": "These F001-F007 IDs are new follow-ups defined by this measured audit, not reconstructed entries from the removed root backlog. F008 was added from live boundary testing during F002. F009 was added from production code-paste testing during F008.",
+  "counts": {
+    "total": 9,
+    "open": 5,
+    "completed": 4
+  },
+  "recommendedOrder": [
+    "VFOPT-X-001-F001",
+    "VFOPT-X-001-F002",
+    "VFOPT-X-001-F008",
+    "VFOPT-X-001-F009",
+    "VFOPT-X-001-F003",
+    "VFOPT-X-001-F004",
+    "VFOPT-X-001-F005",
+    "VFOPT-X-001-F006",
+    "VFOPT-X-001-F007"
+  ],
+  "items": [
+    {
+      "id": "VFOPT-X-001-F001",
+      "priority": "P1",
+      "category": "functional_and_backend_io",
+      "status": "completed",
+      "title": "Separate project document revisions from view counters and preserve atomic save conflicts",
+      "repositories": [
+        "Voltforge_BL",
+        "Voltforge_UI"
+      ],
+      "symptom": "A GET followed by PUT with its returned expectedRevision can fail with PROJECT_REVISION_STALE even though the user did not edit elsewhere. Automatic saves also return 409 during simulation.",
+      "evidence": {
+        "development": {
+          "firstRead": "2026-09-20T06:22:33",
+          "secondRead": "2026-09-20T06:22:35",
+          "firstViews": 1,
+          "secondViews": 2,
+          "savePassed": false
+        },
+        "production": {
+          "firstRead": "2026-09-20T06:29:48",
+          "secondRead": "2026-09-20T06:29:50",
+          "firstViews": 1,
+          "secondViews": 2,
+          "savePassed": false
+        },
+        "production409Count": 8,
+        "schema": "TABLE_NAME\tCOLUMN_NAME\tCOLUMN_TYPE\tCOLUMN_DEFAULT\tEXTRA\r\nprojects\tcreated_at\ttimestamp\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED\r\nprojects\tupdated_at\ttimestamp\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP\r\nprojects\tview_count\tint\t0",
+        "nativeDragSaveReopen": "Passed in both modes; the failure is not claimed to affect every save path."
+      },
+      "rootCauseConfidence": "confirmed_for_read_induced_revision_changes",
+      "rootCause": "getProject reads an entity, then issues incrementViewCount. MySQL projects.updated_at is TIMESTAMP without fractional precision and has ON UPDATE CURRENT_TIMESTAMP, so that counter write changes the persisted revision while the response maps the previously read entity. updateProject compares the supplied string directly with LocalDateTime.toString(). The existing read/compare/write sequence also needs a true atomic concurrency guard.",
+      "sourceRefs": [
+        "Voltforge_BL/src/main/java/in/voltforge/api/project/service/impl/ProjectServiceImpl.java:114",
+        "Voltforge_BL/src/main/java/in/voltforge/api/project/service/impl/ProjectServiceImpl.java:194",
+        "Voltforge_BL/src/main/java/in/voltforge/api/project/repository/ProjectRepository.java:45",
+        "Voltforge_BL/src/main/java/in/voltforge/api/common/entity/BaseEntity.java:30",
+        "Voltforge_UI/src/features/editor/CircuitEditorPage.tsx:453"
+      ],
+      "proposedWork": [
+        "Introduce a migration-backed document revision independent of views/forks, or otherwise prevent counter updates from changing the edit token.",
+        "Make the revision comparison and document update atomic; preserve stale-write rejection for genuinely concurrent authors.",
+        "Normalize revision serialization and database precision; return the persisted revision in save acknowledgements.",
+        "Audit collaboration writes and autosave acknowledgements against the same revision contract."
+      ],
+      "acceptance": [
+        "Two reads separated by more than one second increment views while returning the same document revision.",
+        "Immediate GET/edit/PUT succeeds against the real MySQL database; save/reopen retains components, wires, code and PCB data.",
+        "Two writers using one revision yield one successful edit and one 409 without lost updates.",
+        "No-change reads, simulation and view/fork counts do not make an editor dirty or invalidate a valid save.",
+        "Existing document/routing contracts plus real authenticated save/autosave tests pass."
+      ],
+      "dependsOn": [],
+      "evidenceFiles": [
+        "docs/reports/vfopt-x-001-development.json",
+        "docs/reports/vfopt-x-001-production.json",
+        "docs/reports/vfopt-x-001-database.json"
+      ],
+      "completedAt": "2026-09-20T06:12:09.953Z",
+      "resolution": {
+        "documentRevision": "Additive BIGINT column, exposed as a decimal string; independent of timestamp precision, view and fork counters.",
+        "concurrency": "Originally SELECT FOR UPDATE; superseded by F008 version-checked UPDATE without an upload-time row lock. One success/one 409 and child rollback reverified against real MySQL.",
+        "counterUpdates": "Explicit updatedAt self-assignment suppresses MySQL ON UPDATE for view/fork counters.",
+        "persistence": "Remove unacknowledged delayed WebSocket writer. Authorized broadcasts remain; owner editor saves the whole document through guarded REST after two idle seconds or every ten seconds during continuous edits/retries.",
+        "client": "Snapshots/settings send documentRevision; hydration compares numeric revisions and preserves the dirty editor baseline.",
+        "schema": "Voltforge_BL/docs/schema/VFOPT_X_001_F001.sql applied to configured remote MySQL; project contents preserved. Other databases need the same one-time patch. Original Flyway history remains absent/disabled.",
+        "rollout": "API rebuilt and restarted on port 2001. Reload previously open editor tabs. Existing user configuration changes preserved.",
+        "docs": "Voltforge_BL/docs/PROJECT_REVISIONS.md"
+      },
+      "validation": {
+        "backend": {
+          "command": "mvnw.cmd -q test package",
+          "java": "25",
+          "tests": 40,
+          "failures": 0,
+          "errors": 0
+        },
+        "frontend": {
+          "build": "passed including TypeScript and bundle budget",
+          "documentContracts": 8,
+          "lint": "passed for changed runtime files"
+        },
+        "live": {
+          "task": "VFOPT-X-001-F001",
+          "capturedAt": "2026-09-20T06:09:21.581Z",
+          "mode": "development UI / rebuilt Java 25 API on 2001 / real Keycloak and MySQL",
+          "checks": [
+            {
+              "name": "Repeated reads keep token and list timestamp stable while incrementing views",
+              "passed": true,
+              "detail": {
+                "stableRevision": "0",
+                "viewsIncrement": 1,
+                "saveRevision": "1"
+              }
+            },
+            {
+              "name": "Concurrent same-token pairs each allow exactly one writer",
+              "passed": true,
+              "detail": {
+                "pairs": 3,
+                "successful": 3,
+                "staleRejected": 3
+              }
+            },
+            {
+              "name": "Missing and old timestamp tokens cannot bypass the guard",
+              "passed": true
+            },
+            {
+              "name": "Native canvas drag autosaves with an acknowledged revision and survives reopen",
+              "passed": true,
+              "detail": {
+                "revision": "6",
+                "x": 140,
+                "y": 120
+              }
+            },
+            {
+              "name": "Native code edit autosaves and survives reopen",
+              "passed": true
+            },
+            {
+              "name": "PCB document edit saves through the same guarded path and survives reopen",
+              "passed": true
+            },
+            {
+              "name": "Simulation runtime does not invalidate the editor document revision",
+              "passed": true,
+              "detail": {
+                "revision": "8",
+                "observedSeconds": 12
+              }
+            },
+            {
+              "name": "Live Sync broadcasts do not perform a delayed database write",
+              "passed": true,
+              "detail": {
+                "connected": true,
+                "echoed": true
+              }
+            },
+            {
+              "name": "Fork counters leave the source revision and ordering timestamp unchanged",
+              "passed": true
+            }
+          ],
+          "cleanup": [
+            {
+              "projectDeleted": true
+            },
+            {
+              "projectDeleted": true
+            }
+          ],
+          "status": "passed"
+        },
+        "additionalConcurrency": {
+          "pairs": 10,
+          "successful": 10,
+          "staleRejected": 10,
+          "scope": "Direct real API checks on isolated rebuilt backend before the final nine-check run."
+        },
+        "limitations": [
+          "The final browser verification uses Vite development UI; production was rebuilt but not re-profiled after this fix.",
+          "PCB modification used the existing store action through the browser; real autosave, API persistence and fresh reopen were verified.",
+          "Runtime revision stability observed for 12 seconds on a small circuit, not a renewed full performance baseline."
+        ],
+        "harnessCorrections": [
+          "Preliminary rapid calls reached the normal API rate limit; the final run throttled/retried and cleaned all fixtures.",
+          "Preliminary browser checks still targeted the old server because API URLs come from the build environment; those results are excluded. Final checks assert the new token against the rebuilt backend on port 2001."
+        ]
+      }
+    },
+    {
+      "id": "VFOPT-X-001-F002",
+      "priority": "P1",
+      "category": "functional_and_performance",
+      "status": "completed",
+      "title": "Align native WebSocket message limits and stop repeated reconnects for oversized canvas messages",
+      "repositories": [
+        "Voltforge_BL",
+        "Voltforge_UI"
+      ],
+      "symptom": "The 36-component simulation repeatedly sends a canvas frame, loses Live Sync with close code 1009 and reconnects. This continues briefly after stopping simulation.",
+      "evidence": {
+        "sixtySecondProductionWindow": {
+          "created": 45,
+          "closed": 45,
+          "closeCodes": {
+            "1009": 45
+          },
+          "sentCommands": {
+            "CONNECT": 45,
+            "SUBSCRIBE": 90,
+            "SEND": 47
+          },
+          "receivedCommands": {
+            "CONNECTED": 45
+          },
+          "maxSentBytes": 36779
+        },
+        "controlledProbe": [
+          {
+            "length": 4000,
+            "connected": true,
+            "commands": [
+              "CONNECTED"
+            ],
+            "frameBytes": 4111,
+            "stayedOpen": true,
+            "timeoutMs": 1800
+          },
+          {
+            "length": 12000,
+            "connected": true,
+            "commands": [
+              "CONNECTED"
+            ],
+            "frameBytes": 12111,
+            "stayedOpen": true,
+            "timeoutMs": 1800
+          },
+          {
+            "length": 40000,
+            "connected": true,
+            "commands": [
+              "CONNECTED"
+            ],
+            "frameBytes": 40111,
+            "stayedOpen": false,
+            "closeCode": 1009,
+            "reason": "The decoded text message was too big for the output buffer and the endpoint does not support partial messages"
+          }
+        ],
+        "configuredStompMessageLimitBytes": 1048576,
+        "configuredSendBufferBytes": 524288
+      },
+      "rootCauseConfidence": "confirmed_native_buffer_rejection_and_runtime_pin_handler_authored_writes",
+      "rootCause": "The native WebSocket decoder rejects frames smaller than the configured 1 MiB STOMP limit. Its close reason explicitly reports that the decoded text exceeds its output buffer and partial messages are unsupported. useCollaboration only blocks reconnect for a STOMP ERROR; close code 1009 schedules another connection, resets backoff after CONNECTED and replays pending dirty state. The source of the first dirty publication during simulation needs a revision trace.",
+      "sourceRefs": [
+        "Voltforge_BL/src/main/java/in/voltforge/api/config/WebSocketConfig.java:92",
+        "Voltforge_UI/src/hooks/useCollaboration.ts:126",
+        "Voltforge_UI/src/hooks/useCollaboration.ts:162",
+        "Voltforge_UI/src/hooks/useCollaboration.ts:219",
+        "Voltforge_UI/src/hooks/useCollaboration.ts:274",
+        "Voltforge_UI/src/features/editor/EditorDocumentSync.tsx:19"
+      ],
+      "proposedWork": [
+        "Align servlet/native text-buffer limits with documented STOMP payload limits, or implement bounded chunk/delta transport with backpressure.",
+        "Treat a deterministic oversized-message close as an actionable failure instead of an automatic reconnect loop; retain the unsaved document.",
+        "Trace localDocumentRevision/isDirty changes when simulation starts and keep runtime-only updates out of the authored transport.",
+        "Verify transport limits across native WebSocket and any supported SockJS deployment."
+      ],
+      "acceptance": [
+        "4 KB, 12 KB and the measured 36.8 KB canvas payload succeed within the supported limit.",
+        "A deliberately over-limit payload produces one clear failure with no repeated reconnects or document loss.",
+        "A clean 60-second simulation has one stable collaborative connection and no repeated canvas publication.",
+        "Multi-user updates retain authorization, persistence and conflict handling after reconnect."
+      ],
+      "dependsOn": [
+        "VFOPT-X-001-F001"
+      ],
+      "evidenceFiles": [
+        "docs/reports/vfopt-x-001-production.json",
+        "docs/reports/vfopt-x-001-production-transport-probe.json"
+      ],
+      "completedAt": "2026-09-20T12:32:04.450Z",
+      "resolution": {
+        "server": "STOMP remains bounded at 1 MiB; servlet text/binary and outbound buffers are 2 MiB to allow SockJS wrapping. Authentication/origin/project guards remain enabled.",
+        "client": "Complete UTF-8 frame size check, one actionable pause on STOMP ERROR or close 1002/1003/1007/1008/1009, preserved local edits, bounded transient retry with reset only after 30 seconds stable, disposal guards for old socket callbacks.",
+        "runtime": "MotorLogic.onPinStateChange called authored updateNode during compiled AVR execution. All pin-driven writes in LogicRegistry and DigitalLogicChips now use updateRuntimeNode; live outputs still change without document/model revision changes.",
+        "persistence": "Ordinary guarded autosave after reconnect passed. Over-limit local edits remain present and dirty when a separate REST save fails. Large-document persistence is explicitly open as F008.",
+        "documentation": "Voltforge_BL/docs/LIVE_SYNC.md"
+      },
+      "validation": {
+        "backend": {
+          "java": "25",
+          "tests": 42,
+          "failures": 0,
+          "errors": 0,
+          "package": "passed",
+          "sharedIdentityCheck": "Isolated H2 application integration verifies distinct owner/viewer/editor identities, permission rejection and server-owned event userId."
+        },
+        "frontend": {
+          "documentContracts": 9,
+          "build": "passed with bundle budget",
+          "lint": "passed"
+        },
+        "production": {
+          "task": "VFOPT-X-001-F002",
+          "at": "2026-09-20T06:25:53.150Z",
+          "build": "production",
+          "checks": [
+            {
+              "name": "Clean 60-second compiled mixed simulation keeps one connection and sends no document updates",
+              "passed": true,
+              "detail": {
+                "nodes": 36,
+                "wires": 75,
+                "seconds": 60,
+                "connections": 1,
+                "canvasFrames": 0,
+                "saves": 0,
+                "revision": "0",
+                "avr": "AVR capped · 0.59 MHz · 6%"
+              }
+            },
+            {
+              "name": "Native and SockJS WebSocket transport round-trip supported canvas sizes",
+              "passed": true,
+              "detail": [
+                {
+                  "transport": "native",
+                  "frameBytes": 4205,
+                  "echoedPadding": 4000,
+                  "serverOwnedIdentity": true
+                },
+                {
+                  "transport": "native",
+                  "frameBytes": 12205,
+                  "echoedPadding": 12000,
+                  "serverOwnedIdentity": true
+                },
+                {
+                  "transport": "native",
+                  "frameBytes": 36984,
+                  "echoedPadding": 36779,
+                  "serverOwnedIdentity": true
+                },
+                {
+                  "transport": "native",
+                  "frameBytes": 40205,
+                  "echoedPadding": 40000,
+                  "serverOwnedIdentity": true
+                },
+                {
+                  "transport": "native",
+                  "frameBytes": 900205,
+                  "echoedPadding": 900000,
+                  "serverOwnedIdentity": true
+                },
+                {
+                  "transport": "sockjs-websocket",
+                  "frameBytes": 4205,
+                  "echoedPadding": 4000,
+                  "serverOwnedIdentity": true
+                },
+                {
+                  "transport": "sockjs-websocket",
+                  "frameBytes": 12205,
+                  "echoedPadding": 12000,
+                  "serverOwnedIdentity": true
+                },
+                {
+                  "transport": "sockjs-websocket",
+                  "frameBytes": 36984,
+                  "echoedPadding": 36779,
+                  "serverOwnedIdentity": true
+                },
+                {
+                  "transport": "sockjs-websocket",
+                  "frameBytes": 40205,
+                  "echoedPadding": 40000,
+                  "serverOwnedIdentity": true
+                },
+                {
+                  "transport": "sockjs-websocket",
+                  "frameBytes": 900205,
+                  "echoedPadding": 900000,
+                  "serverOwnedIdentity": true
+                }
+              ]
+            },
+            {
+              "name": "SockJS XHR fallback round-trips a 40 KB canvas message",
+              "passed": true,
+              "detail": {
+                "transport": "sockjs-xhr",
+                "paddingBytes": 40000,
+                "echoed": true
+              }
+            },
+            {
+              "name": "Server oversized-frame close produces one failure without a reconnect loop",
+              "passed": true,
+              "detail": {
+                "connections": 1,
+                "closeCode": 1009,
+                "observedAfterCloseSeconds": 13
+              }
+            },
+            {
+              "name": "Transient disconnects retain increasing backoff until a stable connection",
+              "passed": true,
+              "detail": {
+                "reconnectDelayMs": [
+                  1018,
+                  2309,
+                  4288
+                ]
+              }
+            },
+            {
+              "name": "Real edit broadcasts and guarded autosave still persist after reconnect",
+              "passed": true,
+              "detail": {
+                "savedRevision": "1",
+                "x": 140
+              }
+            }
+          ],
+          "cleanup": [
+            {
+              "deleted": false,
+              "id": "ba13175e-5a6f-4edf-9890-4ffd9c5d4ca8"
+            },
+            {
+              "deleted": true
+            }
+          ],
+          "browserSaves": [
+            {
+              "status": 200
+            }
+          ],
+          "status": "failed",
+          "error": "PUT /projects/ba13175e-5a6f-4edf-9890-4ffd9c5d4ca8 status 500",
+          "scopeStatus": "six_transport_and_normal_persistence_checks_passed; large_REST_seed_failed_and_tracked_as_F008"
+        },
+        "developmentRejections": [
+          {
+            "kind": "stomp-size",
+            "passed": true,
+            "connected": true,
+            "errors": 1,
+            "close": 1002,
+            "noReconnectForSeconds": 6
+          },
+          {
+            "kind": "access-denied",
+            "passed": true,
+            "connected": true,
+            "errors": 1,
+            "close": 1002,
+            "noReconnectForSeconds": 6
+          }
+        ],
+        "developmentPreflight": {
+          "task": "VFOPT-X-001-F002",
+          "check": "UTF-8 preflight retains unsaved document independently of REST outcome",
+          "mode": "development browser",
+          "previousFixtureDeleted": true,
+          "restStatus": 500,
+          "state": {
+            "paddingLength": 550000,
+            "dirty": true,
+            "connections": 1,
+            "canvasFrames": 0
+          },
+          "status": "passed",
+          "paddingUtf8Bytes": 1100000,
+          "cleaned": true,
+          "runnerExit": 1,
+          "runnerError": "Cleanup request timed out on an orphan database lock after the check passed.",
+          "evidenceRecovery": "Check fields recovered verbatim from captured runner stdout because its cleanup exception prevented the final JSON write.",
+          "cleanupRecovery": "Verified the idle zero-write transaction held the exact private fixture row, disconnected only that orphan test connection, removed the fixture, and verified zero VFOPT F002 projects remain."
+        },
+        "cleanup": {
+          "allTestProjectsDeleted": true,
+          "previousFailedCleanupRetried": true
+        },
+        "limitations": [
+          "Production transport probes used the real authorized Keycloak account; distinct-user VIEW/EDIT permission coverage used the isolated application integration test.",
+          "Transient recovery was tested with deliberate browser socket closure; external proxy/network fault combinations were not tested.",
+          "60 seconds proves this measured simulation stays clean; it is not a long-duration or multi-device performance certification.",
+          "Final toast wording was rebuilt and checked in the development preflight test after the production transport run."
+        ],
+        "trace": {
+          "firstDirtyCall": "AVR GPIO -> SimulationEngine.propagatePinState -> LogicRegistry.dispatch -> MotorLogic.onPinStateChange -> canvasStore.updateNode -> EditorDocumentSync.setDirty(true)",
+          "initialState": {
+            "dirty": false,
+            "canvas": 0,
+            "pcb": 0
+          }
+        },
+        "sources": [
+          "https://docs.spring.io/spring-framework/reference/web/websocket/stomp/server-config.html"
+        ]
+      },
+      "persistenceFollowupResolvedBy": "VFOPT-X-001-F008"
+    },
+    {
+      "id": "VFOPT-X-001-F003",
+      "priority": "P1",
+      "category": "ui_performance",
+      "status": "open",
+      "title": "Reduce visible-scene drawing cost during sustained mixed-component simulation",
+      "repositories": [
+        "Voltforge_UI"
+      ],
+      "symptom": "An idle editor is inexpensive, but the 36-component compiled-AVR simulation consumes roughly 2.6 Chromium CPU cores. Physical simulation time advances much more slowly than wall time under its existing adaptive budget.",
+      "evidence": {
+        "production": [
+          {
+            "seconds": 30.04,
+            "mainThreadBusyPercentOfOneCore": 41.51,
+            "chromiumCpuPercentOfOneCore": 267.84,
+            "longTasks": {
+              "count": 0,
+              "maxMs": 0,
+              "totalMs": 0
+            },
+            "physicalTime": "t=7.450s",
+            "avr": "AVR capped · 0.29 MHz · 7%"
+          },
+          {
+            "seconds": 30.02,
+            "mainThreadBusyPercentOfOneCore": 39.99,
+            "chromiumCpuPercentOfOneCore": 261.96,
+            "longTasks": {
+              "count": 1,
+              "maxMs": 58,
+              "totalMs": 58
+            },
+            "physicalTime": "t=14.510s",
+            "avr": "AVR capped · 0.30 MHz · 6%"
+          }
+        ],
+        "development": [
+          {
+            "mainThreadBusyPercentOfOneCore": 88.1,
+            "chromiumCpuPercentOfOneCore": 313.59,
+            "longTasks": {
+              "count": 306,
+              "maxMs": 114,
+              "totalMs": 18325
+            }
+          },
+          {
+            "mainThreadBusyPercentOfOneCore": 88.75,
+            "chromiumCpuPercentOfOneCore": 307.02,
+            "longTasks": {
+              "count": 332,
+              "maxMs": 134,
+              "totalMs": 21744
+            }
+          }
+        ],
+        "profileTop": [
+          {
+            "function": "(idle)",
+            "script": "",
+            "line": -1,
+            "ms": 5750
+          },
+          {
+            "function": "(program)",
+            "script": "",
+            "line": -1,
+            "ms": 1044
+          },
+          {
+            "function": "drawImage",
+            "script": "",
+            "line": -1,
+            "ms": 773
+          },
+          {
+            "function": "(garbage collector)",
+            "script": "",
+            "line": -1,
+            "ms": 272
+          },
+          {
+            "function": "drawImage",
+            "script": "",
+            "line": -1,
+            "ms": 202
+          },
+          {
+            "function": "drawImage",
+            "script": "",
+            "line": -1,
+            "ms": 122
+          },
+          {
+            "function": "r",
+            "script": "http://localhost:3000/assets/vendor-simulation-DDHnx5pB.js",
+            "line": 0,
+            "ms": 108
+          },
+          {
+            "function": "_applyShadow",
+            "script": "http://localhost:3000/assets/vendor-canvas-DvzPCRiz.js",
+            "line": 13,
+            "ms": 99
+          },
+          {
+            "function": "_applyShadow",
+            "script": "http://localhost:3000/assets/vendor-canvas-DvzPCRiz.js",
+            "line": 13,
+            "ms": 57
+          },
+          {
+            "function": "xe",
+            "script": "http://localhost:3000/assets/deferredSimulationEngineFactory-BKYB9NY0.js",
+            "line": 0,
+            "ms": 46
+          },
+          {
+            "function": "restore",
+            "script": "",
+            "line": -1,
+            "ms": 38
+          },
+          {
+            "function": "_drawChildren",
+            "script": "http://localhost:3000/assets/vendor-canvas-DvzPCRiz.js",
+            "line": 13,
+            "ms": 36
+          }
+        ]
+      },
+      "rootCauseConfidence": "profiling_identifies_drawing_hotspots; complete_cpu_attribution_not_claimed",
+      "rootCause": "The independent 10-second main-thread CPU profile is dominated among identifiable active functions by native drawImage and Konva scene/shadow work. React memoization does not prevent native layer rasterization. Chromium aggregate CPU also includes workers, rendering/GPU process work and browser overhead outside that main-thread profile.",
+      "sourceRefs": [
+        "Voltforge_UI/src/features/canvas/components/ComponentNode.tsx",
+        "Voltforge_UI/src/features/canvas/CircuitCanvas.tsx",
+        "Voltforge_UI/src/features/canvas/CurrentFlowLayer.tsx",
+        "Voltforge_UI/src/features/simulator/SimulationEngine.ts"
+      ],
+      "proposedWork": [
+        "Repeat profiling after the transport loop is fixed to avoid treating reconnect overhead as rendering cost.",
+        "Separate static component artwork from changing indicators; evaluate bounded raster caches and narrower redraw scheduling.",
+        "Measure current-flow, pin-detail, shadow and board-image costs separately before reducing work.",
+        "Preserve all solver results, firmware instructions, peripheral ticks and active input handling."
+      ],
+      "acceptance": [
+        "Compare at least three sustained before/after runs with the same fixture, viewport and machine.",
+        "Demonstrate lower main-thread and aggregate Chromium CPU with active simulation interaction p95 within the existing 50 ms stress budget.",
+        "Keep full-fidelity/adaptive semantics and all simulation, visual and lifecycle regressions intact; do not silently skip model work to improve timing."
+      ],
+      "dependsOn": [
+        "VFOPT-X-001-F002"
+      ],
+      "evidenceFiles": [
+        "docs/reports/vfopt-x-001-production.json",
+        "docs/reports/vfopt-x-001-profile-summary.json",
+        "docs/reports/vfopt-x-001-production-simulation.cpuprofile"
+      ],
+      "suggestedNext": true
+    },
+    {
+      "id": "VFOPT-X-001-F004",
+      "priority": "P2",
+      "category": "ui_memory_investigation",
+      "status": "open",
+      "title": "Trace retained memory across repeated editor navigation",
+      "repositories": [
+        "Voltforge_UI"
+      ],
+      "symptom": "Post-GC JavaScript heap increases across all five editor/list cycles, although visible canvases, workers and collaborative sockets are released.",
+      "evidence": {
+        "productionCycles": [
+          {
+            "cycle": 1,
+            "jsHeapAfterGcBytes": 19161568,
+            "dom": {
+              "documents": 4,
+              "nodes": 437,
+              "jsEventListeners": 236
+            },
+            "activeWorkers": 0,
+            "activeSockets": 0,
+            "canvasElements": 0
+          },
+          {
+            "cycle": 2,
+            "jsHeapAfterGcBytes": 19717408,
+            "dom": {
+              "documents": 4,
+              "nodes": 439,
+              "jsEventListeners": 236
+            },
+            "activeWorkers": 0,
+            "activeSockets": 0,
+            "canvasElements": 0
+          },
+          {
+            "cycle": 3,
+            "jsHeapAfterGcBytes": 20274048,
+            "dom": {
+              "documents": 4,
+              "nodes": 441,
+              "jsEventListeners": 236
+            },
+            "activeWorkers": 0,
+            "activeSockets": 0,
+            "canvasElements": 0
+          },
+          {
+            "cycle": 4,
+            "jsHeapAfterGcBytes": 20627520,
+            "dom": {
+              "documents": 4,
+              "nodes": 443,
+              "jsEventListeners": 236
+            },
+            "activeWorkers": 0,
+            "activeSockets": 0,
+            "canvasElements": 0
+          },
+          {
+            "cycle": 5,
+            "jsHeapAfterGcBytes": 21154772,
+            "dom": {
+              "documents": 4,
+              "nodes": 445,
+              "jsEventListeners": 236
+            },
+            "activeWorkers": 0,
+            "activeSockets": 0,
+            "canvasElements": 0
+          }
+        ],
+        "developmentCycles": [
+          {
+            "cycle": 1,
+            "jsHeapAfterGcBytes": 36899656,
+            "dom": {
+              "documents": 4,
+              "nodes": 411,
+              "jsEventListeners": 240
+            },
+            "activeWorkers": 0,
+            "activeSockets": 1,
+            "canvasElements": 0
+          },
+          {
+            "cycle": 2,
+            "jsHeapAfterGcBytes": 37606240,
+            "dom": {
+              "documents": 4,
+              "nodes": 413,
+              "jsEventListeners": 240
+            },
+            "activeWorkers": 0,
+            "activeSockets": 1,
+            "canvasElements": 0
+          },
+          {
+            "cycle": 3,
+            "jsHeapAfterGcBytes": 38157752,
+            "dom": {
+              "documents": 4,
+              "nodes": 415,
+              "jsEventListeners": 240
+            },
+            "activeWorkers": 0,
+            "activeSockets": 1,
+            "canvasElements": 0
+          },
+          {
+            "cycle": 4,
+            "jsHeapAfterGcBytes": 38581972,
+            "dom": {
+              "documents": 4,
+              "nodes": 417,
+              "jsEventListeners": 240
+            },
+            "activeWorkers": 0,
+            "activeSockets": 1,
+            "canvasElements": 0
+          },
+          {
+            "cycle": 5,
+            "jsHeapAfterGcBytes": 38998592,
+            "dom": {
+              "documents": 4,
+              "nodes": 419,
+              "jsEventListeners": 240
+            },
+            "activeWorkers": 0,
+            "activeSockets": 1,
+            "canvasElements": 0
+          }
+        ],
+        "productionGrowthBytes": 1993204
+      },
+      "rootCauseConfidence": "growth_measured; leak_not_proven",
+      "rootCause": "Five cycles are insufficient to distinguish cache warmup from a continuing leak. Investigate retained paths in Monaco models, image caches, query data, observers and detached nodes. ComponentNode has a strong global SVG image cache with no explicit eviction; causation of this measured growth is not yet established.",
+      "sourceRefs": [
+        "Voltforge_UI/src/features/canvas/components/ComponentNode.tsx:70",
+        "Voltforge_UI/src/features/editor/CodeEditor.tsx",
+        "Voltforge_UI/src/App.tsx"
+      ],
+      "proposedWork": [
+        "Capture heap snapshots after warmup and after at least 20 equivalent navigation cycles.",
+        "Identify dominators before changing cache ownership or adding cleanup.",
+        "Bound caches or dispose resources only where retention evidence supports the change."
+      ],
+      "acceptance": [
+        "Post-warmup heap plateaus within a recorded tolerance during a longer soak.",
+        "No late callbacks, stale models, missing artwork or broken editor reopening after cleanup.",
+        "Continue asserting zero exited-editor canvases/workers/collaboration sockets."
+      ],
+      "dependsOn": [],
+      "evidenceFiles": [
+        "docs/reports/vfopt-x-001-production.json"
+      ]
+    },
+    {
+      "id": "VFOPT-X-001-F005",
+      "priority": "P2",
+      "category": "backend_scalability",
+      "status": "open",
+      "title": "Load project-list summaries directly and validate matching pagination indexes",
+      "repositories": [
+        "Voltforge_BL"
+      ],
+      "symptom": "Summary REST responses are small, but ORM list queries still select full canvas_layout and component_config JSON columns.",
+      "evidence": {
+        "requestTimings": [
+          {
+            "endpoint": "/projects?page=0&size=8",
+            "samplesMs": [
+              191.52,
+              147.24,
+              141.59,
+              165.71,
+              134.51,
+              143.45,
+              137.8,
+              138.25,
+              160.38,
+              134.92
+            ],
+            "medianMs": 143.45,
+            "maxMs": 191.52
+          },
+          {
+            "endpoint": "/projects/public?page=0&size=8",
+            "samplesMs": [
+              160.03,
+              170.53,
+              143.38,
+              143.98,
+              149.88,
+              142.68,
+              152.94,
+              146.61,
+              149.13,
+              141.36
+            ],
+            "medianMs": 149.13,
+            "maxMs": 170.53
+          },
+          {
+            "endpoint": "/projects/{auditProjectId}",
+            "samplesMs": [
+              174.68,
+              183.74,
+              188.46,
+              187.5,
+              182.52,
+              181.11,
+              179.32,
+              188.16,
+              189.6,
+              180.81
+            ],
+            "medianMs": 183.74,
+            "maxMs": 189.6
+          }
+        ],
+        "projectIndexes": "INDEX_NAME\tSEQ_IN_INDEX\tCOLUMN_NAME\tCARDINALITY\r\nidx_projects_board_type\t1\tboard_type\t1\r\nidx_projects_created_at\t1\tcreated_at\t4\r\nidx_projects_forked_from\t1\tforked_from\t1\r\nidx_projects_is_public\t1\tis_public\t2\r\nidx_projects_owner_id\t1\towner_id\t3\r\nPRIMARY\t1\tid\t4",
+        "queryDigestSource": "The database digest includes full Project entity SELECTs for owner and public lists."
+      },
+      "rootCauseConfidence": "unnecessary_columns_confirmed; large_dataset_latency_unmeasured",
+      "rootCause": "ProjectServiceImpl loads Page<Project> and maps entities to summaries afterward. The existing owner_id/is_public indexes are separate from the corresponding updated_at/created_at sort keys. The small live dataset does not establish the benefit of a new composite index.",
+      "sourceRefs": [
+        "Voltforge_BL/src/main/java/in/voltforge/api/project/service/impl/ProjectServiceImpl.java:391",
+        "Voltforge_BL/src/main/java/in/voltforge/api/project/service/impl/ProjectServiceImpl.java:415",
+        "Voltforge_BL/src/main/java/in/voltforge/api/project/repository/ProjectRepository.java",
+        "Voltforge_BL/src/main/java/in/voltforge/api/project/mapper/ProjectMapper.java"
+      ],
+      "proposedWork": [
+        "Use DTO/interface projections for list fields and avoid loading document JSON/code collections.",
+        "Run EXPLAIN ANALYZE on representative project counts and payload sizes in an isolated test database.",
+        "Add migration-backed composite indexes only where the measured query plan benefits."
+      ],
+      "acceptance": [
+        "List SQL omits document blobs while preserving owner/public/template metadata and pagination.",
+        "Measure DB rows examined, transferred bytes, application allocations and REST latency before/after.",
+        "Keep authorization and list/count semantics unchanged."
+      ],
+      "dependsOn": [
+        "VFOPT-X-001-F001"
+      ],
+      "evidenceFiles": [
+        "docs/reports/vfopt-x-001-database.json",
+        "docs/reports/vfopt-x-001-production.json"
+      ]
+    },
+    {
+      "id": "VFOPT-X-001-F006",
+      "priority": "P2",
+      "category": "local_resource_configuration",
+      "status": "open",
+      "title": "Right-size local database pool defaults separately from deployment capacity",
+      "repositories": [
+        "Voltforge_BL"
+      ],
+      "symptom": "The local Hikari pool retains 20-21 idle connections during single-user measurements with no active or pending requests.",
+      "evidence": {
+        "configuredMinimumIdle": 20,
+        "configuredMaximumPool": 100,
+        "observed": [
+          {
+            "phase": "before workflows",
+            "active": {
+              "status": 200,
+              "measurements": [
+                {
+                  "statistic": "VALUE",
+                  "value": 0
+                }
+              ],
+              "baseUnit": null
+            },
+            "idle": {
+              "status": 200,
+              "measurements": [
+                {
+                  "statistic": "VALUE",
+                  "value": 20
+                }
+              ],
+              "baseUnit": null
+            },
+            "pending": {
+              "status": 200,
+              "measurements": [
+                {
+                  "statistic": "VALUE",
+                  "value": 0
+                }
+              ],
+              "baseUnit": null
+            }
+          },
+          {
+            "phase": "after workflows",
+            "active": {
+              "status": 200,
+              "measurements": [
+                {
+                  "statistic": "VALUE",
+                  "value": 0
+                }
+              ],
+              "baseUnit": null
+            },
+            "idle": {
+              "status": 200,
+              "measurements": [
+                {
+                  "statistic": "VALUE",
+                  "value": 21
+                }
+              ],
+              "baseUnit": null
+            },
+            "pending": {
+              "status": 200,
+              "measurements": [
+                {
+                  "statistic": "VALUE",
+                  "value": 0
+                }
+              ],
+              "baseUnit": null
+            }
+          }
+        ]
+      },
+      "rootCauseConfidence": "configuration_and_idle_allocation_confirmed;_cpu_saving_unmeasured",
+      "rootCause": "Defaults are sized for hundreds of collaborative sessions, not a single laptop development session. This does not prove that the pool explains the measured simulation CPU load.",
+      "sourceRefs": [
+        "Voltforge_BL/src/main/resources/application.yml:27"
+      ],
+      "proposedWork": [
+        "Introduce environment/profile-specific pool sizing and keep production capacity explicit.",
+        "Measure idle memory, connection count and bursts before selecting smaller development defaults."
+      ],
+      "acceptance": [
+        "Local idle connections and resource footprint decrease without request queuing or connection-timeout regressions under the chosen development workload.",
+        "Production deployment settings remain independently configurable."
+      ],
+      "dependsOn": [],
+      "evidenceFiles": [
+        "docs/reports/vfopt-x-001-production.json"
+      ]
+    },
+    {
+      "id": "VFOPT-X-001-F007",
+      "priority": "P2",
+      "category": "optional_service_request_optimization",
+      "status": "open",
+      "title": "Avoid repeated optional coverage requests while AI support is unavailable",
+      "repositories": [
+        "Voltforge_UI",
+        "Voltforge_BL"
+      ],
+      "symptom": "Ordinary editor visits trigger repeated /ai/component-coverage HTTP 500 responses even though no AI tool is opened.",
+      "evidence": {
+        "developmentFailures": 12,
+        "productionFailures": 12
+      },
+      "rootCauseConfidence": "automatic_query_and_failed_requests_confirmed",
+      "rootCause": "ComponentPanel unconditionally mounts a coverage query. The global query defaults allow retry and remount refetch after failures. The UI does remain usable and displays an unavailable status.",
+      "sourceRefs": [
+        "Voltforge_UI/src/features/editor/ComponentPanel.tsx:81",
+        "Voltforge_UI/src/App.tsx:38"
+      ],
+      "proposedWork": [
+        "Gate/defer optional coverage loading or cache unavailability with an explicit retry action.",
+        "Define a lightweight unavailable response if the application needs capability detection.",
+        "Keep all work in the application UI/backend; do not start AI model or training work."
+      ],
+      "acceptance": [
+        "With AI services unavailable, repeated ordinary editor visits do not produce repeated failed coverage traffic.",
+        "Component search, placement and simulation remain fully usable.",
+        "Explicit coverage refresh still works when the service becomes available."
+      ],
+      "dependsOn": [],
+      "evidenceFiles": [
+        "docs/reports/vfopt-x-001-development.json",
+        "docs/reports/vfopt-x-001-production.json"
+      ]
+    },
+    {
+      "id": "VFOPT-X-001-F008",
+      "priority": "P1",
+      "category": "functional_and_backend_persistence",
+      "status": "completed_with_separate_editor_followup",
+      "title": "Fix large project saves that break the database connection and leave transactions waiting",
+      "repositories": [
+        "Voltforge_BL",
+        "Voltforge_UI"
+      ],
+      "discoveredDuring": "VFOPT-X-001-F002",
+      "symptom": "A project PUT containing roughly 1.1 MB of Unicode canvas-property data returned HTTP 500 twice. The editor retained its local content as dirty, but the document was not saved. Initial cleanup DELETE also timed out waiting for a database lock.",
+      "evidence": {
+        "reproductions": 2,
+        "paddingCharacters": 550000,
+        "paddingUtf8Bytes": 1100000,
+        "character": "Greek capital omega",
+        "restStatus": 500,
+        "firstRequestApproxSeconds": 19.2,
+        "databaseErrors": [
+          "Communications link failure",
+          "No operations allowed after statement closed",
+          "Hibernate transaction unable to rollback against JDBC connection",
+          "Subsequent DELETE lock wait timeout"
+        ],
+        "maxAllowedPacketBytes": 67108864,
+        "netReadTimeoutSeconds": 30,
+        "netWriteTimeoutSeconds": 60,
+        "failedWriteState": "Original small document and revision remained; the large save was not acknowledged.",
+        "clientRetention": {
+          "paddingLength": 550000,
+          "dirty": true,
+          "connections": 1,
+          "canvasFrames": 0
+        },
+        "control": "Small guarded saves succeed. WebSocket native/SockJS 900205-byte frames succeed; REST and transport limits are separate.",
+        "databaseLocation": "Configured remote managed MySQL",
+        "orphanTransaction": {
+          "state": "RUNNING but connection sleeping",
+          "rowsLocked": 1,
+          "rowsModified": 0,
+          "observedIdleSeconds": 240,
+          "scope": "Exact generated private preflight project primary row",
+          "recovery": "Only that verified orphan test connection was terminated to release its lock; all test projects were then removed."
+        }
+      },
+      "rootCauseConfidence": "TCP write reset and early lock confirmed; upstream reset origin not established",
+      "proposedWork": [
+        "Trace request serialization, JDBC batching/driver, the remote MySQL network path and socket timeouts for large ASCII and Unicode documents.",
+        "Verify failed requests release transactions/locks promptly and cannot leave later reads, saves or deletes blocked.",
+        "Define a supported REST document budget and clear validation errors; avoid uncontrolled timeout increases or silent truncation.",
+        "Preserve dirty state and recoverable local content until a durable save acknowledgement."
+      ],
+      "acceptance": [
+        "Supported large canvas/code/PCB documents save and reopen with identical authored content.",
+        "Unsupported sizes fail with a clear bounded 4xx response and retain local edits.",
+        "Concurrent saves still yield one success and one stale revision conflict.",
+        "Failed saves leave no pending transaction or lock that blocks project operations.",
+        "Verify with the real configured MySQL plus targeted regressions."
+      ],
+      "dependsOn": [
+        "VFOPT-X-001-F001"
+      ],
+      "evidenceFiles": [
+        "docs/VFOPT_X_001_FINDINGS_BACKLOG.json#VFOPT-X-001-F002.validation"
+      ],
+      "suggestedNext": false,
+      "completedAt": "2026-09-21T03:18:04.113Z",
+      "rootCause": "The deepest captured failure is SocketException: Connection reset by peer while Connector/J writes TLS packets. The subsequent batch/rollback errors mask it. SELECT FOR UPDATE already held the project row during upload. The server session allowed 28,800 seconds idle and 120-second lock waits, so a lost rollback could strand that lock. The same 1.1 MB request later succeeded unmodified; a fixed packet-size ceiling is not supported by the evidence.",
+      "resolution": {
+        "concurrency": "Use @Version on existing document_revision and check it in the actual UPDATE; remove early SELECT FOR UPDATE. Flush the changed parent for code-only/no-op saves, return the persisted version and translate competing updates to 409. Child updates roll back with a losing writer.",
+        "writes": "DynamicUpdate avoids retransmitting unchanged JSON or overwriting separately incremented view/fork counters.",
+        "transport": "Enable MySQL protocol compression within existing TLS. Driver connect timeout 5 s, socket read timeout 15 s, create/update/delete transaction timeout 20 s. No global database settings changed.",
+        "recovery": "Session row-lock wait 5 s; abandoned idle transaction fallback 60 s, with existing 30 s pool keepalive. Normal failure rolls back immediately; network failure can still require the bounded server-side idle cleanup. Availability/timeout failures return structured 503.",
+        "budget": "4 MiB UTF-8 JSON per project POST/PUT, including escaping and metadata. Read at most limit+1 bytes before parsing/transactions, including chunked input. Structured 413 for oversized requests; nested code-file validation now applies (50 files, 1,000,000 characters/file).",
+        "editor": "Check UTF-8 budget before upload. Keep local content and dirty state. Pause unchanged automatic retries after 400/409/413 or local size rejection; real edits and explicit Save can retry.",
+        "schema": "No additional schema change; uses F001 document_revision column.",
+        "documentation": "Voltforge_BL/docs/PROJECT_REVISIONS.md"
+      },
+      "validation": {
+        "backend": {
+          "command": "mvnw.cmd -q test package",
+          "java": "25",
+          "tests": 45,
+          "failures": 0,
+          "errors": 0,
+          "includes": [
+            "Large Unicode JSON/code persistence, durable code-only/no-op revision acknowledgements",
+            "Barrier-synchronized competing versioned writes with child rollback",
+            "Actual HTTP 413 for Content-Length and chunked uploads"
+          ]
+        },
+        "frontend": {
+          "documentChecks": 10,
+          "build": "passed including TypeScript and bundle budget",
+          "initialStaticJsKiB": 504.6,
+          "initialChunks": 13,
+          "changedFileLint": "passed"
+        },
+        "live": {
+          "database": "Configured remote managed MySQL",
+          "apiChecks": [
+            {
+              "name": "Large Unicode canvas, code and PCB save/reopen match",
+              "passed": true,
+              "requestBytes": 2800433,
+              "saveMs": 1214,
+              "revision": "1"
+            },
+            {
+              "name": "Less compressible large ASCII canvas saves intact",
+              "passed": true,
+              "paddingBytes": 3333336,
+              "saveMs": 5861
+            },
+            {
+              "name": "Exact 4 MiB UTF-8 request saves and reopens",
+              "passed": true,
+              "saveMs": 4119
+            },
+            {
+              "name": "POST oversize rejected with structured 413",
+              "passed": true,
+              "ms": 39
+            },
+            {
+              "name": "PUT oversize rejected with structured 413",
+              "passed": true,
+              "ms": 35
+            },
+            {
+              "name": "Nested code validation rejects unsupported file before save",
+              "passed": true,
+              "ms": 19
+            },
+            {
+              "name": "Three concurrent save pairs each have one success and one conflict; child content matches winner",
+              "passed": true
+            },
+            {
+              "name": "Held database row returns bounded 503",
+              "passed": true,
+              "ms": 5656
+            },
+            {
+              "name": "Failed save rolls back parent and code; immediate read succeeds",
+              "passed": true
+            }
+          ],
+          "developmentBrowser": [
+            {
+              "name": "Browser rejects oversized UTF-8 save locally, preserves edits and stops repeated autosave",
+              "passed": true,
+              "puts": 0,
+              "dirty": true,
+              "saving": false,
+              "paddingLength": 2200000
+            },
+            {
+              "name": "Reducing document resumes autosave and persists retained edits",
+              "passed": true,
+              "statuses": [
+                200
+              ]
+            },
+            {
+              "name": "Server closes abandoned test transaction after idle bound and project reads recover",
+              "passed": true,
+              "observedAfterMs": 65558
+            }
+          ],
+          "productionBrowser": [
+            {
+              "name": "Production native canvas edit exceeds save budget; warning shown, dirty state retained, zero uploads/retries",
+              "passed": true,
+              "puts": 0
+            },
+            {
+              "name": "Production Clear Workspace reduces document, resumes real autosave and reopens intact",
+              "passed": true,
+              "statuses": [
+                200
+              ]
+            }
+          ]
+        },
+        "diagnosticObservations": {
+          "preChangeFullRestSave": {
+            "unicodeBytes": 1100000,
+            "status": 200,
+            "saveMs": 7386,
+            "note": "Intermittent failure did not reproduce on this attempt; pre-change whole-object comparison used JSON key order and is not counted as an equality pass. Final checks use deep content comparison."
+          },
+          "directJdbcSends": {
+            "sizesBytes": [
+              100000,
+              600000,
+              1100000,
+              2000000
+            ],
+            "alphabets": [
+              "ASCII",
+              "Unicode"
+            ],
+            "allPassed": true,
+            "uncompressed1100000Ms": [
+              4838,
+              4397
+            ],
+            "compressed1100000Ms": [
+              1194,
+              925
+            ],
+            "note": "Separate diagnostic sends include connection overhead; not a controlled application benchmark."
+          },
+          "failedAttempts": [
+            "First backend size-rejection test exposed a socket reset hiding the 413; bounded prefix reading corrected it and all 45 tests passed.",
+            "Initial development browser warning assertion timed out. The isolated rerun awaited the owner Save control and hydration, then both rejection and recovery passed.",
+            "First production selector assumed the old Monaco textarea; current Chrome uses the native EditContext textbox.",
+            "A production bulk typed-text attempt froze the renderer and was initially mislabeled as paste; F009 records the corrected input-path diagnosis and native clipboard verification.",
+            "A native Delete key in split view did not reduce the fixture; the explicit Clear Workspace action verified production recovery."
+          ]
+        },
+        "limitations": [
+          "The upstream source of the TCP reset is unknown; this change adds supported budgets, efficient transfers and bounded recovery, not a claim that networks cannot fail.",
+          "Rejected edits are retained in the current tab, not a durable offline draft.",
+          "F009 subsequently verified native large clipboard pastes and corrected a separate timed edit-loss guard. The original freeze reproduction used a bulk typed-text event."
+        ],
+        "finalCleanup": {
+          "testProjectsRemaining": 0,
+          "activeDatabaseTransactions": 0,
+          "temporaryArtifacts": "removed after embedding evidence; count recorded below",
+          "temporaryArtifactFiles": 20
+        }
+      },
+      "editorFollowUp": {
+        "id": "VFOPT-X-001-F009",
+        "status": "completed_scoped_acceptance"
+      }
+    },
+    {
+      "id": "VFOPT-X-001-F009",
+      "priority": "P1",
+      "category": "ui_responsiveness",
+      "status": "completed_scoped_acceptance",
+      "title": "Prevent large single-line code edits from freezing the editor",
+      "repositories": [
+        "Voltforge_UI"
+      ],
+      "discoveredDuring": "VFOPT-X-001-F008",
+      "symptom": "A previous production test injected 920,003 characters through keyboard.insertText and froze the renderer. That was originally mislabeled as clipboard paste. Actual clipboard paste and model loading remain responsive. Follow-up production checks also exposed real keystrokes being lost immediately after switching files.",
+      "evidence": {
+        "mode": "Unmodified production bundle, real authenticated fixture",
+        "existingCanvasUtf8Bytes": 3300000,
+        "pasteCharacters": 920003,
+        "codeFileLimitCharacters": 1000000,
+        "resultingWholeDocument": "Above the 4 MiB save budget; UI must remain responsive enough to reject/reduce it.",
+        "rendererCumulativeCpuSeconds": 3374.859375,
+        "rendererWorkingSetBytes": 910942208,
+        "cleanup": "Terminated only the identified temporary production runner and its Chrome child processes; private fixture removed.",
+        "editor": "Monaco via @monaco-editor/react; wordWrap on; native EditContext textbox in current Chrome",
+        "inputMethodCorrection": "The original test used keyboard.insertText, not Ctrl+V. Its pasteCharacters field records the injected text length. Cumulative renderer CPU is a process snapshot, not a measured paste duration."
+      },
+      "rootCauseConfidence": "Synthetic typed-input stall reproduced with an external watchdog; native paste/model load measured separately; timed lost-edit guard reproduced and corrected.",
+      "sourceRefs": [
+        "Voltforge_UI/src/features/editor/CodeEditor.tsx",
+        "Voltforge_UI/scripts/run-editor-render-tests.mjs",
+        "Voltforge_UI/src/features/editor/editorDocumentSnapshots.ts"
+      ],
+      "proposedWork": [
+        "Profile bounded large-file and long-line workloads without leaving hung test browsers running.",
+        "Keep model load, paste, wrapping and tokenization responsive within documented code-file limits; use size-aware editor settings or a safe large-file mode as evidence warrants.",
+        "Ensure oversized edits can be rejected or reduced with clear feedback before expensive rendering, with no silent truncation or lost local content."
+      ],
+      "acceptance": [
+        "Representative large multiline code and long single-line code open and can be edited within a measured responsiveness budget.",
+        "A paste exceeding the supported save budget leaves the editor responsive and preserves recoverable content or clearly rejects the edit before applying it.",
+        "Normal syntax highlighting, typing, undo/redo, autosave and read-only behavior remain correct.",
+        "Verify with the production bundle and bound/clean up browser test processes."
+      ],
+      "dependsOn": [
+        "VFOPT-X-001-F008"
+      ],
+      "suggestedNext": false,
+      "completedAt": "2026-09-21T03:39:25.708Z",
+      "rootCause": "Monaco 0.55.1 handles keyboard-source type input one character at a time in CursorsController.type, whereas paste applies one TypeOperations.paste edit. Sending a 920,003-character typed event exercised that expensive path. Separately, CodeEditor ignored all onChange events for 100 ms after file/view switches, dropping real user input even though Monaco displayed it. The React Monaco wrapper already suppresses its own controlled value updates.",
+      "resolution": {
+        "editor": "Remove the timed ignoreChange guard. Keep explicit read-only/Full Sketch guards and rely on the existing Monaco React controlled-value suppression. Immediate edits now reach dirty state and persistence.",
+        "performance": "No size-dependent wrapping/tokenization change is warranted by the measured clipboard/model-load path. Existing word wrapping, language highlighting and editor options remain enabled.",
+        "regression": "Extend the existing editor browser runner with --code-editor. Native Ctrl+V plus onDidPaste assertions distinguish clipboard paste from typed input; tab/view transitions freeze time at 32 ms to catch the former 100 ms loss window. An external 8 second watchdog terminates only the owned browser if an editor action stalls.",
+        "cleanup": "The reusable regression supports --no-artifacts and restores the prior clipboard. Temporary production/probe scripts, reports and test projects are removed after summarizing results."
+      },
+      "validation": {
+        "capturedAt": "2026-09-21T03:36:22.991Z",
+        "conditions": "Installed headless Chrome, Monaco 0.55.1. Production: 1440x900, fresh uninstrumented dist build, real Keycloak/API and configured remote managed MySQL. Reusable regressions: 1366x768, Vite StrictMode with intercepted API.",
+        "responsivenessBudget": {
+          "pasteToTwoAnimationFramesMs": 1500,
+          "ownedBrowserWatchdogMs": 8000,
+          "note": "Scheduling proxy measured after clipboard preparation; not physical keyboard-to-pixel latency. Results are local workload observations, not universal device guarantees."
+        },
+        "inputPathProbe": [
+          {
+            "mode": "paste-wrap",
+            "passed": true,
+            "wallMs": 128,
+            "length": 920003,
+            "changes": 1,
+            "applyMs": 15.300000004470348,
+            "resumeMs": 120.70000000298023,
+            "beats": 1
+          },
+          {
+            "mode": "paste-nowrap",
+            "passed": true,
+            "wallMs": 127,
+            "length": 920003,
+            "changes": 1,
+            "applyMs": 15.5,
+            "resumeMs": 122,
+            "beats": 3
+          },
+          {
+            "mode": "load-wrap",
+            "passed": true,
+            "wallMs": 136,
+            "length": 920003,
+            "changes": 1,
+            "applyMs": 28.899999998509884,
+            "resumeMs": 132.19999999552965,
+            "beats": 2
+          },
+          {
+            "mode": "load-nowrap",
+            "passed": true,
+            "wallMs": 127,
+            "length": 920003,
+            "changes": 1,
+            "applyMs": 10.200000002980232,
+            "resumeMs": 123.79999999701977,
+            "beats": 3
+          },
+          {
+            "mode": "type-wrap",
+            "passed": false,
+            "error": "Error",
+            "boundedAtMs": 8000
+          }
+        ],
+        "preFix": {
+          "productionChecks": [
+            {
+              "name": "Native clipboard paste of 920003-character single line remains responsive and autosaves intact",
+              "passed": true,
+              "pasteToTwoFramesMs": 154.30000000447035,
+              "pasteEvents": 1
+            },
+            {
+              "name": "Large paste undo and redo preserve exact content",
+              "passed": true
+            },
+            {
+              "name": "Full Sketch remains read-only and returning preserves the large user file",
+              "passed": true
+            },
+            {
+              "name": "930000-character multiline code pastes and saves intact",
+              "passed": true,
+              "characters": 930000,
+              "pasteToTwoFramesMs": 176.19999999552965,
+              "pasteEvents": 1
+            },
+            {
+              "name": "Both large saved files reopen and switch intact",
+              "passed": true,
+              "reloadAndSwitchMs": 2341
+            },
+            {
+              "name": "Production acceptance",
+              "passed": false,
+              "error": "AssertionError",
+              "message": "Immediate post-switch keystroke disappeared from persisted file\n\nfalse !== true\n"
+            }
+          ],
+          "interpretation": "The saved-file check reproduced the lost keystroke: Monaco showed Z, dirty state stayed false, and a successful explicit PUT omitted Z. Earlier multi-file attempts assumed response ordering; the corrected runner selected files by filename for both paste and reopen."
+        },
+        "focusedRegression": {
+          "command": "npm run test:editor-render -- --code-editor --no-artifacts",
+          "passed": 5,
+          "failed": 0,
+          "checks": [
+            "Real Monaco mounts",
+            "Immediate typing after file switch updates the document",
+            "Full Sketch read-only and immediate typing on return preserve authored code",
+            "Native 920003-character single-line paste, undo/redo and save",
+            "Native 930000-character multiline paste, undo/redo and save"
+          ],
+          "pasteToTwoFramesMs": {
+            "singleLine": 201,
+            "multiline": 295
+          },
+          "clock": "Paused only for tab/view transition checks, advanced 32 ms, resumed for paste measurements."
+        },
+        "documentRegression": {
+          "command": "npm run test:document-revision",
+          "passed": 10,
+          "failed": 0
+        },
+        "build": {
+          "command": "npm run build",
+          "status": "passed",
+          "typescript": "passed",
+          "bundleBudget": "passed",
+          "initialStaticJsKiB": 504.6,
+          "initialChunks": 13
+        },
+        "changedFileLint": "passed",
+        "productionChecks": [
+          {
+            "name": "Native clipboard paste of 920003-character single line remains responsive and autosaves intact",
+            "passed": true,
+            "pasteToTwoFramesMs": 187.29999999701977,
+            "pasteEvents": 1
+          },
+          {
+            "name": "Large paste undo and redo preserve exact content",
+            "passed": true
+          },
+          {
+            "name": "Full Sketch remains read-only and returning preserves the large user file",
+            "passed": true
+          },
+          {
+            "name": "930000-character multiline code pastes and saves intact",
+            "passed": true,
+            "characters": 930000,
+            "pasteToTwoFramesMs": 172.30000000447035,
+            "pasteEvents": 1
+          },
+          {
+            "name": "Both large saved files reopen and switch intact",
+            "passed": true,
+            "reloadAndSwitchMs": 2394
+          },
+          {
+            "name": "Immediate typing after file switch persists",
+            "passed": true,
+            "elapsedMs": 246.89999999850988,
+            "dirty": true
+          },
+          {
+            "name": "Oversized combined document stays responsive with clear feedback, retained code and zero uploads/retries",
+            "passed": true,
+            "pasteToTwoFramesMs": 145.70000000298023,
+            "pasteEvents": 1
+          },
+          {
+            "name": "Reducing code resumes autosave and preserves the large canvas",
+            "passed": true
+          }
+        ],
+        "oversize": {
+          "authoredCanvasUtf8Bytes": 3300000,
+          "pastedCodeCharacters": 920003,
+          "saveBudgetBytes": 4194304,
+          "observationAfterWarningMs": 10500,
+          "projectPutRequests": 0,
+          "dirtyRetained": true,
+          "exactCodeRetained": true,
+          "recovery": "Reducing code to // recovered resumes autosave; stored canvas retains 1650000 omega characters."
+        },
+        "limitations": [
+          "An artificial 920003-character keyboard type event still stalls upstream Monaco and is stopped by the watchdog. This work verifies native clipboard input/model loading and fixes the app edit-loss guard; it does not claim arbitrary huge IME or automation typed events are optimized.",
+          "No production change to wrapping, tokenization, language highlighting, solver behavior or backend was needed for this item.",
+          "Rejected edits remain in the current tab; they are not a durable offline draft."
+        ],
+        "cleanup": {
+          "temporaryTestProjectsRemaining": 0,
+          "ownedBrowserProcesses": "Closed or killed by the owning runner; production fixture DELETE acknowledged.",
+          "temporaryArtifacts": "removed",
+          "retained": "Aggregate backlog evidence and regression additions to the existing editor browser suite; no new standalone test file.",
+          "temporaryArtifactFilesRemoved": 7
+        }
+      }
+    }
+  ],
+  "nextWorkItem": {
+    "id": "VFOPT-X-001-F003",
+    "title": "Reduce visible-scene drawing cost during sustained mixed-component simulation",
+    "status": "recommended_not_started",
+    "reason": "F009 editor checks and save recovery are complete. Resume the measured sustained-simulation CPU/drawing hotspot after the completed transport and persistence prerequisites.",
+    "backlog": "docs/VFOPT_X_001_FINDINGS_BACKLOG.json"
+  },
+  "artifactRetention": {
+    "generatedRawArtifacts": "removed at user request",
+    "oneOffAuditAndValidationScripts": "removed after validation",
+    "retained": "Embedded measurements, live acceptance results, schema patch, implementation notes and reusable regression suites.",
+    "cleanup": {
+      "generatedReportsScreenshotsProfiles": 56,
+      "bytes": 2554320,
+      "temporaryHelpersChecksAndLogs": 16,
+      "oneOffAuditRunners": 2,
+      "temporaryAuditProjectsRemaining": 0
+    },
+    "f008": {
+      "temporaryArtifactsRemoved": 20,
+      "retained": "Implementation, existing regression suites, aggregate evidence and the separately open F009 finding."
+    },
+    "f009": {
+      "temporaryArtifacts": "removed",
+      "retained": "Embedded input-path diagnosis, before/after acceptance evidence and the existing reusable editor browser suite.",
+      "temporaryArtifactFilesRemoved": 7
+    }
+  },
+  "databaseLocationCorrection": {
+    "date": "2026-09-20",
+    "detail": "The application processes run locally; the configured MySQL connection targets a remote managed instance. Earlier wording describing the database as local was incorrect. Retained request timings include that network path."
+  }
+}

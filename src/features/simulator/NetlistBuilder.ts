@@ -5,8 +5,9 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import type { CanvasNode, Wire } from '../../types/domain';
+import { normalizePotentiometerPosition } from '../canvas/componentContracts';
 import type { MNAElement } from './MNASolver';
-import { getBoardLogicVoltage, isBoardComponentType } from '../canvas/boardCatalog';
+import { getBoardLogicVoltage, getBoardPinNumber, getBoardPowerVoltage, isBoardComponentType } from '../canvas/boardCatalog';
 import {
   SIMULATION_MODELS,
   booleanProperty,
@@ -24,6 +25,44 @@ import {
 
 // ── Intermediate types ──────────────────────────────────────────────────
 
+export interface MNAElementTopology {
+  id: string;
+  type: MNAElement['type'];
+  nodeA: number;
+  nodeB: number;
+  controlNode?: number;
+  controlNode2?: number;
+  resetNode?: number;
+  internalNode?: number;
+  positiveRailNode?: number;
+  negativeRailNode?: number;
+  outputElementId?: string;
+  dischargeElementId?: string;
+}
+
+export interface MNATopology {
+  numNodes: number;
+  groundNodeIndex: number;
+  /** Cheap input fingerprint used to reject stale connectivity caches. */
+  connectivitySignature: string;
+  /** Maps a canvas pin key to its stable MNA node index. */
+  pinToMNANode: Map<string, number>;
+  /** Maps each stable MNA element ID back to its canvas component. */
+  elementToComponent: Map<string, string>;
+  /** Components represented by the safe generic load model. */
+  genericComponentIds: Set<string>;
+  /** Element IDs and node references that determine the solver matrix shape. */
+  elementSignatures: MNAElementTopology[];
+}
+
+export interface MNABuildMetrics {
+  topologyCacheHit: boolean;
+  connectivityDiscoveryPassCount: number;
+  registeredPinCount: number;
+  wireUnionCount: number;
+  breadboardProximityComparisonCount: number;
+}
+
 export interface MNACircuit {
   numNodes: number;            // Total electrical nodes (excluding ground)
   elements: MNAElement[];      // Components for the solver
@@ -32,8 +71,21 @@ export interface MNACircuit {
   pinToMNANode: Map<string, number>;
   /** Maps MNA element ID back to canvas component ID */
   elementToComponent: Map<string, string>;
+  /** Components represented by the safe generic load model. */
+  genericComponentIds: Set<string>;
   /** Stable scope channel labels mapped to their solved MNA node. */
   scopeChannels: Record<string, number>;
+  /** Cached connectivity and matrix-shape data used by incremental refreshes. */
+  topology: MNATopology;
+  /** Deterministic evidence that cached refreshes skipped connectivity work. */
+  buildMetrics: MNABuildMetrics;
+}
+
+export type MeterMeasurementMode = 'VOLTAGE' | 'CURRENT' | 'RESISTANCE';
+
+export interface VirtualMeterConfiguration {
+  mode: MeterMeasurementMode;
+  probes: Array<{ nodeId: string; pinId: string }>;
 }
 
 // ── Union-Find (same approach as existing netlist.ts) ───────────────────
@@ -73,6 +125,111 @@ class UnionFind {
 }
 
 const pinKey = (nodeId: string, pinId: string) => `${nodeId}:${pinId}`;
+
+function genericPinLabel(pin: { id: string; name?: string }): string {
+  return `${pin.id} ${pin.name || ''}`;
+}
+
+function isGenericPowerPin(pin: { id: string; name?: string; type?: string }): boolean {
+  return pin.type === 'power' || /(?:^|[\s_:+-])(vcc|vdd|vin|vbat|3v3|5v|12v|power|positive|pos|plus)(?:$|[\s_:+-])/i.test(genericPinLabel(pin));
+}
+
+function isGenericGroundPin(pin: { id: string; name?: string; type?: string }): boolean {
+  return pin.type === 'ground' || /(?:^|[\s_:+-])(gnd|ground|vss|negative|neg|minus)(?:$|[\s_:+-])/i.test(genericPinLabel(pin));
+}
+
+function genericResistance(properties: Record<string, unknown>, fallback: number): number {
+  const requested = properties.resistance
+    ?? properties.loadResistance
+    ?? properties.internalResistance
+    ?? properties.powerResistance;
+  return Math.min(1e9, Math.max(1, numericProperty(requested, fallback)));
+}
+
+function meterMeasurementMode(value: unknown): MeterMeasurementMode {
+  const normalized = String(value || 'VOLTAGE').trim().toUpperCase();
+  if (normalized === 'CURRENT' || normalized === 'MA') return 'CURRENT';
+  if (normalized === 'RESISTANCE' || normalized === 'OHM' || normalized === 'CONTINUITY') return 'RESISTANCE';
+  return 'VOLTAGE';
+}
+
+function hasActiveExternalPower(nodes: CanvasNode[], boardPoweredMap: Record<string, boolean>): boolean {
+  return nodes.some((node) => {
+    if (isStandaloneSourceType(node.type)) {
+      const source = sourceDefinition(node.type, node.properties || {});
+      if (!source.enabled) return false;
+      return source.isAc
+        ? Math.max(Math.abs(source.amplitude), Math.abs(source.offset)) > 0.01
+        : Math.abs(source.voltage) > 0.01;
+    }
+    return isBoardComponentType(node.type) && (boardPoweredMap[node.id] ?? node.properties?.boardPowered !== false);
+  });
+}
+
+function addMeterElements(
+  elements: MNAElement[],
+  elementToComponent: Map<string, string>,
+  meterId: string,
+  nodeA: number,
+  nodeB: number,
+  mode: MeterMeasurementMode,
+  resistanceTestAllowed: boolean,
+  nextExtraNode: number,
+  componentId?: string,
+): number {
+  const voltageId = meterId === 'virtual' ? 'vm_virtual' : `vm_${meterId}`;
+  const currentId = meterId === 'virtual' ? 'mm_virtual' : `mm_${meterId}`;
+  const resistanceSourceId = meterId === 'virtual' ? 'vs_vm_ohm_virtual' : `vs_mm_ohm_${meterId}`;
+  const resistanceSeriesId = meterId === 'virtual' ? 'r_vm_ohm_virtual' : `r_mm_ohm_${meterId}`;
+  const mapToComponent = (id: string) => {
+    if (componentId) elementToComponent.set(id, componentId);
+  };
+
+  if (mode === 'CURRENT') {
+    elements.push({
+      id: currentId,
+      type: 'RESISTOR',
+      nodeA,
+      nodeB,
+      value: SIMULATION_MODELS.meter.currentShuntResistance,
+    });
+    mapToComponent(currentId);
+    return nextExtraNode;
+  }
+
+  if (mode === 'RESISTANCE' && resistanceTestAllowed) {
+    const testNode = nextExtraNode++;
+    elements.push({
+      id: resistanceSourceId,
+      type: 'VOLTAGE_SOURCE',
+      nodeA,
+      nodeB: testNode,
+      value: SIMULATION_MODELS.meter.resistanceTestVoltage,
+    });
+    elements.push({
+      id: resistanceSeriesId,
+      type: 'RESISTOR',
+      nodeA: testNode,
+      nodeB,
+      value: SIMULATION_MODELS.meter.resistanceTestSeriesResistance,
+    });
+    mapToComponent(resistanceSourceId);
+    mapToComponent(resistanceSeriesId);
+    return nextExtraNode;
+  }
+
+  // Voltage mode — and resistance mode while an external supply is present —
+  // keeps a high-impedance probe path and never injects test energy.
+  elements.push({
+    id: voltageId,
+    type: 'RESISTOR',
+    nodeA,
+    nodeB,
+    value: SIMULATION_MODELS.meter.voltageInputResistance,
+  });
+  mapToComponent(voltageId);
+  return nextExtraNode;
+}
 
 // ── Helper: check if a component type is a board / MCU ──────────────────
 
@@ -191,6 +348,8 @@ function addLegacyPinAliases(node: CanvasNode, uf: UnionFind) {
     join('in2', ['a2']);
     join('in3', ['b1']);
     join('in4', ['b2']);
+    join('vcc', ['power', 'positive', 'pos', '5v']);
+    join('gnd', ['ground', 'negative', 'neg', '0v']);
   }
 
   if (['BATTERY_9V', 'BATTERY_AA', 'POWER_SUPPLY', 'DC_SOURCE_3V3', 'DC_SOURCE_5V', 'DC_SOURCE_12V', 'AC_FUNCTION_GENERATOR'].includes(node.type)) {
@@ -204,20 +363,7 @@ function addLegacyPinAliases(node: CanvasNode, uf: UnionFind) {
 }
 
 function boardIoPinNumber(pin: { id: string; name: string; type?: string }): string {
-  const label = `${pin.name} ${pin.id}`;
-
-  // Only real GPIO labels should become MCU drivers. Power labels like "5V"
-  // used to match the old numeric regex and collide with D5.
-  const analogMatch = label.match(/\bA([0-9]{1,2})\b/i);
-  if (analogMatch) return `A${Number(analogMatch[1])}`;
-
-  const digitalMatch = label.match(/\bD([0-9]{1,2})\b/i);
-  if (digitalMatch) return String(Number(digitalMatch[1]));
-
-  if (/\bTX\b/i.test(label)) return '1';
-  if (/\bRX\b/i.test(label)) return '3';
-
-  return '';
+  return getBoardPinNumber(pin);
 }
 
 function mcuDriverSuffix(pinNumber: string): string {
@@ -305,18 +451,40 @@ export function buildMNACircuit(
   wires: Wire[],
   pinStates: Record<string, number> = {},
   pinModes: Record<string, string> = {},
-  boardPoweredMap: Record<string, boolean> = {}
+  boardPoweredMap: Record<string, boolean> = {},
+  virtualMeter?: VirtualMeterConfiguration,
+  cachedTopology?: MNATopology,
 ): MNACircuit {
+  const currentConnectivitySignature = connectivitySignature(nodes, wires);
+  const reusableTopology = cachedTopology && cachedTopology.connectivitySignature === currentConnectivitySignature
+    ? cachedTopology
+    : undefined;
+  const buildMetrics: MNABuildMetrics = {
+    topologyCacheHit: Boolean(reusableTopology),
+    connectivityDiscoveryPassCount: reusableTopology ? 0 : 1,
+    registeredPinCount: 0,
+    wireUnionCount: 0,
+    breadboardProximityComparisonCount: 0,
+  };
   const uf = new UnionFind();
   const elements: MNAElement[] = [];
-  const elementToComponent = new Map<string, string>();
+  const elementToComponent = reusableTopology
+    ? new Map(reusableTopology.elementToComponent)
+    : new Map<string, string>();
   const scopeChannels: Record<string, number> = {};
+  const boardForLogic = nodes.find((node) => isBoardComponentType(node.type));
+  const logicVoltage = boardForLogic ? boardLogicVoltage(boardForLogic.type) : 5;
 
+  let pinToMNANode: Map<string, number>;
+  let nextNode = 1; // 0 is reserved for ground
+
+  if (!reusableTopology) {
   // 1. Register all pins in Union-Find
   for (const node of nodes) {
     if (!node.pins) continue;
     for (const pin of node.pins) {
       uf.add(pinKey(node.id, pin.id));
+      buildMetrics.registeredPinCount += 1;
     }
     // Auto-connect breadboard internal rows
     addBreadboardConnections(node, uf);
@@ -326,6 +494,7 @@ export function buildMNACircuit(
 
   // 2. Merge pins connected by wires
   for (const wire of wires) {
+    buildMetrics.wireUnionCount += 1;
     uf.union(
       pinKey(wire.fromNodeId, wire.fromPinId),
       pinKey(wire.toNodeId, wire.toPinId)
@@ -340,6 +509,7 @@ export function buildMNACircuit(
       for (const node of nodes) {
         if (node.id === bb.id || node.type === 'BREADBOARD') continue;
         for (const pinNode of node.pins || []) {
+          buildMetrics.breadboardProximityComparisonCount += 1;
           const posNode = getAbsolutePinPos(node, pinNode);
           const dx = posNode.x - posBB.x;
           const dy = posNode.y - posBB.y;
@@ -357,8 +527,6 @@ export function buildMNACircuit(
   // electrically separate.
   const groups = uf.groups();
   const rootToMNANode = new Map<string, number>();
-  let nextNode = 1; // 0 is reserved for ground
-
   const referencePin = nodes
     .filter((node) => isBoard(node.type))
     .flatMap((node) => (node.pins || []).map((pin) => ({ node, pin })))
@@ -380,7 +548,7 @@ export function buildMNACircuit(
   }
 
   // Build pin → MNA node map
-  const pinToMNANode = new Map<string, number>();
+  pinToMNANode = new Map<string, number>();
   for (const [root, members] of groups) {
     const mnaNode = rootToMNANode.get(root) ?? 0;
     for (const member of members) {
@@ -388,7 +556,18 @@ export function buildMNACircuit(
     }
   }
 
-  let nextExtraNode = nextNode;
+  } else {
+    pinToMNANode = new Map(reusableTopology.pinToMNANode);
+  }
+
+  // Internal nodes are allocated deterministically after the external pin
+  // range. Starting after cachedTopology.numNodes would append a fresh range
+  // on every value refresh and falsely turn unchanged topology into a rebuild.
+  let highestExternalNode = 0;
+  for (const nodeIndex of pinToMNANode.values()) {
+    highestExternalNode = Math.max(highestExternalNode, nodeIndex);
+  }
+  let nextExtraNode = reusableTopology ? highestExternalNode + 1 : nextNode;
 
   // Helper to get MNA node for a component's pin
   const nodeFor = (componentId: string, pinId: string): number => {
@@ -403,9 +582,14 @@ export function buildMNACircuit(
 
   // 4. Create MNA elements from canvas components
   let vsCounter = 0;
+  const genericComponentIds = reusableTopology
+    ? new Set(reusableTopology.genericComponentIds)
+    : new Set<string>();
+  const resistanceTestAllowed = !hasActiveExternalPower(nodes, boardPoweredMap);
 
   for (const node of nodes) {
     const props = node.properties || {};
+    const elementsBeforeNode = elements.length;
 
     // Skip breadboards (they only provide connectivity)
     if (node.type === 'BREADBOARD') continue;
@@ -466,7 +650,8 @@ export function buildMNACircuit(
       // Power pins as switchable voltage sources
       for (const pin of node.pins || []) {
         const label = pin.name.toUpperCase();
-        if (label === '5V' || label === 'VCC') {
+        const railVoltage = getBoardPowerVoltage(node.type, pin);
+        if (railVoltage !== null) {
           const internalNode = nextExtraNode++;
           const srcId = `vs_${node.id}_${pin.id}_src`;
           elements.push({
@@ -474,29 +659,7 @@ export function buildMNACircuit(
             type: 'VOLTAGE_SOURCE',
             nodeA: internalNode,
             nodeB: boardGroundNode,
-            value: 5,
-          });
-          elementToComponent.set(srcId, node.id);
-          vsCounter++;
-
-          const swId = `r_board_pwr_${node.id}_${pin.id.toLowerCase()}`;
-          elements.push({
-            id: swId,
-            type: 'RESISTOR',
-            nodeA: internalNode,
-            nodeB: nodeFor(node.id, pin.id),
-            value: isPowered ? 0.01 : 1e8,
-          });
-          elementToComponent.set(swId, node.id);
-        } else if (label === '3.3V' || label === '3V3') {
-          const internalNode = nextExtraNode++;
-          const srcId = `vs_${node.id}_${pin.id}_src`;
-          elements.push({
-            id: srcId,
-            type: 'VOLTAGE_SOURCE',
-            nodeA: internalNode,
-            nodeB: boardGroundNode,
-            value: 3.3,
+            value: railVoltage,
           });
           elementToComponent.set(srcId, node.id);
           vsCounter++;
@@ -731,6 +894,7 @@ export function buildMNACircuit(
         { pin: gPin, key: 'g', color: 'green' as const },
         { pin: bPin, key: 'b', color: 'blue' as const },
       ];
+      const hasChannel = channels.some((channel) => Boolean(channel.pin));
 
       for (const ch of channels) {
         if (ch.pin) {
@@ -752,11 +916,11 @@ export function buildMNACircuit(
           elementToComponent.set(diodeId, node.id);
         }
       }
-      continue;
+      if (hasChannel) continue;
     }
 
     // ── LED (modeled as diode + Vf series source) ──
-    if (node.type.includes('LED') && !node.type.includes('NEOPIXEL')) {
+    if (node.type.includes('LED')) {
       const anodePin = node.pins?.find((p) =>
         /anode|\+|pos/i.test(`${p.id} ${p.name}`)
       );
@@ -780,45 +944,11 @@ export function buildMNACircuit(
           maxCurrent: ledMaximumCurrent_mA(props) / 1000,
         });
         elementToComponent.set(diodeId, node.id);
+        continue;
       }
-      continue;
     }
 
     // ── PUSH BUTTON / BUTTON ──
-    // Addressable LED strip/module: powered load plus high-impedance data pins.
-    if (node.type === 'LED_NEOPIXEL') {
-      const vccNode = nodeFor(node.id, 'vcc');
-      const gndNode = nodeFor(node.id, 'gnd');
-      const pixelCount = Math.max(1, Number(props.pixelCount) || Number(props.pixels) || 1);
-      const brightness = Math.max(0.02, Math.min(1, (Number(props.brightness) || 30) / 100));
-      const activeCurrent = pixelCount * 0.06 * brightness;
-      const resistance = activeCurrent > 0 ? 5 / activeCurrent : 1e8;
-
-      const powerId = `r_neopixel_power_${node.id}`;
-      elements.push({
-        id: powerId,
-        type: 'RESISTOR',
-        nodeA: vccNode,
-        nodeB: gndNode,
-        value: Math.max(10, resistance),
-      });
-      elementToComponent.set(powerId, node.id);
-
-      for (const dataPin of ['din', 'dout']) {
-        if (!node.pins?.some((pin) => pin.id === dataPin)) continue;
-        const inputId = `r_neopixel_${dataPin}_${node.id}`;
-        elements.push({
-          id: inputId,
-          type: 'RESISTOR',
-          nodeA: nodeFor(node.id, dataPin),
-          nodeB: gndNode,
-          value: 100_000,
-        });
-        elementToComponent.set(inputId, node.id);
-      }
-      continue;
-    }
-
     if (node.type === 'PUSH_BUTTON' || node.type === 'BUTTON') {
       const isPressed = Boolean(props.isPressed);
       const swVal = isPressed ? 0.01 : 1e8;
@@ -1044,8 +1174,8 @@ export function buildMNACircuit(
 
     // ── 7-Segment Display (segment diodes to com) ──
     if (node.type === 'DISPLAY_LCD_I2C' || node.type === 'LCD_16X2' || node.type === 'DISPLAY_OLED' || node.type === 'OLED_DISPLAY') {
-      const vccPin = node.pins?.find((pin) => /^(vcc|vdd|5v|3v3)$/i.test(pin.id));
-      const gndPin = node.pins?.find((pin) => /^(gnd|vss)$/i.test(pin.id));
+      const vccPin = node.pins?.find((pin) => /\b(vcc|vdd|5v|3v3)\b/i.test(`${pin.id} ${pin.name}`));
+      const gndPin = node.pins?.find((pin) => /\b(gnd|vss)\b/i.test(`${pin.id} ${pin.name}`));
       if (vccPin && gndPin) {
         const vccNode = nodeFor(node.id, vccPin.id);
         const gndNode = nodeFor(node.id, gndPin.id);
@@ -1124,7 +1254,7 @@ export function buildMNACircuit(
         type: 'VOLTAGE_SOURCE',
         nodeA: internalOutNode,
         nodeB: nodeGnd,
-        value: hasMotion ? 5 : 0,
+        value: hasMotion ? logicVoltage : 0,
       });
       elementToComponent.set(idOut, node.id);
       vsCounter++;
@@ -1239,31 +1369,61 @@ export function buildMNACircuit(
 
     // ── DC Motor (winding resistance + dynamic back-EMF) ──
     if (node.type === 'MOTOR_DC') {
-      const id = `mot_${node.id}`;
-      const ratedVoltage = Math.max(
-        0.1,
-        numericProperty(props.ratedVoltage ?? props.voltage, SIMULATION_MODELS.dcMotor.ratedVoltage),
-      );
-      const ratedRpm = Math.max(1, numericProperty(props.ratedRpm, SIMULATION_MODELS.dcMotor.ratedRpm));
-      const storedRpm = Math.max(0, Math.min(ratedRpm * 1.5, numericProperty(props.rpm, 0)));
-      const direction = String(props.direction || 'forward').toLowerCase() === 'reverse' ? -1 : 1;
-      const backEmf = props.isSpinning === false
-        ? 0
-        : direction * Math.min(ratedVoltage * 1.5, (storedRpm / ratedRpm) * ratedVoltage);
-      elements.push({
-        id,
-        type: 'MOTOR_DC',
-        nodeA: nodeFor(node.id, 'm1'),
-        nodeB: nodeFor(node.id, 'm2'),
-        internalNode: nextExtraNode++,
-        value: Math.max(0.1, resistanceOhms(
-          props.windingResistance ?? props.resistance,
-          SIMULATION_MODELS.dcMotor.windingResistance,
-        )),
-        backEmf,
-      });
-      elementToComponent.set(id, node.id);
-      continue;
+      const motorPins = node.pins || [];
+      const positivePin = motorPins.find((pin) =>
+        /^(m1|positive|pos|plus|vcc|power)$/i.test(pin.id)
+        || /m\s*\+|positive|pos|plus|vcc|power/i.test(`${pin.id} ${pin.name}`));
+      const negativePin = motorPins.find((pin) =>
+        /^(m2|negative|neg|minus|gnd|ground)$/i.test(pin.id)
+        || /m\s*[-−]|negative|neg|minus|gnd|ground/i.test(`${pin.id} ${pin.name}`));
+      const nodeA = positivePin ? nodeFor(node.id, positivePin.id) : 0;
+      const nodeB = negativePin ? nodeFor(node.id, negativePin.id) : 0;
+      let terminalPinA = positivePin;
+      let terminalPinB = negativePin;
+
+      // Custom/API motors often use VCC/GND or positive/negative instead of
+      // the built-in m1/m2 IDs. Do not silently create a motor between GND
+      // and GND; let the generic fallback handle genuinely unrecognizable
+      // pin layouts.
+      if (!positivePin || !negativePin || nodeA === nodeB) {
+        const fallbackA = motorPins[0];
+        const fallbackB = motorPins.find((pin) => pin.id !== fallbackA?.id) || motorPins[1];
+        if (!fallbackA || !fallbackB || nodeFor(node.id, fallbackA.id) === nodeFor(node.id, fallbackB.id)) {
+          terminalPinA = undefined;
+          terminalPinB = undefined;
+        } else {
+          terminalPinA = fallbackA;
+          terminalPinB = fallbackB;
+        }
+      }
+
+      if (terminalPinA && terminalPinB) {
+        const id = `mot_${node.id}`;
+        const ratedVoltage = Math.max(
+          0.1,
+          numericProperty(props.ratedVoltage ?? props.voltage, SIMULATION_MODELS.dcMotor.ratedVoltage),
+        );
+        const ratedRpm = Math.max(1, numericProperty(props.ratedRpm, SIMULATION_MODELS.dcMotor.ratedRpm));
+        const storedRpm = Math.max(0, Math.min(ratedRpm * 1.5, numericProperty(props.rpm, 0)));
+        const direction = String(props.direction || 'forward').toLowerCase() === 'reverse' ? -1 : 1;
+        const backEmf = props.isSpinning === false
+          ? 0
+          : direction * Math.min(ratedVoltage * 1.5, (storedRpm / ratedRpm) * ratedVoltage);
+        elements.push({
+          id,
+          type: 'MOTOR_DC',
+          nodeA: nodeFor(node.id, terminalPinA.id),
+          nodeB: nodeFor(node.id, terminalPinB.id),
+          internalNode: nextExtraNode++,
+          value: Math.max(0.1, resistanceOhms(
+            props.windingResistance ?? props.resistance,
+            SIMULATION_MODELS.dcMotor.windingResistance,
+          )),
+          backEmf,
+        });
+        elementToComponent.set(id, node.id);
+        continue;
+      }
     }
 
     // ── Potentiometer (modeled as two resistors, corrected UI values) ──
@@ -1272,8 +1432,7 @@ export function buildMNACircuit(
         props.maxResistance ?? props.resistance,
         10000,
       ));
-      const rawPosition = numericProperty(props.position, 50);
-      const pos = Math.max(0, Math.min(1, rawPosition > 1 ? rawPosition / 100 : rawPosition));
+      const pos = normalizePotentiometerPosition(props.position, 0.5);
       const rTop = total * pos;
       const rBot = total * (1 - pos);
 
@@ -1319,17 +1478,19 @@ export function buildMNACircuit(
       continue;
     }
 
-    // ── Multimeter / Voltmeter (high impedance probe: 10MΩ) ──
+    // ── Multimeter ──
     if (node.type === 'MULTIMETER') {
-      const id = `vm_${node.id}`;
-      elements.push({
-        id,
-        type: 'RESISTOR',
-        nodeA: nodeFor(node.id, 'v_probe'),
-        nodeB: nodeFor(node.id, 'com'),
-        value: SIMULATION_MODELS.meter.voltageInputResistance,
-      });
-      elementToComponent.set(id, node.id);
+      nextExtraNode = addMeterElements(
+        elements,
+        elementToComponent,
+        node.id,
+        nodeFor(node.id, 'v_probe'),
+        nodeFor(node.id, 'com'),
+        meterMeasurementMode(props.mode),
+        resistanceTestAllowed,
+        nextExtraNode,
+        node.id,
+      );
       continue;
     }
 
@@ -1621,7 +1782,7 @@ export function buildMNACircuit(
     }
 
     // ── 74HC595 Shift Register ──
-    if (node.type === 'IC_74HC595') {
+    if (node.type === 'IC_74HC595' || node.type === '74HC595') {
       const gndNode = nodeFor(node.id, 'gnd');
       const vccNode = nodeFor(node.id, 'vcc');
 
@@ -1637,7 +1798,7 @@ export function buildMNACircuit(
       elementToComponent.set(idDraw, node.id);
 
       // Model QA-QF outputs and QHP (serial output) as controlled voltage sources
-      const outputs = ['qa', 'qb', 'qc', 'qd', 'qe', 'qf', 'qhp'];
+      const outputs = ['qa', 'qb', 'qc', 'qd', 'qe', 'qf', 'qg', 'qh', 'qhp'];
       for (const pinId of outputs) {
         const pinNode = nodeFor(node.id, pinId);
         const srcId = `vs_595_${node.id}_${pinId}`;
@@ -1646,7 +1807,7 @@ export function buildMNACircuit(
           type: 'VOLTAGE_SOURCE',
           nodeA: pinNode,
           nodeB: gndNode,
-          value: 0,
+          value: digitalOutputVoltage(props, [pinId.toUpperCase(), pinId === 'qg' ? 'out_G' : pinId === 'qh' ? 'out_H' : '']),
         });
         elementToComponent.set(srcId, node.id);
         vsCounter++;
@@ -1666,6 +1827,118 @@ export function buildMNACircuit(
         });
         elementToComponent.set(rId, node.id);
       }
+      continue;
+    }
+
+    // The remaining catalog logic ICs are handled by LogicRegistry for edge
+    // behavior. Give their power pins, inputs, and outputs an electrical
+    // representation as well, so an output can drive a resistor/LED through
+    // the same MNA circuit instead of existing only as a visual property.
+    if (node.type === 'IC_74HC165' || node.type === '74HC165') {
+      const gndNode = nodeFor(node.id, 'gnd');
+      const vccNode = nodeFor(node.id, 'vcc');
+      addDigitalIcPower(elements, elementToComponent, node.id, vccNode, gndNode);
+
+      for (const [pinId, keys] of [
+        ['q7', ['serialOut']],
+        ['q7_bar', ['serialOutInverted']],
+      ] as const) {
+        const srcId = `vs_165_${node.id}_${pinId}`;
+        elements.push({
+          id: srcId,
+          type: 'VOLTAGE_SOURCE',
+          nodeA: nodeFor(node.id, pinId),
+          nodeB: gndNode,
+          value: digitalOutputVoltage(props, keys, 5, true),
+        });
+        elementToComponent.set(srcId, node.id);
+        vsCounter++;
+      }
+
+      addDigitalIcInputPulls(elements, elementToComponent, node, gndNode,
+        ['pl', 'clk', 'd0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'ser', 'ce'], nodeFor);
+      continue;
+    }
+
+    if (node.type === 'IC_74HC138' || node.type === '74HC138') {
+      const gndNode = nodeFor(node.id, 'gnd');
+      const vccNode = nodeFor(node.id, 'vcc');
+      addDigitalIcPower(elements, elementToComponent, node.id, vccNode, gndNode);
+
+      for (let index = 0; index < 8; index++) {
+        const pinId = `y${index}`;
+        const srcId = `vs_138_${node.id}_${pinId}`;
+        elements.push({
+          id: srcId,
+          type: 'VOLTAGE_SOURCE',
+          nodeA: nodeFor(node.id, pinId),
+          nodeB: gndNode,
+          value: digitalOutputVoltage(props, [`Y${index}`], 5, true),
+        });
+        elementToComponent.set(srcId, node.id);
+        vsCounter++;
+      }
+
+      addDigitalIcInputPulls(elements, elementToComponent, node, gndNode,
+        ['a0', 'a1', 'a2', 'e1_bar', 'e2_bar', 'e3'], nodeFor);
+      continue;
+    }
+
+    if (node.type === 'IC_74HC151' || node.type === '74HC151') {
+      const gndNode = nodeFor(node.id, 'gnd');
+      const vccNode = nodeFor(node.id, 'vcc');
+      addDigitalIcPower(elements, elementToComponent, node.id, vccNode, gndNode);
+
+      for (const [pinId, keys] of [['y', ['outputY']], ['w', ['outputW']] ] as const) {
+        const srcId = `vs_151_${node.id}_${pinId}`;
+        elements.push({
+          id: srcId,
+          type: 'VOLTAGE_SOURCE',
+          nodeA: nodeFor(node.id, pinId),
+          nodeB: gndNode,
+          value: digitalOutputVoltage(props, keys, 5, true),
+        });
+        elementToComponent.set(srcId, node.id);
+        vsCounter++;
+      }
+
+      addDigitalIcInputPulls(elements, elementToComponent, node, gndNode,
+        ['d0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'a', 'b', 'c', 'e_bar'], nodeFor);
+      continue;
+    }
+
+    if (node.type === 'IC_CD4017' || node.type === 'CD4017') {
+      const gndNode = nodeFor(node.id, 'gnd');
+      const vccNode = nodeFor(node.id, 'vcc');
+      addDigitalIcPower(elements, elementToComponent, node.id, vccNode, gndNode);
+
+      for (let index = 0; index < 10; index++) {
+        const pinId = `q${index}`;
+        const srcId = `vs_4017_${node.id}_${pinId}`;
+        elements.push({
+          id: srcId,
+          type: 'VOLTAGE_SOURCE',
+          nodeA: nodeFor(node.id, pinId),
+          nodeB: gndNode,
+          value: digitalOutputVoltage(props, [`Q${index}`], 5, true),
+        });
+        elementToComponent.set(srcId, node.id);
+        vsCounter++;
+      }
+
+      const carryId = `vs_4017_${node.id}_co`;
+      elements.push({
+        id: carryId,
+        type: 'VOLTAGE_SOURCE',
+        nodeA: nodeFor(node.id, 'co'),
+        nodeB: gndNode,
+        value: digitalOutputVoltage(props, ['carryOut'], 5, true),
+      });
+      elementToComponent.set(carryId, node.id);
+      vsCounter++;
+
+      addDigitalIcInputPulls(elements, elementToComponent, node, gndNode,
+        ['clk', 'clk_inh', 'reset'], nodeFor);
       continue;
     }
 
@@ -1694,7 +1967,7 @@ export function buildMNACircuit(
             type: 'VOLTAGE_SOURCE',
             nodeA: internalNode,
             nodeB: nodeFor(node.id, gndPin.id),
-            value: moisture * 5,
+            value: moisture * logicVoltage,
           });
           elementToComponent.set(srcId, node.id);
           vsCounter++;
@@ -1708,99 +1981,6 @@ export function buildMNACircuit(
             value: 1000,
           });
           elementToComponent.set(outR, node.id);
-        }
-      }
-      continue;
-    }
-
-    // ── Bluetooth Module (powered communication module) ──
-    if (node.type === 'BLUETOOTH_MODULE') {
-      const vccPin = node.pins?.find(p => /vcc/i.test(p.id));
-      const gndPin = node.pins?.find(p => /gnd/i.test(p.id));
-      if (vccPin && gndPin) {
-        const idDraw = `r_power_draw_${node.id}`;
-        elements.push({
-          id: idDraw,
-          type: 'RESISTOR',
-          nodeA: nodeFor(node.id, vccPin.id),
-          nodeB: nodeFor(node.id, gndPin.id),
-          value: 500,
-        });
-        elementToComponent.set(idDraw, node.id);
-
-        for (const dataPin of ['tx', 'rx', 'en', 'state']) {
-          if (!node.pins?.some(p => p.id === dataPin)) continue;
-          const rId = `r_bt_${dataPin}_${node.id}`;
-          elements.push({
-            id: rId,
-            type: 'RESISTOR',
-            nodeA: nodeFor(node.id, dataPin),
-            nodeB: nodeFor(node.id, gndPin.id),
-            value: 100_000,
-          });
-          elementToComponent.set(rId, node.id);
-        }
-      }
-      continue;
-    }
-
-    // ── WiFi Module (powered communication module) ──
-    if (node.type === 'WIFI_MODULE') {
-      const vccPin = node.pins?.find(p => /vcc|3v3/i.test(p.id));
-      const gndPin = node.pins?.find(p => /gnd/i.test(p.id));
-      if (vccPin && gndPin) {
-        const idDraw = `r_power_draw_${node.id}`;
-        elements.push({
-          id: idDraw,
-          type: 'RESISTOR',
-          nodeA: nodeFor(node.id, vccPin.id),
-          nodeB: nodeFor(node.id, gndPin.id),
-          value: 300,
-        });
-        elementToComponent.set(idDraw, node.id);
-
-        for (const dataPin of ['tx', 'rx', 'rst', 'ch_pd']) {
-          if (!node.pins?.some(p => p.id === dataPin)) continue;
-          const rId = `r_wifi_${dataPin}_${node.id}`;
-          elements.push({
-            id: rId,
-            type: 'RESISTOR',
-            nodeA: nodeFor(node.id, dataPin),
-            nodeB: nodeFor(node.id, gndPin.id),
-            value: 100_000,
-          });
-          elementToComponent.set(rId, node.id);
-        }
-      }
-      continue;
-    }
-
-    // ── IR Receiver (powered sensor with digital output) ──
-    if (node.type === 'IR_RECEIVER') {
-      const vccPin = node.pins?.find(p => /vcc/i.test(p.id));
-      const gndPin = node.pins?.find(p => /gnd/i.test(p.id));
-      if (vccPin && gndPin) {
-        const idDraw = `r_power_draw_${node.id}`;
-        elements.push({
-          id: idDraw,
-          type: 'RESISTOR',
-          nodeA: nodeFor(node.id, vccPin.id),
-          nodeB: nodeFor(node.id, gndPin.id),
-          value: 5000,
-        });
-        elementToComponent.set(idDraw, node.id);
-
-        const outPin = node.pins?.find(p => /out/i.test(p.id));
-        if (outPin) {
-          const rOut = `r_ir_out_${node.id}`;
-          elements.push({
-            id: rOut,
-            type: 'RESISTOR',
-            nodeA: nodeFor(node.id, outPin.id),
-            nodeB: nodeFor(node.id, vccPin.id),
-            value: 10_000,
-          });
-          elementToComponent.set(rOut, node.id);
         }
       }
       continue;
@@ -1842,6 +2022,8 @@ export function buildMNACircuit(
             type: 'VOLTAGE_SOURCE',
             nodeA: nodeFor(node.id, phasePin),
             nodeB: nodeFor(node.id, gndPin.id),
+            // Phase sources are enabled only after SimulationEngine has
+            // measured a valid ESC VCC/GND supply from the solved circuit.
             value: 0,
           });
           elementToComponent.set(phaseSource, node.id);
@@ -1862,79 +2044,189 @@ export function buildMNACircuit(
 
     // ── BLDC Motor (3-phase motor load) ──
     if (node.type === 'MOTOR_BLDC') {
-      for (const [pinA, pinB] of [['phase_a', 'phase_b'], ['phase_b', 'phase_c']]) {
-        if (!node.pins?.some(p => p.id === pinA) || !node.pins?.some(p => p.id === pinB)) continue;
-        const rCoil = `r_bldc_coil_${pinA}_${pinB}_${node.id}`;
+      // Use a floating star point so all three windings participate in the
+      // electrical load. The earlier chained A-B/B-C approximation omitted
+      // the third winding and made phase-current readings asymmetric.
+      const starNode = nextExtraNode++;
+      for (const phasePin of ['phase_a', 'phase_b', 'phase_c']) {
+        if (!node.pins?.some((pin) => pin.id === phasePin)) continue;
+        const rCoil = `r_bldc_coil_${phasePin}_${node.id}`;
         elements.push({
           id: rCoil,
           type: 'RESISTOR',
-          nodeA: nodeFor(node.id, pinA),
-          nodeB: nodeFor(node.id, pinB),
-          value: numericProperty(node.properties?.windingResistance, SIMULATION_MODELS.bldc.windingResistance),
+          nodeA: nodeFor(node.id, phasePin),
+          nodeB: starNode,
+          value: Math.max(0.1, numericProperty(node.properties?.windingResistance, SIMULATION_MODELS.bldc.windingResistance)),
         });
         elementToComponent.set(rCoil, node.id);
       }
       continue;
     }
 
-    // ── RC Receiver (powered module with signal output) ──
-    if (node.type === 'RC_RECEIVER') {
-      const vccPin = node.pins?.find(p => /vcc/i.test(p.id));
-      const gndPin = node.pins?.find(p => /gnd/i.test(p.id));
-      if (vccPin && gndPin) {
-        const idDraw = `r_power_draw_${node.id}`;
-        elements.push({
-          id: idDraw,
-          type: 'RESISTOR',
-          nodeA: nodeFor(node.id, vccPin.id),
-          nodeB: nodeFor(node.id, gndPin.id),
-          value: 2000,
-        });
-        elementToComponent.set(idDraw, node.id);
+    // Every custom/API component must still participate in the electrical
+    // solve. Unsupported visual types used to fall through with no MNA
+    // element at all, so their pins had no load, no current, and no runtime
+    // state to drive the canvas. Use a conservative resistor model as a
+    // stable generic fallback until a component-specific model is available.
+    if (elements.length === elementsBeforeNode) {
+      const pins = node.pins || [];
+      const powerPin = pins.find(isGenericPowerPin);
+      const groundPin = pins.find(isGenericGroundPin);
+      const activeLoad = /LED|LAMP|BULB|MOTOR|FAN|PUMP/i.test(`${node.type} ${node.name || ''}`);
+      const pinA = powerPin || pins[0];
+      const pinB = groundPin || pins.find((pin) => pin.id !== pinA?.id) || pins[1];
 
-        const ppmPin = node.pins?.find(p => /ppm/i.test(p.id));
-        if (ppmPin) {
-          const rPpm = `r_rc_ppm_${node.id}`;
-          elements.push({
-            id: rPpm,
-            type: 'RESISTOR',
-            nodeA: nodeFor(node.id, ppmPin.id),
-            nodeB: nodeFor(node.id, gndPin.id),
-            value: 100_000,
-          });
-          elementToComponent.set(rPpm, node.id);
-        }
-      }
-      continue;
-    }
-
-    // ── Generic sensors load current draw ──
-    if (node.type.includes('SENSOR') || node.type.includes('TEMP_SENSOR') || node.type === 'SENSOR_IMU') {
-      const vccPin = node.pins?.find(p => /vcc|3v3|5v|vdd/i.test(p.name));
-      const gndPin = node.pins?.find(p => /gnd|ground|vss/i.test(p.name));
-      if (vccPin && gndPin) {
-        const idDraw = `r_power_draw_${node.id}`;
+      if (pinA && pinB && nodeFor(node.id, pinA.id) !== nodeFor(node.id, pinB.id)) {
+        const id = `r_generic_${node.id}`;
         elements.push({
-          id: idDraw,
+          id,
           type: 'RESISTOR',
-          nodeA: nodeFor(node.id, vccPin.id),
-          nodeB: nodeFor(node.id, gndPin.id),
-          value: 10000,
+          nodeA: nodeFor(node.id, pinA.id),
+          nodeB: nodeFor(node.id, pinB.id),
+          value: genericResistance(props, powerPin && groundPin ? activeLoad ? 1000 : 10000 : 1000),
         });
-        elementToComponent.set(idDraw, node.id);
+        elementToComponent.set(id, node.id);
+        genericComponentIds.add(node.id);
       }
-      continue;
     }
   }
 
+  const virtualProbes = virtualMeter?.probes.slice(0, 2) || [];
+  if (virtualProbes.length === 2) {
+    const [positiveProbe, negativeProbe] = virtualProbes;
+    const nodeA = pinToMNANode.get(pinKey(positiveProbe.nodeId, positiveProbe.pinId));
+    const nodeB = pinToMNANode.get(pinKey(negativeProbe.nodeId, negativeProbe.pinId));
+    if (nodeA !== undefined && nodeB !== undefined) {
+      nextExtraNode = addMeterElements(
+        elements,
+        elementToComponent,
+        'virtual',
+        nodeA,
+        nodeB,
+        virtualMeter?.mode || 'VOLTAGE',
+        resistanceTestAllowed,
+        nextExtraNode,
+      );
+    }
+  }
+
+  const numNodes = nextExtraNode - 1;
+  const topology: MNATopology = {
+    numNodes,
+    groundNodeIndex: 0,
+    connectivitySignature: currentConnectivitySignature,
+    pinToMNANode,
+    elementToComponent,
+    genericComponentIds,
+    elementSignatures: elements.map((element) => ({
+      id: element.id,
+      type: element.type,
+      nodeA: element.nodeA,
+      nodeB: element.nodeB,
+      ...(element.controlNode === undefined ? {} : { controlNode: element.controlNode }),
+      ...(element.controlNode2 === undefined ? {} : { controlNode2: element.controlNode2 }),
+      ...(element.resetNode === undefined ? {} : { resetNode: element.resetNode }),
+      ...(element.internalNode === undefined ? {} : { internalNode: element.internalNode }),
+      ...(element.positiveRailNode === undefined ? {} : { positiveRailNode: element.positiveRailNode }),
+      ...(element.negativeRailNode === undefined ? {} : { negativeRailNode: element.negativeRailNode }),
+      ...(element.outputElementId === undefined ? {} : { outputElementId: element.outputElementId }),
+      ...(element.dischargeElementId === undefined ? {} : { dischargeElementId: element.dischargeElementId }),
+    })),
+  };
+
   return {
-    numNodes: nextExtraNode - 1,
+    numNodes,
     elements,
     groundNodeIndex: 0,
     pinToMNANode,
     elementToComponent,
+    genericComponentIds,
     scopeChannels,
+    topology,
+    buildMetrics,
   };
+}
+
+/**
+ * Capture only inputs that can change electrical connectivity. This is much
+ * cheaper than rebuilding Union-Find and breadboard proximity links, but it
+ * still invalidates the cache when a component is moved over a breadboard.
+ */
+function connectivitySignature(nodes: CanvasNode[], wires: Wire[]): string {
+  return JSON.stringify({
+    nodes: nodes.map((node) => ({
+      id: node.id,
+      type: node.type,
+      x: node.x,
+      y: node.y,
+      width: node.width,
+      height: node.height,
+      rotation: node.rotation || 0,
+      pins: (node.pins || []).map((pin) => ({
+        id: pin.id,
+        name: pin.name,
+        type: pin.type,
+        x: pin.x,
+        y: pin.y,
+      })),
+    })),
+    wires: wires.map((wire) => ({
+      fromNodeId: wire.fromNodeId,
+      fromPinId: wire.fromPinId,
+      toNodeId: wire.toNodeId,
+      toPinId: wire.toPinId,
+    })),
+  });
+}
+
+function digitalOutputVoltage(
+  properties: Record<string, unknown>,
+  keys: readonly string[],
+  logicVoltage = 5,
+  requiresPower = false,
+): number {
+  if (requiresPower && properties.powered !== true) return 0;
+  return keys.some((key) => key && booleanProperty(properties[key], false)) ? logicVoltage : 0;
+}
+
+function addDigitalIcPower(
+  elements: MNAElement[],
+  elementToComponent: Map<string, string>,
+  componentId: string,
+  vccNode: number,
+  gndNode: number,
+) {
+  const id = `r_power_draw_${componentId}`;
+  elements.push({
+    id,
+    type: 'RESISTOR',
+    nodeA: vccNode,
+    nodeB: gndNode,
+    value: 10_000,
+  });
+  elementToComponent.set(id, componentId);
+}
+
+function addDigitalIcInputPulls(
+  elements: MNAElement[],
+  elementToComponent: Map<string, string>,
+  node: CanvasNode,
+  gndNode: number,
+  inputPins: readonly string[],
+  resolveNode: (componentId: string, pinId: string) => number,
+) {
+  for (const pinId of inputPins) {
+    if (!node.pins?.some((pin) => pin.id === pinId)) continue;
+    const id = `r_ic_input_${node.id}_${pinId}`;
+    elements.push({
+      id,
+      type: 'RESISTOR',
+      nodeA: resolveNode(node.id, pinId),
+      nodeB: gndNode,
+      value: 1_000_000,
+    });
+    elementToComponent.set(id, node.id);
+  }
 }
 
 function relayChannelActive(properties: Record<string, unknown>, channel = 1): boolean {

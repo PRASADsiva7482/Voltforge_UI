@@ -20,6 +20,8 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
   const oscilloscopeData = useSimulationStore((s) => s.oscilloscopeData)
   const logicCapture = useSimulationStore((s) => s.logicCapture)
   const oscilloscopeSamplePeriodMs = useSimulationStore((s) => s.oscilloscopeSamplePeriodMs)
+  const timePerDiv = useSimulationStore((s) => s.oscilloscopeTimePerDivMs)
+  const setTimePerDiv = useSimulationStore((s) => s.setOscilloscopeTimePerDiv)
   const baudRate = useSimulationStore((s) => s.baudRate)
   const oscilloscopePanelOpen = useSimulationStore((s) => s.oscilloscopePanelOpen)
   const setOscilloscopePanelOpen = useSimulationStore((s) => s.setOscilloscopePanelOpen)
@@ -28,7 +30,6 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
   const [expanded, setExpanded] = useState(false)
   const [paused, setPaused] = useState(false)
   const [voltsPerDiv, setVoltsPerDiv] = useState(1.0)
-  const [timePerDiv, setTimePerDiv] = useState(1.0) // ms
   const [pausedData, setPausedData] = useState<Record<string, number[]>>({})
   const [pausedLogicCapture, setPausedLogicCapture] = useState<typeof logicCapture>([])
   const [audioEnabled, setAudioEnabled] = useState(false)
@@ -229,7 +230,13 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
             <span className="vf-scope-control__label">T/div:</span>
             <SelectField
               value={timePerDiv}
-              onChange={(e) => setTimePerDiv(Number(e.target.value))}
+              onChange={(e) => {
+                setTimePerDiv(Number(e.target.value))
+                if (effectivePaused) {
+                  setPausedData({})
+                  setPausedLogicCapture([])
+                }
+              }}
               className="vf-select-inline"
             >
               <option value={0.1}>0.1ms</option>

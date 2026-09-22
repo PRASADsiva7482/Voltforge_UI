@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import keycloak from '../auth/keycloak';
 import { useCanvasStore } from '../store/canvasStore';
-import type { CanvasNode, Wire } from '../types/domain';
+import { usePcbStore } from '../store/pcbStore';
+import { useProjectStore } from '../store/projectStore';
+import { useToastStore } from '../store/useToastStore';
 
 export interface CollaboratorInfo {
   color: string;
@@ -26,6 +28,11 @@ const CURSOR_THROTTLE_MS = 50;
 const CANVAS_SYNC_DEBOUNCE_MS = 180;
 const STALE_CURSOR_MS = 10_000;
 const MAX_RECONNECT_DELAY_MS = 12_000;
+const STABLE_CONNECTION_MS = 30_000;
+// Complete UTF-8 STOMP frame, matching WebSocketConfig.STOMP_MESSAGE_LIMIT_BYTES.
+const MAX_STOMP_FRAME_BYTES = 1024 * 1024;
+const FRAME_ENCODER = new TextEncoder();
+const TERMINAL_CLOSE_CODES = new Set([1002, 1003, 1007, 1008, 1009]);
 
 function resolveNativeWsUrl(): string {
   const explicit = import.meta.env.VITE_WS_BASE_URL as string | undefined;
@@ -73,27 +80,50 @@ export function useCollaboration(projectId: string) {
   const [activeUsers, setActiveUsers] = useState<Record<string, CollaboratorInfo>>({});
 
   const wsRef = useRef<WebSocket | null>(null);
-  const isRemoteSyncing = useRef(false);
   const lastCursorAt = useRef(0);
   const heartbeatRef = useRef<number | null>(null);
   const canvasSyncTimer = useRef<number | null>(null);
   const reconnectTimer = useRef<number | null>(null);
+  const stableConnectionTimer = useRef<number | null>(null);
+  const reconnectBlocked = useRef(false);
   const reconnectAttempts = useRef(0);
-  const pendingCanvasSync = useRef<{ nodes: CanvasNode[]; wires: Wire[] } | null>(null);
-  const lastCanvasPayload = useRef<string>('');
+  const pendingCanvasSync = useRef(false);
+  const lastCanvasRevision = useRef<string>('');
+  const remoteConflictReported = useRef(false);
   const userColor = useRef(COLLABORATOR_COLORS[Math.floor(Math.random() * COLLABORATOR_COLORS.length)]);
 
   const loadCanvas = useCanvasStore((s) => s.loadCanvas);
+  const loadPcb = usePcbStore((s) => s.loadPcb);
 
   const currentUserId = user?.keycloakId || 'anon';
   const displayName = user?.displayName || user?.username || 'Collaborator';
 
+  const blockLiveSync = useCallback((message: string) => {
+    if (reconnectBlocked.current) return;
+    reconnectBlocked.current = true;
+    pendingCanvasSync.current = false;
+    for (const timer of [canvasSyncTimer, reconnectTimer, stableConnectionTimer]) {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+    if (heartbeatRef.current !== null) window.clearInterval(heartbeatRef.current);
+    heartbeatRef.current = null;
+    setIsConnected(false);
+    useToastStore.getState().addToast(message, 'error');
+    wsRef.current?.close();
+  }, []);
+
   const sendFrame = useCallback((command: string, headers: Record<string, string>, body?: unknown) => {
     const socket = wsRef.current;
-    if (!socket || socket.readyState !== WebSocket.OPEN) return false;
-    socket.send(buildStompFrame(command, headers, body));
+    if (reconnectBlocked.current || !socket || socket.readyState !== WebSocket.OPEN) return false;
+    const frame = buildStompFrame(command, headers, body);
+    if (FRAME_ENCODER.encode(frame).byteLength > MAX_STOMP_FRAME_BYTES) {
+      blockLiveSync('Live Sync paused: this update exceeds the 1 MiB limit. Your edits are still in this tab. Reduce the project size and save before reopening.');
+      return false;
+    }
+    socket.send(frame);
     return true;
-  }, []);
+  }, [blockLiveSync]);
 
   const subscribeToProject = useCallback(() => {
     sendFrame('SUBSCRIBE', {
@@ -110,6 +140,13 @@ export function useCollaboration(projectId: string) {
     if (!projectId) return;
 
     let disposed = false;
+    reconnectBlocked.current = false;
+    reconnectAttempts.current = 0;
+
+    const clearStableTimer = () => {
+      if (stableConnectionTimer.current !== null) window.clearTimeout(stableConnectionTimer.current);
+      stableConnectionTimer.current = null;
+    };
 
     const clearHeartbeat = () => {
       if (heartbeatRef.current) {
@@ -119,7 +156,7 @@ export function useCollaboration(projectId: string) {
     };
 
     const scheduleReconnect = () => {
-      if (disposed || reconnectTimer.current) return;
+      if (disposed || reconnectBlocked.current || reconnectTimer.current) return;
       const delay = Math.min(1000 * 2 ** reconnectAttempts.current, MAX_RECONNECT_DELAY_MS);
       reconnectAttempts.current += 1;
       reconnectTimer.current = window.setTimeout(() => {
@@ -129,13 +166,16 @@ export function useCollaboration(projectId: string) {
     };
 
     const connect = () => {
+      if (disposed || reconnectBlocked.current) return;
       const socket = new WebSocket(resolveNativeWsUrl());
       wsRef.current = socket;
+      const isCurrent = () => !disposed && wsRef.current === socket;
 
       socket.onopen = async () => {
         if (keycloak.token) {
           await keycloak.updateToken(30).catch(() => undefined);
         }
+        if (!isCurrent() || socket.readyState !== WebSocket.OPEN) return;
 
         const connectHeaders: Record<string, string> = {
           'accept-version': '1.2,1.1,1.0',
@@ -150,22 +190,33 @@ export function useCollaboration(projectId: string) {
       };
 
       socket.onmessage = (event) => {
+        if (!isCurrent() || reconnectBlocked.current) return;
         const raw = event.data as string;
         if (!raw || raw === '\n') return;
 
         for (const frame of readStompBodies(raw)) {
           if (frame.command === 'CONNECTED') {
-            reconnectAttempts.current = 0;
+            // A quick CONNECTED -> close loop is still a failed connection.
+            clearStableTimer();
+            stableConnectionTimer.current = window.setTimeout(() => {
+              if (isCurrent()) reconnectAttempts.current = 0;
+              stableConnectionTimer.current = null;
+            }, STABLE_CONNECTION_MS);
+            lastCanvasRevision.current = '';
             setIsConnected(true);
             subscribeToProject();
             clearHeartbeat();
-            heartbeatRef.current = window.setInterval(() => socket.send('\n'), 20_000);
+            heartbeatRef.current = window.setInterval(() => {
+              if (isCurrent() && socket.readyState === WebSocket.OPEN) socket.send('\n');
+            }, 20_000);
             continue;
           }
 
           if (frame.command === 'ERROR') {
-            setIsConnected(false);
-            socket.close();
+            // A STOMP ERROR is a protocol/application rejection (for example
+            // edit access denied), not a transient network disconnect. Do not
+            // immediately reconnect and make the editor header flap forever.
+            blockLiveSync('Live Sync paused because the server rejected the connection or update. Your local edits are retained. Check project access, then reopen it to retry.');
             continue;
           }
 
@@ -191,11 +242,18 @@ export function useCollaboration(projectId: string) {
             }
 
             if (data.eventType === 'CANVAS_SYNC' && data.payload && data.userId !== currentUserId) {
-              isRemoteSyncing.current = true;
-              loadCanvas(data.payload.nodes || [], data.payload.wires || []);
-              window.setTimeout(() => {
-                isRemoteSyncing.current = false;
-              }, 120);
+              // A peer frame must not overwrite a local edit or in-flight save.
+              const project = useProjectStore.getState();
+              if (project.isDirty || project.isSaving) {
+                if (!remoteConflictReported.current) useToastStore.getState().addToast('Remote changes arrived while you have local edits. Reload to resolve the latest project version.', 'info');
+                remoteConflictReported.current = true;
+                continue;
+              }
+              remoteConflictReported.current = false;
+              loadCanvas(data.payload.nodes || [], data.payload.wires || [], data.payload.viewport, data.payload.routeCache);
+              if (data.payload.pcbLayout) {
+                loadPcb(data.payload.pcbLayout);
+              }
             }
           } catch {
             // Ignore malformed third-party frames.
@@ -203,17 +261,25 @@ export function useCollaboration(projectId: string) {
         }
       };
 
-      socket.onclose = () => {
+      socket.onclose = (event) => {
+        if (!isCurrent()) return;
         setIsConnected(false);
         clearHeartbeat();
+        clearStableTimer();
         if (wsRef.current === socket) {
           wsRef.current = null;
         }
-        scheduleReconnect();
+        if (TERMINAL_CLOSE_CODES.has(event.code)) {
+          blockLiveSync(event.code === 1009
+            ? 'Live Sync paused: the server rejected an oversized update. Your edits are still in this tab. Save successfully before reopening.'
+            : 'Live Sync paused because the server rejected the protocol or project access. Your local edits are retained. Reopen the project after resolving the problem.');
+        } else {
+          scheduleReconnect();
+        }
       };
 
       socket.onerror = () => {
-        setIsConnected(false);
+        if (isCurrent()) setIsConnected(false);
       };
     };
 
@@ -222,6 +288,7 @@ export function useCollaboration(projectId: string) {
     return () => {
       disposed = true;
       clearHeartbeat();
+      clearStableTimer();
       if (canvasSyncTimer.current) {
         window.clearTimeout(canvasSyncTimer.current);
         canvasSyncTimer.current = null;
@@ -238,9 +305,12 @@ export function useCollaboration(projectId: string) {
         socket.close();
       }
       wsRef.current = null;
+      pendingCanvasSync.current = false;
+      lastCanvasRevision.current = '';
+      remoteConflictReported.current = false;
       setIsConnected(false);
     };
-  }, [currentUserId, loadCanvas, projectId, sendFrame, subscribeToProject]);
+  }, [blockLiveSync, currentUserId, loadCanvas, loadPcb, projectId, sendFrame, subscribeToProject]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -258,22 +328,23 @@ export function useCollaboration(projectId: string) {
 
   const flushCanvasSync = useCallback(() => {
     const pending = pendingCanvasSync.current;
-    pendingCanvasSync.current = null;
+    pendingCanvasSync.current = false;
     canvasSyncTimer.current = null;
 
-    if (!pending || isRemoteSyncing.current) return;
+    if (!pending) return;
+    const project = useProjectStore.getState().currentProject;
+    if (project?.id !== projectId || project.owner?.keycloakId !== currentUserId) return;
+    const canvas = useCanvasStore.getState(), pcb = usePcbStore.getState();
+    const revision = `${canvas.documentRevision}:${pcb.documentRevision}`;
+    if (lastCanvasRevision.current === revision) return;
     const payload = {
       eventType: 'CANVAS_SYNC',
-      payload: pending,
+      payload: { nodes: canvas.documentNodes, wires: canvas.wires, viewport: canvas.viewport, routeCache: canvas.routeCache, pcbLayout: pcb.getLayout() },
       projectId,
       timestamp: Date.now(),
       userId: currentUserId,
     };
-    const serialized = JSON.stringify(payload);
-    if (serialized === lastCanvasPayload.current) return;
-
-    lastCanvasPayload.current = serialized;
-    sendFrame(
+    const sent = sendFrame(
       'SEND',
       {
         'content-type': 'application/json',
@@ -281,13 +352,13 @@ export function useCollaboration(projectId: string) {
       },
       payload
     );
+    if (sent) lastCanvasRevision.current = revision;
   }, [currentUserId, projectId, sendFrame]);
 
   const broadcastCanvasSync = useCallback(
-    (nodes: CanvasNode[], wires: Wire[]) => {
-      if (isRemoteSyncing.current || !isConnected) return;
-
-      pendingCanvasSync.current = { nodes, wires };
+    () => {
+      if (!isConnected) return;
+      pendingCanvasSync.current = true;
       if (canvasSyncTimer.current) return;
       canvasSyncTimer.current = window.setTimeout(flushCanvasSync, CANVAS_SYNC_DEBOUNCE_MS);
     },

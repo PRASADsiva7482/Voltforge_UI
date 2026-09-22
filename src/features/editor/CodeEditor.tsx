@@ -1,11 +1,11 @@
-import { lazy, Suspense, useEffect, useRef, useState, useMemo } from 'react';
+import { lazy, memo, Suspense, useRef, useState, useMemo } from 'react';
 import { useProjectStore } from '../../store/projectStore';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useSimulationStore } from '../../store/simulationStore';
 import { useToastStore } from '../../store/useToastStore';
 import { Loader2, Maximize2, Minimize2, AlignLeft, Eye, EyeOff, Cpu, Upload, X } from 'lucide-react';
 import type { OnMount } from '@monaco-editor/react';
-import { getBoardProfile } from '../canvas/boardCatalog';
+import { getBoardPinNumber, getBoardProfile, isBoardComponentType, supportsAvr8js } from '../canvas/boardCatalog';
 
 const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.default })));
 
@@ -16,13 +16,17 @@ function generateFullCode(userCode: string, boardType?: string): string {
   // Collect pin assignments from connected components
   const pinDefs: string[] = [];
   const seenTypes = new Set<string>();
+  const pinNames = new Set<string>();
+
+  const identifier = (value: string) => value.replace(/[^A-Za-z0-9_]/g, '_').replace(/^([^A-Za-z_])/, '_$1');
+  const boardPinNumber = (pin: { id: string; name: string }) => getBoardPinNumber(pin);
 
   nodes.forEach(node => {
     const type = node.type;
     if (seenTypes.has(type)) return;
     seenTypes.add(type);
 
-    if (type === 'LED_STANDARD' || type === 'LED_RGB' || type === 'LED_NEOPIXEL') {
+    if (type === 'LED_STANDARD' || type === 'LED_RGB') {
       pinDefs.push(`// LED: ${node.name}`);
     }
     if (type === 'SERVO_MOTOR' || type === 'MOTOR_SERVO') {
@@ -31,6 +35,32 @@ function generateFullCode(userCode: string, boardType?: string): string {
     if (type.startsWith('SENSOR_') || type.startsWith('DISPLAY_') || type.startsWith('LCD')) {
       pinDefs.push(`// ${type.replace(/_/g, ' ')}: ${node.name}`);
     }
+  });
+
+  // Derive usable constants from actual schematic connections. The previous
+  // generator emitted only comments, so a "full sketch" could not address the
+  // components it described.
+  const boardNodes = nodes.filter((node) => isBoardComponentType(node.type));
+  const boardIds = new Set(boardNodes.map((node) => node.id));
+  useCanvasStore.getState().wires.forEach((wire) => {
+    const boardNode = boardIds.has(wire.fromNodeId)
+      ? nodes.find((node) => node.id === wire.fromNodeId)
+      : boardIds.has(wire.toNodeId)
+        ? nodes.find((node) => node.id === wire.toNodeId)
+        : undefined;
+    const peripheralId = boardIds.has(wire.fromNodeId) ? wire.toNodeId : wire.fromNodeId;
+    const peripheral = nodes.find((node) => node.id === peripheralId);
+    if (!boardNode || !peripheral) return;
+    const boardPinId = boardIds.has(wire.fromNodeId) ? wire.fromPinId : wire.toPinId;
+    const peripheralPinId = boardIds.has(wire.fromNodeId) ? wire.toPinId : wire.fromPinId;
+    const boardPin = boardNode.pins.find((pin) => pin.id === boardPinId);
+    const peripheralPin = peripheral.pins.find((pin) => pin.id === peripheralPinId);
+    const pinNumber = boardPin ? boardPinNumber(boardPin) : null;
+    if (!pinNumber) return;
+    const constantName = `${identifier(peripheral.name)}_${identifier(peripheralPin?.name || peripheralPinId)}_PIN`.toUpperCase();
+    if (pinNames.has(constantName)) return;
+    pinNames.add(constantName);
+    pinDefs.push(`const int ${constantName} = ${pinNumber}; // ${peripheral.name} / ${peripheralPin?.name || peripheralPinId}`);
   });
 
   // Determine board-specific includes
@@ -46,8 +76,6 @@ function generateFullCode(userCode: string, boardType?: string): string {
     ...(nodes.some(n => n.type.includes('LCD') || n.type.includes('OLED')) ? ['#include <Wire.h>'] : []),
     ...(nodes.some(n => n.type.includes('LCD_I2C') || n.type === 'DISPLAY_LCD_I2C') ? ['#include <LiquidCrystal_I2C.h>'] : []),
     ...(nodes.some(n => n.type.includes('OLED') || n.type === 'DISPLAY_OLED') ? ['#include <Adafruit_SSD1306.h>'] : []),
-    ...(nodes.some(n => n.type === 'SENSOR_DHT11' || n.type === 'SENSOR_DHT22' || n.type === 'TEMP_SENSOR') ? ['#include <DHT.h>'] : []),
-    ...(nodes.some(n => n.type === 'LED_NEOPIXEL') ? ['#include <Adafruit_NeoPixel.h>'] : []),
   ];
 
   const header = [
@@ -60,7 +88,7 @@ function generateFullCode(userCode: string, boardType?: string): string {
     ...includes,
     '',
     '// ── Pin Definitions ─────────────────────────────────────────',
-    ...(pinDefs.length > 0 ? pinDefs : ['// No components on canvas']),
+    ...(pinDefs.length > 0 ? pinDefs : ['// No board-connected component pins detected']),
     '',
     '// ── User Code ───────────────────────────────────────────────',
     '',
@@ -69,9 +97,10 @@ function generateFullCode(userCode: string, boardType?: string): string {
   return header + userCode;
 }
 
-export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
+function CodeEditor({ readOnly }: { readOnly?: boolean }) {
   const activeCodeFile = useProjectStore((s) => s.activeCodeFile);
-  const codeFiles = useProjectStore((s) => s.currentProject?.codeFiles || []);
+  // Keep the subscribed snapshot stable while a project is absent or denied.
+  const codeFiles = useProjectStore((s) => s.currentProject?.codeFiles) ?? [];
   const updateCodeFileContent = useProjectStore((s) => s.updateCodeFileContent);
   const setActiveCodeFile = useProjectStore((s) => s.setActiveCodeFile);
   const boardType = useProjectStore((s) => s.currentProject?.boardType);
@@ -81,16 +110,6 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
 
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
-  const ignoreChange = useRef(false);
-
-  // Sync to prevent onChange updates during fullCode toggling
-  useEffect(() => {
-    ignoreChange.current = true;
-    const timer = setTimeout(() => {
-      ignoreChange.current = false;
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [showFullCode, activeCodeFile?.id]);
 
   const fullCode = useMemo(() => {
     if (!activeCodeFile || !showFullCode) return null;
@@ -119,6 +138,7 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
   const customHex = useSimulationStore((s) => s.customHex);
   const setCustomHex = useSimulationStore((s) => s.setCustomHex);
   const addToast = useToastStore((s) => s.addToast);
+  const canRunCustomHex = supportsAvr8js(boardType || 'ARDUINO_UNO');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleHexUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,7 +149,15 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
       const content = event.target?.result as string;
       if (content && content.includes(':')) {
         setCustomHex(content);
-        addToast(`Loaded Intel HEX (${file.name}, ${content.length} chars) into AVR8js engine`, 'success');
+        const selectedBoard = boardType || 'ARDUINO_UNO';
+        const boardLabel = getBoardProfile(selectedBoard)?.name || selectedBoard.replace(/_/g, ' ');
+        const canRunInBrowser = supportsAvr8js(selectedBoard);
+        addToast(
+          canRunInBrowser
+            ? `Loaded Intel HEX (${file.name}, ${content.length} chars) into AVR8js engine`
+            : `Loaded Intel HEX for ${boardLabel}; browser execution will use source compatibility mode`,
+          canRunInBrowser ? 'success' : 'warning'
+        );
       } else {
         addToast('Invalid Intel HEX file format (must start with :)', 'error');
       }
@@ -173,7 +201,7 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
               <div
                 className="vf-code-editor__action-btn"
                 style={{
-                  backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                    backgroundColor: canRunCustomHex ? 'rgba(56, 189, 248, 0.15)' : 'rgba(250, 204, 21, 0.15)',
                   borderColor: '#38bdf8',
                   color: '#38bdf8',
                   display: 'flex',
@@ -184,11 +212,12 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
                   fontSize: '11px',
                   fontWeight: 600,
                 }}
-                title="Custom Intel HEX firmware loaded into AVR8js emulator"
+                title="Custom Intel HEX firmware; AVR8js execution is available only for Uno/Nano/ATmega328P boards"
               >
                 <Cpu size={12} />
-                <span>AVR8js: Custom HEX</span>
+                <span>{canRunCustomHex ? 'AVR8js: Custom HEX' : 'Custom HEX: Interpreter'}</span>
                 <button
+                  disabled={readOnly}
                   onClick={(e) => {
                     e.stopPropagation();
                     setCustomHex(null);
@@ -212,7 +241,8 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
               <button
                 className="vf-code-editor__action-btn"
                 onClick={() => fileInputRef.current?.click()}
-                title="Upload compiled Intel HEX file to run directly on AVR8js ATmega328P emulator"
+                disabled={readOnly}
+                title="Upload compiled Intel HEX file; direct AVR8js execution is available only for Uno/Nano/ATmega328P boards"
                 style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
               >
                 <Upload size={12} />
@@ -280,7 +310,10 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
               value={displayedContent}
               onMount={handleEditorMount}
               onChange={(value) => {
-                if (readOnly || showFullCode || ignoreChange.current) return;
+                // The Monaco React wrapper suppresses its own controlled value
+                // updates. A timed guard here would also drop real user edits
+                // immediately after changing tabs or leaving Full Sketch.
+                if (readOnly || showFullCode) return;
                 if (value === undefined) return;
 
                 // Protect content integrity
@@ -313,3 +346,5 @@ export default function CodeEditor({ readOnly }: { readOnly?: boolean }) {
     </div>
   );
 }
+
+export default memo(CodeEditor);

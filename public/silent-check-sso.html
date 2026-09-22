@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Voltforge session check</title>
+  </head>
+  <body>
+    <script>
+      if (window.parent !== window) {
+        window.parent.postMessage(window.location.href, window.location.origin);
+      }
+    </script>
+  </body>
+</html>

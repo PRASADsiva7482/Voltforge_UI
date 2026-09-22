@@ -172,8 +172,8 @@ export class LabCriteriaEvaluator {
     const astableEstimate = estimate555Astable(nodes, wires);
 
     const results = challenge.objectives.map((objective) => {
-      let passed = false;
-      let currentValueText = 'Evaluating...';
+      const checks: boolean[] = [];
+      const valueTexts: string[] = [];
 
       if (objective.targetVoltage !== undefined) {
         const tolerance = objective.voltageTolerance ?? 0.2;
@@ -182,24 +182,26 @@ export class LabCriteriaEvaluator {
 
         if (measuredVoltage === null) {
           const voltages = Object.values(nodeVoltages).filter((voltage) => voltage > 0.1);
-          measuredVoltage = voltages.find((voltage) => Math.abs(voltage - objective.targetVoltage!) <= tolerance)
-            ?? voltages[0]
+          measuredVoltage = voltages.sort((a, b) =>
+            Math.abs(a - objective.targetVoltage!) - Math.abs(b - objective.targetVoltage!)
+          )[0]
             ?? null;
         }
 
         if (measuredVoltage !== null) {
-          passed = Math.abs(measuredVoltage - objective.targetVoltage) <= tolerance;
-          currentValueText = `${measuredVoltage.toFixed(2)}V (target ${objective.targetVoltage}V +/- ${tolerance}V)`;
+          checks.push(Math.abs(measuredVoltage - objective.targetVoltage) <= tolerance);
+          valueTexts.push(`${measuredVoltage.toFixed(2)}V (target ${objective.targetVoltage}V +/- ${tolerance}V)`);
         } else {
-          currentValueText = '0.00V detected';
+          checks.push(false);
+          valueTexts.push('0.00V detected');
         }
       }
 
       if (objective.maxCurrent_mA !== undefined) {
         const currents = Object.values(branchCurrents).map((current) => Math.abs(current) * 1000);
         const maxCurrent = currents.length > 0 ? Math.max(...currents) : 0;
-        passed = maxCurrent <= objective.maxCurrent_mA && maxCurrent > 0.01;
-        currentValueText = `${maxCurrent.toFixed(1)} mA (max ${objective.maxCurrent_mA} mA)`;
+        checks.push(maxCurrent <= objective.maxCurrent_mA && maxCurrent > 0.01);
+        valueTexts.push(`${maxCurrent.toFixed(1)} mA (max ${objective.maxCurrent_mA} mA)`);
       }
 
       if (objective.targetCurrent_mA !== undefined) {
@@ -208,19 +210,20 @@ export class LabCriteriaEvaluator {
         const matchedCurrent = currents.find((current) => Math.abs(current - objective.targetCurrent_mA!) <= tolerance);
 
         if (matchedCurrent !== undefined) {
-          passed = true;
-          currentValueText = `${matchedCurrent.toFixed(1)} mA (target ${objective.targetCurrent_mA} mA +/- ${tolerance} mA)`;
+          checks.push(true);
+          valueTexts.push(`${matchedCurrent.toFixed(1)} mA (target ${objective.targetCurrent_mA} mA +/- ${tolerance} mA)`);
         } else {
           const highestCurrent = currents.length > 0 ? Math.max(...currents) : 0;
-          currentValueText = `${highestCurrent.toFixed(1)} mA`;
+          checks.push(false);
+          valueTexts.push(`${highestCurrent.toFixed(1)} mA`);
         }
       }
 
       if (objective.requireLedLit) {
         const leds = nodes.filter((node) => node.type.includes('LED'));
         const litCount = leds.filter((led) => led.properties.isLit).length;
-        passed = litCount > 0;
-        currentValueText = passed ? 'LED is illuminated' : 'LED is off';
+        checks.push(litCount > 0);
+        valueTexts.push(litCount > 0 ? 'LED is illuminated' : 'LED is off');
       }
 
       if (objective.requireShiftData) {
@@ -228,15 +231,15 @@ export class LabCriteriaEvaluator {
         const latchValue = finiteNumber(shiftRegister?.properties.latchRegValue)
           ?? finiteNumber(shiftRegister?.properties.shiftValue)
           ?? 0;
-        passed = latchValue > 0;
-        currentValueText = passed ? `Shift latch = 0x${latchValue.toString(16).toUpperCase()}` : 'Latch empty (0x00)';
+        checks.push(latchValue > 0);
+        valueTexts.push(latchValue > 0 ? `Shift latch = 0x${latchValue.toString(16).toUpperCase()}` : 'Latch empty (0x00)');
       }
 
       if (objective.minLedsLit !== undefined) {
         const leds = nodes.filter((node) => node.type.includes('LED'));
         const litCount = leds.filter((led) => led.properties.isLit).length;
-        passed = litCount >= objective.minLedsLit;
-        currentValueText = `${litCount} of ${objective.minLedsLit} required LEDs lit`;
+        checks.push(litCount >= objective.minLedsLit);
+        valueTexts.push(`${litCount} of ${objective.minLedsLit} required LEDs lit`);
       }
 
       if (objective.targetFrequency_hz !== undefined) {
@@ -245,10 +248,11 @@ export class LabCriteriaEvaluator {
           ?? finiteNumber(nodes.find((node) => node.type === 'OSCILLOSCOPE')?.properties.frequencyHz);
 
         if (measuredFrequency !== null && measuredFrequency !== undefined) {
-          passed = Math.abs(measuredFrequency - objective.targetFrequency_hz) <= tolerance;
-          currentValueText = `${measuredFrequency.toFixed(0)} Hz (target ${objective.targetFrequency_hz} Hz +/- ${tolerance} Hz)`;
+          checks.push(Math.abs(measuredFrequency - objective.targetFrequency_hz) <= tolerance);
+          valueTexts.push(`${measuredFrequency.toFixed(0)} Hz (target ${objective.targetFrequency_hz} Hz +/- ${tolerance} Hz)`);
         } else {
-          currentValueText = 'Timing network incomplete';
+          checks.push(false);
+          valueTexts.push('Timing network incomplete');
         }
       }
 
@@ -259,15 +263,18 @@ export class LabCriteriaEvaluator {
           ?? finiteNumber(nodes.find((node) => node.type === 'OSCILLOSCOPE')?.properties.dutyCycle);
 
         if (measuredDuty !== null && measuredDuty !== undefined) {
-          passed = measuredDuty >= minDuty && measuredDuty <= maxDuty;
-          currentValueText = `${(measuredDuty * 100).toFixed(1)}% duty (range ${(minDuty * 100).toFixed(0)}-${(maxDuty * 100).toFixed(0)}%)`;
+          checks.push(measuredDuty >= minDuty && measuredDuty <= maxDuty);
+          valueTexts.push(`${(measuredDuty * 100).toFixed(1)}% duty (range ${(minDuty * 100).toFixed(0)}-${(maxDuty * 100).toFixed(0)}%)`);
         } else {
-          currentValueText = 'Duty cycle unavailable';
+          checks.push(false);
+          valueTexts.push('Duty cycle unavailable');
         }
       }
 
+      const passed = checks.length > 0 && checks.every(Boolean);
+
       return {
-        currentValueText,
+        currentValueText: valueTexts.join(' · ') || 'No measurable criteria',
         objectiveId: objective.id,
         passed,
       };

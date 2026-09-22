@@ -1,0 +1,80 @@
+{
+  "item": "OPT-FB-009",
+  "capturedOn": "2026-08-27",
+  "scope": "VoltForge UI production route, feature, simulator, and vendor chunks",
+  "measurementKind": "vite-production-manifest",
+  "baseline": {
+    "mainChunkMinifiedBytesApprox": 1362130,
+    "mainChunkGzipBytesApprox": 399860,
+    "viteOversizedChunkWarning": true
+  },
+  "budgets": {
+    "entryChunkBytes": 153600,
+    "initialStaticJsBytes": 563200,
+    "initialStaticChunkCount": 16,
+    "individualJsChunkBytes": 460800
+  },
+  "result": {
+    "entryFile": "assets/index-DsEQtRVp.js",
+    "entryChunkBytes": 97234,
+    "entryChunkGzipKb": 23.85,
+    "initialStaticJsBytes": 513006,
+    "initialStaticChunkCount": 13,
+    "largestChunkFile": "assets/SerialMonitor-DL96Q6ln.js",
+    "largestChunkBytes": 180244,
+    "emittedJsChunkCount": 52,
+    "viteOversizedChunkWarning": false
+  },
+  "boundaries": {
+    "routes": [
+      "landing",
+      "dashboard",
+      "projects",
+      "new project",
+      "explore",
+      "labs",
+      "lab challenge",
+      "settings",
+      "admin",
+      "circuit editor"
+    ],
+    "editorFeatures": [
+      "PCB workspace",
+      "code editor and Monaco host",
+      "multimeter",
+      "oscilloscope",
+      "bill of materials",
+      "AI assistant",
+      "AI validator",
+      "IoT inspector",
+      "project settings",
+      "solver diagnostics"
+    ],
+    "runtime": "SimulationEngine, AVR8js, and their logic/runtime graph are imported only after simulation or solver-regression start.",
+    "vendors": [
+      "React/router/query/state",
+      "platform/auth/network/i18n",
+      "Konva/react-konva",
+      "Monaco React host",
+      "AVR8js",
+      "Lucide icons"
+    ]
+  },
+  "cacheAndRecovery": {
+    "contentHashedJavaScript": true,
+    "staleChunkRecovery": "Route boundary explains update/offline failures and offers full reload plus home navigation.",
+    "accessibleLoading": "Route and editor feature fallbacks expose status, aria-live, and aria-busy semantics.",
+    "directNavigationSmoke": [
+      "/",
+      "/editor/share",
+      "/public-project/smoke",
+      "/labs/smoke"
+    ]
+  },
+  "verification": [
+    "npm test",
+    "npm run build",
+    "npm run test:bundle-budget",
+    "Vite preview direct-navigation and hashed-entry HTTP smoke"
+  ]
+}

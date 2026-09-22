@@ -1,0 +1,16 @@
+{
+  "item": "OPT-002",
+  "capturedOn": "2026-08-27",
+  "scope": "MNA worker-to-UI result delivery before the OPT-002 implementation",
+  "measurementKind": "static-baseline",
+  "runtimeTraceCaptured": false,
+  "observations": {
+    "workerResultCadence": "Every worker interval (~60 per second)",
+    "workerPresentationCredit": false,
+    "mainThreadPresentationThrottle": "Latest pending result plus requestAnimationFrame and a 66 ms timestamp guard",
+    "unconsumedResultRetention": "Worker keeps posting; main thread retains only its latest pending result",
+    "scopeMessageCadence": "Every worker tick when scope channels are present",
+    "slowMainThreadQueueBound": false
+  },
+  "limitation": "A browser message-queue trace was not available in the repository environment; protocol behavior will be covered by OPT-FB-002 and runtime comparison by OPT-FB-001."
+}

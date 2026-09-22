@@ -34,7 +34,7 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config as RetryableRequestConfig | undefined
 
-    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+    if (error.response?.status === 401 && keycloak.token && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true
       try {
         const refreshed = await keycloak.updateToken(30)
@@ -43,7 +43,7 @@ api.interceptors.response.use(
           return api(originalRequest)
         }
       } catch {
-        keycloak.login({ redirectUri: `${window.location.origin}/dashboard` })
+        keycloak.clearToken()
       }
     }
 

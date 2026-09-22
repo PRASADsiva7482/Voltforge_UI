@@ -8,12 +8,52 @@
 
 export type SourceWaveform = 'sine' | 'square' | 'triangle';
 
+/**
+ * Controls the trade-off between transient/firmware fidelity and responsiveness.
+ * Adaptive mode may widen the solver timestep and uses the smaller AVR frame
+ * slice; full-fidelity keeps the configured timestep and gives AVR more wall
+ * time. Both AVR modes execute every instruction/peripheral tick in order.
+ */
+export type SimulationFidelityMode = 'adaptive' | 'full-fidelity';
+
+export interface SolverCostProfile {
+  numNodes: number;
+  voltageSourceCount: number;
+  nonlinearElementCount: number;
+}
+
 export const SIMULATION_MODELS = Object.freeze({
   clock: Object.freeze({
     framePeriod_s: 1 / 60,
-    defaultTimeStep_s: 0.0001,
+    // Keep the existing runtime default. The solver's constructor has a
+    // smaller standalone default, but the worker has historically used 1 ms.
+    defaultTimeStep_s: 0.001,
+    minAdaptiveTimeStep_s: 0.001,
+    maxAdaptiveTimeStep_s: 0.005,
+    solverBudget_ms: 8,
+    presentationPeriod_ms: 1000 / 15,
+    referenceMatrixSize: 24,
+    referenceNonlinearElements: 2,
     maxSubstepsPerFrame: 250,
     maxCatchUp_s: 0.05,
+  }),
+  avr: Object.freeze({
+    // AVR8js advances peripherals from CPU cycle counts. A wall-time budget
+    // may slow playback, but no firmware cycle is skipped to catch up.
+    cpuFrequency_Hz: 16_000_000,
+    adaptiveFrameBudget_ms: 4,
+    fullFidelityFrameBudget_ms: 8,
+    adaptiveMaxCatchUp_ms: 50,
+    fullFidelityMaxCatchUp_ms: 100,
+    maxFrameDelta_ms: 50,
+    timeCheckInstructionInterval: 32,
+    maxInstructionsPerSlice: 100_000,
+    telemetryPeriod_ms: 250,
+  }),
+  scope: Object.freeze({
+    horizontalDivisions: 10,
+    targetSamplesPerScreen: 512,
+    pendingSampleCapacity: 1024,
   }),
   circuit: Object.freeze({
     openCircuitResistance: 1e8,
@@ -83,9 +123,19 @@ export const SIMULATION_MODELS = Object.freeze({
     minimumThrottlePercent: 0,
   }),
   esc: Object.freeze({
+    minimumSupplyVoltage: 4.5,
     powerDrawResistance: 100,
     signalInputResistance: 100_000,
     phaseLoadResistance: 1_000,
+  }),
+  display: Object.freeze({
+    lcdMinimumSupplyVoltage: 4.5,
+    oledMinimumSupplyVoltage: 2.7,
+  }),
+  digitalIc: Object.freeze({
+    // 3 V is the shared valid supply floor for the catalog's 74HC and CD4017
+    // models. Output sources use the solved rail voltage, not a fixed 5 V.
+    minimumSupplyVoltage: 3,
   }),
   stepper: Object.freeze({
     stepsPerRevolution: 200,
@@ -96,6 +146,10 @@ export const SIMULATION_MODELS = Object.freeze({
   }),
   meter: Object.freeze({
     voltageInputResistance: 10e6,
+    currentShuntResistance: 0.1,
+    resistanceTestVoltage: 1,
+    resistanceTestSeriesResistance: 1_000,
+    maximumResistance_ohm: 100e6,
     oscilloscopeInputResistance: 1e6,
     rmsWindowSamples: 256,
   }),
@@ -122,12 +176,65 @@ export const SIMULATION_MODELS = Object.freeze({
   sensors: Object.freeze({
     ldrDarkResistance: 100_000,
     ldrLightResistance: 500,
-    dhtTemperature_C: 25,
-    dhtHumidity_percent: 60,
-    ultrasonicDistance_cm: 100,
     soilMoisture_percent: 50,
   }),
 });
+
+const BRANCH_VARIABLE_ELEMENT_TYPES = new Set(['VOLTAGE_SOURCE', 'AMMETER', 'MOTOR_DC', 'OPAMP']);
+const NONLINEAR_ELEMENT_TYPES = new Set([
+  'DIODE',
+  'BJT',
+  'MOSFET',
+  'MOTOR_DC',
+  'OPAMP',
+  'BEHAVIORAL_555',
+]);
+
+/**
+ * Estimate the MNA matrix cost without making the solver depend on canvas
+ * types. Dense elimination grows roughly with the square of matrix size per
+ * iteration, while nonlinear devices add Newton work. This is deliberately a
+ * conservative, bounded heuristic: the wall-clock budget remains the final
+ * authority in the worker.
+ */
+export function solverCostProfile(
+  elements: ReadonlyArray<{ type: string }>,
+  numNodes: number,
+): SolverCostProfile {
+  return {
+    numNodes: Math.max(0, Math.floor(numNodes)),
+    voltageSourceCount: elements.reduce(
+      (count, element) => count + (BRANCH_VARIABLE_ELEMENT_TYPES.has(element.type) ? 1 : 0),
+      0,
+    ),
+    nonlinearElementCount: elements.reduce(
+      (count, element) => count + (NONLINEAR_ELEMENT_TYPES.has(element.type) ? 1 : 0),
+      0,
+    ),
+  };
+}
+
+/** Select an adaptive physical timestep for the supplied MNA circuit cost. */
+export function selectAdaptiveTimeStep(
+  profile: SolverCostProfile,
+  requestedTimeStep_s: number,
+): number {
+  const clock = SIMULATION_MODELS.clock;
+  const requested = Number.isFinite(requestedTimeStep_s)
+    ? Math.max(clock.minAdaptiveTimeStep_s, requestedTimeStep_s)
+    : clock.defaultTimeStep_s;
+  const matrixSize = Math.max(1, profile.numNodes + profile.voltageSourceCount);
+  const matrixScale = matrixSize / clock.referenceMatrixSize;
+  const nonlinearScale = Math.sqrt(
+    1 + profile.nonlinearElementCount / clock.referenceNonlinearElements,
+  );
+  const costScale = Math.max(1, matrixScale * nonlinearScale);
+
+  return Math.min(
+    clock.maxAdaptiveTimeStep_s,
+    Math.max(clock.minAdaptiveTimeStep_s, requested * costScale),
+  );
+}
 
 export function numericProperty(value: unknown, fallback: number): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -194,7 +301,35 @@ export function ledSeriesResistance(properties: Record<string, unknown> = {}): n
 }
 
 export function ledMaximumCurrent_mA(properties: Record<string, unknown> = {}): number {
-  return Math.max(0.1, numericProperty(properties.maxCurrent, SIMULATION_MODELS.led.maximumCurrent_mA));
+  const value = properties.maxCurrent;
+
+  // `numericProperty` intentionally returns SI units, so `20mA` becomes
+  // `0.02`. This helper is named in mA and is consumed as mA by the netlist
+  // builder; parsing through numericProperty here used to turn that value
+  // into 0.1mA after the safety floor and made ordinary LEDs never light.
+  let current_mA: number = SIMULATION_MODELS.led.maximumCurrent_mA;
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    current_mA = value;
+  } else if (typeof value === 'string' && value.trim()) {
+    const match = value.trim().replace(',', '.').match(/^([-+]?\d*\.?\d+(?:e[-+]?\d+)?)[\s]*([a-zµμ]*)$/i);
+    if (match) {
+      const base = Number(match[1]);
+      const unit = match[2].toLowerCase();
+      if (Number.isFinite(base)) {
+        if (!unit || /^ma|milliamp/.test(unit)) {
+          current_mA = base;
+        } else if (/^a|amp/.test(unit)) {
+          current_mA = base * 1000;
+        } else if (/^(?:u|µ|μ)a|microamp/.test(unit)) {
+          current_mA = base / 1000;
+        } else if (/^na|nanoamp/.test(unit)) {
+          current_mA = base / 1_000_000;
+        }
+      }
+    }
+  }
+
+  return Math.max(0.1, current_mA);
 }
 
 export function diodeSeriesResistance(properties: Record<string, unknown> = {}): number {

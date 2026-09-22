@@ -1,0 +1,305 @@
+{
+  "schemaVersion": 1,
+  "backlogType": "simulation-optimization-follow-up",
+  "createdOn": "2026-08-27",
+  "relatedItems": ["OPT-001", "OPT-002", "OPT-003", "OPT-004", "OPT-005", "OPT-006", "OPT-007", "OPT-008", "OPT-009"],
+  "purpose": "Work discovered while implementing optimization items that needs a separate validation or feature pass.",
+  "items": [
+    {
+      "id": "OPT-FB-001",
+      "priority": "P1",
+      "status": "in_progress",
+      "title": "Add a maximum-circuit solver benchmark and runtime diagnostics",
+      "reason": "The current repository has no browser performance harness or persistent solver telemetry, so the adaptive budget can be verified structurally but not yet compared on a real laptop.",
+      "work": "Expose sampled worker budget usage, completed steps, selected timestep, and simulation-time rate behind a diagnostics view; automate a repeatable maximum-component regression trace for Adaptive and Full fidelity modes.",
+      "definitionOfDone": [
+        "The maximum-component circuit records solver wall time and completed steps without changing normal result payloads.",
+        "Adaptive and Full fidelity runs can be compared using the same circuit, firmware, and duration.",
+        "The benchmark records convergence, monotonic simulation time, and representative transient, motor, LED, and digital-IC checks."
+      ],
+      "implementation": {
+        "completedOn": "2026-08-27",
+        "summary": "Added opt-in 4 Hz worker diagnostics, a Solver Diagnostics editor panel, a deterministic maximum-component circuit and firmware fixture, and an injected runtime trace runner that executes Adaptive and Full fidelity runs for the same duration before restoring the user's circuit.",
+        "verification": [
+          "UI TypeScript and oxlint checks pass.",
+          "Vite production build passes.",
+          "Normal worker result fields remain unchanged unless diagnostics are explicitly subscribed.",
+          "The regression runner evaluates convergence, monotonic physical time, completed steps, and transient/motor/LED/digital-IC fixture coverage."
+        ],
+        "remainingValidation": "Run both traces on the target maximum-component circuit in a real browser/laptop and record wall time, budget utilization, frame rate, memory, and any convergence differences. A deterministic performance-clock harness remains tracked in OPT-FB-002 and OPT-FB-010."
+      }
+    },
+    {
+      "id": "OPT-FB-002",
+      "priority": "P1",
+      "status": "in_progress",
+      "title": "Add deterministic worker backpressure protocol tests",
+      "reason": "The UI package currently has no worker test harness to assert that duplicate credits collapse, uncredited solves do not emit RESULT payloads, and pause/step delivery does not advance time unexpectedly.",
+      "work": "Extract or host the worker scheduling state behind a deterministic test seam and cover credit issuance, slow-consumer behavior, pause, step, resume, stop, and scope-buffer bounds.",
+      "definitionOfDone": [
+        "No RESULT is emitted without a presentation credit.",
+        "At most one RESULT is outstanding while the consumer is slow.",
+        "Pause and step publish the latest state with correct monotonic timestamps."
+      ],
+      "implementation": {
+        "completedOn": "2026-08-27",
+        "summary": "Extracted WorkerBackpressureGate and BoundedScopeRing as deterministic, browser-independent protocol seams; SimulationWorker now uses the gate for credits and lifecycle transitions and the ring for bounded scope capture.",
+        "verification": [
+          "npm run test passes TypeScript, oxlint, and 22 deterministic worker protocol assertions.",
+          "Duplicate result credits collapse to one pending publication.",
+          "Pause, manual step, resume, and stop transitions are asserted, including stale-credit rejection after stop.",
+          "Scope-ring wrap order, row-major values, fixed capacity, and drain clearing are asserted."
+        ],
+        "remainingValidation": "Run the protocol against a real browser Worker and compare pause/step timing under a deliberately slow main-thread consumer; browser-worker integration coverage remains a follow-up validation item."
+      }
+    },
+    {
+      "id": "OPT-FB-003",
+      "priority": "P1",
+      "status": "in_progress",
+      "title": "Add selective result subscription payload and consumer-coverage tests",
+      "reason": "The compact worker contract and active-consumer demand need deterministic coverage for meters, probes, current-flow, thermal feedback, and full AI/lab diagnostics.",
+      "work": "Add a worker result fixture harness that asserts subscribed node and element IDs map to typed-array values, numeric buffers are transferable, unused branch/power data is omitted, and consumer toggles update subscriptions without dropping required visible feedback.",
+      "definitionOfDone": [
+        "A selective subscription produces no unsubscribed branch-current or power IDs.",
+        "Node, current, and power arrays materialize to the correct IDs and values on the main thread.",
+        "Meter, probe, current-flow, thermal, AI, and lab coverage is asserted independently.",
+        "Full diagnostic demand requests all solver nodes, branches, and power values only while an AI or lab consumer is active."
+      ],
+      "implementation": {
+        "completedOn": "2026-08-27",
+        "summary": "Extracted the selective result-subscription policy, typed-array materialization, and transfer-list construction into pure helpers shared by SimulationEngine and SimulationWorker.",
+        "verification": [
+          "npm run test passes TypeScript, oxlint, worker protocol assertions, and result-subscription contract assertions.",
+          "Meter, virtual probe, current-flow, thermal, AI, and lab demand combinations are covered independently.",
+          "Typed-array node/current/power ID mapping and omission of unused numeric buffers are asserted.",
+          "Vite production build passes."
+        ],
+        "remainingValidation": "Run the subscription assertions through a real browser Worker and inspect payload sizes while toggling consumers on the maximum-component circuit; browser message instrumentation remains a follow-up validation task."
+      }
+    },
+    {
+      "id": "OPT-FB-004",
+      "priority": "P1",
+      "status": "in_progress",
+      "title": "Add deterministic runtime-delta write-count regression",
+      "reason": "The result reconciler now uses indexed nodes and deadband comparisons, but the repository has no harness that counts unchanged-result canvas writes across a maximum-component circuit.",
+      "work": "Instrument the canvas-store batch boundary in a deterministic worker/result fixture and compare repeated identical results with controlled voltage, current, display, and actuator transitions.",
+      "definitionOfDone": [
+        "Repeated identical solver results publish zero canvas-node updates.",
+        "A value crossing its visual or behavioral threshold publishes exactly one affected component update.",
+        "Topology rebuilds refresh the node and pin indexes without retaining removed component IDs.",
+        "The maximum-component regression remains responsive while result reconciliation is active."
+      ],
+      "implementation": {
+        "completedOn": "2026-08-27",
+        "summary": "Extracted the runtime deadband, sparse per-component delta collector, write-count metrics, and rebuildable component/pin index into deterministic helpers used directly by SimulationEngine, with the real maximum-component preset loaded by the regression runner.",
+        "verification": [
+          "npm run test passes TypeScript, oxlint, worker protocol, result-subscription, and runtime-delta assertions.",
+          "Repeated identical voltage, current, display, actuator, and maximum-preset snapshots produce zero canvas writes.",
+          "A controlled deadband crossing produces exactly one sparse component write, while display, actuator, and LED transitions remain one write each.",
+          "A topology rebuild removes deleted component and pin IDs, and stale result candidates are rejected without a canvas write.",
+          "The 36-component maximum preset completes 128 indexed reconciliation rounds with exactly one candidate visit per component and zero unchanged-result writes."
+        ],
+        "remainingValidation": "Capture a real-browser maximum-circuit trace with result reconciliation enabled and correlate frame time with the deterministic write counts; browser rendering traces remain tracked by OPT-FB-008."
+      }
+    },
+    {
+      "id": "OPT-FB-005",
+      "priority": "P1",
+      "status": "in_progress",
+      "title": "Add model-revision and runtime-isolation regression coverage",
+      "reason": "The repository has no deterministic store harness proving that runtime feedback leaves the model revision unchanged while user electrical edits trigger exactly one targeted solver update.",
+      "work": "Exercise canvas add/remove/edit/wire/undo/redo actions and runtime node/batch actions with a subscribed SimulationEngine fixture; count revision transitions, listener work, netlist refreshes, worker recreation, and feedback-loop writes.",
+      "definitionOfDone": [
+        "Runtime-only node and batch updates do not increment modelRevision or refresh/recreate the solver.",
+        "Electrical property edits increment modelRevision and update the worker without a runtime feedback loop.",
+        "Topology edits, load, clear, undo, and redo recreate the solver with current node and wire data.",
+        "The maximum-component regression records no full canvas property scan for runtime-only updates."
+      ],
+      "implementation": {
+        "completedOn": "2026-08-27",
+        "summary": "Extracted the canvas revision classifier used by SimulationEngine, added deterministic revision/worker-decision instrumentation, and introduced a maintained node ID-to-array-index map so targeted model and runtime writes no longer scan the full canvas.",
+        "verification": [
+          "npm run test passes TypeScript, oxlint, worker protocol, result-subscription, runtime-delta, and model-revision assertions.",
+          "Actual Zustand single-node and batch runtime actions preserve modelRevision, lastModelChange, and the wires reference while scheduling zero MNA refreshes or worker recreations.",
+          "One resistor property commit increments modelRevision once, visits one affected node ID, and schedules one value-update envelope without recreating the worker.",
+          "Add/remove node, add/remove wire, undo, redo, load, and clear each produce one topology rebuild decision with the current node and wire IDs.",
+          "The real 36-component maximum preset applies two runtime updates with two indexed lookups, two replaced nodes, stable unaffected references, and zero full-canvas scans."
+        ],
+        "remainingValidation": "Run the same action matrix against a real browser Worker and assert concrete UPDATE_ELEMENT_VALUES payloads plus worker termination ordering; detailed element patch and transient-state coverage remains tracked by OPT-FB-006."
+      }
+    },
+    {
+      "id": "OPT-FB-006",
+      "priority": "P1",
+      "status": "in_progress",
+      "title": "Add incremental-MNA topology and mutable-element regression coverage",
+      "reason": "The repository has no deterministic harness proving that a model-only edit skips connectivity discovery, sends only changed element fields, preserves transient solver state, and recreates the worker only when topology actually changes.",
+      "work": "Add builder and worker fixtures for cached-versus-fresh topology equivalence, element patch counts, capacitor/inductor/behavioral history preservation, worker termination/recreation, virtual-meter structure changes, breadboard proximity links, and direct-wire endpoint changes.",
+      "definitionOfDone": [
+        "A supported resistor, source, diode, motor, or sensor value edit reuses the cached pin/node map and emits only the affected element patch set.",
+        "A topology-changing node or wire edit terminates the old worker before starting the replacement, with no leaked worker or stale element IDs.",
+        "Fresh and cache-aware builders produce equivalent topology signatures for unchanged breadboard and direct-wire circuits.",
+        "Virtual-meter mode/probe changes and unsupported structural model changes take the safe rebuild path."
+      ],
+      "implementation": {
+        "completedOn": "2026-08-27",
+        "summary": "Extracted incremental topology comparison, sparse element patching, transient-state preservation, virtual-meter cache selection, and worker-generation gating into shared production helpers. Corrected cached internal-node allocation and preserved the canvas model subscription across worker-only restarts.",
+        "verification": [
+          "npm run test passes TypeScript, oxlint, and all deterministic worker, result, runtime, model-revision, and incremental-MNA contracts.",
+          "Resistor, source, diode, motor, and LDR value edits reuse cached connectivity, run zero connectivity-discovery passes, and emit exactly one affected element patch with only the expected mutable field.",
+          "Fresh and cached builds of the maximum preset plus a sensor have equivalent topology, node counts, and motor internal-node IDs; unchanged refreshes emit zero patches.",
+          "Unchanged breadboard proximity is cache-equivalent, while moving a component away from a hole and changing a direct-wire endpoint reject the cache and take the topology rebuild path.",
+          "Capacitor, inductor, transformer-secondary, and behavioral-device history survives both sparse value patches and full element replacement.",
+          "Virtual-meter mode changes and on-canvas multimeter structural changes fail closed to a rebuild, while unchanged meter demand reuses topology.",
+          "Worker lifecycle assertions enforce start-stop-start ordering, one active generation, stale-message rejection, and removal of old element IDs.",
+          "Canvas topology subscriptions survive worker-only restarts and can create the first worker when a previously empty running simulation receives solvable topology."
+        ],
+        "remainingValidation": "Run the deterministic matrix through a real browser Worker to observe actual postMessage and terminate calls under queued-result load; the production generation gate already rejects late messages and the deterministic contract covers ordering and element ownership."
+      }
+    },
+    {
+      "id": "OPT-FB-007",
+      "priority": "P1",
+      "status": "in_progress",
+      "title": "Add deterministic scope-ring and capture-cadence regression coverage",
+      "reason": "The UI package has no worker/store fixture proving typed scope batches remain ordered through ring wrap, timebase changes, slow presentation credits, pause, and manual stepping.",
+      "work": "Add deterministic worker and store fixtures for capture-interval downsampling, transferable row-major batches, fixed-capacity wrap order, one publication per batch, timebase reset behavior, paused result flushing, manual step capture, and representative I2C/SPI/UART decoder inputs.",
+      "definitionOfDone": [
+        "Worker and store rings retain exactly their configured capacities in chronological order after multiple wraps.",
+        "Changing time-per-division updates capture cadence and cannot mix old-period samples into the new waveform.",
+        "One worker scope batch causes one store publication regardless of sample or channel count.",
+        "Pause publishes retained samples without advancing time, and each manual step publishes exactly one new timestamped sample.",
+        "Representative protocol edges remain decodable at a compatible selected timebase."
+      ],
+      "implementation": {
+        "completedOn": "2026-08-27",
+        "summary": "Extracted worker capture cadence, timing revision, transfer-list, and store accumulation policies into deterministic helpers used by SimulationWorker, SimulationEngine, and the Zustand store. Added the scope regression runner and corrected UART start-edge detection so data-bit transitions cannot create repeated false frames.",
+        "verification": [
+          "npm test passes TypeScript, oxlint, and all worker, result, runtime, model-revision, incremental-MNA, and scope-capture contracts.",
+          "Worker and store fixtures retain exact configured capacities after multiple wraps, preserve chronological timestamps, and preserve row-major multi-channel values.",
+          "Capture-interval downsampling, proportional time-per-division cadence, worker-buffer reset, monotonic revisions, and rejection of queued old-revision batches are asserted.",
+          "A 128-sample three-channel worker batch causes exactly one Zustand scope publication, independent of contained sample and channel counts.",
+          "Pause drains retained samples without changing the fixture clock, while consecutive manual steps each force exactly one newly advanced timestamp despite a longer normal capture interval.",
+          "Representative I2C address/ACK, SPI mode-0 MOSI/MISO, and UART 8N1 frames decode at a compatible selected scope timebase.",
+          "Vite production build passes; the existing oversized main-chunk warning remains tracked by OPT-FB-009."
+        ],
+        "remainingValidation": "Run the same contract through a real browser Worker to observe ArrayBuffer detachment, queued old-revision delivery, and pause/step postMessage ordering under a deliberately slow main thread; deterministic production seams already cover cadence, capacity, publication, and decoder correctness."
+      }
+    },
+    {
+      "id": "OPT-FB-008",
+      "priority": "P1",
+      "status": "in_progress",
+      "title": "Add deterministic canvas-budget coverage and browser rendering traces",
+      "reason": "The UI package has no Konva scene-count harness or browser GPU/frame-time benchmark proving viewport culling, particle caps, reduced cadence, and the Full detail override under maximum-component wiring density.",
+      "work": "Add pure-policy fixtures plus a browser benchmark that pans and zooms the maximum-component circuit with current flow disabled, adaptive, limited, and Full detail; record mounted wire shapes, compiled flow paths, particle draws, animation cadence, main-thread frame time, and GPU activity.",
+      "definitionOfDone": [
+        "Wire and current-flow scene counts exclude geometry outside the viewport overscan bounds.",
+        "Adaptive mode observes its global/per-wire particle caps and overview cadence while Full detail removes those visual limits.",
+        "Switching visual quality never changes solved wire-current values or measurement consumers.",
+        "Maximum-component browser traces compare adaptive and Full detail using the same viewport motion and simulation result stream."
+      ],
+      "implementation": {
+        "completedOn": "2026-08-27",
+        "summary": "Extracted visible-wire path compilation and particle allocation into production render policies, added opt-in Konva layout/compile/draw instrumentation, added deterministic culling/budget/isolation contracts, and added a diagnostics-panel browser runner that restores the user's project after replaying the maximum preset through disabled, Adaptive, overview-limited, and Full detail scenarios.",
+        "verification": [
+          "npm test passes TypeScript, oxlint, and all worker, result, runtime, model-revision, MNA, scope, and canvas-render contracts.",
+          "Straight wires inside or crossing viewport overscan remain mounted, fully offscreen wires are excluded, and current-flow compilation receives only the visible wire set.",
+          "Adaptive dense and overview policies assert their 33 ms/50 ms cadence plus global and per-wire particle caps; Full detail asserts 16 ms cadence and unlimited visual caps.",
+          "The browser trace records mounted wire components, compiled flow paths, total and per-path particle draws, configured and observed cadence, requestAnimationFrame frame-time distribution, Canvas2D draw submissions, and draw CPU submission time.",
+          "Quality-mode switches preserve solved wire-current, node-voltage, branch-current, power, meter-probe, and AI/lab consumer references.",
+          "The maximum-preset runner replays identical deterministic current-result frames and identical overview viewport motion for limited Adaptive and Full detail, supports cancellation, downloads JSON evidence, and restores canvas, viewport, visual settings, solved maps, and dirty state.",
+          "Vite production build passes; the existing oversized main-chunk warning remains tracked by OPT-FB-009."
+        ],
+        "remainingValidation": "Run the new diagnostics-panel canvas trace on target browsers/laptops and attach the downloaded JSON plus a Chrome/Edge Performance trace with GPU-process categories. Web pages cannot directly read GPU-process utilization, so the in-app trace records Canvas2D submissions as an honest activity proxy while external profiler evidence completes direct GPU timing."
+      }
+    },
+    {
+      "id": "OPT-FB-009",
+      "priority": "P2",
+      "status": "in_progress",
+      "title": "Split the oversized UI production bundle",
+      "reason": "OPT-008 production verification still reports a roughly 1.33 MB minified main JavaScript chunk, above Vite's 500 kB warning threshold; this is an application loading/architecture concern rather than part of the current rendering-loop optimization.",
+      "work": "Profile the main bundle and introduce route/feature-level dynamic imports plus deliberate vendor chunk boundaries for heavy editor, Monaco, AI, simulation, and lab surfaces without creating duplicate dependencies or unstable loading states.",
+      "definitionOfDone": [
+        "The initial application chunk meets a documented size target and no longer triggers the current oversized-chunk warning.",
+        "Editor, simulator, AI, and lab routes load their heavy dependencies only when needed.",
+        "Lazy-loading states and chunk-load failures have accessible user feedback.",
+        "Production navigation, offline/cache behavior, and all existing TypeScript and lint checks pass."
+      ],
+      "implementation": {
+        "completedOn": "2026-08-27",
+        "summary": "Converted every page to a recoverable route-level lazy boundary; deferred PCB, Monaco host, AI, IoT, instruments, settings, and diagnostics behind editor actions; moved SimulationEngine/AVR8js construction behind simulation or regression start with shared cancellation-safe lifecycle handling; and introduced Rolldown vendor groups plus a manifest-enforced production budget.",
+        "verification": [
+          "npm test passes TypeScript, oxlint, and every deterministic worker, result, runtime, model-revision, MNA, scope, and canvas-render contract.",
+          "npm run build passes without Vite's oversized-chunk warning and automatically runs the production manifest budget.",
+          "The minified main entry is 97,234 bytes against a 153,600-byte target; its gzip output is 23.85 kB, down from the previous roughly 1.36 MB monolithic entry.",
+          "The complete initial static JavaScript graph is 513,006 bytes across 13 chunks against budgets of 563,200 bytes and 16 requests; the largest emitted JavaScript chunk is 180,244 bytes against a 460,800-byte guardrail.",
+          "Manifest assertions prove editor, lab challenge, AI, Monaco host, PCB, diagnostics, and SimulationEngine/AVR modules remain outside the startup graph and that every emitted JavaScript asset is content-hashed.",
+          "Route and feature loading fallbacks expose live status semantics; route chunk failures provide an offline/update-aware alert with Retry and Go to home recovery actions.",
+          "Vite preview returns the application shell for direct navigation to /, /editor/share, /public-project/smoke, and /labs/smoke, and serves the hashed entry as JavaScript. Detailed evidence is recorded in docs/opt-fb-009-bundle-evidence.json."
+        ],
+        "remainingValidation": "On the deployed CDN/reverse proxy, verify immutable cache headers for hashed assets and no-cache revalidation for index.html, then exercise one stale-tab deployment and browser offline navigation. The application-side hashed naming, lazy boundaries, and recovery UI are implemented and production-preview navigation passes."
+      }
+    },
+    {
+      "id": "OPT-FB-010",
+      "priority": "P1",
+      "status": "in_progress",
+      "title": "Add deterministic AVR budget and compiled-firmware responsiveness coverage",
+      "reason": "The UI package has no controllable requestAnimationFrame/performance clock harness or browser trace proving AVR cycle debt, pause/resume, power transitions, fidelity budgets, and telemetry remain correct under expensive compiled firmware.",
+      "work": "Extract or host the AVR slice clock behind a deterministic fixture and add compiled ATmega328P browser scenarios for GPIO, timers/PWM, UART, ADC, and I2C while recording instruction/cycle throughput, deadline overshoot, retained debt, input latency, and frame time in Adaptive and Full fidelity modes.",
+      "definitionOfDone": [
+        "No AVR slice exceeds its configured deadline by more than one bounded deadline-check block or the hard instruction safety ceiling.",
+        "Executed instructions and peripheral ticks remain ordered with cycle totals independent of frame partitioning.",
+        "Pause, background-frame stalls, board power-off, resume, stop, and restart cannot create stale catch-up bursts.",
+        "Adaptive and Full fidelity traces expose instruction rate, emulated clock rate, main-thread utilization, cycle debt, and budget-limited state without per-frame store publication.",
+        "Representative compiled GPIO, timer/PWM, UART, ADC, and I2C firmware remains functional while editor input latency stays within the documented target."
+      ],
+      "implementation": {
+        "completedOn": "2026-08-27",
+        "summary": "Extracted the production AVR cycle/deadline policy into a deterministic scheduler with signed cycle carry and explicit lifecycle rebasing, added opt-in peripheral evidence counters, and added a diagnostics-panel runner that compiles and executes the same ATmega328P GPIO/PWM/UART/ADC/I2C fixture in Adaptive and Full fidelity while recording workload, frame-time, and synthetic-click latency distributions.",
+        "verification": [
+          "npm test passes TypeScript, oxlint, and every deterministic worker, result, runtime, model-revision, MNA, scope, canvas-render, and AVR-budget contract.",
+          "Controlled clock/requestAnimationFrame assertions prove bounded deadline checks, the hard instruction ceiling, signed cycle-carry partition independence, instruction-then-peripheral ordering, pause/power/background/restart rebasing, and exactly five 200 ms telemetry publications per second.",
+          "The browser trace collector requires non-empty frame and input samples plus independently passing GPIO, timer/PWM, UART, ADC, and I2C counters before a mode can report responsive.",
+          "The representative Arduino Uno source compiled through the configured remote compiler with HTTP 200 to 11,562 Intel HEX characters; compiler output reports 4,104 bytes of flash and 409 bytes of SRAM.",
+          "npm run build passes the production manifest budget with a 95.0 kB entry, 501.0 kB initial static JavaScript graph across 13 chunks, and a 176.1 kB largest chunk, with no oversized-chunk warning.",
+          "Detailed deterministic, compiler, browser-runner, and bundle evidence is recorded in docs/opt-fb-010-avr-evidence.json."
+        ],
+        "remainingValidation": "Run the new diagnostics-panel AVR trace on each target browser/laptop and attach the downloaded Adaptive/Full JSON. The implementation intentionally leaves the 50 ms p95 frame and synthetic-click targets unclaimed until measured on real hardware; compiler, deterministic timing, lifecycle, telemetry cadence, peripheral-classification, and production-build evidence already pass."
+      }
+    },
+    {
+      "id": "OPT-FB-011",
+      "priority": "P1",
+      "status": "in_progress",
+      "title": "Decongest the editor command ribbon",
+      "reason": "Long project names plus view, instrument, diagnostics, workspace, sharing, export, simulation, and save controls compete for one 48 px row, making the primary workflow difficult to scan and causing pressure at common laptop widths.",
+      "work": "Prioritize navigation, project context, view mode, undo/redo, fidelity, simulation, and save/fork in the primary ribbon; move lower-frequency commands into an accessible horizontal disclosure row with responsive labels and overflow behavior.",
+      "definitionOfDone": [
+        "The collapsed ribbon keeps primary editing and simulation actions visible without overlapping long project names.",
+        "Secondary commands are grouped with text labels in one horizontal tray and never become a tall vertical menu.",
+        "The tray remains usable through horizontal scrolling at narrow widths and exposes active states without requiring it to stay open.",
+        "Keyboard, focus, pressed/expanded semantics, reduced-motion preferences, read-only behavior, and existing command actions remain intact.",
+        "Authenticated light/dark editor checks pass at 1366 px, 1080 px, 860 px, and the minimum supported width."
+      ],
+      "implementation": {
+        "completedOn": "2026-08-27",
+        "summary": "Rebuilt the editor header as a prioritized two-level command ribbon. The primary row now contains only project/navigation context, view selection, undo/redo, fidelity, simulation controls, a Tools disclosure, and save/fork. Inspect, Assist, Workspace, and Project commands now use an icon-first detached command shelf with compact group labels, accessible hover names, and horizontal overflow without resizing the workspace.",
+        "verification": [
+          "npm test passes TypeScript, oxlint, and every existing deterministic regression contract.",
+          "npm run build passes with the production bundle budget: 95.0 kB entry, 500.7 kB initial static JavaScript across 13 chunks, and a 176.1 kB largest chunk.",
+          "The disclosure exposes aria-expanded/aria-controls, toggle actions expose aria-pressed, Escape collapses the tray and restores trigger focus, and focus-visible plus reduced-motion styles are present.",
+          "Project and fork names truncate instead of pushing controls; telemetry and labels progressively compact at 1320 px, 1080 px, 860 px, and 700 px breakpoints.",
+          "Secondary actions remain grouped in one non-wrapping horizontal row with explicit overflow scrolling.",
+          "The expanded command shelf is absolutely positioned beneath the ribbon, so opening it causes no canvas/code layout shift; outside click and Escape both dismiss it.",
+          "Secondary commands use compact icon buttons with title and aria-label discovery; diagnostics, ZIP export, and Gerber export use distinct bug, archive, and circuit-board symbols instead of duplicated or ambiguous icons."
+        ],
+        "remainingValidation": "Capture authenticated editor screenshots in light and dark themes at 1366 px, 1080 px, 860 px, and the minimum supported width, with the tray both collapsed and expanded. The isolated headless browser remained at the authentication preparation gate, so visual sign-off is intentionally left pending."
+      }
+    }
+  ]
+}

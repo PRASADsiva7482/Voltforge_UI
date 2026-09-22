@@ -38,8 +38,11 @@ export function validateComponentSchema(def: any): { valid: boolean; errors: str
   if (!Array.isArray(def.pins) || def.pins.length === 0) {
     errors.push('"pins" must be a non-empty array of pin definitions');
   } else {
+    const pinIds = new Set<string>();
     def.pins.forEach((pin: any, idx: number) => {
       if (!pin.id || !pin.name) errors.push(`Pin at index ${idx} must have "id" and "name"`);
+      if (pin.id && pinIds.has(pin.id)) errors.push(`Pin "${pin.id}" is duplicated`);
+      if (pin.id) pinIds.add(pin.id);
       if (!['left', 'right', 'top', 'bottom'].includes(pin.side)) {
         errors.push(`Pin "${pin.id || idx}" has invalid side (must be left, right, top, or bottom)`);
       }

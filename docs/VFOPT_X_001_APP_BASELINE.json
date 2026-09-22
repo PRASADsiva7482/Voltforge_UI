@@ -1,0 +1,2756 @@
+{
+  "schemaVersion": 1,
+  "id": "VFOPT-X-001",
+  "title": "Full-application performance baseline and validation",
+  "status": "completed_baseline_with_open_findings",
+  "updatedAt": "2026-09-21T03:39:25.708Z",
+  "appCompletelyReady": false,
+  "scope": "Local UI/backend/Keycloak with configured remote MySQL workflows; baseline and follow-up definition only. No application, backend or database schema fixes were applied.",
+  "machine": {
+    "platform": "win32",
+    "release": "10.0.26200",
+    "cpu": "Intel(R) Core(TM) i5-8265U CPU @ 1.60GHz",
+    "logicalCpus": 8,
+    "totalMemoryBytes": 25569435648,
+    "node": "v20.19.6"
+  },
+  "methodology": {
+    "viewportCssPx": {
+      "width": 1440,
+      "height": 900
+    },
+    "devicePixelRatio": 1,
+    "auth": "User-authorized real credentials used only by isolated test browsers. Real Keycloak token exchange and backend account sync; no synthetic authentication or mocked API responses.",
+    "data": "Private audit projects created through the UI, seeded with deterministic local fixtures through the actual API, and deleted at completion. Existing projects were not edited. The standalone transport probe used a separate private project.",
+    "fixtureSetup": "The revision guard failed in a preliminary setup. Subsequent fixture seeding used the existing optional-revision legacy API. The separate fresh-revision test and native UI save test still exercise the real guard; this is not reported as a product fix.",
+    "navigation": "Time to visible route heading/canvas plus two animation frames; not a guarantee that every background request, image or Monaco resource has completed. Cold documents use fresh browser contexts; warm transitions use the actual React router through pushState/popstate.",
+    "cpu": "CDP TaskDuration delta measures main-thread busy time. SystemInfo CPU-time deltas sum surviving Chromium processes; 100% means one logical CPU core, not the whole laptop. Short-lived process CPU can be missed. Background applications were not disabled.",
+    "memory": "JS heap only. Navigation samples explicitly collect garbage; ordinary interval heaps do not and should not be compared as leak measurements. Browser/GPU/native memory was not measured.",
+    "simulation": "36 components/75 wires, built-in deterministic firmware, compiled AVR mode observed in the actual UI. Two unprofiled 30-second windows per mode; an additional production 10-second CPU-profile window is separate diagnostic evidence.",
+    "backend": "10 sequential authenticated requests per endpoint after workflows. Medians/maxima are reported; no meaningful p95 claim is made from this small sample. No Server-Timing breakdown was exposed. Actuator readings include other server activity.",
+    "database": "Read-only schema/index/digest inspection of the BL-configured MySQL database. Digests are cumulative and cannot attribute historical maximum query time to this audit.",
+    "productionCorrection": "An initial route-fulfillment delivery attempt triggered Chromium local-network access checks and was excluded. Final production uses real HTTP on free IPv4 loopback port 3000 while the existing IPv6 Vite server remains running. No security feature was disabled.",
+    "exclusions": [
+      "AI implementation/training",
+      "Admin-only workflows and multi-user concurrency",
+      "Production deployment/CORS/CSP acceptance on external hosts",
+      "Other hardware, higher DPR or physical-display scanout",
+      "Long-duration leak proof beyond the measured 60-second simulation and five navigation cycles",
+      "Large account/project-count database stress"
+    ]
+  },
+  "development": {
+    "capturedAt": "2026-09-20T00:51:56.654Z",
+    "completedAt": "2026-09-20T00:55:18.892Z",
+    "delivery": "Existing local Vite development server",
+    "browser": "153.0.8010.48",
+    "fixtures": {
+      "dense": {
+        "nodes": 100,
+        "wires": 99,
+        "sha256": "9e7b00ca2c792f0b34a15ecbab6ba1873f34d72622f4cb36a663c8e2b26b620a"
+      },
+      "simulation": {
+        "nodes": 36,
+        "wires": 75,
+        "sha256": "ab4d3bc31fa61747a98c84353a7949937c84a755595023a8e852e959e198a02e"
+      }
+    },
+    "checksPassed": 11,
+    "checksFailed": 1,
+    "checks": [
+      {
+        "name": "Real Keycloak login and backend account synchronization",
+        "passed": true,
+        "detail": {
+          "synchronized": true,
+          "formAndSyncMs": 2218.44
+        }
+      },
+      {
+        "name": "Open authenticated project list",
+        "passed": true,
+        "detail": {
+          "name": "project list",
+          "readyMs": 382.57,
+          "spa": true,
+          "requests": 4,
+          "path": "/projects",
+          "state": {
+            "lcpMs": 1160,
+            "canvasElements": 0,
+            "activeWorkers": 0,
+            "activeSockets": 1
+          }
+        }
+      },
+      {
+        "name": "Open authenticated explore",
+        "passed": true,
+        "detail": {
+          "name": "explore",
+          "readyMs": 378.7,
+          "spa": true,
+          "requests": 3,
+          "path": "/explore",
+          "state": {
+            "lcpMs": 1160,
+            "canvasElements": 0,
+            "activeWorkers": 0,
+            "activeSockets": 1
+          }
+        }
+      },
+      {
+        "name": "Open authenticated labs",
+        "passed": true,
+        "detail": {
+          "name": "labs",
+          "readyMs": 413.59,
+          "spa": true,
+          "requests": 5,
+          "path": "/labs",
+          "state": {
+            "lcpMs": 1160,
+            "canvasElements": 0,
+            "activeWorkers": 0,
+            "activeSockets": 1
+          }
+        }
+      },
+      {
+        "name": "Open authenticated settings",
+        "passed": true,
+        "detail": {
+          "name": "settings",
+          "readyMs": 571.42,
+          "spa": true,
+          "requests": 3,
+          "path": "/settings",
+          "state": {
+            "lcpMs": 1160,
+            "canvasElements": 0,
+            "activeWorkers": 0,
+            "activeSockets": 1
+          }
+        }
+      },
+      {
+        "name": "Create an isolated private audit project through the real UI",
+        "passed": true,
+        "detail": {
+          "private": true,
+          "testProjectId": "ce7fb7b6-344a-479d-837f-513927680c73"
+        }
+      },
+      {
+        "name": "Reading a project keeps its edit revision stable and immediately usable for save",
+        "passed": false,
+        "error": "GET changed the edit revision\n+ actual - expected\n\n+ '2026-09-20T06:22:33'\n- '2026-09-20T06:22:35'\n                     ^"
+      },
+      {
+        "name": "Native component drag saves to the backend and survives a fresh reopen",
+        "passed": true,
+        "detail": {
+          "x": 180,
+          "y": 140,
+          "nodes": 100,
+          "wires": 99
+        }
+      },
+      {
+        "name": "Code and PCB views open in the authenticated editor",
+        "passed": true,
+        "detail": {
+          "codeReadyMs": 277.53,
+          "pcbReadyMs": 755.07
+        }
+      },
+      {
+        "name": "Repeated editor exit releases canvas elements, workers and collaboration sockets",
+        "passed": true,
+        "detail": [
+          {
+            "cycle": 1,
+            "jsHeapAfterGcBytes": 36899656,
+            "dom": {
+              "documents": 4,
+              "nodes": 411,
+              "jsEventListeners": 240
+            },
+            "activeWorkers": 0,
+            "activeSockets": 1,
+            "canvasElements": 0
+          },
+          {
+            "cycle": 2,
+            "jsHeapAfterGcBytes": 37606240,
+            "dom": {
+              "documents": 4,
+              "nodes": 413,
+              "jsEventListeners": 240
+            },
+            "activeWorkers": 0,
+            "activeSockets": 1,
+            "canvasElements": 0
+          },
+          {
+            "cycle": 3,
+            "jsHeapAfterGcBytes": 38157752,
+            "dom": {
+              "documents": 4,
+              "nodes": 415,
+              "jsEventListeners": 240
+            },
+            "activeWorkers": 0,
+            "activeSockets": 1,
+            "canvasElements": 0
+          },
+          {
+            "cycle": 4,
+            "jsHeapAfterGcBytes": 38581972,
+            "dom": {
+              "documents": 4,
+              "nodes": 417,
+              "jsEventListeners": 240
+            },
+            "activeWorkers": 0,
+            "activeSockets": 1,
+            "canvasElements": 0
+          },
+          {
+            "cycle": 5,
+            "jsHeapAfterGcBytes": 38998592,
+            "dom": {
+              "documents": 4,
+              "nodes": 419,
+              "jsEventListeners": 240
+            },
+            "activeWorkers": 0,
+            "activeSockets": 1,
+            "canvasElements": 0
+          }
+        ]
+      },
+      {
+        "name": "Start a real mixed-component simulation and observe physical time advance",
+        "passed": true,
+        "detail": {
+          "startupMs": 3910.65,
+          "state": "t=0.075s"
+        }
+      },
+      {
+        "name": "No unhandled browser errors during the live workflows",
+        "passed": true
+      }
+    ],
+    "navigation": [
+      {
+        "name": "public landing cold",
+        "readyMs": 920.62,
+        "spa": false,
+        "requests": 101,
+        "path": "/",
+        "state": {
+          "lcpMs": 712,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "project list",
+        "readyMs": 382.57,
+        "spa": true,
+        "requests": 4,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 1160,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "explore",
+        "readyMs": 378.7,
+        "spa": true,
+        "requests": 3,
+        "path": "/explore",
+        "state": {
+          "lcpMs": 1160,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "labs",
+        "readyMs": 413.59,
+        "spa": true,
+        "requests": 5,
+        "path": "/labs",
+        "state": {
+          "lcpMs": 1160,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "settings",
+        "readyMs": 571.42,
+        "spa": true,
+        "requests": 3,
+        "path": "/settings",
+        "state": {
+          "lcpMs": 1160,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "new project form",
+        "readyMs": 370.64,
+        "spa": true,
+        "requests": 6,
+        "path": "/projects/new",
+        "state": {
+          "lcpMs": 1160,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "leave editor for revision check",
+        "readyMs": 114.41,
+        "spa": true,
+        "requests": 3,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 1160,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "leave editor before fixture replacement",
+        "readyMs": 26.29,
+        "spa": true,
+        "requests": 0,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 1160,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "editor load 100 components",
+        "readyMs": 2661.73,
+        "spa": false,
+        "requests": 171,
+        "path": "/editor/ce7fb7b6-344a-479d-837f-513927680c73",
+        "state": {
+          "lcpMs": 2460,
+          "canvasElements": 4,
+          "activeWorkers": 1,
+          "activeSockets": 2
+        }
+      },
+      {
+        "name": "saved project reopen",
+        "readyMs": 2524.82,
+        "spa": false,
+        "requests": 166,
+        "path": "/editor/ce7fb7b6-344a-479d-837f-513927680c73",
+        "state": {
+          "lcpMs": 2152,
+          "canvasElements": 4,
+          "activeWorkers": 0,
+          "activeSockets": 2
+        }
+      },
+      {
+        "name": "cycle 1 projects",
+        "readyMs": 869.76,
+        "spa": true,
+        "requests": 12,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 2152,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "cycle 1 editor",
+        "readyMs": 1186.74,
+        "spa": true,
+        "requests": 2,
+        "path": "/editor/ce7fb7b6-344a-479d-837f-513927680c73",
+        "state": {
+          "lcpMs": 2152,
+          "canvasElements": 7,
+          "activeWorkers": 1,
+          "activeSockets": 2
+        }
+      },
+      {
+        "name": "cycle 2 projects",
+        "readyMs": 109.34,
+        "spa": true,
+        "requests": 1,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 2152,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "cycle 2 editor",
+        "readyMs": 1098.92,
+        "spa": true,
+        "requests": 2,
+        "path": "/editor/ce7fb7b6-344a-479d-837f-513927680c73",
+        "state": {
+          "lcpMs": 2152,
+          "canvasElements": 7,
+          "activeWorkers": 1,
+          "activeSockets": 2
+        }
+      },
+      {
+        "name": "cycle 3 projects",
+        "readyMs": 116.14,
+        "spa": true,
+        "requests": 1,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 2152,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "cycle 3 editor",
+        "readyMs": 1018.9,
+        "spa": true,
+        "requests": 2,
+        "path": "/editor/ce7fb7b6-344a-479d-837f-513927680c73",
+        "state": {
+          "lcpMs": 2152,
+          "canvasElements": 7,
+          "activeWorkers": 1,
+          "activeSockets": 2
+        }
+      },
+      {
+        "name": "cycle 4 projects",
+        "readyMs": 114.24,
+        "spa": true,
+        "requests": 1,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 2152,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "cycle 4 editor",
+        "readyMs": 1056.09,
+        "spa": true,
+        "requests": 2,
+        "path": "/editor/ce7fb7b6-344a-479d-837f-513927680c73",
+        "state": {
+          "lcpMs": 2152,
+          "canvasElements": 7,
+          "activeWorkers": 1,
+          "activeSockets": 2
+        }
+      },
+      {
+        "name": "cycle 5 projects",
+        "readyMs": 125.83,
+        "spa": true,
+        "requests": 1,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 2152,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "cycle 5 editor",
+        "readyMs": 967.04,
+        "spa": true,
+        "requests": 2,
+        "path": "/editor/ce7fb7b6-344a-479d-837f-513927680c73",
+        "state": {
+          "lcpMs": 2152,
+          "canvasElements": 7,
+          "activeWorkers": 0,
+          "activeSockets": 2
+        }
+      },
+      {
+        "name": "leave editor before fixture replacement",
+        "readyMs": 131.86,
+        "spa": true,
+        "requests": 1,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 2152,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "editor load 36 components",
+        "readyMs": 2254.62,
+        "spa": false,
+        "requests": 171,
+        "path": "/editor/ce7fb7b6-344a-479d-837f-513927680c73",
+        "state": {
+          "lcpMs": 1960,
+          "canvasElements": 4,
+          "activeWorkers": 1,
+          "activeSockets": 2
+        }
+      },
+      {
+        "name": "exit simulation editor",
+        "readyMs": 396.89,
+        "spa": true,
+        "requests": 11,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 1960,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      }
+    ],
+    "intervals": [
+      {
+        "name": "public landing idle",
+        "seconds": 15.01,
+        "mainThreadBusyPercentOfOneCore": 2.1,
+        "chromiumCpuPercentOfOneCore": 9.33,
+        "jsHeapBeforeBytes": 18858272,
+        "jsHeapAfterBytes": 18874288,
+        "domBefore": {
+          "documents": 14,
+          "nodes": 892,
+          "jsEventListeners": 196
+        },
+        "domAfter": {
+          "documents": 14,
+          "nodes": 892,
+          "jsEventListeners": 196
+        },
+        "longTasks": {
+          "count": 0,
+          "maxMs": 0,
+          "totalMs": 0
+        },
+        "endState": {
+          "lcpMs": 1344,
+          "activeWorkers": 0,
+          "workersCreated": 0,
+          "workersTerminated": 0,
+          "activeSockets": 1,
+          "socketsCreated": 1,
+          "canvasElements": 0,
+          "simulationTime": null,
+          "avr": null
+        }
+      },
+      {
+        "name": "authenticated dashboard idle",
+        "seconds": 15.02,
+        "mainThreadBusyPercentOfOneCore": 0.28,
+        "chromiumCpuPercentOfOneCore": 2.6,
+        "jsHeapBeforeBytes": 28636140,
+        "jsHeapAfterBytes": 18264112,
+        "domBefore": {
+          "documents": 30,
+          "nodes": 2063,
+          "jsEventListeners": 427
+        },
+        "domAfter": {
+          "documents": 5,
+          "nodes": 990,
+          "jsEventListeners": 182
+        },
+        "longTasks": {
+          "count": 0,
+          "maxMs": 0,
+          "totalMs": 0
+        },
+        "endState": {
+          "lcpMs": 1160,
+          "activeWorkers": 0,
+          "workersCreated": 0,
+          "workersTerminated": 0,
+          "activeSockets": 1,
+          "socketsCreated": 1,
+          "canvasElements": 0,
+          "simulationTime": null,
+          "avr": null
+        }
+      },
+      {
+        "name": "100-component editor idle",
+        "seconds": 15.01,
+        "mainThreadBusyPercentOfOneCore": 0.57,
+        "chromiumCpuPercentOfOneCore": 3.28,
+        "jsHeapBeforeBytes": 50315948,
+        "jsHeapAfterBytes": 49630936,
+        "domBefore": {
+          "documents": 3,
+          "nodes": 1586,
+          "jsEventListeners": 593
+        },
+        "domAfter": {
+          "documents": 3,
+          "nodes": 1546,
+          "jsEventListeners": 585
+        },
+        "longTasks": {
+          "count": 0,
+          "maxMs": 0,
+          "totalMs": 0
+        },
+        "endState": {
+          "lcpMs": 2460,
+          "activeWorkers": 1,
+          "workersCreated": 2,
+          "workersTerminated": 1,
+          "activeSockets": 2,
+          "socketsCreated": 3,
+          "canvasElements": 7,
+          "simulationTime": null,
+          "avr": null
+        }
+      },
+      {
+        "name": "mixed-component editor idle",
+        "seconds": 15.02,
+        "mainThreadBusyPercentOfOneCore": 0.81,
+        "chromiumCpuPercentOfOneCore": 3.42,
+        "jsHeapBeforeBytes": 118419920,
+        "jsHeapAfterBytes": 44643860,
+        "domBefore": {
+          "documents": 43,
+          "nodes": 5923,
+          "jsEventListeners": 1608
+        },
+        "domAfter": {
+          "documents": 17,
+          "nodes": 2167,
+          "jsEventListeners": 521
+        },
+        "longTasks": {
+          "count": 0,
+          "maxMs": 0,
+          "totalMs": 0
+        },
+        "endState": {
+          "lcpMs": 1960,
+          "activeWorkers": 1,
+          "workersCreated": 2,
+          "workersTerminated": 1,
+          "activeSockets": 2,
+          "socketsCreated": 3,
+          "canvasElements": 7,
+          "simulationTime": null,
+          "avr": null
+        }
+      },
+      {
+        "name": "simulation first 30 seconds",
+        "seconds": 30.08,
+        "mainThreadBusyPercentOfOneCore": 88.1,
+        "chromiumCpuPercentOfOneCore": 313.59,
+        "jsHeapBeforeBytes": 53523232,
+        "jsHeapAfterBytes": 76430804,
+        "domBefore": {
+          "documents": 16,
+          "nodes": 2232,
+          "jsEventListeners": 580
+        },
+        "domAfter": {
+          "documents": 16,
+          "nodes": 2240,
+          "jsEventListeners": 1276
+        },
+        "longTasks": {
+          "count": 306,
+          "maxMs": 114,
+          "totalMs": 18325
+        },
+        "endState": {
+          "lcpMs": 1960,
+          "activeWorkers": 2,
+          "workersCreated": 3,
+          "workersTerminated": 1,
+          "activeSockets": 2,
+          "socketsCreated": 22,
+          "canvasElements": 7,
+          "simulationTime": "t=7.335s",
+          "avr": "AVR capped · 0.33 MHz · 8%"
+        }
+      },
+      {
+        "name": "simulation second 30 seconds",
+        "seconds": 30.13,
+        "mainThreadBusyPercentOfOneCore": 88.75,
+        "chromiumCpuPercentOfOneCore": 307.02,
+        "jsHeapBeforeBytes": 81957480,
+        "jsHeapAfterBytes": 95115740,
+        "domBefore": {
+          "documents": 16,
+          "nodes": 2240,
+          "jsEventListeners": 1304
+        },
+        "domAfter": {
+          "documents": 16,
+          "nodes": 2240,
+          "jsEventListeners": 1344
+        },
+        "longTasks": {
+          "count": 332,
+          "maxMs": 134,
+          "totalMs": 21744
+        },
+        "endState": {
+          "lcpMs": 1960,
+          "activeWorkers": 2,
+          "workersCreated": 3,
+          "workersTerminated": 1,
+          "activeSockets": 2,
+          "socketsCreated": 40,
+          "canvasElements": 7,
+          "simulationTime": "t=13.575s",
+          "avr": "AVR capped · 0.22 MHz · 5%"
+        }
+      },
+      {
+        "name": "editor idle after simulation stop",
+        "seconds": 15.07,
+        "mainThreadBusyPercentOfOneCore": 3.2,
+        "chromiumCpuPercentOfOneCore": 7.81,
+        "jsHeapBeforeBytes": 85788596,
+        "jsHeapAfterBytes": 55488032,
+        "domBefore": {
+          "documents": 16,
+          "nodes": 2245,
+          "jsEventListeners": 1482
+        },
+        "domAfter": {
+          "documents": 16,
+          "nodes": 2221,
+          "jsEventListeners": 550
+        },
+        "longTasks": {
+          "count": 0,
+          "maxMs": 0,
+          "totalMs": 0
+        },
+        "endState": {
+          "lcpMs": 1960,
+          "activeWorkers": 1,
+          "workersCreated": 3,
+          "workersTerminated": 2,
+          "activeSockets": 2,
+          "socketsCreated": 42,
+          "canvasElements": 7,
+          "simulationTime": null,
+          "avr": null
+        }
+      },
+      {
+        "name": "project list after all workflows",
+        "seconds": 15.06,
+        "mainThreadBusyPercentOfOneCore": 0.07,
+        "chromiumCpuPercentOfOneCore": 0.3,
+        "jsHeapBeforeBytes": 44468064,
+        "jsHeapAfterBytes": 45423948,
+        "domBefore": {
+          "documents": 17,
+          "nodes": 1808,
+          "jsEventListeners": 357
+        },
+        "domAfter": {
+          "documents": 17,
+          "nodes": 1808,
+          "jsEventListeners": 357
+        },
+        "longTasks": {
+          "count": 0,
+          "maxMs": 0,
+          "totalMs": 0
+        },
+        "endState": {
+          "lcpMs": 1960,
+          "activeWorkers": 0,
+          "workersCreated": 3,
+          "workersTerminated": 3,
+          "activeSockets": 1,
+          "socketsCreated": 42,
+          "canvasElements": 0,
+          "simulationTime": null,
+          "avr": null
+        }
+      }
+    ],
+    "navigationCycles": [
+      {
+        "cycle": 1,
+        "jsHeapAfterGcBytes": 36899656,
+        "dom": {
+          "documents": 4,
+          "nodes": 411,
+          "jsEventListeners": 240
+        },
+        "activeWorkers": 0,
+        "activeSockets": 1,
+        "canvasElements": 0
+      },
+      {
+        "cycle": 2,
+        "jsHeapAfterGcBytes": 37606240,
+        "dom": {
+          "documents": 4,
+          "nodes": 413,
+          "jsEventListeners": 240
+        },
+        "activeWorkers": 0,
+        "activeSockets": 1,
+        "canvasElements": 0
+      },
+      {
+        "cycle": 3,
+        "jsHeapAfterGcBytes": 38157752,
+        "dom": {
+          "documents": 4,
+          "nodes": 415,
+          "jsEventListeners": 240
+        },
+        "activeWorkers": 0,
+        "activeSockets": 1,
+        "canvasElements": 0
+      },
+      {
+        "cycle": 4,
+        "jsHeapAfterGcBytes": 38581972,
+        "dom": {
+          "documents": 4,
+          "nodes": 417,
+          "jsEventListeners": 240
+        },
+        "activeWorkers": 0,
+        "activeSockets": 1,
+        "canvasElements": 0
+      },
+      {
+        "cycle": 5,
+        "jsHeapAfterGcBytes": 38998592,
+        "dom": {
+          "documents": 4,
+          "nodes": 419,
+          "jsEventListeners": 240
+        },
+        "activeWorkers": 0,
+        "activeSockets": 1,
+        "canvasElements": 0
+      }
+    ],
+    "endpointBenchmarks": [
+      {
+        "endpoint": "/projects?page=0&size=8",
+        "samplesMs": [
+          295.23,
+          138.4,
+          186.77,
+          185.6,
+          181.7,
+          157.16,
+          139.52,
+          136.97,
+          140.58,
+          138.09
+        ],
+        "medianMs": 157.16,
+        "maxMs": 295.23
+      },
+      {
+        "endpoint": "/projects/public?page=0&size=8",
+        "samplesMs": [
+          167.25,
+          163.07,
+          162.01,
+          161.02,
+          165.89,
+          165.2,
+          159.25,
+          166.71,
+          171.12,
+          166.21
+        ],
+        "medianMs": 165.89,
+        "maxMs": 171.12
+      },
+      {
+        "endpoint": "/projects/{auditProjectId}",
+        "samplesMs": [
+          179.16,
+          206.23,
+          186.83,
+          184.3,
+          181.67,
+          183.11,
+          187.52,
+          188.7,
+          184.1,
+          184.48
+        ],
+        "medianMs": 184.48,
+        "maxMs": 206.23
+      }
+    ],
+    "serverMetrics": [
+      {
+        "label": "before workflows",
+        "values": {
+          "process.cpu.usage": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 0.002123076303523015
+              }
+            ],
+            "baseUnit": null
+          },
+          "jvm.memory.used": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 356020264
+              }
+            ],
+            "baseUnit": "bytes"
+          },
+          "jvm.threads.live": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 48
+              }
+            ],
+            "baseUnit": "threads"
+          },
+          "hikaricp.connections.active": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 0
+              }
+            ],
+            "baseUnit": null
+          },
+          "hikaricp.connections.idle": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 20
+              }
+            ],
+            "baseUnit": null
+          },
+          "hikaricp.connections.pending": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 0
+              }
+            ],
+            "baseUnit": null
+          },
+          "http.server.requests": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "COUNT",
+                "value": 106
+              },
+              {
+                "statistic": "TOTAL_TIME",
+                "value": 35.0999708
+              },
+              {
+                "statistic": "MAX",
+                "value": 1.3510718
+              }
+            ],
+            "baseUnit": "seconds"
+          }
+        }
+      },
+      {
+        "label": "after workflows",
+        "values": {
+          "process.cpu.usage": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 0.007287949118259431
+              }
+            ],
+            "baseUnit": null
+          },
+          "jvm.memory.used": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 338292584
+              }
+            ],
+            "baseUnit": "bytes"
+          },
+          "jvm.threads.live": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 82
+              }
+            ],
+            "baseUnit": "threads"
+          },
+          "hikaricp.connections.active": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 0
+              }
+            ],
+            "baseUnit": null
+          },
+          "hikaricp.connections.idle": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 20
+              }
+            ],
+            "baseUnit": null
+          },
+          "hikaricp.connections.pending": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 0
+              }
+            ],
+            "baseUnit": null
+          },
+          "http.server.requests": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "COUNT",
+                "value": 256
+              },
+              {
+                "statistic": "TOTAL_TIME",
+                "value": 49.634745599999995
+              },
+              {
+                "statistic": "MAX",
+                "value": 3.0309128
+              }
+            ],
+            "baseUnit": "seconds"
+          }
+        }
+      }
+    ],
+    "revisionProbe": {
+      "firstRead": "2026-09-20T06:22:33",
+      "secondRead": "2026-09-20T06:22:35",
+      "firstViews": 1,
+      "secondViews": 2,
+      "savePassed": false
+    },
+    "networkFailuresByStatus": {
+      "409": 7,
+      "500": 12
+    },
+    "unhandledBrowserErrors": [],
+    "cleanup": {
+      "testProjectId": "ce7fb7b6-344a-479d-837f-513927680c73",
+      "deleted": true,
+      "status": 200
+    }
+  },
+  "production": {
+    "capturedAt": "2026-09-20T00:59:12.313Z",
+    "completedAt": "2026-09-20T01:02:36.217Z",
+    "delivery": "Unmodified dist over real HTTP on 127.0.0.1:3000; isolated Chrome resolves localhost to IPv4. Existing IPv6 Vite server and live API/identity configuration unchanged.",
+    "browser": "153.0.8010.48",
+    "fixtures": {
+      "dense": {
+        "nodes": 100,
+        "wires": 99,
+        "sha256": "9e7b00ca2c792f0b34a15ecbab6ba1873f34d72622f4cb36a663c8e2b26b620a"
+      },
+      "simulation": {
+        "nodes": 36,
+        "wires": 75,
+        "sha256": "ab4d3bc31fa61747a98c84353a7949937c84a755595023a8e852e959e198a02e"
+      }
+    },
+    "checksPassed": 11,
+    "checksFailed": 1,
+    "checks": [
+      {
+        "name": "Real Keycloak login and backend account synchronization",
+        "passed": true,
+        "detail": {
+          "synchronized": true,
+          "formAndSyncMs": 2165.18
+        }
+      },
+      {
+        "name": "Open authenticated project list",
+        "passed": true,
+        "detail": {
+          "name": "project list",
+          "readyMs": 377.59,
+          "spa": true,
+          "requests": 3,
+          "path": "/projects",
+          "state": {
+            "lcpMs": 700,
+            "canvasElements": 0,
+            "activeWorkers": 0,
+            "activeSockets": 0
+          }
+        }
+      },
+      {
+        "name": "Open authenticated explore",
+        "passed": true,
+        "detail": {
+          "name": "explore",
+          "readyMs": 363.73,
+          "spa": true,
+          "requests": 3,
+          "path": "/explore",
+          "state": {
+            "lcpMs": 700,
+            "canvasElements": 0,
+            "activeWorkers": 0,
+            "activeSockets": 0
+          }
+        }
+      },
+      {
+        "name": "Open authenticated labs",
+        "passed": true,
+        "detail": {
+          "name": "labs",
+          "readyMs": 395.66,
+          "spa": true,
+          "requests": 5,
+          "path": "/labs",
+          "state": {
+            "lcpMs": 700,
+            "canvasElements": 0,
+            "activeWorkers": 0,
+            "activeSockets": 0
+          }
+        }
+      },
+      {
+        "name": "Open authenticated settings",
+        "passed": true,
+        "detail": {
+          "name": "settings",
+          "readyMs": 546.98,
+          "spa": true,
+          "requests": 3,
+          "path": "/settings",
+          "state": {
+            "lcpMs": 700,
+            "canvasElements": 0,
+            "activeWorkers": 0,
+            "activeSockets": 0
+          }
+        }
+      },
+      {
+        "name": "Create an isolated private audit project through the real UI",
+        "passed": true,
+        "detail": {
+          "private": true,
+          "testProjectId": "b23ff590-48d8-46ba-9747-e8bc7aef9350"
+        }
+      },
+      {
+        "name": "Reading a project keeps its edit revision stable and immediately usable for save",
+        "passed": false,
+        "error": "GET changed the edit revision\n+ actual - expected\n\n+ '2026-09-20T06:29:48'\n- '2026-09-20T06:29:50'\n                    ^"
+      },
+      {
+        "name": "Native component drag saves to the backend and survives a fresh reopen",
+        "passed": true,
+        "detail": {
+          "x": 180,
+          "y": 140,
+          "nodes": 100,
+          "wires": 99
+        }
+      },
+      {
+        "name": "Code and PCB views open in the authenticated editor",
+        "passed": true,
+        "detail": {
+          "codeReadyMs": 299.74,
+          "pcbReadyMs": 592.29
+        }
+      },
+      {
+        "name": "Repeated editor exit releases canvas elements, workers and collaboration sockets",
+        "passed": true,
+        "detail": [
+          {
+            "cycle": 1,
+            "jsHeapAfterGcBytes": 19161568,
+            "dom": {
+              "documents": 4,
+              "nodes": 437,
+              "jsEventListeners": 236
+            },
+            "activeWorkers": 0,
+            "activeSockets": 0,
+            "canvasElements": 0
+          },
+          {
+            "cycle": 2,
+            "jsHeapAfterGcBytes": 19717408,
+            "dom": {
+              "documents": 4,
+              "nodes": 439,
+              "jsEventListeners": 236
+            },
+            "activeWorkers": 0,
+            "activeSockets": 0,
+            "canvasElements": 0
+          },
+          {
+            "cycle": 3,
+            "jsHeapAfterGcBytes": 20274048,
+            "dom": {
+              "documents": 4,
+              "nodes": 441,
+              "jsEventListeners": 236
+            },
+            "activeWorkers": 0,
+            "activeSockets": 0,
+            "canvasElements": 0
+          },
+          {
+            "cycle": 4,
+            "jsHeapAfterGcBytes": 20627520,
+            "dom": {
+              "documents": 4,
+              "nodes": 443,
+              "jsEventListeners": 236
+            },
+            "activeWorkers": 0,
+            "activeSockets": 0,
+            "canvasElements": 0
+          },
+          {
+            "cycle": 5,
+            "jsHeapAfterGcBytes": 21154772,
+            "dom": {
+              "documents": 4,
+              "nodes": 445,
+              "jsEventListeners": 236
+            },
+            "activeWorkers": 0,
+            "activeSockets": 0,
+            "canvasElements": 0
+          }
+        ]
+      },
+      {
+        "name": "Start a real mixed-component simulation and observe physical time advance",
+        "passed": true,
+        "detail": {
+          "startupMs": 3014.3,
+          "state": "t=0.035s"
+        }
+      },
+      {
+        "name": "No unhandled browser errors during the live workflows",
+        "passed": true
+      }
+    ],
+    "navigation": [
+      {
+        "name": "public landing cold",
+        "readyMs": 563.28,
+        "spa": false,
+        "requests": 23,
+        "path": "/",
+        "state": {
+          "lcpMs": 404,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 0
+        }
+      },
+      {
+        "name": "project list",
+        "readyMs": 377.59,
+        "spa": true,
+        "requests": 3,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 700,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 0
+        }
+      },
+      {
+        "name": "explore",
+        "readyMs": 363.73,
+        "spa": true,
+        "requests": 3,
+        "path": "/explore",
+        "state": {
+          "lcpMs": 700,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 0
+        }
+      },
+      {
+        "name": "labs",
+        "readyMs": 395.66,
+        "spa": true,
+        "requests": 5,
+        "path": "/labs",
+        "state": {
+          "lcpMs": 700,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 0
+        }
+      },
+      {
+        "name": "settings",
+        "readyMs": 546.98,
+        "spa": true,
+        "requests": 3,
+        "path": "/settings",
+        "state": {
+          "lcpMs": 700,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 0
+        }
+      },
+      {
+        "name": "new project form",
+        "readyMs": 380.62,
+        "spa": true,
+        "requests": 3,
+        "path": "/projects/new",
+        "state": {
+          "lcpMs": 700,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 0
+        }
+      },
+      {
+        "name": "leave editor for revision check",
+        "readyMs": 83.53,
+        "spa": true,
+        "requests": 3,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 700,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 0
+        }
+      },
+      {
+        "name": "leave editor before fixture replacement",
+        "readyMs": 25.69,
+        "spa": true,
+        "requests": 0,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 700,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 0
+        }
+      },
+      {
+        "name": "editor load 100 components",
+        "readyMs": 1861.65,
+        "spa": false,
+        "requests": 41,
+        "path": "/editor/b23ff590-48d8-46ba-9747-e8bc7aef9350",
+        "state": {
+          "lcpMs": 1584,
+          "canvasElements": 4,
+          "activeWorkers": 1,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "saved project reopen",
+        "readyMs": 1727.76,
+        "spa": false,
+        "requests": 40,
+        "path": "/editor/b23ff590-48d8-46ba-9747-e8bc7aef9350",
+        "state": {
+          "lcpMs": 1420,
+          "canvasElements": 4,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "cycle 1 projects",
+        "readyMs": 390.34,
+        "spa": true,
+        "requests": 5,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 1420,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 0
+        }
+      },
+      {
+        "name": "cycle 1 editor",
+        "readyMs": 663.97,
+        "spa": true,
+        "requests": 2,
+        "path": "/editor/b23ff590-48d8-46ba-9747-e8bc7aef9350",
+        "state": {
+          "lcpMs": 1420,
+          "canvasElements": 7,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "cycle 2 projects",
+        "readyMs": 67.99,
+        "spa": true,
+        "requests": 1,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 1420,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 0
+        }
+      },
+      {
+        "name": "cycle 2 editor",
+        "readyMs": 485.48,
+        "spa": true,
+        "requests": 2,
+        "path": "/editor/b23ff590-48d8-46ba-9747-e8bc7aef9350",
+        "state": {
+          "lcpMs": 1420,
+          "canvasElements": 7,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "cycle 3 projects",
+        "readyMs": 77.53,
+        "spa": true,
+        "requests": 1,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 1420,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 0
+        }
+      },
+      {
+        "name": "cycle 3 editor",
+        "readyMs": 521.92,
+        "spa": true,
+        "requests": 2,
+        "path": "/editor/b23ff590-48d8-46ba-9747-e8bc7aef9350",
+        "state": {
+          "lcpMs": 1420,
+          "canvasElements": 7,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "cycle 4 projects",
+        "readyMs": 66.48,
+        "spa": true,
+        "requests": 1,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 1420,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 0
+        }
+      },
+      {
+        "name": "cycle 4 editor",
+        "readyMs": 524.46,
+        "spa": true,
+        "requests": 2,
+        "path": "/editor/b23ff590-48d8-46ba-9747-e8bc7aef9350",
+        "state": {
+          "lcpMs": 1420,
+          "canvasElements": 7,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "cycle 5 projects",
+        "readyMs": 73.34,
+        "spa": true,
+        "requests": 1,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 1420,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 0
+        }
+      },
+      {
+        "name": "cycle 5 editor",
+        "readyMs": 582.21,
+        "spa": true,
+        "requests": 2,
+        "path": "/editor/b23ff590-48d8-46ba-9747-e8bc7aef9350",
+        "state": {
+          "lcpMs": 1420,
+          "canvasElements": 7,
+          "activeWorkers": 0,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "leave editor before fixture replacement",
+        "readyMs": 62.65,
+        "spa": true,
+        "requests": 1,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 1420,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 0
+        }
+      },
+      {
+        "name": "editor load 36 components",
+        "readyMs": 1960.43,
+        "spa": false,
+        "requests": 41,
+        "path": "/editor/b23ff590-48d8-46ba-9747-e8bc7aef9350",
+        "state": {
+          "lcpMs": 1452,
+          "canvasElements": 4,
+          "activeWorkers": 1,
+          "activeSockets": 1
+        }
+      },
+      {
+        "name": "exit simulation editor",
+        "readyMs": 398.53,
+        "spa": true,
+        "requests": 5,
+        "path": "/projects",
+        "state": {
+          "lcpMs": 1452,
+          "canvasElements": 0,
+          "activeWorkers": 0,
+          "activeSockets": 0
+        }
+      }
+    ],
+    "intervals": [
+      {
+        "name": "public landing idle",
+        "seconds": 15.01,
+        "mainThreadBusyPercentOfOneCore": 0.05,
+        "chromiumCpuPercentOfOneCore": 10.55,
+        "jsHeapBeforeBytes": 5446600,
+        "jsHeapAfterBytes": 5461756,
+        "domBefore": {
+          "documents": 14,
+          "nodes": 901,
+          "jsEventListeners": 183
+        },
+        "domAfter": {
+          "documents": 14,
+          "nodes": 901,
+          "jsEventListeners": 183
+        },
+        "longTasks": {
+          "count": 0,
+          "maxMs": 0,
+          "totalMs": 0
+        },
+        "endState": {
+          "lcpMs": 988,
+          "activeWorkers": 0,
+          "workersCreated": 0,
+          "workersTerminated": 0,
+          "activeSockets": 0,
+          "socketsCreated": 0,
+          "socketsByUrl": {},
+          "canvasElements": 0,
+          "simulationTime": null,
+          "avr": null
+        }
+      },
+      {
+        "name": "authenticated dashboard idle",
+        "seconds": 15.02,
+        "mainThreadBusyPercentOfOneCore": 0.3,
+        "chromiumCpuPercentOfOneCore": 2.29,
+        "jsHeapBeforeBytes": 9490800,
+        "jsHeapAfterBytes": 4970748,
+        "domBefore": {
+          "documents": 32,
+          "nodes": 2146,
+          "jsEventListeners": 401
+        },
+        "domAfter": {
+          "documents": 4,
+          "nodes": 805,
+          "jsEventListeners": 178
+        },
+        "longTasks": {
+          "count": 0,
+          "maxMs": 0,
+          "totalMs": 0
+        },
+        "endState": {
+          "lcpMs": 700,
+          "activeWorkers": 0,
+          "workersCreated": 0,
+          "workersTerminated": 0,
+          "activeSockets": 0,
+          "socketsCreated": 0,
+          "socketsByUrl": {},
+          "canvasElements": 0,
+          "simulationTime": null,
+          "avr": null
+        }
+      },
+      {
+        "name": "100-component editor idle",
+        "seconds": 15.02,
+        "mainThreadBusyPercentOfOneCore": 0.32,
+        "chromiumCpuPercentOfOneCore": 1.91,
+        "jsHeapBeforeBytes": 32732800,
+        "jsHeapAfterBytes": 25283800,
+        "domBefore": {
+          "documents": 4,
+          "nodes": 1838,
+          "jsEventListeners": 638
+        },
+        "domAfter": {
+          "documents": 3,
+          "nodes": 1568,
+          "jsEventListeners": 582
+        },
+        "longTasks": {
+          "count": 0,
+          "maxMs": 0,
+          "totalMs": 0
+        },
+        "endState": {
+          "lcpMs": 1584,
+          "activeWorkers": 1,
+          "workersCreated": 2,
+          "workersTerminated": 1,
+          "activeSockets": 1,
+          "socketsCreated": 1,
+          "socketsByUrl": {
+            "ws://localhost:2001/voltForge-app/ws-native": {
+              "created": 1,
+              "closed": 0,
+              "closeCodes": {},
+              "sentCommands": {
+                "CONNECT": 1,
+                "SUBSCRIBE": 2
+              },
+              "receivedCommands": {
+                "CONNECTED": 1
+              },
+              "maxSentBytes": 1827
+            }
+          },
+          "canvasElements": 7,
+          "simulationTime": null,
+          "avr": null
+        }
+      },
+      {
+        "name": "mixed-component editor idle",
+        "seconds": 15.02,
+        "mainThreadBusyPercentOfOneCore": 0.47,
+        "chromiumCpuPercentOfOneCore": 2.38,
+        "jsHeapBeforeBytes": 56185124,
+        "jsHeapAfterBytes": 22181308,
+        "domBefore": {
+          "documents": 44,
+          "nodes": 6034,
+          "jsEventListeners": 1555
+        },
+        "domAfter": {
+          "documents": 17,
+          "nodes": 2189,
+          "jsEventListeners": 518
+        },
+        "longTasks": {
+          "count": 0,
+          "maxMs": 0,
+          "totalMs": 0
+        },
+        "endState": {
+          "lcpMs": 1452,
+          "activeWorkers": 1,
+          "workersCreated": 2,
+          "workersTerminated": 1,
+          "activeSockets": 1,
+          "socketsCreated": 1,
+          "socketsByUrl": {
+            "ws://localhost:2001/voltForge-app/ws-native": {
+              "created": 1,
+              "closed": 0,
+              "closeCodes": {},
+              "sentCommands": {
+                "CONNECT": 1,
+                "SUBSCRIBE": 2
+              },
+              "receivedCommands": {
+                "CONNECTED": 1
+              },
+              "maxSentBytes": 1827
+            }
+          },
+          "canvasElements": 7,
+          "simulationTime": null,
+          "avr": null
+        }
+      },
+      {
+        "name": "simulation first 30 seconds",
+        "seconds": 30.04,
+        "mainThreadBusyPercentOfOneCore": 41.51,
+        "chromiumCpuPercentOfOneCore": 267.84,
+        "jsHeapBeforeBytes": 26647400,
+        "jsHeapAfterBytes": 44273092,
+        "domBefore": {
+          "documents": 16,
+          "nodes": 2258,
+          "jsEventListeners": 554
+        },
+        "domAfter": {
+          "documents": 16,
+          "nodes": 2266,
+          "jsEventListeners": 745
+        },
+        "longTasks": {
+          "count": 0,
+          "maxMs": 0,
+          "totalMs": 0
+        },
+        "endState": {
+          "lcpMs": 1452,
+          "activeWorkers": 2,
+          "workersCreated": 3,
+          "workersTerminated": 1,
+          "activeSockets": 0,
+          "socketsCreated": 23,
+          "socketsByUrl": {
+            "ws://localhost:2001/voltForge-app/ws-native": {
+              "created": 23,
+              "closed": 23,
+              "closeCodes": {
+                "1009": 23
+              },
+              "sentCommands": {
+                "CONNECT": 23,
+                "SUBSCRIBE": 46,
+                "SEND": 23
+              },
+              "receivedCommands": {
+                "CONNECTED": 23
+              },
+              "maxSentBytes": 36779
+            }
+          },
+          "canvasElements": 7,
+          "simulationTime": "t=7.450s",
+          "avr": "AVR capped · 0.29 MHz · 7%"
+        }
+      },
+      {
+        "name": "simulation second 30 seconds",
+        "seconds": 30.02,
+        "mainThreadBusyPercentOfOneCore": 39.99,
+        "chromiumCpuPercentOfOneCore": 261.96,
+        "jsHeapBeforeBytes": 44823696,
+        "jsHeapAfterBytes": 50797552,
+        "domBefore": {
+          "documents": 16,
+          "nodes": 2266,
+          "jsEventListeners": 745
+        },
+        "domAfter": {
+          "documents": 16,
+          "nodes": 2266,
+          "jsEventListeners": 771
+        },
+        "longTasks": {
+          "count": 1,
+          "maxMs": 58,
+          "totalMs": 58
+        },
+        "endState": {
+          "lcpMs": 1452,
+          "activeWorkers": 2,
+          "workersCreated": 3,
+          "workersTerminated": 1,
+          "activeSockets": 0,
+          "socketsCreated": 45,
+          "socketsByUrl": {
+            "ws://localhost:2001/voltForge-app/ws-native": {
+              "created": 45,
+              "closed": 45,
+              "closeCodes": {
+                "1009": 45
+              },
+              "sentCommands": {
+                "CONNECT": 45,
+                "SUBSCRIBE": 90,
+                "SEND": 47
+              },
+              "receivedCommands": {
+                "CONNECTED": 45
+              },
+              "maxSentBytes": 36779
+            }
+          },
+          "canvasElements": 7,
+          "simulationTime": "t=14.510s",
+          "avr": "AVR capped · 0.30 MHz · 6%"
+        }
+      },
+      {
+        "name": "simulation CPU diagnostic with profiler enabled",
+        "seconds": 10.01,
+        "mainThreadBusyPercentOfOneCore": 42.9,
+        "chromiumCpuPercentOfOneCore": 275.64,
+        "jsHeapBeforeBytes": 51791752,
+        "jsHeapAfterBytes": 41779444,
+        "domBefore": {
+          "documents": 16,
+          "nodes": 2266,
+          "jsEventListeners": 785
+        },
+        "domAfter": {
+          "documents": 16,
+          "nodes": 2266,
+          "jsEventListeners": 649
+        },
+        "longTasks": {
+          "count": 0,
+          "maxMs": 0,
+          "totalMs": 0
+        },
+        "endState": {
+          "lcpMs": 1452,
+          "activeWorkers": 2,
+          "workersCreated": 3,
+          "workersTerminated": 1,
+          "activeSockets": 1,
+          "socketsCreated": 53,
+          "socketsByUrl": {
+            "ws://localhost:2001/voltForge-app/ws-native": {
+              "created": 53,
+              "closed": 52,
+              "closeCodes": {
+                "1009": 52
+              },
+              "sentCommands": {
+                "CONNECT": 53,
+                "SUBSCRIBE": 106,
+                "SEND": 54
+              },
+              "receivedCommands": {
+                "CONNECTED": 53
+              },
+              "maxSentBytes": 36779
+            }
+          },
+          "canvasElements": 7,
+          "simulationTime": "t=17.135s",
+          "avr": "AVR capped · 0.23 MHz · 6%"
+        }
+      },
+      {
+        "name": "editor idle after simulation stop",
+        "seconds": 15.01,
+        "mainThreadBusyPercentOfOneCore": 0.88,
+        "chromiumCpuPercentOfOneCore": 4.08,
+        "jsHeapBeforeBytes": 48744540,
+        "jsHeapAfterBytes": 50606584,
+        "domBefore": {
+          "documents": 16,
+          "nodes": 2271,
+          "jsEventListeners": 717
+        },
+        "domAfter": {
+          "documents": 16,
+          "nodes": 2279,
+          "jsEventListeners": 806
+        },
+        "longTasks": {
+          "count": 0,
+          "maxMs": 0,
+          "totalMs": 0
+        },
+        "endState": {
+          "lcpMs": 1452,
+          "activeWorkers": 1,
+          "workersCreated": 3,
+          "workersTerminated": 2,
+          "activeSockets": 1,
+          "socketsCreated": 55,
+          "socketsByUrl": {
+            "ws://localhost:2001/voltForge-app/ws-native": {
+              "created": 55,
+              "closed": 54,
+              "closeCodes": {
+                "1009": 54
+              },
+              "sentCommands": {
+                "CONNECT": 55,
+                "SUBSCRIBE": 110,
+                "SEND": 56
+              },
+              "receivedCommands": {
+                "CONNECTED": 55
+              },
+              "maxSentBytes": 36779
+            }
+          },
+          "canvasElements": 7,
+          "simulationTime": null,
+          "avr": null
+        }
+      },
+      {
+        "name": "project list after all workflows",
+        "seconds": 15.01,
+        "mainThreadBusyPercentOfOneCore": 0.02,
+        "chromiumCpuPercentOfOneCore": 0.32,
+        "jsHeapBeforeBytes": 27433576,
+        "jsHeapAfterBytes": 27485688,
+        "domBefore": {
+          "documents": 17,
+          "nodes": 1827,
+          "jsEventListeners": 339
+        },
+        "domAfter": {
+          "documents": 17,
+          "nodes": 1827,
+          "jsEventListeners": 339
+        },
+        "longTasks": {
+          "count": 0,
+          "maxMs": 0,
+          "totalMs": 0
+        },
+        "endState": {
+          "lcpMs": 1452,
+          "activeWorkers": 0,
+          "workersCreated": 3,
+          "workersTerminated": 3,
+          "activeSockets": 0,
+          "socketsCreated": 55,
+          "socketsByUrl": {
+            "ws://localhost:2001/voltForge-app/ws-native": {
+              "created": 55,
+              "closed": 55,
+              "closeCodes": {
+                "1000": 1,
+                "1009": 54
+              },
+              "sentCommands": {
+                "CONNECT": 55,
+                "SUBSCRIBE": 110,
+                "SEND": 56,
+                "DISCONNECT": 1
+              },
+              "receivedCommands": {
+                "CONNECTED": 55
+              },
+              "maxSentBytes": 36779
+            }
+          },
+          "canvasElements": 0,
+          "simulationTime": null,
+          "avr": null
+        }
+      }
+    ],
+    "navigationCycles": [
+      {
+        "cycle": 1,
+        "jsHeapAfterGcBytes": 19161568,
+        "dom": {
+          "documents": 4,
+          "nodes": 437,
+          "jsEventListeners": 236
+        },
+        "activeWorkers": 0,
+        "activeSockets": 0,
+        "canvasElements": 0
+      },
+      {
+        "cycle": 2,
+        "jsHeapAfterGcBytes": 19717408,
+        "dom": {
+          "documents": 4,
+          "nodes": 439,
+          "jsEventListeners": 236
+        },
+        "activeWorkers": 0,
+        "activeSockets": 0,
+        "canvasElements": 0
+      },
+      {
+        "cycle": 3,
+        "jsHeapAfterGcBytes": 20274048,
+        "dom": {
+          "documents": 4,
+          "nodes": 441,
+          "jsEventListeners": 236
+        },
+        "activeWorkers": 0,
+        "activeSockets": 0,
+        "canvasElements": 0
+      },
+      {
+        "cycle": 4,
+        "jsHeapAfterGcBytes": 20627520,
+        "dom": {
+          "documents": 4,
+          "nodes": 443,
+          "jsEventListeners": 236
+        },
+        "activeWorkers": 0,
+        "activeSockets": 0,
+        "canvasElements": 0
+      },
+      {
+        "cycle": 5,
+        "jsHeapAfterGcBytes": 21154772,
+        "dom": {
+          "documents": 4,
+          "nodes": 445,
+          "jsEventListeners": 236
+        },
+        "activeWorkers": 0,
+        "activeSockets": 0,
+        "canvasElements": 0
+      }
+    ],
+    "endpointBenchmarks": [
+      {
+        "endpoint": "/projects?page=0&size=8",
+        "samplesMs": [
+          191.52,
+          147.24,
+          141.59,
+          165.71,
+          134.51,
+          143.45,
+          137.8,
+          138.25,
+          160.38,
+          134.92
+        ],
+        "medianMs": 143.45,
+        "maxMs": 191.52
+      },
+      {
+        "endpoint": "/projects/public?page=0&size=8",
+        "samplesMs": [
+          160.03,
+          170.53,
+          143.38,
+          143.98,
+          149.88,
+          142.68,
+          152.94,
+          146.61,
+          149.13,
+          141.36
+        ],
+        "medianMs": 149.13,
+        "maxMs": 170.53
+      },
+      {
+        "endpoint": "/projects/{auditProjectId}",
+        "samplesMs": [
+          174.68,
+          183.74,
+          188.46,
+          187.5,
+          182.52,
+          181.11,
+          179.32,
+          188.16,
+          189.6,
+          180.81
+        ],
+        "medianMs": 183.74,
+        "maxMs": 189.6
+      }
+    ],
+    "serverMetrics": [
+      {
+        "label": "before workflows",
+        "values": {
+          "process.cpu.usage": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 0.0003941995141786795
+              }
+            ],
+            "baseUnit": null
+          },
+          "jvm.memory.used": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 347389728
+              }
+            ],
+            "baseUnit": "bytes"
+          },
+          "jvm.threads.live": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 48
+              }
+            ],
+            "baseUnit": "threads"
+          },
+          "hikaricp.connections.active": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 0
+              }
+            ],
+            "baseUnit": null
+          },
+          "hikaricp.connections.idle": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 20
+              }
+            ],
+            "baseUnit": null
+          },
+          "hikaricp.connections.pending": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 0
+              }
+            ],
+            "baseUnit": null
+          },
+          "http.server.requests": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "COUNT",
+                "value": 269
+              },
+              {
+                "statistic": "TOTAL_TIME",
+                "value": 50.1840082
+              },
+              {
+                "statistic": "MAX",
+                "value": 0.1442885
+              }
+            ],
+            "baseUnit": "seconds"
+          }
+        }
+      },
+      {
+        "label": "after workflows",
+        "values": {
+          "process.cpu.usage": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 0.0046244364279114086
+              }
+            ],
+            "baseUnit": null
+          },
+          "jvm.memory.used": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 354094920
+              }
+            ],
+            "baseUnit": "bytes"
+          },
+          "jvm.threads.live": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 82
+              }
+            ],
+            "baseUnit": "threads"
+          },
+          "hikaricp.connections.active": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 0
+              }
+            ],
+            "baseUnit": null
+          },
+          "hikaricp.connections.idle": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 21
+              }
+            ],
+            "baseUnit": null
+          },
+          "hikaricp.connections.pending": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "VALUE",
+                "value": 0
+              }
+            ],
+            "baseUnit": null
+          },
+          "http.server.requests": {
+            "status": 200,
+            "measurements": [
+              {
+                "statistic": "COUNT",
+                "value": 426
+              },
+              {
+                "statistic": "TOTAL_TIME",
+                "value": 63.7498144
+              },
+              {
+                "statistic": "MAX",
+                "value": 2.608679
+              }
+            ],
+            "baseUnit": "seconds"
+          }
+        }
+      }
+    ],
+    "revisionProbe": {
+      "firstRead": "2026-09-20T06:29:48",
+      "secondRead": "2026-09-20T06:29:50",
+      "firstViews": 1,
+      "secondViews": 2,
+      "savePassed": false
+    },
+    "networkFailuresByStatus": {
+      "409": 8,
+      "500": 12
+    },
+    "unhandledBrowserErrors": [],
+    "cleanup": {
+      "testProjectId": "b23ff590-48d8-46ba-9747-e8bc7aef9350",
+      "deleted": true,
+      "status": 200
+    }
+  },
+  "database": {
+    "task": "VFOPT-X-001",
+    "capturedAt": "2026-09-20T01:06:51.590Z",
+    "method": "Read-only metadata queries against Voltforge_BL/.env database. Digests are cumulative database-wide observations, not isolated per-request timings.",
+    "queries": [
+      {
+        "name": "version",
+        "sql": "SELECT VERSION(), @@performance_schema",
+        "output": "VERSION()\t@@performance_schema\r\n8.4.8\t1"
+      },
+      {
+        "name": "project_revision_column",
+        "sql": "SELECT TABLE_NAME,COLUMN_NAME,COLUMN_TYPE,COLUMN_DEFAULT,EXTRA FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='projects' AND COLUMN_NAME IN ('updated_at','created_at','view_count')",
+        "output": "TABLE_NAME\tCOLUMN_NAME\tCOLUMN_TYPE\tCOLUMN_DEFAULT\tEXTRA\r\nprojects\tcreated_at\ttimestamp\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED\r\nprojects\tupdated_at\ttimestamp\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP\r\nprojects\tview_count\tint\t0"
+      },
+      {
+        "name": "project_indexes",
+        "sql": "SELECT INDEX_NAME,SEQ_IN_INDEX,COLUMN_NAME,CARDINALITY FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='projects' ORDER BY INDEX_NAME,SEQ_IN_INDEX",
+        "output": "INDEX_NAME\tSEQ_IN_INDEX\tCOLUMN_NAME\tCARDINALITY\r\nidx_projects_board_type\t1\tboard_type\t1\r\nidx_projects_created_at\t1\tcreated_at\t4\r\nidx_projects_forked_from\t1\tforked_from\t1\r\nidx_projects_is_public\t1\tis_public\t2\r\nidx_projects_owner_id\t1\towner_id\t3\r\nPRIMARY\t1\tid\t4"
+      },
+      {
+        "name": "table_sizes",
+        "sql": "SELECT TABLE_NAME,TABLE_ROWS,DATA_LENGTH,INDEX_LENGTH FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('projects','code_files','users')",
+        "output": "TABLE_NAME\tTABLE_ROWS\tDATA_LENGTH\tINDEX_LENGTH\r\ncode_files\t3\t16384\t32768\r\nprojects\t3\t180224\t81920\r\nusers\t4\t16384\t81920"
+      },
+      {
+        "name": "project_query_digests",
+        "sql": "SELECT DIGEST_TEXT,COUNT_STAR,ROUND(SUM_TIMER_WAIT/1000000000,3),ROUND(MAX_TIMER_WAIT/1000000000,3),SUM_ROWS_EXAMINED FROM performance_schema.events_statements_summary_by_digest WHERE SCHEMA_NAME=DATABASE() AND DIGEST_TEXT LIKE '%projects%' ORDER BY SUM_TIMER_WAIT DESC LIMIT 10",
+        "output": "DIGEST_TEXT\tCOUNT_STAR\tROUND(SUM_TIMER_WAIT/1000000000,3)\tROUND(MAX_TIMER_WAIT/1000000000,3)\tSUM_ROWS_EXAMINED\r\nUPDATE `projects` SET `board_type` = ? , `canvas_layout` = CAST ( ? AS JSON ) , `component_config` = CAST ( ? AS JSON ) , DESCRIPTION = ? , `fork_count` = ? , `forked_from` = ? , `is_public` = ? , NAME = ? , `owner_id` = ? , `tags` = ? , `thumbnail_url` = ? , `updated_at` = ? , `view_count` = ? WHERE `id` = ?\t15\t5572.204\t5378.880\t15\r\nSELECT `p1_0` . `id` , `p1_0` . `board_type` , `p1_0` . `canvas_layout` , `p1_0` . `component_config` , `p1_0` . `created_at` , `p1_0` . `description` , `p1_0` . `fork_count` , `p1_0` . `forked_from` , `p1_0` . `is_public` , `p1_0` . `name` , `p1_0` . `owner_id` , `p1_0` . `tags` , `p1_0` . `thumbnail_url` , `p1_0` . `updated_at` , `p1_0` . `view_count` FROM `projects` `p1_0` WHERE `p1_0` . `id` = ?\t548\t215.674\t1.344\t551\r\nSELECT `p1_0` . `id` , `p1_0` . `board_type` , `p1_0` . `canvas_layout` , `p1_0` . `component_config` , `p1_0` . `created_at` , `p1_0` . `description` , `p1_0` . `fork_count` , `p1_0` . `forked_from` , `p1_0` . `is_public` , `p1_0` . `name` , `p1_0` . `owner_id` , `p1_0` . `tags` , `p1_0` . `thumbnail_url` , `p1_0` . `updated_at` , `p1_0` . `view_count` FROM `projects` `p1_0` WHERE `p1_0` . `is_public` = TRUE ORDER BY `p1_0` . `created_at` DESC LIMIT ?\t25\t45.219\t20.287\t100\r\nREPLACE INTO `projects` ( `id` , `owner_id` , `name` , `description` , `board_type` , `canvas_layout` , `component_config` , `is_public` , `fork_count` , `view_count` , `forked_from` , `thumbnail_url` , `tags` , `created_at` , `updated_at` ) VALUES (...) /* , ... */\t1\t18.234\t18.234\t0\r\nSELECT `p1_0` . `id` , `p1_0` . `board_type` , `p1_0` . `canvas_layout` , `p1_0` . `component_config` , `p1_0` . `created_at` , `p1_0` . `description` , `p1_0` . `fork_count` , `p1_0` . `forked_from` , `p1_0` . `is_public` , `p1_0` . `name` , `p1_0` . `owner_id` , `p1_0` . `tags` , `p1_0` . `thumbnail_url` , `p1_0` . `updated_at` , `p1_0` . `view_count` FROM `projects` `p1_0` WHERE `p1_0` . `owner_id` = ? ORDER BY `p1_0` . `updated_at` DESC LIMIT ?\t36\t17.505\t0.730\t120\r\nUPDATE `projects` `p1_0` SET `view_count` = ( `p1_0` . `view_count` + ? ) WHERE `p1_0` . `id` = ?\t38\t16.923\t0.741\t38\r\nCREATE TABLE IF NOT EXISTS `projects` ( `id` VARCHARACTER (?) COLLATE `utf8mb4_unicode_ci` NOT NULL , `owner_id` VARCHARACTER (?) COLLATE `utf8mb4_unicode_ci` NOT NULL , `name` VARCHARACTER (?) COLLATE `utf8mb4_unicode_ci` NOT NULL , `description` TEXT COLLATE `utf8mb4_unicode_ci` , `board_type` VARCHARACTER (?) COLLATE `utf8mb4_unicode_ci` NOT NULL DEFAULT ? , `canvas_layout` JSON DEFAULT ? , `component_config` JSON DEFAULT ? , `is_public` TINYINT (?) NOT NULL DEFAULT ? , `fork_count` INTEGER NOT NULL DEFAULT ? , `view_count` INTEGER NOT NULL DEFAULT ? , `forked_from` VARCHARACTER (?) COLLATE `utf8mb4_unicode_ci` DEFAULT ? , `thumbnail_url` VARCHARACTER (?) COLLATE `utf8mb4_unicode_ci` DEFAULT ? , `tags` VARCHARACTER (?) COLLATE `utf8mb4_unicode_ci` DEFAULT ? , `created_at` TIMESTAMP NOT NULL DEFAULT NOW , `updated_at` TIMESTAMP NOT NULL DEFAULT NOW ON UPDATE NOW , PRIMARY KEY ( `id` ) , KEY `idx_projects_owner_id` ( `owner_id` ) , KEY `idx_projects_board_type` ( `board_type` ) , KEY `idx_projects_is_public` ( `is_public` ) , KEY `idx_projects_forked_from` ( `forked_from` ) , KEY `idx_projects_created_at` ( `created_at` DESC ) , CONSTRAINT `fk_projects_forked_from` FOREIGN KEY ( `forked_from` ) REFERENCES `projects` ( `id` ) ON DELETE SET NULL , CONSTRAINT `fk_projects_owner` FOREIGN KEY ( `owner_id` ) REFERENCES `users` ( `id` ) ON DELETE CASCADE ) ENGINE = `InnoDB` DEFAULT CHARSET =\t1\t9.363\t9.363\t0\r\nSELECT `p1_0` . `id` , `p1_0` . `board_type` , `p1_0` . `canvas_layout` , `p1_0` . `component_config` , `p1_0` . `created_at` , `p1_0` . `description` , `p1_0` . `fork_count` , `p1_0` . `forked_from` , `p1_0` . `is_public` , `p1_0` . `name` , `p1_0` . `owner_id` , `p1_0` . `tags` , `p1_0` . `thumbnail_url` , `p1_0` . `updated_at` , `p1_0` . `view_count` FROM `projects` `p1_0` WHERE `p1_0` . `owner_id` = ? AND `p1_0` . `forked_from` = ?\t38\t8.783\t0.351\t2\r\nCREATE TABLE IF NOT EXISTS `project_shares` ( `id` VARCHARACTER (?) COLLATE `utf8mb4_unicode_ci` NOT NULL , `project_id` VARCHARACTER (?) COLLATE `utf8mb4_unicode_ci` NOT NULL , `shared_with_user_id` VARCHARACTER (?) COLLATE `utf8mb4_unicode_ci` NOT NULL , `permission` VARCHARACTER (?) COLLATE `utf8mb4_unicode_ci` NOT NULL DEFAULT ? , `created_at` TIMESTAMP NOT NULL DEFAULT NOW , `updated_at` TIMESTAMP NOT NULL DEFAULT NOW ON UPDATE NOW , PRIMARY KEY ( `id` ) , UNIQUE KEY `uk_project_shares` ( `project_id` , `shared_with_user_id` ) , KEY `idx_project_shares_user` ( `shared_with_user_id` ) , CONSTRAINT `fk_project_shares_project` FOREIGN KEY ( `project_id` ) REFERENCES `projects` ( `id` ) ON DELETE CASCADE , CONSTRAINT `fk_project_shares_user` FOREIGN KEY ( `shared_with_user_id` ) REFERENCES `users` ( `id` ) ON DELETE CASCADE ) ENGINE = `InnoDB` DEFAULT CHARSET = `utf8mb4` COLLATE = `utf8mb4_unicode_ci`\t1\t6.712\t6.712\t0\r\nCREATE TABLE IF NOT EXISTS `code_files` ( `id` VARCHARACTER (?) COLLATE `utf8mb4_unicode_ci` NOT NULL , `project_id` VARCHARACTER (?) COLLATE `utf8mb4_unicode_ci` NOT NULL , `filename` VARCHARACTER (?) COLLATE `utf8mb4_unicode_ci` NOT NULL , `content` LONGTEXT COLLATE `utf8mb4_unicode_ci` , `language` VARCHARACTER (?) COLLATE `utf8mb4_unicode_ci` NOT NULL DEFAULT ? , `sort_order` INTEGER NOT NULL DEFAULT ? , `created_at` TIMESTAMP NOT NULL DEFAULT NOW , `updated_at` TIMESTAMP NOT NULL DEFAULT NOW ON UPDATE NOW , PRIMARY KEY ( `id` ) , UNIQUE KEY `uk_code_files_project_filename` ( `project_id` , `filename` ) , KEY `idx_code_files_project_id` ( `project_id` ) , CONSTRAINT `fk_code_files_project` FOREIGN KEY ( `project_id` ) REFERENCES `projects` ( `id` ) ON DELETE CASCADE ) ENGINE = `InnoDB` DEFAULT CHARSET = `utf8mb4` COLLATE = `utf8mb4_unicode_ci`\t1\t5.939\t5.939\t0"
+      }
+    ]
+  },
+  "transportProbe": {
+    "capturedAt": "2026-09-20T01:04:19.003Z",
+    "results": [
+      {
+        "length": 4000,
+        "connected": true,
+        "commands": [
+          "CONNECTED"
+        ],
+        "frameBytes": 4111,
+        "stayedOpen": true,
+        "timeoutMs": 1800
+      },
+      {
+        "length": 12000,
+        "connected": true,
+        "commands": [
+          "CONNECTED"
+        ],
+        "frameBytes": 12111,
+        "stayedOpen": true,
+        "timeoutMs": 1800
+      },
+      {
+        "length": 40000,
+        "connected": true,
+        "commands": [
+          "CONNECTED"
+        ],
+        "frameBytes": 40111,
+        "stayedOpen": false,
+        "closeCode": 1009,
+        "reason": "The decoded text message was too big for the output buffer and the endpoint does not support partial messages"
+      }
+    ],
+    "cleanup": {
+      "testProjectId": "dc57456f-d03a-43cb-a330-caf3b5898bf6",
+      "deleted": true,
+      "status": 200
+    }
+  },
+  "profile": {
+    "method": "Separate 10-second main-thread sampling profile; self time, not complete browser/GPU/worker attribution.",
+    "sampleMs": 10535.518,
+    "topSelf": [
+      {
+        "function": "(idle)",
+        "script": "",
+        "line": -1,
+        "ms": 5750
+      },
+      {
+        "function": "(program)",
+        "script": "",
+        "line": -1,
+        "ms": 1044
+      },
+      {
+        "function": "drawImage",
+        "script": "",
+        "line": -1,
+        "ms": 773
+      },
+      {
+        "function": "(garbage collector)",
+        "script": "",
+        "line": -1,
+        "ms": 272
+      },
+      {
+        "function": "drawImage",
+        "script": "",
+        "line": -1,
+        "ms": 202
+      },
+      {
+        "function": "drawImage",
+        "script": "",
+        "line": -1,
+        "ms": 122
+      },
+      {
+        "function": "r",
+        "script": "http://localhost:3000/assets/vendor-simulation-DDHnx5pB.js",
+        "line": 0,
+        "ms": 108
+      },
+      {
+        "function": "_applyShadow",
+        "script": "http://localhost:3000/assets/vendor-canvas-DvzPCRiz.js",
+        "line": 13,
+        "ms": 99
+      },
+      {
+        "function": "_applyShadow",
+        "script": "http://localhost:3000/assets/vendor-canvas-DvzPCRiz.js",
+        "line": 13,
+        "ms": 57
+      },
+      {
+        "function": "xe",
+        "script": "http://localhost:3000/assets/deferredSimulationEngineFactory-BKYB9NY0.js",
+        "line": 0,
+        "ms": 46
+      },
+      {
+        "function": "restore",
+        "script": "",
+        "line": -1,
+        "ms": 38
+      },
+      {
+        "function": "_drawChildren",
+        "script": "http://localhost:3000/assets/vendor-canvas-DvzPCRiz.js",
+        "line": 13,
+        "ms": 36
+      },
+      {
+        "function": "drawScene",
+        "script": "http://localhost:3000/assets/vendor-canvas-DvzPCRiz.js",
+        "line": 13,
+        "ms": 35
+      },
+      {
+        "function": "now",
+        "script": "http://localhost:3000/assets/deferredSimulationEngineFactory-BKYB9NY0.js",
+        "line": 5,
+        "ms": 28
+      },
+      {
+        "function": "getConnectedPins",
+        "script": "http://localhost:3000/assets/deferredSimulationEngineFactory-BKYB9NY0.js",
+        "line": 4,
+        "ms": 27
+      },
+      {
+        "function": "runFrame",
+        "script": "http://localhost:3000/assets/deferredSimulationEngineFactory-BKYB9NY0.js",
+        "line": 0,
+        "ms": 27
+      },
+      {
+        "function": "rebuild",
+        "script": "http://localhost:3000/assets/runtimeDelta-DR_c4rye.js",
+        "line": 0,
+        "ms": 27
+      },
+      {
+        "function": "fillText",
+        "script": "",
+        "line": -1,
+        "ms": 24
+      },
+      {
+        "function": "Se",
+        "script": "http://localhost:3000/assets/deferredSimulationEngineFactory-BKYB9NY0.js",
+        "line": 0,
+        "ms": 24
+      },
+      {
+        "function": "C",
+        "script": "http://localhost:3000/assets/vendor-canvas-BhGe7B85.js",
+        "line": 7,
+        "ms": 23
+      },
+      {
+        "function": "save",
+        "script": "",
+        "line": -1,
+        "ms": 23
+      },
+      {
+        "function": "Er",
+        "script": "http://localhost:3000/assets/vendor-canvas-DvzPCRiz.js",
+        "line": 13,
+        "ms": 22
+      },
+      {
+        "function": "drawScene",
+        "script": "http://localhost:3000/assets/vendor-canvas-DvzPCRiz.js",
+        "line": 13,
+        "ms": 22
+      },
+      {
+        "function": "stroke",
+        "script": "",
+        "line": -1,
+        "ms": 22
+      },
+      {
+        "function": "drawScene",
+        "script": "http://localhost:3000/assets/vendor-canvas-DvzPCRiz.js",
+        "line": 13,
+        "ms": 21
+      }
+    ],
+    "byScript": [
+      {
+        "script": "(native/idle)",
+        "ms": 8532
+      },
+      {
+        "script": "vendor-canvas-DvzPCRiz.js",
+        "ms": 627
+      },
+      {
+        "script": "deferredSimulationEngineFactory-BKYB9NY0.js",
+        "ms": 400
+      },
+      {
+        "script": "vendor-canvas-C5Xevebz.js",
+        "ms": 182
+      },
+      {
+        "script": "vendor-simulation-DDHnx5pB.js",
+        "ms": 142
+      },
+      {
+        "script": "vendor-react-twJIgk6O.js",
+        "ms": 137
+      },
+      {
+        "script": "SerialMonitor-Bf-0bvIG.js",
+        "ms": 110
+      },
+      {
+        "script": "vendor-react-H513-8hH.js",
+        "ms": 100
+      },
+      {
+        "script": "vendor-canvas-C4Wk5Pd6.js",
+        "ms": 65
+      },
+      {
+        "script": "vendor-canvas-BhGe7B85.js",
+        "ms": 52
+      },
+      {
+        "script": "CircuitEditorPage-CU-2ba8N.js",
+        "ms": 35
+      },
+      {
+        "script": "runtimeDelta-DR_c4rye.js",
+        "ms": 32
+      },
+      {
+        "script": "vendor-icons-7RHNWf-a.js",
+        "ms": 31
+      },
+      {
+        "script": "boardCatalog-BgygELB1.js",
+        "ms": 21
+      },
+      {
+        "script": "rolldown-runtime-QTnfLwEv.js",
+        "ms": 19
+      },
+      {
+        "script": "vendor-react-BXN1vuu4.js",
+        "ms": 18
+      },
+      {
+        "script": "vendor-react-DO5aG3Q3.js",
+        "ms": 7
+      },
+      {
+        "script": "vendor-canvas-DjDK5o4-.js",
+        "ms": 7
+      },
+      {
+        "script": "simulationModels-DEQuxzot.js",
+        "ms": 5
+      },
+      {
+        "script": "vendor-canvas-CZI7_Jkm.js",
+        "ms": 5
+      },
+      {
+        "script": "index-uxSVv4S1.js",
+        "ms": 5
+      },
+      {
+        "script": "vendor-platform-DwDJA31M.js",
+        "ms": 2
+      },
+      {
+        "script": "SplitPane-C4mEqG0m.js",
+        "ms": 2
+      }
+    ]
+  },
+  "findingsBacklog": "docs/VFOPT_X_001_FINDINGS_BACKLOG.json",
+  "nextWorkItem": {
+    "id": "VFOPT-X-001-F003",
+    "title": "Reduce visible-scene drawing cost during sustained mixed-component simulation",
+    "status": "recommended_not_started",
+    "reason": "F009 editor checks and save recovery are complete. Resume the measured sustained-simulation CPU/drawing hotspot after the completed transport and persistence prerequisites.",
+    "backlog": "docs/VFOPT_X_001_FINDINGS_BACKLOG.json"
+  },
+  "validation": [
+    {
+      "command": "Live development and production app audits",
+      "result": "baseline_collected_with_product_findings",
+      "checksPerMode": {
+        "passed": 11,
+        "failed": 1
+      },
+      "detail": "Fresh-revision check fails; native drag/save/reopen and lifecycle checks pass. Transport churn is captured in interval metrics and a separate size probe."
+    },
+    {
+      "command": "Production native WebSocket size probe",
+      "result": "reproduced_buffer_rejection",
+      "detail": "4111 and 12111-byte frames stayed open; 40111-byte frame closed with 1009 and an explicit output-buffer reason."
+    },
+    {
+      "command": "npm run audit:database-performance",
+      "result": "passed",
+      "readOnlyQueries": 5
+    },
+    {
+      "command": "npm run build",
+      "result": "passed",
+      "initialStaticJsKiB": 504.6,
+      "initialChunks": 13
+    },
+    {
+      "command": "npx oxlint scripts/run-app-performance-audit.mjs scripts/run-database-performance-audit.mjs",
+      "result": "passed"
+    }
+  ],
+  "evidence": {
+    "rawDevelopment": "docs/reports/vfopt-x-001-development.json",
+    "rawProduction": "docs/reports/vfopt-x-001-production.json",
+    "database": "docs/reports/vfopt-x-001-database.json",
+    "transport": "docs/reports/vfopt-x-001-production-transport-probe.json",
+    "profile": "docs/reports/vfopt-x-001-production-simulation.cpuprofile",
+    "screenshot": "docs/reports/vfopt-x-001-production-editor.png",
+    "notes": "docs/VFOPT_X_001_APP_BASELINE.md",
+    "builtIndexSha256": "a0968d1af12115810e8c4e802333ded3d680450243327d62fd341c955cb11227",
+    "buildManifestSha256": "aca13e64046d188ee02043ec6e5073ba401d7439e04f7e8213d83b4a9153418e",
+    "rawHashes": {
+      "vfopt-x-001-development.json": "99300a605600ee5341cb8a928db1cc4662c723d68687c3dcd1c99018c02836c8",
+      "vfopt-x-001-production.json": "aacb4d329d6b6b8b4c496898b4da47d6bda717cda33de44f7fe10761bbdd9dde",
+      "vfopt-x-001-database.json": "909a4c0c79e91fc552de521b4cb4798ccc313bd8989ab246aa94d2876ca7f5e9",
+      "vfopt-x-001-production-transport-probe.json": "a9843627f9343ce2caf55346605423e2e152743c1b588ca17126bda2d0349865"
+    },
+    "note": "Generated raw reports/screenshots/profiles removed at user request. Embedded measurements remain; original paths/hashes are historical provenance."
+  },
+  "continuation": {
+    "updatedAt": "2026-09-21T03:39:25.708Z",
+    "completed": "VFOPT-X-001-F009",
+    "previousCompleted": "VFOPT-X-001-F008",
+    "next": "VFOPT-X-001-F003",
+    "backlog": "docs/VFOPT_X_001_FINDINGS_BACKLOG.json"
+  },
+  "rawArtifactRetention": "Generated raw reports/screenshots/profiles removed at user request. Embedded measurements remain; original paths/hashes are historical provenance.",
+  "databaseLocationCorrection": {
+    "date": "2026-09-20",
+    "detail": "The application processes run locally; the configured MySQL connection targets a remote managed instance. Earlier wording describing the database as local was incorrect. Retained request timings include that network path."
+  }
+}

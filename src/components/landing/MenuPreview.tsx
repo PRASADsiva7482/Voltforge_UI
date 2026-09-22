@@ -5,7 +5,7 @@ export function MenuPreview() {
   return (
     <div className="menu-preview">
       <div className="menu-preview__rail">
-        {getNavItems('ADMIN').map((item) => {
+        {getNavItems().map((item) => {
           const Icon = item.icon
           return (
             <span key={item.path}>
@@ -17,8 +17,8 @@ export function MenuPreview() {
       </div>
       <div className="menu-preview__panel">
         <Badge tone="success">After login</Badge>
-        <h3>Legacy menus, cleaner shell.</h3>
-        <p>Dashboard, projects, explore, settings, and admin stay familiar while UI2 gets a sharper system.</p>
+        <h3>Pick up where you left off.</h3>
+        <p>Open recent projects, find a starting point in Explore, or build your skills in Challenge Labs.</p>
       </div>
     </div>
   )

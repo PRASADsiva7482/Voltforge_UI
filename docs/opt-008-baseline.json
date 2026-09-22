@@ -1,0 +1,17 @@
+{
+  "item": "OPT-008",
+  "capturedOn": "2026-08-27",
+  "scope": "Dense wire and current-flow rendering before OPT-008",
+  "measurementKind": "static-baseline",
+  "runtimeTraceCaptured": false,
+  "observations": {
+    "schematicWireMounts": "CircuitCanvas mounts one WireShape, including outline and interactive line nodes, for every wire regardless of viewport intersection",
+    "pcbWireMounts": "PCB trace mode builds a Konva line for every wire regardless of viewport intersection",
+    "flowPathCompilation": "CurrentFlowLayer computes routed polyline segments for every canvas wire whenever wire or node topology changes",
+    "flowFrameScope": "Every Konva animation frame scans every compiled path and draws every eligible particle",
+    "particleBudget": "Particle count grows with every active wire length and has no global or per-wire cap",
+    "overviewCadence": "Current-flow animation requests a layer redraw at display animation cadence at every zoom level",
+    "qualityVisibility": "No visual-quality status or Full detail override is available"
+  },
+  "limitation": "Browser-mounted scene counts, frame time, and GPU traces were unavailable; validate culling and adaptive-versus-full rendering through OPT-FB-008."
+}

@@ -24,13 +24,8 @@ export function userFromToken(token: VoltforgeToken | undefined): AppUser | null
   }
 }
 
-export async function syncUser(): Promise<AppUser | null> {
-  if (!keycloak.token) return userFromToken(keycloak.tokenParsed as VoltforgeToken | undefined)
-
-  try {
-    const response = await authApi.syncUser()
-    return response.data.data ?? userFromToken(keycloak.tokenParsed as VoltforgeToken | undefined)
-  } catch {
-    return userFromToken(keycloak.tokenParsed as VoltforgeToken | undefined)
-  }
+export async function syncUser(signal?: AbortSignal): Promise<AppUser | null> {
+  if (!keycloak.token) return null
+  const response = await authApi.syncUser(signal)
+  return response.data.data ?? userFromToken(keycloak.tokenParsed as VoltforgeToken | undefined)
 }

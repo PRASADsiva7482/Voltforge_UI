@@ -1,0 +1,78 @@
+{
+  "item": "OPT-FB-010",
+  "capturedOn": "2026-08-27",
+  "deterministicContract": {
+    "command": "npm run test:avr-budget",
+    "passed": true,
+    "coverage": [
+      "deadline checked at a bounded instruction interval",
+      "hard instruction safety ceiling",
+      "signed cycle carry and frame-partition independence",
+      "instruction then peripheral tick ordering",
+      "pause, resume, power-off, power-on, background stall, stop, and restart rebasing",
+      "200 ms telemetry cadence without per-frame publication",
+      "controlled performance clock, requestAnimationFrame, and input callback latency",
+      "GPIO, timer/PWM, UART, ADC, and I2C evidence classification"
+    ],
+    "adaptiveSliceBudgetMs": 4,
+    "fullFidelitySliceBudgetMs": 8,
+    "telemetryPeriodMs": 200
+  },
+  "compiledFixture": {
+    "board": "ARDUINO_UNO",
+    "compilerEndpoint": "configured REMOTE firmware compiler",
+    "httpStatus": 200,
+    "hexCharacters": 11562,
+    "flashBytes": 4104,
+    "flashMaximumBytes": 32256,
+    "sramBytes": 409,
+    "sramMaximumBytes": 2048,
+    "features": [
+      "GPIO pin 13",
+      "timer/PWM pin 3",
+      "UART 115200",
+      "ADC A0",
+      "I2C address 0x27"
+    ]
+  },
+  "browserRunner": {
+    "fixtureId": "compiled-atmega328p-responsiveness-v1",
+    "durationPerModeMs": 3000,
+    "modes": [
+      "adaptive",
+      "full-fidelity"
+    ],
+    "p95FrameTimeTargetMs": 50,
+    "p95SyntheticClickLatencyTargetMs": 50,
+    "records": [
+      "instruction rate",
+      "emulated clock rate",
+      "main-thread utilization",
+      "maximum slice time",
+      "maximum deadline overshoot",
+      "maximum retained cycle debt",
+      "budget-limited and hard-ceiling state",
+      "background stalls",
+      "requestAnimationFrame distribution",
+      "synthetic click latency distribution",
+      "peripheral evidence counters"
+    ],
+    "realBrowserCaptureAttached": false,
+    "remainingValidation": "Run from Solver, canvas, and AVR diagnostics on each target browser/laptop and attach the downloaded JSON before claiming hardware-specific latency targets."
+  },
+  "verification": {
+    "npmTest": "passed",
+    "productionBuild": "passed",
+    "bundleBudget": {
+      "entryKb": 95.0,
+      "entryBudgetKb": 150.0,
+      "initialStaticJavascriptKb": 501.0,
+      "initialStaticJavascriptBudgetKb": 550.0,
+      "initialChunkCount": 13,
+      "initialChunkBudget": 16,
+      "largestChunkKb": 176.1,
+      "largestChunkBudgetKb": 450.0,
+      "oversizedChunkWarning": false
+    }
+  }
+}

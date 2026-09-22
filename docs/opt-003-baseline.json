@@ -1,0 +1,17 @@
+{
+  "item": "OPT-003",
+  "capturedOn": "2026-08-27",
+  "scope": "MNA RESULT payload before OPT-003",
+  "measurementKind": "static-baseline",
+  "runtimeTraceCaptured": false,
+  "observations": {
+    "nodeVoltages": "Full dense array for every RESULT",
+    "branchCurrents": "Full object conversion for every solver branch result",
+    "componentPower": "Power object built for every MNA element on every posted RESULT",
+    "resultSubscriptions": false,
+    "transferableNumericBuffers": false,
+    "wireFlowComputed": "Always in the engine result handler",
+    "uiConsumerPayloadDeduplication": "The engine rebuilds node, current, and power maps independently"
+  },
+  "limitation": "Browser payload-size tracing was unavailable; compare selective and full subscriptions in OPT-FB-001 and OPT-FB-003."
+}

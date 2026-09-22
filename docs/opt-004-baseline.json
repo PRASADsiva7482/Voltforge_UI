@@ -1,0 +1,15 @@
+{
+  "item": "OPT-004",
+  "capturedOn": "2026-08-27",
+  "scope": "Solver-result reconciliation before OPT-004",
+  "measurementKind": "static-baseline",
+  "runtimeTraceCaptured": false,
+  "observations": {
+    "nodeLookup": "The result handler reads the full canvas node array for every handled RESULT",
+    "pinLookup": "The handler repeatedly resolves component-pin keys through the circuit map",
+    "runtimeWrites": "Result reconciliation queues component property updates through the batched updateNode shim",
+    "duplicateWrites": "The batch collector does not filter repeated property values before publication",
+    "batchLookup": "Batch flush and canvas batchUpdateNodes use linear node/update searches"
+  },
+  "limitation": "Browser render and canvas-store write counts were unavailable; compare unchanged-result write counts in OPT-FB-004."
+}

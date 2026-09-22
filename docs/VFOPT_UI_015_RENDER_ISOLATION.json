@@ -1,0 +1,482 @@
+{
+  "schemaVersion": 1,
+  "id": "VFOPT-UI-015",
+  "title": "Reduce unnecessary schematic re-renders",
+  "status": "completed_scoped_acceptance",
+  "updatedAt": "2026-09-21T03:39:25.708Z",
+  "appCompletelyReady": false,
+  "scope": "React renders and wire-path computation in the real schematic canvas; no backend or AI implementation changes.",
+  "predecessor": {
+    "id": "VFOPT-UI-014",
+    "evidence": "docs/VFOPT_UI_014_COMPONENT_CULLING.json"
+  },
+  "rootCauses": [
+    "WireShape had no memo boundary and received a fresh selection callback plus the complete changing wire array.",
+    "Endpoint subscriptions consumed all runtime/electrical properties although routing uses only geometry and pins.",
+    "Every wiring-preview movement invalidated all wire paths; active bend preview was supplied to unrelated wires.",
+    "CanvasMat was described as memoized but was not; WireToolbar subscribed to the entire canvas store.",
+    "Memoized PinDot still received a changing full node, rerendering pins on property-only updates."
+  ],
+  "implementation": [
+    {
+      "files": [
+        "src/features/canvas/CircuitCanvas.tsx",
+        "src/features/canvas/components/WireShape.tsx"
+      ],
+      "change": "Memoize grid, toolbar and wires; narrow toolbar subscriptions; reuse selection action; pass bend-preview state only to its wire; cache path geometry."
+    },
+    {
+      "files": [
+        "src/features/canvas/wireNodeGeometry.ts"
+      ],
+      "change": "Use stable endpoint snapshots across property-only updates; invalidate on position, size, rotation, type, pin identity/alias changes, deletion and document replacement."
+    },
+    {
+      "files": [
+        "src/features/canvas/wireRoutingPeers.ts",
+        "src/utils/wireRouting.ts"
+      ],
+      "change": "Group routing peers by the existing unordered endpoint-pair key and reuse arrays while ordered wire IDs match. Smart-router lane offsets depend only on that membership. Own wire data remains current; routing algorithm and full store document remain intact."
+    },
+    {
+      "files": [
+        "src/features/canvas/components/ComponentNode.tsx",
+        "src/features/canvas/components/PinDot.tsx"
+      ],
+      "change": "Give PinDot stable width/height/type layout data so property-only and position-only updates do not rerender unchanged pin shapes."
+    },
+    {
+      "files": [
+        "src/features/canvas/components/ProbeVoltageTooltip.tsx"
+      ],
+      "change": "Subscribe to live endpoint properties inside hovered voltage tooltips. Readings continue refreshing without forcing static wire and pin geometry to rerender."
+    }
+  ],
+  "measurements": {
+    "method": {
+      "browser": "153.0.8010.48",
+      "canvasCssPx": {
+        "width": 1280,
+        "height": 700
+      },
+      "browserViewportCssPx": {
+        "width": 1366,
+        "height": 768
+      },
+      "devicePixelRatio": 1,
+      "fixture": "100 built-in resistors, 99 auto wires, 10 columns, 120x100 world-pixel spacing, scale 0.65. Actual CircuitCanvas with external HTTP blocked; routing finishes before measurements.",
+      "counters": "Test-only Vite transforms count actual component function entries and getWireRenderPoints calls; no production render-counter code was added.",
+      "drag": "30 native pointer moves; input capture to last Konva layer draw completion. This measures a paint proxy, not physical display scanout.",
+      "baseline": "Original pre-UI-015 files preserved before implementation in local ignored cache, with SHA-256 hashes. Final baseline reruns use those files, not current code.",
+      "timingLimit": "Single-machine measurements vary with host load. Do not attribute the entire change from the earlier UI-014 drag run to UI-015: fresh pre-UI-015 measurements already meet 50 ms p95."
+    },
+    "renderCalls": [
+      {
+        "action": "select one wire",
+        "before": {
+          "canvas": 1,
+          "grid": 1,
+          "toolbar": 1,
+          "wrapper": 2,
+          "component": 2,
+          "pin": 4,
+          "wire": 99,
+          "routePoints": 99
+        },
+        "after": {
+          "canvas": 1,
+          "grid": 0,
+          "toolbar": 0,
+          "wrapper": 2,
+          "component": 2,
+          "pin": 4,
+          "wire": 1,
+          "routePoints": 0
+        }
+      },
+      {
+        "action": "one runtime property update",
+        "before": {
+          "canvas": 0,
+          "grid": 0,
+          "toolbar": 1,
+          "wrapper": 1,
+          "component": 1,
+          "pin": 2,
+          "wire": 2,
+          "routePoints": 2
+        },
+        "after": {
+          "canvas": 0,
+          "grid": 0,
+          "toolbar": 0,
+          "wrapper": 1,
+          "component": 1,
+          "pin": 0,
+          "wire": 0,
+          "routePoints": 0
+        }
+      },
+      {
+        "action": "one authored electrical property update",
+        "before": {
+          "canvas": 1,
+          "grid": 1,
+          "toolbar": 1,
+          "wrapper": 1,
+          "component": 1,
+          "pin": 2,
+          "wire": 99,
+          "routePoints": 99
+        },
+        "after": {
+          "canvas": 1,
+          "grid": 0,
+          "toolbar": 0,
+          "wrapper": 1,
+          "component": 1,
+          "pin": 0,
+          "wire": 0,
+          "routePoints": 0
+        }
+      },
+      {
+        "action": "one wire color update",
+        "before": {
+          "canvas": 1,
+          "grid": 1,
+          "toolbar": 1,
+          "wrapper": 0,
+          "component": 0,
+          "pin": 0,
+          "wire": 99,
+          "routePoints": 99
+        },
+        "after": {
+          "canvas": 1,
+          "grid": 0,
+          "toolbar": 0,
+          "wrapper": 0,
+          "component": 0,
+          "pin": 0,
+          "wire": 1,
+          "routePoints": 1
+        }
+      },
+      {
+        "action": "pan without changing mounted membership",
+        "before": {
+          "canvas": 1,
+          "grid": 1,
+          "toolbar": 1,
+          "wrapper": 0,
+          "component": 0,
+          "pin": 0,
+          "wire": 99,
+          "routePoints": 99
+        },
+        "after": {
+          "canvas": 1,
+          "grid": 1,
+          "toolbar": 0,
+          "wrapper": 0,
+          "component": 0,
+          "pin": 0,
+          "wire": 0,
+          "routePoints": 0
+        }
+      },
+      {
+        "action": "move wiring preview",
+        "before": {
+          "canvas": 2,
+          "grid": 2,
+          "toolbar": 2,
+          "wrapper": 0,
+          "component": 0,
+          "pin": 0,
+          "wire": 198,
+          "routePoints": 198
+        },
+        "after": {
+          "canvas": 2,
+          "grid": 0,
+          "toolbar": 0,
+          "wrapper": 0,
+          "component": 0,
+          "pin": 0,
+          "wire": 0,
+          "routePoints": 0
+        }
+      }
+    ],
+    "drag": [
+      {
+        "mode": "production",
+        "baselineCapturedAt": "2026-09-19T14:51:53.254Z",
+        "afterCapturedAt": "2026-09-19T14:52:11.746Z",
+        "inputToLastDrawMs": {
+          "before": {
+            "count": 30,
+            "median": 18.3,
+            "p95": 35.4,
+            "max": 71.3
+          },
+          "after": {
+            "count": 30,
+            "median": 15,
+            "p95": 28.5,
+            "max": 28.6
+          }
+        },
+        "componentLayerDrawCpuMs": {
+          "before": {
+            "count": 32,
+            "median": 13.6,
+            "p95": 27.6,
+            "max": 28.2
+          },
+          "after": {
+            "count": 32,
+            "median": 11.5,
+            "p95": 22.9,
+            "max": 28
+          }
+        },
+        "targetP95Ms": 50,
+        "targetMet": true
+      },
+      {
+        "mode": "development",
+        "baselineCapturedAt": "2026-09-19T14:52:25.621Z",
+        "afterCapturedAt": "2026-09-19T14:52:57.093Z",
+        "inputToLastDrawMs": {
+          "before": {
+            "count": 30,
+            "median": 18.7,
+            "p95": 34.1,
+            "max": 83.3
+          },
+          "after": {
+            "count": 30,
+            "median": 18.2,
+            "p95": 32.6,
+            "max": 112.2
+          }
+        },
+        "componentLayerDrawCpuMs": {
+          "before": {
+            "count": 32,
+            "median": 14.9,
+            "p95": 26.7,
+            "max": 30.8
+          },
+          "after": {
+            "count": 33,
+            "median": 12.5,
+            "p95": 26.1,
+            "max": 28.9
+          }
+        },
+        "targetP95Ms": 50,
+        "targetMet": true
+      }
+    ],
+    "existingDragRegression": {
+      "checksPassed": 9,
+      "sampleCount": 31,
+      "p95Ms": 47.2,
+      "maxMs": 79.8,
+      "dragEndDispatchMaxMs": 1.9,
+      "historicalUI014P95Ms": 58,
+      "note": "Historical failure remains in UI-014 evidence; this fresh full command passes all 9 checks, including current-flow, read-only, unmount and one-gesture undo/redo."
+    },
+    "componentSceneRegression": [
+      {
+        "storedNodes": 500,
+        "mountedComponents": 35,
+        "mountedPins": 70,
+        "panP95Ms": 26.7,
+        "zoomP95Ms": 21.6
+      },
+      {
+        "storedNodes": 1000,
+        "mountedComponents": 35,
+        "mountedPins": 70,
+        "panP95Ms": 22.9,
+        "zoomP95Ms": 23
+      }
+    ]
+  },
+  "acceptance": [
+    {
+      "criterion": "Stable wires, pins, grid and toolbar avoid unrelated selection, property and preview updates",
+      "status": "passed",
+      "evidence": "6 action counter comparisons in both development and production; one wire selection 99 to 1 renders, two preview moves 198 to 0."
+    },
+    {
+      "criterion": "Reactive geometry, lane membership and interactions remain correct",
+      "status": "passed",
+      "checks": [
+        "Unchanged, runtime and electrical-property-only updates retain endpoint geometry identity",
+        "Movement, rotation, resize, type and pin coordinate/alias changes invalidate geometry",
+        "Deletion, missing endpoints, same-ID document replacement and undo/redo cannot reuse stale geometry",
+        "Cached endpoints match fresh routing across every routing mode, manual bends and pin-name aliases",
+        "Only changed component-pair membership invalidates routing peer identity",
+        "Partitioned peers preserve complete-router points for reversed pairs, lanes, modes and reordered documents"
+      ]
+    },
+    {
+      "criterion": "Native browser behavior remains correct through memo boundaries",
+      "status": "passed",
+      "checks": [
+        "Wire selection updates one wire and leaves the grid, toolbar and unrelated components alone",
+        "Runtime and electrical-property updates avoid unrelated wire routing and toolbar renders",
+        "Pan and wiring-preview movement do not rerender stable wires or recompute their paths",
+        "A wire style edit leaves every unrelated wire and pin unchanged",
+        "Dense native drag meets 50 ms p95 with intact gesture completion and viewport",
+        "Native wire selection uses the current wire ID after prior selections and edits",
+        "Endpoint movement, rotation/resize, retargeting and peer additions preserve the full-router output",
+        "Native bend preview updates only its wire, commits correctly and respects read-only mode",
+        "Wire hover probe stays live without rerendering wire geometry on runtime updates",
+        "Pin hover probe stays live while unrelated pins and wires retain their render state",
+        "Toolbar mode/color, theme and read-only guards remain reactive through memo boundaries"
+      ]
+    },
+    {
+      "criterion": "Existing scene, drag and routing browser contracts remain intact",
+      "status": "passed",
+      "checksPassed": 30
+    }
+  ],
+  "visualComparison": {
+    "production": {
+      "initialViewportPngBytesIdentical": true,
+      "note": "Production after image also visually inspected. Equality covers this initial light-theme viewport only."
+    },
+    "development": {
+      "initialViewportPngBytesIdentical": true,
+      "note": "Production after image also visually inspected. Equality covers this initial light-theme viewport only."
+    }
+  },
+  "validation": [
+    {
+      "command": "npm test",
+      "result": "passed",
+      "detail": "TypeScript, lint and all configured contract suites passed; includes 6 new render-isolation contracts."
+    },
+    {
+      "command": "npm run build",
+      "result": "passed",
+      "initialStaticJsKiB": 504.6,
+      "initialChunks": 13,
+      "detail": "Production build and bundle budgets passed."
+    },
+    {
+      "command": "npm run test:render-isolation-browser",
+      "result": "passed",
+      "checksPassed": 11
+    },
+    {
+      "command": "npm run test:render-isolation-development",
+      "result": "passed",
+      "checksPassed": 11
+    },
+    {
+      "command": "npm run test:component-scene-browser",
+      "result": "passed",
+      "checksPassed": 13
+    },
+    {
+      "command": "npm run test:drag-browser",
+      "result": "passed",
+      "checksPassed": 9
+    },
+    {
+      "command": "npm run test:routing-browser",
+      "result": "passed",
+      "checksPassed": 8
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed",
+      "detail": "Expected Windows line-ending notices only."
+    }
+  ],
+  "remainingWork": [
+    {
+      "trackedBy": "VFOPT-X-001",
+      "status": "baseline_captured_findings_open",
+      "detail": "Real-account application baseline is captured in VFOPT_X_001_APP_BASELINE.json. Seven follow-ups remain open, beginning with save-revision conflicts; this is not full application acceptance."
+    },
+    {
+      "status": "measured_limit",
+      "detail": "Development render fixture still recorded a 112.2 ms maximum and existing drag fixture 79.8 ms maximum despite passing p95. These are not zero-lag guarantees."
+    },
+    {
+      "status": "scope_limit",
+      "detail": "Konva still draws the visible scene during drag. Reduced React/path work does not eliminate raster draw cost or establish a 16.7 ms frame budget, total laptop CPU/GPU or browser memory reduction."
+    },
+    {
+      "status": "existing_behavior_preserved",
+      "detail": "Hovered voltage tooltips refresh on endpoint-node publication as before. Updating only the global voltage map without a publication is not a new guaranteed refresh path."
+    }
+  ],
+  "warnings": [
+    "Pre-existing palette fixture Fast Refresh lint warning remains.",
+    "Two pre-existing short-lived Vite SSR suites emitted dependency-scan shutdown warnings; npm test exited 0."
+  ],
+  "nextWorkItem": {
+    "id": "VFOPT-X-001-F003",
+    "title": "Reduce visible-scene drawing cost during sustained mixed-component simulation",
+    "status": "recommended_not_started",
+    "reason": "F009 editor checks and save recovery are complete. Resume the measured sustained-simulation CPU/drawing hotspot after the completed transport and persistence prerequisites.",
+    "backlog": "docs/VFOPT_X_001_FINDINGS_BACKLOG.json"
+  },
+  "evidence": {
+    "taskNotes": "docs/VFOPT_UI_015_RENDER_ISOLATION.md",
+    "beforeProduction": "docs/reports/vfopt-ui-015-before-production.json",
+    "afterProduction": "docs/reports/vfopt-ui-015-after-production.json",
+    "beforeDevelopment": "docs/reports/vfopt-ui-015-before-development.json",
+    "afterDevelopment": "docs/reports/vfopt-ui-015-after-development.json",
+    "contracts": "docs/reports/vfopt-ui-015-contract.json",
+    "regressions": [
+      "docs/reports/vfopt-ui-015-rerun-vfopt-ui-014-scene-after.json",
+      "docs/reports/vfopt-ui-015-rerun-vfopt-ui-017-drag-after.json",
+      "docs/reports/vfopt-ui-015-rerun-vfopt-ui-016-routing-after.json"
+    ],
+    "sourceSnapshot": "node_modules/.cache/vfopt-ui-015/before",
+    "sourceHashesBefore": {
+      "src/features/canvas/CircuitCanvas.tsx": "ef54d96cc658fe6264b6f1b813dae046eed6c9ecbc117e0cea538031d4cb3250",
+      "src/features/canvas/components/WireShape.tsx": "9b0052b06586fc377abe4ece99deeb5780c55aed0313b6d3fbaf726db2ed4ced",
+      "src/features/canvas/components/ComponentNode.tsx": "cd84fadcc97bcec87a883b944527780085d57065613e5654a7e2c7894b71557f",
+      "src/features/canvas/components/PinDot.tsx": "e500e50943fb59ca5174e641fe7aaeb46250d40f909ebc17eb6e97301659b15e",
+      "src/utils/wireRouting.ts": "8805f28c49de4d5ddb888372de5e4ba331d41992e6d71cede44539fa68c69dcc"
+    },
+    "sourceHashesAfter": {
+      "src/features/canvas/CircuitCanvas.tsx": "b8bb4756f03bbad50e700427a50f655005478606e4a59632b86db51a9fd9e0ec",
+      "src/features/canvas/components/WireShape.tsx": "10aa82caf92c0846962db882e9e90e7e95fa5b37ef51476c9960b0393e96136b",
+      "src/features/canvas/components/ComponentNode.tsx": "b12abbcb5d90914f0bd7eccf4f3318695d3b1269de7ad5a775c4b4aeb0c7e4c8",
+      "src/features/canvas/components/PinDot.tsx": "8152f5b091aba65c88eff4a08bd733d860d0124a8299fd4c597e1d0101bacb3f",
+      "src/utils/wireRouting.ts": "82d836e70bc4ed8ba9048a2ccac27c8bd8e6b0c98739204908f89cf677c313de",
+      "src/features/canvas/wireNodeGeometry.ts": "0bd6891b7cef257bf4fceb4cdd264952b4234f2e037f9f35602c1b1d2a5e42b3",
+      "src/features/canvas/wireRoutingPeers.ts": "1c0acb6b0ad668c9dbcf99be1a5aff2150641a36e81db22c30ea351b6952c434",
+      "src/features/canvas/components/ProbeVoltageTooltip.tsx": "2fe90f50c9010164fea12d53a7a64a7f323c95b3512ac967d7998fdf1d738582"
+    },
+    "note": "Generated raw reports/screenshots/profiles removed at user request. Embedded measurements remain; original paths/hashes are historical provenance."
+  },
+  "fullApplicationBaseline": {
+    "id": "VFOPT-X-001",
+    "status": "completed_baseline_with_open_findings",
+    "evidence": "docs/VFOPT_X_001_APP_BASELINE.json",
+    "appCompletelyReady": false
+  },
+  "continuation": {
+    "updatedAt": "2026-09-21T03:39:25.708Z",
+    "completed": "VFOPT-X-001-F009",
+    "previousCompleted": "VFOPT-X-001-F008",
+    "next": "VFOPT-X-001-F003",
+    "backlog": "docs/VFOPT_X_001_FINDINGS_BACKLOG.json"
+  },
+  "rawArtifactRetention": "Generated raw reports/screenshots/profiles removed at user request. Embedded measurements remain; original paths/hashes are historical provenance."
+}

@@ -1,10 +1,29 @@
 import Keycloak from 'keycloak-js'
 
-const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'https://copious-opposite-mangle.ngrok-free.dev'
+declare global {
+  interface Window {
+    config?: {
+      keycloak?: {
+        url?: string
+        realm?: string
+        clientId?: string
+      }
+      api?: {
+        baseUrl?: string
+      }
+    }
+  }
+}
+
+const runtimeKeycloak = typeof window !== 'undefined' ? window.config?.keycloak : undefined
+
+const keycloakUrl = runtimeKeycloak?.url || import.meta.env.VITE_KEYCLOAK_URL
+const clientId = runtimeKeycloak?.clientId || import.meta.env.VITE_KEYCLOAK_CLIENT_ID
+const realm = runtimeKeycloak?.realm || import.meta.env.VITE_KEYCLOAK_REALM
 
 const keycloak = new Keycloak({
-  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'VOLT-UI',
-  realm: import.meta.env.VITE_KEYCLOAK_REALM || 'voltforge-realm',
+  clientId,
+  realm,
   url: keycloakUrl,
 })
 

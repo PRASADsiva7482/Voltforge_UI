@@ -6,10 +6,14 @@ interface ProjectState {
   activeCodeFile: CodeFile | null;
   isDirty: boolean;
   isSaving: boolean;
+  documentSession: number;
+  codeRevision: number;
 
   setCurrentProject: (project: Project | null) => void;
   setActiveCodeFile: (file: CodeFile | null) => void;
   updateCodeFileContent: (fileId: string, content: string) => void;
+  setProjectUpdatedAt: (updatedAt: string) => void;
+  mergeProjectMetadata: (project: Project) => void;
   setDirty: (dirty: boolean) => void;
   setSaving: (saving: boolean) => void;
 }
@@ -19,19 +23,26 @@ export const useProjectStore = create<ProjectState>((set) => ({
   activeCodeFile: null,
   isDirty: false,
   isSaving: false,
+  documentSession: 0,
+  codeRevision: 0,
 
   setCurrentProject: (project) =>
-    set({
+    set((state) => ({
       currentProject: project,
       activeCodeFile: project?.codeFiles?.[0] || null,
       isDirty: false,
-    }),
+      isSaving: false,
+      documentSession: state.documentSession + 1,
+      codeRevision: 0,
+    })),
 
   setActiveCodeFile: (file) => set({ activeCodeFile: file }),
 
   updateCodeFileContent: (fileId, content) =>
     set((state) => {
       if (!state.currentProject) return state;
+      const file = state.currentProject.codeFiles.find(file => file.id === fileId);
+      if (!file || file.content === content) return state;
       const updatedFiles = state.currentProject.codeFiles.map((f) =>
         f.id === fileId ? { ...f, content } : f
       );
@@ -42,8 +53,20 @@ export const useProjectStore = create<ProjectState>((set) => ({
             ? { ...state.activeCodeFile, content }
             : state.activeCodeFile,
         isDirty: true,
+        codeRevision: state.codeRevision + 1,
       };
     }),
+
+  setProjectUpdatedAt: (updatedAt) =>
+    set((state) => state.currentProject
+      ? { currentProject: { ...state.currentProject, updatedAt } }
+      : state),
+
+  mergeProjectMetadata: (project) => set((state) => {
+    if (state.currentProject?.id !== project.id) return state;
+    const { canvasLayout: _canvas, componentConfig: _config, codeFiles: _code, ...metadata } = project;
+    return { currentProject: { ...state.currentProject, ...metadata } };
+  }),
 
   setDirty: (isDirty) => set({ isDirty }),
   setSaving: (isSaving) => set({ isSaving }),
