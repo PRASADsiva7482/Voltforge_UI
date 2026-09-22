@@ -1,7 +1,8 @@
 import { memo, useState } from 'react';
-import { Group, Circle, Line, Text, Rect } from 'react-konva';
+import { Group, Circle, Line, Text } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { CanvasNode, PinPosition } from '../canvasTypes';
+import { PinVoltageTooltip } from './ProbeVoltageTooltip';
 import {
   PIN_COLOR_POWER,
   PIN_COLOR_GROUND,
@@ -21,7 +22,7 @@ import {
 interface PinDotProps {
   pin: PinPosition;
   nodeId: string;
-  node: CanvasNode;
+  node: Pick<CanvasNode, 'width' | 'height' | 'type'>;
   isWiring: boolean;
   wiringFromNodeId: string | null;
   isDark: boolean;
@@ -29,6 +30,7 @@ interface PinDotProps {
   finishWiring: (nodeId: string, pinId: string) => void;
   readOnly?: boolean;
   isProbeMode?: boolean;
+  detailed?: boolean;
   onProbeToggle?: (target: { nodeId: string; pinId: string; x: number; y: number }) => void;
 }
 
@@ -50,7 +52,7 @@ function resolvePinColors(type: PinPosition['type']) {
   return { fill, glow };
 }
 
-function computeLabelLayout(pin: PinPosition, node: CanvasNode) {
+function computeLabelLayout(pin: PinPosition, node: Pick<CanvasNode, 'width' | 'height'>) {
   const isLeft = pin.x <= 5;
   const isRight = pin.x >= node.width - 5;
   const isTop = pin.y <= 5;
@@ -106,6 +108,7 @@ const PinDot = memo(function PinDot({
   finishWiring,
   readOnly = false,
   isProbeMode,
+  detailed = true,
   onProbeToggle,
 }: PinDotProps) {
   const [hovered, setHovered] = useState(false);
@@ -115,7 +118,7 @@ const PinDot = memo(function PinDot({
   const { labelX, labelY, rotation, labelWidth, labelAlign } = computeLabelLayout(pin, node);
 
   return (
-    <Group>
+    <Group name="schematic-pin" id={`${nodeId}:${pin.id}`}>
       {/* Magnetic snap zone */}
       {isValidTarget && (
         <>
@@ -173,6 +176,9 @@ const PinDot = memo(function PinDot({
               : 'rgba(15,23,42,0.28)'
         }
         strokeWidth={1.5}
+        // Konva treats even a transparent shadow color as an active shadow.
+        // Disable it while idle to avoid a full-canvas buffer copy per pin.
+        shadowEnabled={hovered}
         shadowColor={hovered ? glowColor : 'transparent'}
         shadowBlur={hovered ? 8 : 0}
         hitStrokeWidth={PIN_HIT_STROKE_WIDTH}
@@ -203,7 +209,7 @@ const PinDot = memo(function PinDot({
       />
 
       {/* Pin label */}
-      {node.type === 'BREADBOARD' && !hovered ? null : (
+      {(!detailed && !hovered && !isWiring && !isProbeMode) || (node.type === 'BREADBOARD' && !hovered) ? null : (
         <Text
           text={pin.name}
           x={labelX}
@@ -233,43 +239,7 @@ const PinDot = memo(function PinDot({
         />
       )}
 
-      {isProbeMode && hovered && (() => {
-        const voltage = (globalThis as any).__voltforgePinVoltages?.[`${nodeId}:${pin.id}`];
-        if (voltage === undefined) return null;
-        return (
-          <Group x={pin.x + 12} y={pin.y - 12} listening={false}>
-            <Rect
-              width={75}
-              height={30}
-              cornerRadius={6}
-              fill="#0c0a1c"
-              stroke="#c084fc"
-              strokeWidth={1.5}
-              shadowColor="#c084fc"
-              shadowBlur={10}
-              shadowOpacity={0.6}
-            />
-            <Text
-              text={pin.name}
-              x={6}
-              y={4}
-              fontSize={8}
-              fontFamily="JetBrains Mono"
-              fontStyle="700"
-              fill="#a855f7"
-            />
-            <Text
-              text={`${voltage.toFixed(3)} V`}
-              x={6}
-              y={15}
-              fontSize={10}
-              fontFamily="JetBrains Mono"
-              fontStyle="700"
-              fill="#34d399"
-            />
-          </Group>
-        );
-      })()}
+      {isProbeMode && hovered && <PinVoltageTooltip nodeId={nodeId} pin={pin} />}
     </Group>
   );
 });

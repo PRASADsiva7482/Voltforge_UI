@@ -28,6 +28,11 @@ const CURSOR_THROTTLE_MS = 50;
 const CANVAS_SYNC_DEBOUNCE_MS = 180;
 const STALE_CURSOR_MS = 10_000;
 const MAX_RECONNECT_DELAY_MS = 12_000;
+const STABLE_CONNECTION_MS = 30_000;
+// Complete UTF-8 STOMP frame, matching WebSocketConfig.STOMP_MESSAGE_LIMIT_BYTES.
+const MAX_STOMP_FRAME_BYTES = 1024 * 1024;
+const FRAME_ENCODER = new TextEncoder();
+const TERMINAL_CLOSE_CODES = new Set([1002, 1003, 1007, 1008, 1009]);
 
 function resolveNativeWsUrl(): string {
   const explicit = import.meta.env.VITE_WS_BASE_URL as string | undefined;
@@ -79,6 +84,7 @@ export function useCollaboration(projectId: string) {
   const heartbeatRef = useRef<number | null>(null);
   const canvasSyncTimer = useRef<number | null>(null);
   const reconnectTimer = useRef<number | null>(null);
+  const stableConnectionTimer = useRef<number | null>(null);
   const reconnectBlocked = useRef(false);
   const reconnectAttempts = useRef(0);
   const pendingCanvasSync = useRef(false);
@@ -92,12 +98,32 @@ export function useCollaboration(projectId: string) {
   const currentUserId = user?.keycloakId || 'anon';
   const displayName = user?.displayName || user?.username || 'Collaborator';
 
+  const blockLiveSync = useCallback((message: string) => {
+    if (reconnectBlocked.current) return;
+    reconnectBlocked.current = true;
+    pendingCanvasSync.current = false;
+    for (const timer of [canvasSyncTimer, reconnectTimer, stableConnectionTimer]) {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+    if (heartbeatRef.current !== null) window.clearInterval(heartbeatRef.current);
+    heartbeatRef.current = null;
+    setIsConnected(false);
+    useToastStore.getState().addToast(message, 'error');
+    wsRef.current?.close();
+  }, []);
+
   const sendFrame = useCallback((command: string, headers: Record<string, string>, body?: unknown) => {
     const socket = wsRef.current;
-    if (!socket || socket.readyState !== WebSocket.OPEN) return false;
-    socket.send(buildStompFrame(command, headers, body));
+    if (reconnectBlocked.current || !socket || socket.readyState !== WebSocket.OPEN) return false;
+    const frame = buildStompFrame(command, headers, body);
+    if (FRAME_ENCODER.encode(frame).byteLength > MAX_STOMP_FRAME_BYTES) {
+      blockLiveSync('Live Sync paused: this update exceeds the 1 MiB limit. Your edits are still in this tab. Reduce the project size and save before reopening.');
+      return false;
+    }
+    socket.send(frame);
     return true;
-  }, []);
+  }, [blockLiveSync]);
 
   const subscribeToProject = useCallback(() => {
     sendFrame('SUBSCRIBE', {
@@ -115,6 +141,12 @@ export function useCollaboration(projectId: string) {
 
     let disposed = false;
     reconnectBlocked.current = false;
+    reconnectAttempts.current = 0;
+
+    const clearStableTimer = () => {
+      if (stableConnectionTimer.current !== null) window.clearTimeout(stableConnectionTimer.current);
+      stableConnectionTimer.current = null;
+    };
 
     const clearHeartbeat = () => {
       if (heartbeatRef.current) {
@@ -134,13 +166,16 @@ export function useCollaboration(projectId: string) {
     };
 
     const connect = () => {
+      if (disposed || reconnectBlocked.current) return;
       const socket = new WebSocket(resolveNativeWsUrl());
       wsRef.current = socket;
+      const isCurrent = () => !disposed && wsRef.current === socket;
 
       socket.onopen = async () => {
         if (keycloak.token) {
           await keycloak.updateToken(30).catch(() => undefined);
         }
+        if (!isCurrent() || socket.readyState !== WebSocket.OPEN) return;
 
         const connectHeaders: Record<string, string> = {
           'accept-version': '1.2,1.1,1.0',
@@ -155,16 +190,25 @@ export function useCollaboration(projectId: string) {
       };
 
       socket.onmessage = (event) => {
+        if (!isCurrent() || reconnectBlocked.current) return;
         const raw = event.data as string;
         if (!raw || raw === '\n') return;
 
         for (const frame of readStompBodies(raw)) {
           if (frame.command === 'CONNECTED') {
-            reconnectAttempts.current = 0;
+            // A quick CONNECTED -> close loop is still a failed connection.
+            clearStableTimer();
+            stableConnectionTimer.current = window.setTimeout(() => {
+              if (isCurrent()) reconnectAttempts.current = 0;
+              stableConnectionTimer.current = null;
+            }, STABLE_CONNECTION_MS);
+            lastCanvasRevision.current = '';
             setIsConnected(true);
             subscribeToProject();
             clearHeartbeat();
-            heartbeatRef.current = window.setInterval(() => socket.send('\n'), 20_000);
+            heartbeatRef.current = window.setInterval(() => {
+              if (isCurrent() && socket.readyState === WebSocket.OPEN) socket.send('\n');
+            }, 20_000);
             continue;
           }
 
@@ -172,9 +216,7 @@ export function useCollaboration(projectId: string) {
             // A STOMP ERROR is a protocol/application rejection (for example
             // edit access denied), not a transient network disconnect. Do not
             // immediately reconnect and make the editor header flap forever.
-            reconnectBlocked.current = true;
-            setIsConnected(false);
-            socket.close();
+            blockLiveSync('Live Sync paused because the server rejected the connection or update. Your local edits are retained. Check project access, then reopen it to retry.');
             continue;
           }
 
@@ -219,17 +261,25 @@ export function useCollaboration(projectId: string) {
         }
       };
 
-      socket.onclose = () => {
+      socket.onclose = (event) => {
+        if (!isCurrent()) return;
         setIsConnected(false);
         clearHeartbeat();
+        clearStableTimer();
         if (wsRef.current === socket) {
           wsRef.current = null;
         }
-        scheduleReconnect();
+        if (TERMINAL_CLOSE_CODES.has(event.code)) {
+          blockLiveSync(event.code === 1009
+            ? 'Live Sync paused: the server rejected an oversized update. Your edits are still in this tab. Save successfully before reopening.'
+            : 'Live Sync paused because the server rejected the protocol or project access. Your local edits are retained. Reopen the project after resolving the problem.');
+        } else {
+          scheduleReconnect();
+        }
       };
 
       socket.onerror = () => {
-        setIsConnected(false);
+        if (isCurrent()) setIsConnected(false);
       };
     };
 
@@ -238,6 +288,7 @@ export function useCollaboration(projectId: string) {
     return () => {
       disposed = true;
       clearHeartbeat();
+      clearStableTimer();
       if (canvasSyncTimer.current) {
         window.clearTimeout(canvasSyncTimer.current);
         canvasSyncTimer.current = null;
@@ -259,7 +310,7 @@ export function useCollaboration(projectId: string) {
       remoteConflictReported.current = false;
       setIsConnected(false);
     };
-  }, [currentUserId, loadCanvas, loadPcb, projectId, sendFrame, subscribeToProject]);
+  }, [blockLiveSync, currentUserId, loadCanvas, loadPcb, projectId, sendFrame, subscribeToProject]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {

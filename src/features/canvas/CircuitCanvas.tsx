@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect, useMemo, useState, memo } from 'react';
+import { useCallback, useRef, useEffect, useLayoutEffect, useMemo, useState, memo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Stage, Layer, Rect, Group, Text, Circle, Line, Shape } from 'react-konva';
 import Konva from 'konva';
@@ -9,7 +9,7 @@ import CanvasRoutingStatus from './CanvasRoutingStatus';
 import { useSimulationStore } from '../../store/simulationStore';
 
 import { useThemeStore } from '../../store/themeStore';
-import { getPinAbsPos, getWireRenderPoints, snapToRoutingGuides } from '../../utils/wireRouting';
+import { componentPairKey, getPinAbsPos, getWireRenderPoints, snapToRoutingGuides } from '../../utils/wireRouting';
 import {
   WireShape,
   WiringPreview,
@@ -31,10 +31,13 @@ import {
   COLLABORATOR_CURSOR_RADIUS,
   COLLABORATOR_DEFAULT_COLOR,
 } from './canvasConstants';
-import type { Collaborator, ActiveBendPoint, Wire } from './canvasTypes';
+import type { Collaborator, ActiveBendPoint, Wire, CanvasNode } from './canvasTypes';
 import { createCurrentFlowRenderBudget, cullWiresToViewport } from './renderBudget';
 import { canvasLayoutBudgetFields, recordCanvasLayout } from './canvasRenderInstrumentation';
 import { indexIncidentWires } from './dragRouting';
+import { ComponentBoundsCache, ComponentSpatialIndex, createComponentVisibilitySnapshot, COMPONENT_DETAIL_SCALE } from './componentVisibility';
+import { CanvasAudioBridge } from './CanvasAudioBridge';
+import { WireRoutingPeerCache } from './wireRoutingPeers';
 
 interface Props {
   width: number;
@@ -50,7 +53,7 @@ interface Props {
 }
 
 // ── Grid Layer (memoized) — professional engineering grid ──
-const CanvasMat = ({
+const CanvasMat = memo(({
   width,
   height,
   viewport,
@@ -138,11 +141,17 @@ const CanvasMat = ({
       />
     </Group>
   );
-};
+});
 
 // ── Wire Color Picker Toolbar ──
-const WireToolbar = () => {
-  const { wiringColor, setWiringColor, wiringMode, setWiringMode, isWiring } = useCanvasStore();
+const WireToolbar = memo(() => {
+  const { wiringColor, setWiringColor, wiringMode, setWiringMode, isWiring } = useCanvasStore(useShallow(state => ({
+    wiringColor: state.wiringColor,
+    setWiringColor: state.setWiringColor,
+    wiringMode: state.wiringMode,
+    setWiringMode: state.setWiringMode,
+    isWiring: state.isWiring,
+  })));
 
   if (!isWiring) return null;
 
@@ -180,16 +189,18 @@ const WireToolbar = () => {
       <span className="vf-wire-toolbar__hint">Click a pin to connect • ESC to cancel</span>
     </div>
   );
-};
+});
 
 // ── PCB Trace Layer ──
 const PcbTraceLayer = ({
   wires,
   allWires,
+  visibleNodes,
   isDark,
 }: {
   wires: Wire[];
   allWires: Wire[];
+  visibleNodes: CanvasNode[];
   isDark: boolean;
 }) => {
   const nodes = useCanvasStore((state) => state.nodes);
@@ -218,8 +229,9 @@ const PcbTraceLayer = ({
           />
         );
       })}
-      {nodes.flatMap((node) =>
-        node.pins.map((pin) => {
+      {visibleNodes.flatMap((authoredNode) => {
+        const node = useCanvasStore.getState().nodesById.get(authoredNode.id) ?? authoredNode;
+        return node.pins.map((pin) => {
           const pos = getPinAbsPos(node, pin.id);
           if (!pos) return null;
           return (
@@ -233,8 +245,8 @@ const PcbTraceLayer = ({
               strokeWidth={2}
             />
           );
-        })
-      )}
+        });
+      })}
     </Layer>
   );
 };
@@ -248,6 +260,7 @@ const ComponentNodeWrapper = memo(({
   readOnly,
   isProbeMode,
   isSimulating,
+  detailed,
 }: {
   id: string;
   isDark: boolean;
@@ -256,6 +269,7 @@ const ComponentNodeWrapper = memo(({
   readOnly?: boolean;
   isProbeMode?: boolean;
   isSimulating?: boolean;
+  detailed: boolean;
 }) => {
   const node = useCanvasStore((state) => state.nodesById.get(id));
   const isSelected = useCanvasStore((state) => state.selectedNodeId === id);
@@ -292,6 +306,7 @@ const ComponentNodeWrapper = memo(({
       readOnly={readOnly}
       isProbeMode={isProbeMode}
       isSimulating={isSimulating}
+      detailed={detailed || isSelected || isWiring || isProbeMode}
     />
   );
 });
@@ -311,10 +326,12 @@ export default function CircuitCanvas({
 }: Props) {
   const isDark = useThemeStore((state) => state.theme === 'dark');
 
-  const nodeIds = useCanvasStore(
-    useShallow((state) => state.nodes.map((n) => n.id))
-  );
+  const [selectComponentDocument] = useState(createComponentVisibilitySnapshot);
+  const documentNodes = useCanvasStore(selectComponentDocument);
+  const selectedNodeId = useCanvasStore((state) => state.selectedNodeId);
   const wires = useCanvasStore((state) => state.wires);
+  const [routingPeerCache] = useState(() => new WireRoutingPeerCache());
+  const routingPeers = useMemo(() => routingPeerCache.update(wires), [wires, routingPeerCache]);
   const draggingNodeId = useCanvasStore((state) => state.draggingNodeId);
   const geometryCommitRevision = useCanvasStore((state) => state.geometryCommitRevision);
   const incidentWires = useMemo(() => indexIncidentWires(wires), [wires]);
@@ -331,12 +348,43 @@ export default function CircuitCanvas({
   const storeIsSimulating = useSimulationStore((state) => state.isSimulating);
   const currentFlowQualityMode = useSimulationStore((state) => state.currentFlowQualityMode);
   const thermalHeatmapEnabled = useSimulationStore((state) => state.thermalHeatmapEnabled);
+  const probeNodeIds = useSimulationStore(useShallow((state) => state.meterProbes.map(probe => probe.nodeId)));
 
   const stageRef = useRef<Konva.Stage>(null);
   const gridLayerRef = useRef<Konva.Layer>(null);
   const viewportRenderAnchorRef = useRef(viewport);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [activeNewBendPoint, setActiveNewBendPoint] = useState<ActiveBendPoint | null>(null);
+  const [activeInteractionId, setActiveInteractionId] = useState<string | null>(null);
+  const [boundsCache] = useState(() => new ComponentBoundsCache());
+  const previousVisible = useRef<ReadonlySet<string>>(new Set());
+  const componentIndex = useMemo(() => new ComponentSpatialIndex(documentNodes, boundsCache), [documentNodes, boundsCache]);
+  const retainedNodeIds = useMemo(() => {
+    const ids = new Set(probeNodeIds.filter((id): id is string => Boolean(id)));
+    for (const id of [selectedNodeId, draggingNodeId, wiringFrom?.nodeId, activeInteractionId]) if (id) ids.add(id);
+    for (const wire of wires) if (wire.id === selectedWireId || wire.id === activeNewBendPoint?.wireId) {
+      ids.add(wire.fromNodeId); ids.add(wire.toNodeId);
+    }
+    return ids;
+  }, [probeNodeIds, selectedNodeId, draggingNodeId, wiringFrom?.nodeId, activeInteractionId, wires, selectedWireId, activeNewBendPoint?.wireId]);
+  const visibleNodes = useMemo(() => componentIndex.select(viewport, width, height, previousVisible.current, retainedNodeIds), [componentIndex, viewport, width, height, retainedNodeIds]);
+  useLayoutEffect(() => { previousVisible.current = new Set(visibleNodes.map(node => node.id)); }, [visibleNodes]);
+
+  // Native DOM capture runs before controls stop Konva event bubbling. Keep
+  // dials, momentary buttons and nested sensor drag handles alive until release.
+  useEffect(() => {
+    let frame = 0;
+    const release = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(() => setActiveInteractionId(null)); };
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release);
+    window.addEventListener('blur', release);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('pointerup', release);
+      window.removeEventListener('pointercancel', release);
+      window.removeEventListener('blur', release);
+    };
+  }, []);
 
   const wireRenderContext = useMemo(() => {
     const nodesById = useCanvasStore.getState().nodesById;
@@ -371,6 +419,9 @@ export default function CircuitCanvas({
       viewportHeight: height,
       totalWireCount: wires.length,
       mountedWireShapeCount: wireRenderContext.visibleWires.length,
+      totalComponentCount: documentNodes.length,
+      mountedComponentCount: visibleNodes.length,
+      mountedPinCount: visibleNodes.reduce((count, node) => count + node.pins.length, 0),
       currentFlowEnabled: Boolean((isSimulating ?? storeIsSimulating) && showCurrentFlow),
       ...canvasLayoutBudgetFields(currentFlowBudget),
     });
@@ -384,6 +435,8 @@ export default function CircuitCanvas({
     width,
     wireRenderContext.visibleWires.length,
     wires.length,
+    documentNodes.length,
+    visibleNodes,
   ]);
 
   useEffect(() => {
@@ -470,7 +523,14 @@ export default function CircuitCanvas({
   }, [selectNode, selectWire]);
 
   return (
-    <div className="vf-canvas-container">
+    <div className="vf-canvas-container" onPointerDownCapture={(event) => {
+      const stage = stageRef.current;
+      if (!stage || !stage.content.contains(event.target as Node)) return;
+      const rect = stage.content.getBoundingClientRect();
+      const hit = stage.getIntersection({ x: (event.clientX - rect.left) * width / rect.width, y: (event.clientY - rect.top) * height / rect.height });
+      setActiveInteractionId(hit?.findAncestor('.schematic-component', true)?.id() ?? null);
+    }}>
+      <CanvasAudioBridge isSimulating={isSimulating} />
       <CanvasRoutingStatus />
       <CanvasErrorBoundary>
         <Stage
@@ -549,12 +609,12 @@ export default function CircuitCanvas({
           </Layer>
 
           {viewMode === 'pcb' && (
-            <PcbTraceLayer wires={wireRenderContext.visibleWires} allWires={wires} isDark={isDark} />
+            <PcbTraceLayer wires={wireRenderContext.visibleWires} allWires={wires} visibleNodes={visibleNodes} isDark={isDark} />
           )}
 
           {/* Component layer (below wires) */}
           <Layer opacity={viewMode === 'pcb' ? 0.35 : 1}>
-            {nodeIds.map((id) => (
+            {visibleNodes.map(({ id }) => (
               <ComponentNodeWrapper
                 key={id}
                 id={id}
@@ -564,6 +624,7 @@ export default function CircuitCanvas({
                 readOnly={readOnly}
                 isProbeMode={isProbeMode}
                 isSimulating={isSimulating}
+                detailed={viewport.scale >= COMPONENT_DETAIL_SCALE || retainedNodeIds.has(id)}
               />
             ))}
           </Layer>
@@ -574,12 +635,12 @@ export default function CircuitCanvas({
               <WireShape
                 key={w.id}
                 wire={w}
-                wires={wires}
+                routingPeers={routingPeers.get(componentPairKey(w))!}
                 isSelected={w.id === selectedWireId}
                 isDark={isDark}
-                onSelect={() => selectWire(w.id)}
+                onSelect={selectWire}
                 onWireDragStart={handleWireDragStart}
-                activeNewBendPoint={activeNewBendPoint}
+                activeNewBendPoint={activeNewBendPoint?.wireId === w.id ? activeNewBendPoint : null}
                 readOnly={readOnly}
                 isProbeMode={isProbeMode}
               />

@@ -263,7 +263,7 @@ function wireLaneOffset(wire: Wire, allWires: Wire[]): number {
   return round((index - (related.length - 1) / 2) * gap);
 }
 
-function componentPairKey(wire: Wire): string {
+export function componentPairKey(wire: Wire): string {
   return [wire.fromNodeId, wire.toNodeId].sort().join('|');
 }
 

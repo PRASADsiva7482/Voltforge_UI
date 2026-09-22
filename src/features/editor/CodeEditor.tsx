@@ -1,4 +1,4 @@
-import { lazy, memo, Suspense, useEffect, useRef, useState, useMemo } from 'react';
+import { lazy, memo, Suspense, useRef, useState, useMemo } from 'react';
 import { useProjectStore } from '../../store/projectStore';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useSimulationStore } from '../../store/simulationStore';
@@ -110,16 +110,6 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
 
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
-  const ignoreChange = useRef(false);
-
-  // Sync to prevent onChange updates during fullCode toggling
-  useEffect(() => {
-    ignoreChange.current = true;
-    const timer = setTimeout(() => {
-      ignoreChange.current = false;
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [showFullCode, activeCodeFile?.id]);
 
   const fullCode = useMemo(() => {
     if (!activeCodeFile || !showFullCode) return null;
@@ -320,7 +310,10 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
               value={displayedContent}
               onMount={handleEditorMount}
               onChange={(value) => {
-                if (readOnly || showFullCode || ignoreChange.current) return;
+                // The Monaco React wrapper suppresses its own controlled value
+                // updates. A timed guard here would also drop real user edits
+                // immediately after changing tabs or leaving Full Sketch.
+                if (readOnly || showFullCode) return;
                 if (value === undefined) return;
 
                 // Protect content integrity

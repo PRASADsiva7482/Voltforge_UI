@@ -9,7 +9,9 @@ import { chromium } from '@playwright/test'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const phase = process.argv.includes('--before') ? 'before' : 'after'
-const reportPrefix = process.argv.find(value => value.startsWith('--report-prefix='))?.split('=')[1] || 'vfopt-ui-010'
+const codeEditorOnly = process.argv.includes('--code-editor')
+const retainArtifacts = !process.argv.includes('--no-artifacts')
+const reportPrefix = process.argv.find(value => value.startsWith('--report-prefix='))?.split('=')[1] || (codeEditorOnly ? 'vfopt-x-001-f009' : 'vfopt-ui-010')
 if (!/^[a-z0-9-]+$/.test(reportPrefix)) throw new Error('Invalid report prefix')
 const origin = 'http://localhost:3102'
 const output = path.join(root, 'docs/reports')
@@ -23,7 +25,7 @@ const fixture = {
   },
   componentConfig: {},
   codeFiles: [{ id: 'render-code', filename: 'main.ino', content: 'void setup() {}\nvoid loop() { delay(100); }', language: 'cpp', sortOrder: 0 }],
-  createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', forkCount: 0, viewCount: 0,
+  documentRevision: '0', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', forkCount: 0, viewCount: 0,
 }
 const sourceFiles = ['src/features/editor/CircuitEditorPage.tsx', 'src/features/editor/ComponentPanel.tsx', 'src/features/editor/CodeEditor.tsx', 'src/features/editor/SolverDiagnosticsPanel.tsx', ...phase === 'after' ? ['src/features/editor/EditorDocumentSync.tsx','src/features/editor/EditorSimulationStatus.tsx','src/features/editor/editorDocumentSnapshots.ts'] : []]
 const sha = value => crypto.createHash('sha256').update(value).digest('hex')
@@ -31,6 +33,15 @@ const measured = [], checks = [], errors = [], requests = []
 const saves = []
 let savedProject = structuredClone(fixture)
 let browser
+let browserServer, clipboardPage, previousClipboard
+async function boundedEditorAction(action) {
+  let timer
+  try {
+    return await Promise.race([action(), new Promise((_, reject) => {
+      timer = setTimeout(() => { void browserServer?.kill(); reject(new Error('Editor action exceeded the 8 second watchdog')) }, 8000)
+    })])
+  } finally { clearTimeout(timer) }
+}
 const server = await createServer({ root, server: { host: 'localhost', port: 3102, strictPort: true }, plugins: [{
   name: 'editor-audit-only', enforce: 'pre',
   configureServer(vite) {
@@ -96,7 +107,8 @@ async function measure(page, name, kind, count = 60) {
 
 try {
   await server.listen()
-  browser = await chromium.launch({ channel: 'chrome', headless: true })
+  browserServer = await chromium.launchServer({ channel: 'chrome', headless: true })
+  browser = await chromium.connect(browserServer.wsEndpoint())
   const context = await browser.newContext({ viewport: { width: 1366, height: 768 }, permissions: ['clipboard-read','clipboard-write'] })
   await context.addInitScript(() => { window.__editorAudit = { commits: {} } })
   await context.route('**/*', async route => {
@@ -108,7 +120,8 @@ try {
         if (request.method() === 'PUT') {
           const payload = request.postDataJSON()
           saves.push(structuredClone(payload))
-          savedProject = { ...savedProject, ...payload, codeFiles: payload.codeFiles.map(file => ({ ...savedProject.codeFiles.find(existing => existing.filename === file.filename), ...file })), updatedAt: '2026-01-02T00:00:00Z' }
+          if (payload.expectedRevision !== savedProject.documentRevision) return route.fulfill({ status: 409, json: { success: false, message: 'Stale document revision' } })
+          savedProject = { ...savedProject, ...payload, codeFiles: payload.codeFiles.map(file => ({ ...savedProject.codeFiles.find(existing => existing.filename === file.filename), ...file })), documentRevision: String(BigInt(savedProject.documentRevision) + 1n), updatedAt: '2026-01-02T00:00:00Z' }
         }
         return route.fulfill({ json: { success: true, data: savedProject } })
       }
@@ -120,6 +133,8 @@ try {
     return route.abort()
   })
   const page = await context.newPage()
+  clipboardPage = page
+  if (codeEditorOnly) await page.clock.install()
   page.on('pageerror', error => errors.push(error.message))
   page.setDefaultTimeout(15000)
   await page.goto(origin + '/editor/render-owned', { waitUntil: 'domcontentloaded' })
@@ -127,6 +142,77 @@ try {
   await page.waitForFunction(() => window.__editorAudit.stores.canvas.getState().nodes.length === 25)
   await check('Real Monaco editor loads', async () => { await page.locator('.monaco-editor textarea').first().waitFor({ state: 'attached', timeout: 45000 }) })
   await settle(page)
+  previousClipboard = await page.evaluate(() => navigator.clipboard.readText())
+  if (codeEditorOnly) {
+    await check('Immediate typing after a file switch reaches the document without a timed ignore window', async () => {
+      await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+      try {
+        await page.evaluate(() => {
+          const store = window.__editorAudit.stores.project
+          const file = { ...store.getState().activeCodeFile, id: 'helper-code', filename: 'helper.h', content: '// helper', sortOrder: 1 }
+          store.setState({ currentProject: { ...store.getState().currentProject, codeFiles: [...store.getState().currentProject.codeFiles, file] } })
+        })
+        await page.getByRole('button', { name: 'helper.h', exact: true }).click({ force: true })
+        await page.clock.runFor(32)
+        await page.evaluate(() => {
+          const editor = window.__editorAudit.monacoEditor
+          if (editor.getValue() !== '// helper') throw new Error('Target file has not reached Monaco')
+          editor.focus(); editor.setPosition(editor.getModel().getFullModelRange().getEndPosition())
+        })
+        await page.keyboard.type('Z')
+        const state = await page.evaluate(() => ({ model: window.__editorAudit.monacoEditor.getValue(), content: window.__editorAudit.stores.project.getState().activeCodeFile.content, dirty: window.__editorAudit.stores.project.getState().isDirty }))
+        assert.equal(state.model, '// helperZ'); assert.equal(state.content, state.model); assert.equal(state.dirty, true)
+      } finally { await page.clock.resume() }
+    })
+    await check('Full Sketch is read-only; immediate typing on return persists without generated text', async () => {
+      const original = await page.evaluate(() => window.__editorAudit.stores.project.getState().activeCodeFile.content)
+      await page.getByTitle('Show full generated sketch code', { exact: true }).click()
+      await settle(page)
+      const generated = await page.evaluate(() => window.__editorAudit.monacoEditor.getValue())
+      await page.evaluate(() => window.__editorAudit.monacoEditor.focus())
+      await page.keyboard.type('blocked')
+      assert.equal(await page.evaluate(() => window.__editorAudit.monacoEditor.getValue()), generated)
+      assert.equal(await page.evaluate(() => window.__editorAudit.stores.project.getState().activeCodeFile.content), original)
+      await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+      try {
+        await page.getByTitle('Show user code only', { exact: true }).click({ force: true })
+        await page.clock.runFor(32)
+        await page.evaluate(() => { const e = window.__editorAudit.monacoEditor; e.focus(); e.setPosition(e.getModel().getFullModelRange().getEndPosition()) })
+        await page.keyboard.type('Q')
+        assert.equal(await page.evaluate(() => window.__editorAudit.stores.project.getState().activeCodeFile.content), original + 'Q')
+      } finally { await page.clock.resume() }
+    })
+    for (const [name, content] of [['single line', '// ' + 'x'.repeat(920000)], ['multiline', 'int sensorValue = 1; // sample\n'.repeat(30000)]]) {
+      await check(`Native clipboard paste of large ${name} stays responsive, supports undo/redo and saves intact`, async () => {
+        const before = await page.evaluate(() => window.__editorAudit.monacoEditor.getValue())
+        await boundedEditorAction(async () => {
+          await page.evaluate(async text => {
+            const a = window.__editorAudit, e = a.monacoEditor
+            e.focus(); e.setSelection(e.getModel().getFullModelRange())
+            await navigator.clipboard.writeText(text)
+            a.pasteEvents = 0; a.pasteListener?.dispose(); a.pasteListener = e.onDidPaste(() => a.pasteEvents++)
+            a.pasteStart = performance.now()
+          }, content)
+          // insertText represents typed input in EditContext and processes each
+          // character separately. Only Ctrl+V exercises the clipboard paste path.
+          await page.keyboard.press('Control+V')
+          const result = await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => {
+            const a = window.__editorAudit
+            resolve({ elapsedMs: performance.now() - a.pasteStart, pasteEvents: a.pasteEvents, content: a.stores.project.getState().activeCodeFile.content })
+          }))))
+          assert.equal(sha(result.content), sha(content)); assert.equal(result.pasteEvents, 1); assert(result.elapsedMs < 1500)
+          measured.push({ name: `Native clipboard ${name}`, characters: content.length, pasteToTwoFramesMs: result.elapsedMs, budgetMs: 1500 })
+          await page.keyboard.press('Control+Z')
+          assert.equal(sha(await page.evaluate(() => window.__editorAudit.monacoEditor.getValue())), sha(before))
+          await page.keyboard.press('Control+Y')
+          assert.equal(sha(await page.evaluate(() => window.__editorAudit.monacoEditor.getValue())), sha(content))
+        })
+        await page.getByRole('button', { name: 'Save project', exact: true }).click()
+        await page.waitForFunction(() => !window.__editorAudit.stores.project.getState().isDirty && !window.__editorAudit.stores.project.getState().isSaving)
+        assert.equal(sha(savedProject.codeFiles.find(file => file.filename === 'helper.h').content), sha(content))
+      })
+    }
+  } else {
   await measure(page,'First runtime feedback on a clean document','runtime',1)
   for (const kind of ['runtime','clock','avr','diagnostics','viewport','code','pcb']) {
     // Keep the before/after steady-state comparison independent of autosave and the first dirty transition.
@@ -141,7 +227,7 @@ try {
       if (kind !== 'code') assert.equal(r.commits.CodeEditor || 0, 0)
     })
   }
-  await page.screenshot({ path: path.join(output, `${reportPrefix}-${phase}.png`) })
+  if (retainArtifacts) await page.screenshot({ path: path.join(output, `${reportPrefix}-${phase}.png`) })
   if (phase === 'after') {
     await check('Project metadata updates remain visible', async () => {
       await page.evaluate(() => {
@@ -192,6 +278,7 @@ try {
     })
     await check('Save uses the latest document and code revision', async () => {
       const before = saves.length
+      const expectedRevision = savedProject.documentRevision
       await page.getByRole('button', { name: 'Save project', exact: true }).click()
       await page.waitForFunction(() => !window.__editorAudit.stores.project.getState().isSaving)
       await settle(page)
@@ -201,7 +288,7 @@ try {
       assert.equal(payload.canvasLayout.viewport.x,21)
       assert.equal(payload.componentConfig.pcbLayout.boardWidth_mm,171)
       assert(payload.codeFiles[0].content.includes('Monaco typing regression'))
-      assert.equal(payload.expectedRevision,'2026-01-01T00:00:00Z')
+      assert.equal(payload.expectedRevision,expectedRevision)
       await page.waitForFunction(() => window.__editorAudit.stores.project.getState().currentProject.updatedAt === '2026-01-02T00:00:00Z')
     })
     await check('Real canvas drag pans without shell or code-editor commits', async () => {
@@ -301,14 +388,18 @@ try {
       assert.deepEqual(await page.evaluate(() => window.__editorAudit.commits),{})
     })
   }
+  }
 } catch (error) {
   checks.push({ name: 'Harness completed', passed: false, error: error.stack })
   console.error(error)
 } finally {
+  if (previousClipboard !== undefined && browser?.isConnected()) await boundedEditorAction(() => clipboardPage.evaluate(text => navigator.clipboard.writeText(text), previousClipboard)).catch(() => {})
   await browser?.close()
+  await browserServer?.close()
   await server.close()
-  fs.mkdirSync(output,{recursive:true})
-  const report = { task:'VFOPT-UI-010',phase,capturedAt:new Date().toISOString(),fixtureSha256:sha(JSON.stringify(fixture)),sourceEvidence:sourceFiles.map(file=>({file,sha256:sha(fs.readFileSync(path.join(root,file)))})),conditions:{browser:'Installed headless Chrome',viewport:'1366x768',mode:'Vite development with StrictMode; identical test-only layout-effect counters in actual editor components',auth:'Fixture AuthContext; no live identity validation',api:'Isolated intercepted HTTP fixtures; no real backend writes',monaco:'Actual configured CDN Monaco; readiness check recorded',timing:'Update to next animation frame is a scheduling proxy, not pixel paint or hardware input latency',scope:'25-node LED render fixture; no simulated solver work during subscription-isolation windows'},measured,checks,errors,requests,status:checks.every(c=>c.passed)&&!errors.length?'passed':'failed'}
-  fs.writeFileSync(path.join(output,`${reportPrefix}-render-${phase}.json`),JSON.stringify(report,null,2)+'\n')
+  if (retainArtifacts) fs.mkdirSync(output,{recursive:true})
+  const report = { task:codeEditorOnly?'VFOPT-X-001-F009':'VFOPT-UI-010',phase,capturedAt:new Date().toISOString(),fixtureSha256:sha(JSON.stringify(fixture)),sourceEvidence:sourceFiles.map(file=>({file,sha256:sha(fs.readFileSync(path.join(root,file)))})),conditions:{browser:'Installed headless Chrome',viewport:'1366x768',mode:'Vite development with StrictMode; identical test-only layout-effect counters in actual editor components',auth:'Fixture AuthContext; no live identity validation',api:'Isolated intercepted HTTP fixtures; no real backend writes',monaco:'Actual configured CDN Monaco; readiness check recorded',timing:'Animation-frame timing is a scheduling proxy, not pixel paint or hardware input latency',scope:codeEditorOnly?'Tab and view transitions use a paused clock advanced 32 ms; native clipboard paste runs with the clock resumed and an external 8 second browser watchdog':'25-node LED render fixture; no simulated solver work during subscription-isolation windows'},measured,checks,errors,requests,status:checks.every(c=>c.passed)&&!errors.length?'passed':'failed'}
+  if (retainArtifacts) fs.writeFileSync(path.join(output,`${reportPrefix}-render-${phase}.json`),JSON.stringify(report,null,2)+'\n')
+  else console.log(JSON.stringify({ status: report.status, checks, measured, errors }))
   if(report.status==='failed') process.exitCode=1
 }

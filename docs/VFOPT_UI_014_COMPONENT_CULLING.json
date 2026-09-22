@@ -1,0 +1,376 @@
+{
+  "schemaVersion": 1,
+  "id": "VFOPT-UI-014",
+  "title": "Cull components and pins as well as wires",
+  "priority": "P1",
+  "status": "completed_scoped_production_acceptance",
+  "updatedAt": "2026-09-21T03:39:25.708Z",
+  "appCompletelyReady": false,
+  "scope": "Schematic viewport rendering in Voltforge_UI. Full documents, simulation, routing and persistence keep every node and wire.",
+  "predecessor": {
+    "id": "VFOPT-UI-027",
+    "status": "implementation_present_historical_validation_not_rerun",
+    "evidence": "docs/VFOPT_UI_027_PCB_SCENE.md",
+    "note": "Current committed PCB scene implementation and documentation were inspected. A later workspace cleanup removed the original root optimization backlog and UI-027 raw reports; this task does not recreate or revalidate them."
+  },
+  "dependency": {
+    "id": "VFOPT-X-001",
+    "itemSpecificBaseline": "captured_before_changes_and_repeated_after_routing_settled",
+    "broaderCrossApplicationBaseline": "not_closed_by_this_task"
+  },
+  "rootCause": {
+    "file": "src/features/canvas/CircuitCanvas.tsx",
+    "detail": "The component layer mapped the entire node-ID array although the wire layer already culled wires. Offscreen ComponentNodeWrapper, ComponentNode, pin shapes, hit regions, subscriptions and visual animation effects stayed mounted. Legacy schematic PCB pads also mapped all nodes."
+  },
+  "implementation": [
+    {
+      "files": [
+        "src/features/canvas/componentVisibility.ts",
+        "src/features/canvas/CircuitCanvas.tsx"
+      ],
+      "change": "Index conservative component bounds in 512-world-pixel cells. Include rotated bodies, external pins, text overhang, LED glow and sensor controls. Cache immutable node bounds weakly. Oversized shapes and very large view queries have bounded fallback paths.",
+      "entryOverscanScreenPx": 128,
+      "exitOverscanScreenPx": 384
+    },
+    {
+      "files": [
+        "src/features/canvas/CircuitCanvas.tsx"
+      ],
+      "change": "Keep selected, dragged, wired and probed nodes, selected/bend-edit wire endpoints and the component owning an active pointer control resident. Native DOM capture protects controls that stop Konva bubbling. Preserve document stacking order."
+    },
+    {
+      "files": [
+        "src/features/canvas/componentVisibility.ts"
+      ],
+      "change": "Keep the visibility snapshot stable during drag-only geometry previews; a dragged component reads live coordinates from its own subscription. Other edits, additions/deletions and gesture completion update the index."
+    },
+    {
+      "files": [
+        "src/features/canvas/components/ComponentNode.tsx",
+        "src/features/canvas/components/PinDot.tsx"
+      ],
+      "change": "Mount only the visible component wrappers and their pins. Below 0.7 scale omit unreadable pin labels; keep pin hit targets and restore labels for hover, wiring, probes and retained interactions. Visible components retain their physical artwork and simulation controls."
+    },
+    {
+      "files": [
+        "src/features/canvas/CanvasAudioBridge.tsx",
+        "src/features/canvas/canvasAudioState.ts"
+      ],
+      "change": "Move sound transition ownership out of visual ComponentNode effects to one document subscription. Offscreen buzzer/button/switch/relay changes remain audible; panning does not restart sounds. Removal/editor teardown releases owned tone state."
+    },
+    {
+      "files": [
+        "src/features/canvas/CircuitCanvas.tsx",
+        "src/features/canvas/canvasRenderInstrumentation.ts"
+      ],
+      "change": "Cull the legacy PCB pad layer with its components while retaining complete routing input. Expose mounted component and pin counts alongside existing wire/flow instrumentation."
+    }
+  ],
+  "acceptance": [
+    {
+      "criterion": "Mounted component/pin complexity follows viewport area rather than document size",
+      "status": "passed",
+      "evidence": "Both 500- and 1000-node fixtures mount 35 components/70 pins initially and 42 components after a distant pan; all nodes and wires remain stored."
+    },
+    {
+      "criterion": "No lost wire endpoints, probe anchors or active drag targets at culling boundaries",
+      "status": "passed",
+      "checks": [
+        "Native Stage drag mounts newly visible components before release without changing saved nodes/wires",
+        "Selected, dragged, probed and wiring-source components remain mounted offscreen",
+        "Distant zoom removes pin labels while retaining native wiring and hover hit targets",
+        "Wiring completes using full document geometry when its source is offscreen",
+        "Readonly pin probes stay usable, persist across culling, and cannot start wiring",
+        "A component drag remains live across culling and commits exactly one undoable move",
+        "Rotated external pins, spanning wires and dense breadboards survive viewport-edge culling",
+        "Offscreen runtime audio continues once, never restarts on pan, and stops on simulation stop/unmount",
+        "Nested sensor drag is retained by DOM capture even when it stops Konva event bubbling",
+        "Legacy PCB pads are culled with their components while full routing data remains available",
+        "PNG export still captures the visible scene after culling"
+      ]
+    },
+    {
+      "criterion": "Pan/zoom stress p95 <=50 ms with at least 500 nodes, mostly offscreen",
+      "status": "passed",
+      "requiredNodeCount": 500,
+      "evidence": {
+        "storedNodes": 500,
+        "storedWires": 499,
+        "measurementsPerGesture": 30,
+        "mountedComponents": {
+          "before": 500,
+          "after": 35,
+          "afterPan": 42
+        },
+        "mountedPins": {
+          "before": 1000,
+          "after": 70
+        },
+        "mountedKonvaObjects": {
+          "before": 4103,
+          "after": 383
+        },
+        "listeningShapes": {
+          "before": 1548,
+          "after": 153
+        },
+        "panP95Ms": {
+          "before": 135.2,
+          "after": 44.2
+        },
+        "panMaxMs": {
+          "before": 143.1,
+          "after": 49.9
+        },
+        "zoomP95Ms": {
+          "before": 109,
+          "after": 31.5
+        },
+        "zoomMaxMs": {
+          "before": 113.7,
+          "after": 32.6
+        },
+        "medianLayerDrawsPerPanInput": {
+          "before": 4,
+          "after": 4
+        },
+        "jsHeapUsedBytesAfterGC": {
+          "before": 28147556,
+          "after": 7831812
+        },
+        "stressTargetMs": 50,
+        "stressTargetMetInThisRun": true
+      }
+    }
+  ],
+  "measurementMethod": {
+    "build": "Isolated production Vite build of the real CircuitCanvas",
+    "browser": "153.0.8010.48",
+    "canvasCssPx": {
+      "width": 1280,
+      "height": 700
+    },
+    "devicePixelRatio": 1,
+    "document": "Built-in resistor grid, 25 columns, 220x180 world-pixel spacing, connected adjacent nodes; normal load migration/routing is allowed to finish before measuring.",
+    "inputs": "30 real mouse pan movements of 600px while held and 30 alternating real wheel events per size. Record input capture to last Konva layer draw, not physical monitor scanout.",
+    "memory": "One Runtime.getHeapUsage sample per size after HeapProfiler.collectGarbage; JS heap only, not total process/GPU memory.",
+    "baselineCapturedAt": "2026-09-19T09:34:31.371Z",
+    "afterCapturedAt": "2026-09-19T14:16:59.656Z",
+    "baselineCorrection": "Initial diagnostic runs overlapped asynchronous legacy wire migration. Final before/after comparisons both wait for routingStatus=ready; those diagnostic timings are excluded.",
+    "limitations": "Single-machine samples; timing varies with host load. This does not assert a universal 16.7 ms frame budget or full live-app readiness."
+  },
+  "measurements": [
+    {
+      "storedNodes": 500,
+      "storedWires": 499,
+      "measurementsPerGesture": 30,
+      "mountedComponents": {
+        "before": 500,
+        "after": 35,
+        "afterPan": 42
+      },
+      "mountedPins": {
+        "before": 1000,
+        "after": 70
+      },
+      "mountedKonvaObjects": {
+        "before": 4103,
+        "after": 383
+      },
+      "listeningShapes": {
+        "before": 1548,
+        "after": 153
+      },
+      "panP95Ms": {
+        "before": 135.2,
+        "after": 44.2
+      },
+      "panMaxMs": {
+        "before": 143.1,
+        "after": 49.9
+      },
+      "zoomP95Ms": {
+        "before": 109,
+        "after": 31.5
+      },
+      "zoomMaxMs": {
+        "before": 113.7,
+        "after": 32.6
+      },
+      "medianLayerDrawsPerPanInput": {
+        "before": 4,
+        "after": 4
+      },
+      "jsHeapUsedBytesAfterGC": {
+        "before": 28147556,
+        "after": 7831812
+      },
+      "stressTargetMs": 50,
+      "stressTargetMetInThisRun": true
+    },
+    {
+      "storedNodes": 1000,
+      "storedWires": 999,
+      "measurementsPerGesture": 30,
+      "mountedComponents": {
+        "before": 1000,
+        "after": 35,
+        "afterPan": 42
+      },
+      "mountedPins": {
+        "before": 2000,
+        "after": 70
+      },
+      "mountedKonvaObjects": {
+        "before": 8103,
+        "after": 383
+      },
+      "listeningShapes": {
+        "before": 3048,
+        "after": 153
+      },
+      "panP95Ms": {
+        "before": 347.7,
+        "after": 46.1
+      },
+      "panMaxMs": {
+        "before": 359.7,
+        "after": 49.4
+      },
+      "zoomP95Ms": {
+        "before": 288.7,
+        "after": 42
+      },
+      "zoomMaxMs": {
+        "before": 328.1,
+        "after": 50.3
+      },
+      "medianLayerDrawsPerPanInput": {
+        "before": 4,
+        "after": 4
+      },
+      "jsHeapUsedBytesAfterGC": {
+        "before": 48046996,
+        "after": 9995404
+      },
+      "stressTargetMs": 50,
+      "stressTargetMetInThisRun": true
+    }
+  ],
+  "visualComparison": {
+    "initialViewportPngBytesIdentical": true,
+    "note": "Before/after production screenshots were also visually inspected. Other zoom/theme/DPI combinations are not covered by this equality check."
+  },
+  "validation": [
+    {
+      "command": "npm test",
+      "result": "passed",
+      "detail": "TypeScript, oxlint and all configured contract suites passed after the final implementation; includes 11 new component/audio assertions."
+    },
+    {
+      "command": "npm run build",
+      "result": "passed",
+      "initialStaticJsKiB": 504.6,
+      "initialChunkCount": 13,
+      "detail": "Production build and bundle boundaries/budgets pass."
+    },
+    {
+      "command": "npm run test:component-scene-browser",
+      "result": "passed",
+      "checksPassed": 13,
+      "runtimeErrors": []
+    },
+    {
+      "command": "npm run test:routing-browser",
+      "result": "passed",
+      "checksPassed": 8
+    },
+    {
+      "command": "npm run test:drag-browser",
+      "result": "failed_performance_budget_only",
+      "functionalAndLifecycleChecksPassed": 8,
+      "totalChecks": 9,
+      "targetMs": 50,
+      "developmentDragP95Ms": 58,
+      "developmentDragMaxMs": 60,
+      "runtimeErrors": []
+    },
+    {
+      "command": "npm run test:drag-browser -- --ui014-baseline",
+      "result": "failed_same_performance_budget_on_preserved_prechange_source",
+      "developmentDragP95Ms": 56.9,
+      "functionalAndLifecycleChecksPassed": 8
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed",
+      "detail": "Git reports expected Windows line-ending notices."
+    }
+  ],
+  "remainingWork": [
+    {
+      "trackedBy": "VFOPT-UI-015",
+      "status": "resolved_in_followup_with_timing_limits",
+      "detail": "Original UI-014 run failed development drag at 58 ms p95. UI-015 now passes all 9 existing drag checks at 47.2 ms p95, 79.8 ms max. Fresh baseline timing varied; this is scoped p95 acceptance, not a zero-lag guarantee.",
+      "evidence": "docs/VFOPT_UI_015_RENDER_ISOLATION.json"
+    },
+    {
+      "trackedBy": "VFOPT-X-001",
+      "status": "baseline_captured_findings_open",
+      "detail": "Real-account application baseline is captured in VFOPT_X_001_APP_BASELINE.json. Seven follow-ups remain open, beginning with save-revision conflicts; this is not full application acceptance."
+    },
+    {
+      "status": "measurement_limit",
+      "detail": "Visible large breadboards retain all physical pin hit targets. Raster memory, arbitrary custom components, extremely large scenes and all-visible workloads are not claimed to scale with this resistor fixture."
+    }
+  ],
+  "warnings": [
+    "One pre-existing palette fixture Fast Refresh lint warning remains.",
+    "Two existing short-lived Vite SSR test servers emitted dependency-scan shutdown warnings; npm test exited successfully."
+  ],
+  "nextWorkItem": {
+    "id": "VFOPT-X-001-F003",
+    "title": "Reduce visible-scene drawing cost during sustained mixed-component simulation",
+    "status": "recommended_not_started",
+    "reason": "F009 editor checks and save recovery are complete. Resume the measured sustained-simulation CPU/drawing hotspot after the completed transport and persistence prerequisites.",
+    "backlog": "docs/VFOPT_X_001_FINDINGS_BACKLOG.json"
+  },
+  "evidence": {
+    "taskNotes": "docs/VFOPT_UI_014_COMPONENT_CULLING.md",
+    "before": "docs/reports/vfopt-ui-014-scene-before.json",
+    "after": "docs/reports/vfopt-ui-014-scene-after.json",
+    "contracts": "docs/reports/vfopt-ui-014-contract.json",
+    "dragBefore": "docs/reports/vfopt-ui-014-drag-baseline.json",
+    "dragAfter": "docs/reports/vfopt-ui-017-drag-after.json",
+    "originalSourceSnapshot": "node_modules/.cache/vfopt-ui-014/before",
+    "sourceHashesAfter": {
+      "src/features/canvas/CircuitCanvas.tsx": "ef54d96cc658fe6264b6f1b813dae046eed6c9ecbc117e0cea538031d4cb3250",
+      "src/features/canvas/components/ComponentNode.tsx": "cd84fadcc97bcec87a883b944527780085d57065613e5654a7e2c7894b71557f",
+      "src/features/canvas/components/PinDot.tsx": "e500e50943fb59ca5174e641fe7aaeb46250d40f909ebc17eb6e97301659b15e",
+      "src/features/canvas/componentVisibility.ts": "555d44a0090092363ac8e194b873b6867689180dcb3092c2231d88d444cff0a9",
+      "src/features/canvas/canvasAudioState.ts": "11ebe6028c2fedc9ea8b4a6cf2ebafd7c354dd9dc353dca6e38be8078fe021f0",
+      "src/features/canvas/CanvasAudioBridge.tsx": "4d903bf83bb840adbdc4f54eb936c93b47f74c9580f9e9f97286b9cfa7586abb",
+      "src/features/canvas/canvasRenderInstrumentation.ts": "d718d86302832c8883d457e68e2bb2a21a5a395727b7d26f7f20ecbf3ca74aad"
+    },
+    "note": "Generated raw reports/screenshots/profiles removed at user request. Embedded measurements remain; original paths/hashes are historical provenance."
+  },
+  "completedFollowUp": {
+    "id": "VFOPT-UI-015",
+    "status": "completed_scoped_acceptance",
+    "evidence": "docs/VFOPT_UI_015_RENDER_ISOLATION.json"
+  },
+  "fullApplicationBaseline": {
+    "id": "VFOPT-X-001",
+    "status": "completed_baseline_with_open_findings",
+    "evidence": "docs/VFOPT_X_001_APP_BASELINE.json",
+    "appCompletelyReady": false
+  },
+  "continuation": {
+    "updatedAt": "2026-09-21T03:39:25.708Z",
+    "completed": "VFOPT-X-001-F009",
+    "previousCompleted": "VFOPT-X-001-F008",
+    "next": "VFOPT-X-001-F003",
+    "backlog": "docs/VFOPT_X_001_FINDINGS_BACKLOG.json"
+  },
+  "rawArtifactRetention": "Generated raw reports/screenshots/profiles removed at user request. Embedded measurements remain; original paths/hashes are historical provenance."
+}

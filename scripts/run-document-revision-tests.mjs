@@ -10,13 +10,43 @@ try {
   const { useCanvasStore: canvas } = await vite.ssrLoadModule('/src/store/canvasStore.ts')
   const { usePcbStore: pcb } = await vite.ssrLoadModule('/src/store/pcbStore.ts')
   const { useProjectStore: project } = await vite.ssrLoadModule('/src/store/projectStore.ts')
-  const { captureEditorDocument, hasEditsSince, isCurrentDocumentSession } = await vite.ssrLoadModule('/src/features/editor/editorDocumentSnapshots.ts')
+  const { captureEditorDocument, exceedsProjectSaveBudget, MAX_PROJECT_SAVE_BYTES, hasEditsSince, isCurrentDocumentSession } = await vite.ssrLoadModule('/src/features/editor/editorDocumentSnapshots.ts')
+  const { LogicRegistry } = await vite.ssrLoadModule('/src/features/simulator/logic/LogicRegistry.ts')
   const seed = { id: 'led', type: 'LED_STANDARD', x: 20, y: 20, properties: { isLit: false, ledColor: 'red', customAuthored: 'keep me' } }
   function load() {
     canvas.getState().resetCanvas(); pcb.getState().resetPcb()
     canvas.getState().loadCanvas([seed], [])
-    project.getState().setCurrentProject({ id: 'document-test', updatedAt: 'revision-1', owner: { keycloakId: 'owner' }, canvasLayout: {}, codeFiles: [{ id: 'code', filename: 'main.ino', content: '// original', language: 'cpp', sortOrder: 0 }] })
+    project.getState().setCurrentProject({ id: 'document-test', documentRevision: '7', updatedAt: 'revision-1', owner: { keycloakId: 'owner' }, canvasLayout: {}, codeFiles: [{ id: 'code', filename: 'main.ino', content: '// original', language: 'cpp', sortOrder: 0 }] })
   }
+  await check('Save budget counts UTF-8 JSON bytes including escaping and the exact boundary', () => {
+    const overhead = Buffer.byteLength(JSON.stringify({ notes: '' }))
+    assert.equal(exceedsProjectSaveBudget({ notes: 'x'.repeat(MAX_PROJECT_SAVE_BYTES - overhead) }), false)
+    assert.equal(exceedsProjectSaveBudget({ notes: 'x'.repeat(MAX_PROJECT_SAVE_BYTES - overhead + 1) }), true)
+    assert.equal(exceedsProjectSaveBudget({ notes: 'Ω'.repeat(MAX_PROJECT_SAVE_BYTES / 2) }), true)
+    assert.equal(exceedsProjectSaveBudget({ notes: '"'.repeat(MAX_PROJECT_SAVE_BYTES / 2) }), true)
+  })
+  await check('Firmware pin handlers update live motor, LED and shift-register outputs without editing the document', () => {
+    load()
+    canvas.getState().loadCanvas([
+      { id: 'motor', type: 'MOTOR_DC', x: 0, y: 0, properties: {} },
+      { id: 'led', type: 'LED_STANDARD', x: 100, y: 0, properties: {} },
+      { id: 'shift', type: 'IC_74HC595', x: 200, y: 0, properties: {} },
+    ], [])
+    const before = canvas.getState(), snapshot = captureEditorDocument()
+    LogicRegistry.dispatch('MOTOR_DC', 'motor', 'pin1', 'HIGH')
+    LogicRegistry.dispatch('LED_STANDARD', 'led', 'anode', 'HIGH')
+    LogicRegistry.dispatch('IC_74HC595', 'shift', 'SER', 'HIGH')
+    LogicRegistry.dispatch('IC_74HC595', 'shift', 'SHCP', 'HIGH')
+    LogicRegistry.dispatch('IC_74HC595', 'shift', 'STCP', 'HIGH')
+    const after = canvas.getState()
+    assert.equal(after.nodesById.get('motor').properties.requestedOn, true)
+    assert.equal(after.nodesById.get('led').properties.requestedOn, true)
+    assert.equal(after.nodesById.get('shift').properties.shiftValue, 1)
+    assert.equal(after.documentNodes, before.documentNodes)
+    assert.equal(after.localDocumentRevision, before.localDocumentRevision)
+    assert.equal(after.modelRevision, before.modelRevision)
+    assert.equal(hasEditsSince(snapshot), false)
+  })
   await check('Runtime and irrelevant PCB writes do not revise or serialize the authored document', () => {
     load()
     const initial = canvas.getState(), pcbRevision = pcb.getState().localDocumentRevision
@@ -86,6 +116,7 @@ try {
   })
   await check('Save snapshot remains immutable and only local edits invalidate its acknowledgement', () => {
     load(); const snapshot = captureEditorDocument()
+    assert.equal(snapshot.payload.expectedRevision, '7')
     canvas.getState().updateRuntimeNode('led', { properties: { isLit: true } })
     assert.equal(hasEditsSince(snapshot), false)
     project.getState().updateCodeFileContent('code', '// changed during save')

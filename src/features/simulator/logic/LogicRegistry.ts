@@ -22,7 +22,7 @@ export interface IComponentLogic {
  */
 export class LedLogic implements IComponentLogic {
   onPinStateChange(componentId: string, pinId: string, state: PinState): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
     if (node.properties?.isBlown) return;
@@ -32,7 +32,7 @@ export class LedLogic implements IComponentLogic {
 
     // HIGH on anode means lit
     if (pinLabel.includes('anode') || pinLabel.includes('+') || pinLabel.includes('pos')) {
-      updateNode(componentId, { properties: { ...node.properties, requestedOn: state === 'HIGH' } });
+      updateRuntimeNode(componentId, { properties: { ...node.properties, requestedOn: state === 'HIGH' } });
     }
   }
 }
@@ -42,7 +42,7 @@ export class LedLogic implements IComponentLogic {
  */
 export class RgbLedLogic implements IComponentLogic {
   onPinStateChange(componentId: string, pinId: string, state: PinState, value?: number): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
     if (node.properties?.isBlown) return;
@@ -68,7 +68,7 @@ export class RgbLedLogic implements IComponentLogic {
 
     props.requestedColor = hexColor;
     props.requestedOn = isLit;
-    updateNode(componentId, { properties: props });
+    updateRuntimeNode(componentId, { properties: props });
   }
 }
 
@@ -77,21 +77,21 @@ export class RgbLedLogic implements IComponentLogic {
  */
 export class MotorLogic implements IComponentLogic {
   onPinStateChange(componentId: string, pinId: string, state: PinState): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
     const pin = node.pins?.find(p => p.id === pinId);
     const pinLabel = `${pinId} ${pin?.name || ''}`.toLowerCase();
     if (pinLabel.includes('pin') || pinLabel.includes('m+') || pinLabel.includes('signal')) {
-      updateNode(componentId, { properties: { ...node.properties, requestedOn: state === 'HIGH' } });
+      updateRuntimeNode(componentId, { properties: { ...node.properties, requestedOn: state === 'HIGH' } });
     }
   }
 }
 
 export class ServoLogic implements IComponentLogic {
   onPinStateChange(componentId: string, pinId: string, state: PinState, value?: number): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
     if (node.properties?.powered !== true) return;
@@ -102,7 +102,7 @@ export class ServoLogic implements IComponentLogic {
 
     const pwm = state === 'PWM' ? Math.max(0, Math.min(255, value ?? 0)) : state === 'HIGH' ? 255 : 0;
     const angle = Math.round((pwm / 255) * 180);
-    updateNode(componentId, { properties: { ...node.properties, servoAngle: angle, isSpinning: false } });
+    updateRuntimeNode(componentId, { properties: { ...node.properties, servoAngle: angle, isSpinning: false } });
   }
 }
 
@@ -111,13 +111,13 @@ export class ServoLogic implements IComponentLogic {
  */
 export class StepperLogic implements IComponentLogic {
   onPinStateChange(componentId: string, pinId: string, state: PinState, value?: number): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
     // Animation tick handler (driven by SimulationEngine)
     if (pinId === '__stepper_anim__') {
-      updateNode(componentId, {
+      updateRuntimeNode(componentId, {
         properties: {
           ...node.properties,
           stepperRotation: value ?? 0,
@@ -142,7 +142,7 @@ export class StepperLogic implements IComponentLogic {
       );
       const newSteps = currentSteps + 1;
       const rotation = ((newSteps % stepsPerRev) / stepsPerRev) * 360;
-      updateNode(componentId, {
+      updateRuntimeNode(componentId, {
         properties: {
           ...node.properties,
           stepperSteps: newSteps,
@@ -160,7 +160,7 @@ export class StepperLogic implements IComponentLogic {
         return true;
       });
       if (allLow) {
-        updateNode(componentId, {
+        updateRuntimeNode(componentId, {
           properties: { ...node.properties, isSpinning: false },
         });
       }
@@ -173,7 +173,7 @@ export class StepperLogic implements IComponentLogic {
  */
 export class BuzzerLogic implements IComponentLogic {
   onPinStateChange(componentId: string, pinId: string, state: PinState, value?: number): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
@@ -181,7 +181,7 @@ export class BuzzerLogic implements IComponentLogic {
     if (pinLabel.includes('pos') || pinLabel.includes('p1') || pinLabel.includes('+') || pinLabel === '1' || pinLabel.includes('sig') || pinLabel.includes('in')) {
       const isBeeping = state === 'HIGH' || state === 'PWM';
       const freq = value && value > 0 ? value : SIMULATION_MODELS.audio.buzzerFrequencyHz;
-      updateNode(componentId, { properties: { ...node.properties, isBeeping, frequency: freq } });
+      updateRuntimeNode(componentId, { properties: { ...node.properties, isBeeping, frequency: freq } });
 
     }
   }
@@ -189,12 +189,12 @@ export class BuzzerLogic implements IComponentLogic {
 
 export class MultimeterLogic implements IComponentLogic {
   onPinStateChange(componentId: string, _pinId: string, _state: PinState, value?: number): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
     const voltage = Number.isFinite(value) ? Number(value) : 0;
-    updateNode(componentId, {
+    updateRuntimeNode(componentId, {
       properties: {
         ...node.properties,
         measuredVoltage: voltage,
@@ -209,7 +209,7 @@ export class MultimeterLogic implements IComponentLogic {
  */
 export class RelayLogic implements IComponentLogic {
   onPinStateChange(componentId: string, pinId: string, state: PinState): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
@@ -237,7 +237,7 @@ export class RelayLogic implements IComponentLogic {
       Object.keys(props).some(k => k.startsWith('isSwitched_') && props[k]);
     props.isActive = anySwitched;
 
-    updateNode(componentId, { properties: props });
+    updateRuntimeNode(componentId, { properties: props });
   }
 }
 
@@ -246,7 +246,7 @@ export class RelayLogic implements IComponentLogic {
  */
 export class SevenSegLogic implements IComponentLogic {
   onPinStateChange(componentId: string, pinId: string, state: PinState): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
@@ -269,7 +269,7 @@ export class SevenSegLogic implements IComponentLogic {
     props.displayDigit = digitMap[pattern] ?? '';
     props.isActive = Object.values(segs).some(v => v);
 
-    updateNode(componentId, { properties: props });
+    updateRuntimeNode(componentId, { properties: props });
   }
 }
 
@@ -278,14 +278,14 @@ export class SevenSegLogic implements IComponentLogic {
  */
 export class ButtonLogic implements IComponentLogic {
   onPinStateChange(componentId: string, pinId: string, state: PinState): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
     const props = { ...(node.properties || {}) };
     props.isPressed = state === 'HIGH';
     props.isActive = state === 'HIGH';
-    updateNode(componentId, { properties: props });
+    updateRuntimeNode(componentId, { properties: props });
   }
 }
 
@@ -294,7 +294,7 @@ export class ButtonLogic implements IComponentLogic {
  */
 export class SwitchLogic implements IComponentLogic {
   onPinStateChange(componentId: string, pinId: string, state: PinState): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
@@ -304,7 +304,7 @@ export class SwitchLogic implements IComponentLogic {
       props.isClosed = !props.isClosed;
     }
     props.isActive = Boolean(props.isClosed);
-    updateNode(componentId, { properties: props });
+    updateRuntimeNode(componentId, { properties: props });
   }
 }
 
@@ -316,13 +316,13 @@ export class LcdDisplayLogic implements IComponentLogic {
   onPinStateChange(componentId: string, pinId: string, _state: PinState): void {
     if (pinId !== '__lcd_display__') return;
 
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
     if (node.properties?.powered !== true) {
       if (node.properties?.lcdLine1 || node.properties?.lcdLine2 || node.properties?.lcdBacklight !== false) {
-        updateNode(componentId, {
+        updateRuntimeNode(componentId, {
           properties: {
             ...node.properties,
             lcdLine1: '',
@@ -338,7 +338,7 @@ export class LcdDisplayLogic implements IComponentLogic {
     const lcdState = (globalThis as any).__voltforgeLcdState?.[componentId];
     if (!lcdState) return;
 
-    updateNode(componentId, {
+    updateRuntimeNode(componentId, {
       properties: {
         ...node.properties,
         lcdLine1: lcdState.line1 || '',
@@ -356,7 +356,7 @@ export class LcdDisplayLogic implements IComponentLogic {
  */
 export class ESCLogic implements IComponentLogic {
   onPinStateChange(componentId: string, pinId: string, state: PinState, value?: number): void {
-    const { updateNode, nodes, wires } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes, wires } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
@@ -377,7 +377,7 @@ export class ESCLogic implements IComponentLogic {
     const throttlePercent = powered ? requestedThrottle : 0;
     const rpm = powered ? requestedRpm : 0;
 
-    updateNode(componentId, {
+    updateRuntimeNode(componentId, {
       properties: {
         ...node.properties,
         escRequestedThrottle: requestedThrottle,
@@ -413,13 +413,13 @@ export class ESCLogic implements IComponentLogic {
  */
 export class BLDCMotorLogic implements IComponentLogic {
   onPinStateChange(componentId: string, _pinId: string, state: PinState, value?: number): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
     // Animation tick — update rotation angle
     if (_pinId === '__bldc_anim__') {
-      updateNode(componentId, {
+      updateRuntimeNode(componentId, {
         properties: {
           ...node.properties,
           bldcRotation: value ?? 0,
@@ -432,7 +432,7 @@ export class BLDCMotorLogic implements IComponentLogic {
     const isSpinning = rpm > 0;
 
     // Store RPM for animation; the CircuitCanvas will use bldcRpm to animate rotation
-    updateNode(componentId, {
+    updateRuntimeNode(componentId, {
       properties: {
         ...node.properties,
         bldcRpm: rpm,
@@ -447,7 +447,7 @@ export class BLDCMotorLogic implements IComponentLogic {
  */
 export class AmmeterLogic implements IComponentLogic {
   onPinStateChange(componentId: string, _pinId: string, _state: PinState, value?: number): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
@@ -464,7 +464,7 @@ export class AmmeterLogic implements IComponentLogic {
       displayValue = `${currentMa.toFixed(2)} mA`;
     }
 
-    updateNode(componentId, {
+    updateRuntimeNode(componentId, {
       properties: {
         ...node.properties,
         measuredCurrent: currentAmps,
@@ -479,12 +479,12 @@ export class AmmeterLogic implements IComponentLogic {
  */
 export class OscilloscopeLogic implements IComponentLogic {
   onPinStateChange(componentId: string, _pinId: string, _state: PinState, value?: number): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
     const voltage = Number.isFinite(value) ? Number(value) : 0;
-    updateNode(componentId, {
+    updateRuntimeNode(componentId, {
       properties: {
         ...node.properties,
         displayValue: `${voltage.toFixed(2)}V`,
@@ -499,12 +499,12 @@ export class OscilloscopeLogic implements IComponentLogic {
  */
 export class SensorPIRLogic implements IComponentLogic {
   onPinStateChange(componentId: string, pinId: string, state: PinState, _value?: number): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
     if (pinId === '__sensor_motion__' || pinId === 'out') {
-      updateNode(componentId, {
+      updateRuntimeNode(componentId, {
         properties: { ...node.properties, motionDetected: state === 'HIGH' },
       });
     }
@@ -516,12 +516,12 @@ export class SensorPIRLogic implements IComponentLogic {
  */
 export class SensorLDRLogic implements IComponentLogic {
   onPinStateChange(componentId: string, pinId: string, _state: PinState, value?: number): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
     if (pinId === '__sensor_light__' || pinId === 'p1') {
-      updateNode(componentId, {
+      updateRuntimeNode(componentId, {
         properties: { ...node.properties, lightLevel: value ?? 50 },
       });
     }
@@ -536,12 +536,12 @@ export class SensorLDRLogic implements IComponentLogic {
  */
 export class SoilMoistureLogic implements IComponentLogic {
   onPinStateChange(componentId: string, pinId: string, _state: PinState, value?: number): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
     if (pinId === '__sensor_moisture__' || pinId === 'sig') {
-      updateNode(componentId, {
+      updateRuntimeNode(componentId, {
         properties: { ...node.properties, moistureLevel: value ?? 50 },
       });
     }

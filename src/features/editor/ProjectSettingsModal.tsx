@@ -98,7 +98,7 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
         isPublic,
         boardType,
         tags,
-        expectedRevision: currentProject!.updatedAt,
+        expectedRevision: currentProject!.documentRevision,
       }),
     onSuccess: (res) => {
       mergeProjectMetadata(res.data.data)

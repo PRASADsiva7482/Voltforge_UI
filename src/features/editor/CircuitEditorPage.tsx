@@ -55,7 +55,7 @@ import ComponentPanel from './ComponentPanel'
 import PropertyEditor from './PropertyEditor'
 import SerialMonitor from './SerialMonitor'
 import EditorDocumentSync, { EditorAutosave, EditorDirtyIndicator } from './EditorDocumentSync'
-import { captureEditorDocument, hasEditsSince, isCurrentDocumentSession } from './editorDocumentSnapshots'
+import { captureEditorDocument, exceedsProjectSaveBudget, hasEditsSince, isCurrentDocumentSession } from './editorDocumentSnapshots'
 import { EditorSimulationTime, EditorAvrWorkload } from './EditorSimulationStatus'
 
 import { ContextMenu } from '../../components/ui/ContextMenu'
@@ -220,7 +220,7 @@ export default function CircuitEditorPage() {
   const [isSimulationPaused, setIsSimulationPaused] = useState(false)
   const canvasContainerRef = useRef<HTMLDivElement>(null)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
-  const hydratedVersionRef = useRef<{ id: string; updatedAt: string } | null>(null)
+  const hydratedVersionRef = useRef<{ id: string; revision: string } | null>(null)
   const sharedCanvasStateRef = useRef<string | null>(null)
   const sharedCodeStateRef = useRef<string | null>(null)
   const simulationRequestRef = useRef(0)
@@ -359,17 +359,18 @@ export default function CircuitEditorPage() {
       const current = store.currentProject
       if (current?.id === project.id) {
         // An older in-flight GET may finish after a newer save acknowledgement.
-        if (Date.parse(project.updatedAt) < Date.parse(current.updatedAt)) return
+        if (project.documentRevision != null && current.documentRevision != null
+          && BigInt(project.documentRevision) < BigInt(current.documentRevision)) return
         const alreadyHydrated = hydratedVersionRef.current?.id === project.id
-          && hydratedVersionRef.current.updatedAt === project.updatedAt
+          && hydratedVersionRef.current.revision === (project.documentRevision ?? project.updatedAt)
         if (alreadyHydrated || store.isDirty) {
           // Permissions/metadata stay observable, but an unreviewed remote
           // document cannot advance the local optimistic-save baseline.
-          mergeProjectMetadata({ ...project, updatedAt: current.updatedAt })
+          mergeProjectMetadata({ ...project, updatedAt: current.updatedAt, documentRevision: current.documentRevision })
           return
         }
       }
-      hydratedVersionRef.current = { id: project.id, updatedAt: project.updatedAt }
+      hydratedVersionRef.current = { id: project.id, revision: project.documentRevision ?? project.updatedAt }
       setCurrentProject(project as Project)
       const layout = project.canvasLayout
       loadCanvas(layout?.nodes || [], layout?.wires || [], layout?.viewport, layout?.routeCache)
@@ -450,6 +451,10 @@ export default function CircuitEditorPage() {
     }
   }, [searchParams, loadCanvas, loadPcb, activeCodeFileId, updateCodeFileContent, addToast, isSharedView, setCurrentProject])
 
+  // Do not keep autosaving a document rejected for size, validation or conflict.
+  // A real edit or an explicit Save can retry; the local document stays dirty.
+  const rejectedSaveRef = useRef<ReturnType<typeof captureEditorDocument>>(null)
+
   // ── Save mutation ──
   const { mutate: saveProject } = useMutation({
     mutationFn: async (snapshot: NonNullable<ReturnType<typeof captureEditorDocument>>) => {
@@ -461,31 +466,47 @@ export default function CircuitEditorPage() {
     },
     onSuccess: (project, snapshot) => {
       if (!isCurrentDocumentSession(snapshot)) return
+      rejectedSaveRef.current = null
       setSaving(false)
       if (!project) return
       setDirty(hasEditsSince(snapshot))
       mergeProjectMetadata(project)
-      hydratedVersionRef.current = { id: project.id, updatedAt: project.updatedAt }
+      hydratedVersionRef.current = { id: project.id, revision: project.documentRevision ?? project.updatedAt }
       queryClient.setQueryData(['project', project.id], project)
       addToast('Project saved successfully', 'success')
     },
     onError: (error, snapshot) => {
       if (!isCurrentDocumentSession(snapshot)) return
       setSaving(false)
-      const errorCode = (error as { response?: { data?: { errorCode?: string } } })?.response?.data?.errorCode
-      addToast(errorCode === 'PROJECT_REVISION_STALE'
-        ? 'Project changed elsewhere. Reload before saving your local changes.'
-        : 'Failed to save project', 'error')
+      const response = (error as { response?: { status?: number; data?: { errorCode?: string; data?: Record<string, string> } } })?.response
+      if (response?.status === 400 || response?.status === 409 || response?.status === 413) rejectedSaveRef.current = snapshot
+      const message = response?.data?.errorCode === 'PROJECT_REVISION_STALE'
+        ? 'Project changed elsewhere. Keep a copy of your local edits before reloading.'
+        : response?.status === 413
+          ? 'Save exceeds the 4 MiB limit. Your edits are still in this tab. Reduce the document size and save again.'
+          : response?.status === 400
+            ? `Save rejected: ${Object.values(response.data?.data ?? {}).filter(value => typeof value === 'string')[0] || 'check the project fields'}. Your edits are still in this tab.`
+            : 'Save could not be confirmed. Your edits are still in this tab. Retry shortly.'
+      addToast(message, 'error')
     },
   })
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback((manual = true) => {
     const project = useProjectStore.getState()
     if (isPreset || !isOwner || project.isSaving || project.currentProject?.id !== projectId
       || project.currentProject?.owner?.keycloakId !== user?.keycloakId) return
+    const rejected = rejectedSaveRef.current
+    if (manual === false && rejected && isCurrentDocumentSession(rejected) && !hasEditsSince(rejected)) return
     const snapshot = captureEditorDocument()
+    if (snapshot && exceedsProjectSaveBudget(snapshot.payload)) {
+      rejectedSaveRef.current = snapshot
+      addToast('Save exceeds the 4 MiB limit. Your edits are still in this tab. Reduce the document size and save again.', 'error')
+      return
+    }
     if (snapshot) { setSaving(true); saveProject(snapshot) }
-  }, [isPreset, isOwner, projectId, user?.keycloakId, setSaving, saveProject])
+  }, [isPreset, isOwner, projectId, user?.keycloakId, setSaving, saveProject, addToast])
+
+  const handleAutosave = useCallback(() => handleSave(false), [handleSave])
 
   // ── Fork mutation ──
   const forkMutation = useMutation({
@@ -1212,7 +1233,7 @@ export default function CircuitEditorPage() {
         broadcastEnabled={isLiveSyncConnected && isOwner && !isPreset && regressionMode === null && !canvasRenderTraceRunning && !avrCompiledTraceRunning}
         broadcastCanvasSync={broadcastCanvasSync}
       />
-      <EditorAutosave enabled={!isPreset && isOwner} onSave={handleSave} />
+      <EditorAutosave enabled={!isPreset && isOwner} onSave={handleAutosave} />
       {/* ── Prioritized command ribbon ── */}
       <header className={`vf-editor__ribbon ${secondaryToolsOpen ? 'is-expanded' : ''}`}>
         <div className="vf-editor__toolbar">
@@ -1398,7 +1419,7 @@ export default function CircuitEditorPage() {
           {isOwner ? (
             <button
               className="vf-editor__save-btn"
-              onClick={handleSave}
+              onClick={() => handleSave()}
               disabled={isSaving || isPreset}
               type="button"
               aria-label={isSaving ? 'Saving project' : 'Save project'}

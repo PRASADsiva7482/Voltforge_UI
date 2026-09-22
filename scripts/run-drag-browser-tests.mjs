@@ -7,9 +7,17 @@ import { createServer } from 'vite'
 import { chromium } from '@playwright/test'
 const root = fileURLToPath(new URL('..', import.meta.url)), origin = 'http://localhost:3107'
 const phase = process.argv.includes('--before') ? 'before' : 'after', checks = [], samples = [], errors = []
+const ui014Baseline = process.argv.includes('--ui014-baseline')
+const reportName = ui014Baseline ? 'vfopt-ui-014-drag-baseline' : `vfopt-ui-017-drag-${phase}`
 const output = path.join(root, 'docs/reports'), sha = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
 let browser
-const server = await createServer({ root, server: { host: 'localhost', port: 3107, strictPort: true }, plugins: [{ name: 'drag-fixture', configureServer(vite) {
+const server = await createServer({ root, server: { host: 'localhost', port: 3107, strictPort: true }, plugins: [{ name: 'drag-fixture', enforce: 'pre', transform(source, id) {
+  const file = path.relative(root, id).replaceAll('\\', '/')
+  if (ui014Baseline && ['src/features/canvas/CircuitCanvas.tsx', 'src/features/canvas/components/ComponentNode.tsx', 'src/features/canvas/components/PinDot.tsx'].includes(file)) {
+    return fs.readFileSync(path.join(root, 'node_modules/.cache/vfopt-ui-014/before', file), 'utf8')
+  }
+  return source
+}, configureServer(vite) {
   vite.middlewares.use(async (request, response, next) => {
     if (!request.headers.accept?.includes('text/html')) return next()
     response.setHeader('Content-Type', 'text/html')
@@ -104,9 +112,9 @@ try {
       await page.evaluate(()=>window.__dragAudit.setMounted(true));await page.waitForTimeout(150)
     })
   }
-  await page.screenshot({path:path.join(output,`vfopt-ui-017-drag-${phase}.png`)})
+  await page.screenshot({path:path.join(output,`${reportName}.png`)})
 } finally {
-  fs.writeFileSync(path.join(output,`vfopt-ui-017-drag-${phase}.json`),JSON.stringify({task:'VFOPT-UI-017',phase,capturedAt:new Date().toISOString(),status:checks.some(c=>!c.passed)||errors.length?'failed':'passed',fixtureSha256:sha(path.join(root,'scripts/fixtures/drag-entry.tsx')),browser:browser?.version(),samples,checks,errors,limitations:['Mouse event to Konva layer draw completion is a browser paint proxy; physical display scanout is not measured.','100 built-in resistor nodes and 99 wires; isolated canvas without backend.']},null,2)+'\n')
+  fs.writeFileSync(path.join(output,`${reportName}.json`),JSON.stringify({task:'VFOPT-UI-017',phase,ui014Baseline,capturedAt:new Date().toISOString(),status:checks.some(c=>!c.passed)||errors.length?'failed':'passed',fixtureSha256:sha(path.join(root,'scripts/fixtures/drag-entry.tsx')),browser:browser?.version(),samples,checks,errors,limitations:['Mouse event to Konva layer draw completion is a browser paint proxy; physical display scanout is not measured.','100 built-in resistor nodes and 99 wires; isolated canvas without backend.']},null,2)+'\n')
   await browser?.close();await server.close()
 }
 assert(checks.every(c=>c.passed)&&errors.length===0)

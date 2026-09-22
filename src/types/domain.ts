@@ -159,6 +159,8 @@ export type CodeFile = {
 }
 
 export type Project = {
+  /** Server save token; absent only for local presets/shared snapshots. */
+  documentRevision?: string
   boardType: BoardType
   canvasLayout?: CanvasLayout
   codeFiles: CodeFile[]

@@ -10,7 +10,6 @@ import { componentSvgs } from '../componentSvgs';
 import { normalizePotentiometerPosition, potentiometerPositionPercent } from '../componentContracts';
 import { isBoardComponentType } from '../boardCatalog';
 import { SIMULATION_MODELS } from '../../simulator/simulationModels';
-import { AudioEngine } from '../../simulator/AudioEngine';
 import PinDot from './PinDot';
 import type { CanvasNode } from '../canvasTypes';
 
@@ -328,6 +327,7 @@ interface ComponentNodeProps {
   readOnly?: boolean;
   isProbeMode?: boolean;
   isSimulating?: boolean;
+  detailed?: boolean;
 }
 
 /** Main visual component rendered on the canvas. */
@@ -349,9 +349,11 @@ const ComponentNode = ({
   readOnly,
   isProbeMode,
   isSimulating,
+  detailed = true,
 }: ComponentNodeProps) => {
 
   const shapeRef = useRef<Konva.Group>(null);
+  const pinLayout = useMemo(() => ({ width: node.width, height: node.height, type: node.type }), [node.width, node.height, node.type]);
   const trRef = useRef<Konva.Transformer>(null);
   const dcMotorShaftRef = useRef<Konva.Group>(null);
   const bldcPropellerRef = useRef<Konva.Group>(null);
@@ -364,10 +366,6 @@ const ComponentNode = ({
   const rxLedRef = useRef<Konva.Circle>(null);
   const txTextRef = useRef<Konva.Text>(null);
   const rxTextRef = useRef<Konva.Text>(null);
-  const prevBeepingRef = useRef(false);
-  const prevPressedRef = useRef(false);
-  const prevClosedRef = useRef<boolean | undefined>(undefined);
-  const prevRelayActiveRef = useRef(false);
   const thermalHeatmapEnabled = useSimulationStore((state) => state.thermalHeatmapEnabled);
   const livePowerWatts = useSimulationStore((state) => state.thermalHeatmapEnabled ? (state.componentPower[node.id] ?? 0) : 0);
 
@@ -633,47 +631,12 @@ const ComponentNode = ({
     return () => clearInterval(iv);
   }, [isSimulating, isBoard]);
 
-  // ── Audio triggers for buzzer, buttons, switches, relays ──
-  useEffect(() => {
-    const currentBeeping = Boolean(isSimulating && node.properties?.isBeeping);
-    if (currentBeeping && !prevBeepingRef.current) {
-      const freq = Number(node.properties?.frequency) || 1000;
-      try { AudioEngine.playTone(freq, 'square', 0.08); } catch { /* audio is optional */ }
-    } else if (!currentBeeping && prevBeepingRef.current) {
-      AudioEngine.stopTone();
-    }
-    prevBeepingRef.current = currentBeeping;
-  }, [isSimulating, node.properties?.isBeeping, node.properties?.frequency]);
-
-  useEffect(() => {
-    const currentPressed = Boolean(node.properties?.isPressed);
-    if (currentPressed && !prevPressedRef.current && isButton) {
-      try { AudioEngine.playClick('button'); } catch { /* audio is optional */ }
-    }
-    prevPressedRef.current = currentPressed;
-  }, [node.properties?.isPressed, isButton]);
-
-  useEffect(() => {
-    const currentClosed = Boolean(node.properties?.isClosed);
-    if (isSwitch && prevClosedRef.current !== undefined && currentClosed !== prevClosedRef.current) {
-      try { AudioEngine.playClick('switch'); } catch { /* audio is optional */ }
-    }
-    prevClosedRef.current = currentClosed;
-  }, [node.properties?.isClosed, isSwitch]);
-
-  useEffect(() => {
-    const currentActive = Boolean(node.properties?.isActive);
-    if (isRelay && prevRelayActiveRef.current !== undefined && currentActive !== prevRelayActiveRef.current) {
-      try { AudioEngine.playClick('relay'); } catch { /* audio is optional */ }
-    }
-    prevRelayActiveRef.current = currentActive;
-  }, [node.properties?.isActive, isRelay]);
-
-
   return (
     <>
       <Group
         ref={shapeRef}
+        name="schematic-component"
+        id={node.id}
         x={node.x}
         y={node.y}
         width={node.width}
@@ -2088,7 +2051,7 @@ const ComponentNode = ({
             key={pin.id}
             pin={pin}
             nodeId={node.id}
-            node={node}
+            node={pinLayout}
             isWiring={isWiring}
             wiringFromNodeId={wiringFromNodeId}
             isDark={isDark}
@@ -2097,6 +2060,7 @@ const ComponentNode = ({
             readOnly={readOnly}
             isProbeMode={isProbeMode}
             onProbeToggle={onProbeToggle}
+            detailed={detailed}
           />
         ))}
 

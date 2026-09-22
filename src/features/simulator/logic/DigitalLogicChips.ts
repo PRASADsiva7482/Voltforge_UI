@@ -17,7 +17,7 @@ export class ShiftRegister595Logic implements IComponentLogic {
   private serState: Map<string, boolean> = new Map();
 
   onPinStateChange(componentId: string, pinId: string, state: PinState): void {
-    const { updateNode, nodes, wires } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes, wires } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
@@ -56,7 +56,7 @@ export class ShiftRegister595Logic implements IComponentLogic {
           outputs[`Q${pinChar}`] = bitVal;
         }
 
-        updateNode(componentId, {
+        updateRuntimeNode(componentId, {
           properties: {
             ...node.properties,
             shiftValue: storage,
@@ -80,7 +80,7 @@ export class ShiftRegister595Logic implements IComponentLogic {
   }
 
   private propagateOutputs(componentId: string, storageVal: number, node: any, wires: any[]) {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
 
     for (let i = 0; i < 8; i++) {
       const pinChar = String.fromCharCode(65 + i);
@@ -98,7 +98,7 @@ export class ShiftRegister595Logic implements IComponentLogic {
           const targetNode = nodes.find(n => n.id === targetNodeId);
           if (targetNode) {
             if (targetNode.type.includes('LED')) {
-              updateNode(targetNodeId, {
+              updateRuntimeNode(targetNodeId, {
                 properties: { ...targetNode.properties, isLit: bitVal }
               });
             }
@@ -118,7 +118,7 @@ export class ShiftRegister165Logic implements IComponentLogic {
   private parallelInputs: Map<string, number> = new Map();
 
   onPinStateChange(componentId: string, pinId: string, state: PinState): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
@@ -163,7 +163,7 @@ export class ShiftRegister165Logic implements IComponentLogic {
     }
 
     const serialOut = Boolean((reg >> 7) & 1);
-    updateNode(componentId, {
+    updateRuntimeNode(componentId, {
       properties: {
         ...node.properties,
         shiftValue: reg,
@@ -182,7 +182,7 @@ export class Decoder138Logic implements IComponentLogic {
   private enables: Map<string, { e1: boolean; e2: boolean; e3: boolean }> = new Map();
 
   onPinStateChange(componentId: string, pinId: string, state: PinState): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
@@ -226,7 +226,7 @@ export class Decoder138Logic implements IComponentLogic {
       outputs[`Y${i}`] = isEnabled ? (addr !== i) : true;
     }
 
-    updateNode(componentId, {
+    updateRuntimeNode(componentId, {
       properties: {
         ...node.properties,
         activeChannel: isEnabled ? addr : -1,
@@ -245,7 +245,7 @@ export class Multiplexer151Logic implements IComponentLogic {
   private enableBar: Map<string, boolean> = new Map();
 
   onPinStateChange(componentId: string, pinId: string, state: PinState): void {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
@@ -295,7 +295,7 @@ export class Multiplexer151Logic implements IComponentLogic {
     }
     const w = !y;
 
-    updateNode(componentId, {
+    updateRuntimeNode(componentId, {
       properties: {
         ...node.properties,
         selectedInput: sel,
@@ -314,7 +314,7 @@ export class DecadeCounter4017Logic implements IComponentLogic {
   private prevClk: Map<string, boolean> = new Map();
 
   onPinStateChange(componentId: string, pinId: string, state: PinState): void {
-    const { updateNode, nodes, wires } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes, wires } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === componentId);
     if (!node) return;
 
@@ -353,7 +353,7 @@ export class DecadeCounter4017Logic implements IComponentLogic {
     // Carry out is HIGH for counts 0-4, LOW for 5-9
     const carryOut = count < 5;
 
-    updateNode(componentId, {
+    updateRuntimeNode(componentId, {
       properties: {
         ...node.properties,
         currentCount: count,
@@ -367,7 +367,7 @@ export class DecadeCounter4017Logic implements IComponentLogic {
   }
 
   private propagateOutputs(componentId: string, activeIndex: number, node: any, wires: any[]) {
-    const { updateNode, nodes } = useCanvasStore.getState();
+    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
 
     for (let i = 0; i < 10; i++) {
       const pinName = `Q${i}`;
@@ -384,7 +384,7 @@ export class DecadeCounter4017Logic implements IComponentLogic {
           const targetNodeId = w.fromNodeId === componentId ? w.toNodeId : w.fromNodeId;
           const targetNode = nodes.find(n => n.id === targetNodeId);
           if (targetNode && targetNode.type.includes('LED')) {
-            updateNode(targetNodeId, {
+            updateRuntimeNode(targetNodeId, {
               properties: { ...targetNode.properties, isLit: isHigh }
             });
           }

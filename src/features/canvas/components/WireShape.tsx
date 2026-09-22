@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Circle, Line, Text, Group, Rect } from 'react-konva';
+import { memo, useMemo, useState } from 'react';
+import { Circle, Line, Text } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { getPinAbsPos, distToSegment, getWireRenderPoints, getWiringPreviewPoints } from '../../../utils/wireRouting';
 import type { Wire, ActiveBendPoint } from '../canvasTypes';
@@ -17,13 +17,15 @@ import {
 } from '../canvasConstants';
 
 import { useCanvasStore } from '../../../store/canvasStore';
+import { createWireNodeGeometrySelector } from '../wireNodeGeometry';
+import { WireVoltageTooltip } from './ProbeVoltageTooltip';
 
 interface WireShapeProps {
   wire: Wire;
-  wires: Wire[];
+  routingPeers: Wire[];
   isSelected: boolean;
   isDark: boolean;
-  onSelect: () => void;
+  onSelect: (wireId: string) => void;
   onWireDragStart: (wireId: string, index: number, x: number, y: number) => void;
   activeNewBendPoint: ActiveBendPoint | null;
   readOnly?: boolean;
@@ -33,7 +35,7 @@ interface WireShapeProps {
 /** Renders a single wire with outline, bend point handles, and label. */
 const WireShape = ({
   wire,
-  wires,
+  routingPeers,
   isSelected,
   isDark,
   onSelect,
@@ -43,32 +45,29 @@ const WireShape = ({
   isProbeMode,
 }: WireShapeProps) => {
   const [hovered, setHovered] = useState(false);
-  const from = useCanvasStore((state) => state.nodesById.get(wire.fromNodeId));
-  const to = useCanvasStore((state) => state.nodesById.get(wire.toNodeId));
+  const selectFrom = useMemo(() => createWireNodeGeometrySelector(wire.fromNodeId), [wire.fromNodeId]);
+  const selectTo = useMemo(() => createWireNodeGeometrySelector(wire.toNodeId), [wire.toNodeId]);
+  const from = useCanvasStore(selectFrom);
+  const to = useCanvasStore(selectTo);
   const preview = useCanvasStore((state) => state.draggingNodeId !== null
     && (state.draggingNodeId === wire.fromNodeId || state.draggingNodeId === wire.toNodeId));
-  if (!from || !to) return null;
-  const nodes = [from, to];
-
-  const startPos = getPinAbsPos(from, wire.fromPinId);
-  const endPos = getPinAbsPos(to, wire.toPinId);
-  if (!startPos || !endPos) return null;
-
-  const currentBendPoints = [...(wire.bendPoints || [])];
-  if (activeNewBendPoint && activeNewBendPoint.wireId === wire.id) {
-    currentBendPoints.splice(activeNewBendPoint.index, 0, {
-      x: activeNewBendPoint.x,
-      y: activeNewBendPoint.y,
-    });
-  }
-
-  const allPoints = preview && (wire.routingMode === 'auto' || (wire.routingMode === 'orthogonal' && currentBendPoints.length === 0))
-    ? getWiringPreviewPoints(startPos, endPos)
-    : getWireRenderPoints(wire, nodes, currentBendPoints, wires);
+  const geometry = useMemo(() => {
+    if (!from || !to) return null;
+    const startPos = getPinAbsPos(from, wire.fromPinId), endPos = getPinAbsPos(to, wire.toPinId);
+    if (!startPos || !endPos) return null;
+    const currentBendPoints = [...(wire.bendPoints || [])];
+    if (activeNewBendPoint && activeNewBendPoint.wireId === wire.id) currentBendPoints.splice(activeNewBendPoint.index, 0, { x: activeNewBendPoint.x, y: activeNewBendPoint.y });
+    const allPoints = preview && (wire.routingMode === 'auto' || (wire.routingMode === 'orthogonal' && currentBendPoints.length === 0))
+      ? getWiringPreviewPoints(startPos, endPos)
+      : getWireRenderPoints(wire, [from, to], currentBendPoints, routingPeers);
+    return { startPos, endPos, allPoints };
+  }, [from, to, wire, routingPeers, preview, activeNewBendPoint]);
+  if (!geometry) return null;
+  const { startPos, endPos, allPoints } = geometry;
 
   const handleMouseDown = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
     e.cancelBubble = true;
-    onSelect();
+    onSelect(wire.id);
   };
 
   const handleDoubleClick = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -110,6 +109,8 @@ const WireShape = ({
       />
       {/* Main wire line */}
       <Line
+        name="schematic-wire"
+        id={wire.id}
         points={allPoints}
         stroke={isSelected ? (isDark ? '#ffffff' : '#0f172a') : wire.color}
         strokeWidth={isSelected ? WIRE_SELECTED_WIDTH : WIRE_DEFAULT_WIDTH}
@@ -168,53 +169,9 @@ const WireShape = ({
         />
       )}
 
-      {isProbeMode && hovered && (() => {
-        const voltage =
-          (globalThis as any).__voltforgePinVoltages?.[`${wire.fromNodeId}:${wire.fromPinId}`] ??
-          (globalThis as any).__voltforgePinVoltages?.[`${wire.toNodeId}:${wire.toPinId}`];
-        if (voltage === undefined) return null;
-        const getWireMidpoint = (pts: number[]): { x: number; y: number } => {
-          if (pts.length < 4) return { x: 0, y: 0 };
-          const numPoints = pts.length / 2;
-          const midIdx = Math.floor(numPoints / 2);
-          if (numPoints % 2 === 1) {
-            return { x: pts[2 * midIdx], y: pts[2 * midIdx + 1] };
-          } else {
-            const x1 = pts[2 * (midIdx - 1)];
-            const y1 = pts[2 * (midIdx - 1) + 1];
-            const x2 = pts[2 * midIdx];
-            const y2 = pts[2 * midIdx + 1];
-            return { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
-          }
-        };
-        const mid = getWireMidpoint(allPoints);
-        return (
-          <Group x={mid.x - 32} y={mid.y - 10} listening={false}>
-            <Rect
-              width={65}
-              height={20}
-              cornerRadius={4}
-              fill="#0c0a1c"
-              stroke="#c084fc"
-              strokeWidth={1.2}
-              shadowColor="#c084fc"
-              shadowBlur={8}
-              shadowOpacity={0.6}
-            />
-            <Text
-              text={`${voltage.toFixed(3)} V`}
-              x={6}
-              y={5}
-              fontSize={9}
-              fontFamily="JetBrains Mono"
-              fontStyle="700"
-              fill="#34d399"
-            />
-          </Group>
-        );
-      })()}
+      {isProbeMode && hovered && <WireVoltageTooltip wire={wire} points={allPoints} />}
     </>
   );
 };
 
-export default WireShape;
+export default memo(WireShape);

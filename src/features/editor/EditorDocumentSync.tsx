@@ -45,8 +45,22 @@ export const EditorAutosave = memo(function EditorAutosave({ enabled, onSave }: 
   const isDirty = useProjectStore((state) => state.isDirty)
   useEffect(() => {
     if (!enabled || !isDirty) return
+    // Keep the former Live Sync persistence window, but save through the same
+    // guarded REST path as the Save button so every write acknowledges a token.
+    let debounce = window.setTimeout(onSave, 2000)
+    const schedule = () => { window.clearTimeout(debounce); debounce = window.setTimeout(onSave, 2000) }
+    const canvas = useCanvasStore.subscribe((next, previous) => {
+      if (next.localDocumentRevision !== previous.localDocumentRevision) schedule()
+    })
+    const pcb = usePcbStore.subscribe((next, previous) => {
+      if (next.localDocumentRevision !== previous.localDocumentRevision) schedule()
+    })
+    const code = useProjectStore.subscribe((next, previous) => {
+      if (next.codeRevision !== previous.codeRevision) schedule()
+    })
+    // Bound the wait during continuous editing and retry transient failures.
     const timer = window.setInterval(onSave, 10000)
-    return () => window.clearInterval(timer)
+    return () => { window.clearTimeout(debounce); window.clearInterval(timer); canvas(); pcb(); code() }
   }, [enabled, isDirty, onSave])
   return null
 })

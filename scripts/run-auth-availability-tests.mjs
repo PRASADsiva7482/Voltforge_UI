@@ -67,7 +67,7 @@ async function makePage(options = {}) {
         if (options.realIdentity) return route.continue()
         if (options.networkFailure || options.http404) return route.fulfill({ status: 503, json: { success: false } })
         if (options.discoveryStalls || options.probeStalls) return
-        return route.fulfill({ json: { success: true, data: { available: true, issuer: options.mismatchedIssuer ? 'https://wrong.invalid/realms/test' : 'https://copious-opposite-mangle.ngrok-free.dev/realms/voltforge-realm' } } })
+        return route.fulfill({ json: { success: true, data: { available: true, issuer: options.mismatchedIssuer ? 'https://wrong.invalid/realms/test' : 'http://localhost:8080/realms/voltforge-realm' } } })
       }
       if (apiPath === '/auth/sync') {
         if (options.syncStalls) return // cancelled by the application's sync deadline

@@ -11,6 +11,9 @@ export interface CanvasLayoutRenderEvent extends CanvasRenderEventBase {
   viewportHeight: number;
   totalWireCount: number;
   mountedWireShapeCount: number;
+  totalComponentCount?: number;
+  mountedComponentCount?: number;
+  mountedPinCount?: number;
   currentFlowEnabled: boolean;
   qualityMode: CurrentFlowQualityMode;
   budgetLimited: boolean;
