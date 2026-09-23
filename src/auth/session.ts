@@ -1,8 +1,8 @@
-import keycloak from './keycloak'
-import api from '../api/client'
+import keycloak, { getKeycloakConfig } from './keycloak'
+import api, { getBaseURL } from '../api/client'
 
-export const SESSION_CHECK_TIMEOUT_MS = 3500
-export const USER_SYNC_TIMEOUT_MS = 5000
+export const SESSION_CHECK_TIMEOUT_MS = 10000
+export const USER_SYNC_TIMEOUT_MS = 10000
 
 type SessionCheck = { authenticated: boolean; error: string | null }
 let sessionCheck: Promise<SessionCheck> | undefined
@@ -34,7 +34,10 @@ export function checkSession(): Promise<SessionCheck> {
       resolve(result)
     }
     const timer = window.setTimeout(() => {
-      finish({ authenticated: false, error: 'The sign-in service did not respond. Please try signing in again.' })
+      finish({
+        authenticated: false,
+        error: hasLoginCallback() ? 'The sign-in service did not respond. Please try signing in again.' : null,
+      })
       keycloak.clearToken()
       // No retry loop: explicit login starts a fresh page/session instead.
       document.querySelectorAll('iframe[title="keycloak-3p-check-iframe"], iframe[title="keycloak-silent-check-sso"]')
@@ -45,16 +48,17 @@ export function checkSession(): Promise<SessionCheck> {
         })
     }, SESSION_CHECK_TIMEOUT_MS)
 
+    const kcConfig = getKeycloakConfig()
     void keycloak.init({
       checkLoginIframe: false,
-      pkceMethod: 'S256',
+      pkceMethod: kcConfig.pkceMethod,
       messageReceiveTimeout: SESSION_CHECK_TIMEOUT_MS,
       // An explicit callback needs code exchange, not another cookie probe.
       // Public share URLs containing only ?state= are not login callbacks.
       ...(hasLoginCallback() ? {} : {
         onLoad: 'check-sso' as const,
         silentCheckSsoRedirectUri: new URL('silent-check-sso.html', window.location.origin).href,
-        silentCheckSsoFallback: false,
+        silentCheckSsoFallback: true,
       }),
     }).then((authenticated) => {
       if (settled) {
@@ -63,8 +67,12 @@ export function checkSession(): Promise<SessionCheck> {
         return
       }
       finish({ authenticated, error: null })
-    }).catch(() => {
-      finish({ authenticated: false, error: 'Sign-in is unavailable right now. You can try again or continue browsing.' })
+    }).catch((err) => {
+      console.warn('Keycloak session check notice:', err)
+      finish({
+        authenticated: false,
+        error: hasLoginCallback() ? 'Sign-in failed. Please try signing in again.' : null,
+      })
     })
   })
   return sessionCheck
@@ -80,21 +88,27 @@ export async function checkSignInAvailability() {
   const controller = new AbortController()
   const timer = window.setTimeout(() => controller.abort(), SESSION_CHECK_TIMEOUT_MS)
   try {
-    const base = keycloak.authServerUrl?.replace(/\/$/, '')
-    if (!base || !keycloak.realm) throw new Error('Sign-in is not configured.')
+    const config = getKeycloakConfig()
+    const base = (keycloak.authServerUrl || config.url)?.replace(/\/$/, '')
+    const realm = keycloak.realm || config.realm
+    if (!base || !realm) throw new Error('Sign-in is not configured.')
     // Discovery endpoints can be reachable while browser CORS rejects them.
     // The backend probes only its configured issuer with a bounded timeout.
-    const issuer = `${base}/realms/${encodeURIComponent(keycloak.realm)}`
-    const response = await fetch(`${api.defaults.baseURL}/auth/identity-health`, {
+    const issuer = `${base}/realms/${encodeURIComponent(realm)}`
+    const response = await fetch(`${getBaseURL()}/auth/identity-health`, {
       signal: controller.signal,
       credentials: 'omit',
       cache: 'no-store',
     })
     if (!response.ok) throw new Error('Sign-in service unavailable.')
     const configuration = await response.json() as { success?: boolean; data?: { issuer?: string; available?: boolean } }
+    const realmSuffix = `/realms/${encodeURIComponent(realm)}`
+    const isMatchingIssuer = configuration.data?.issuer === issuer
+      || (Boolean(configuration.data?.issuer?.endsWith(realmSuffix)) && issuer.endsWith(realmSuffix))
     if (configuration.success !== true || configuration.data?.available !== true
-      || configuration.data.issuer !== issuer) throw new Error('Sign-in provider is unavailable or does not match the app configuration.')
+      || !isMatchingIssuer) throw new Error('Sign-in provider is unavailable or does not match the app configuration.')
   } finally {
     window.clearTimeout(timer)
   }
 }
+

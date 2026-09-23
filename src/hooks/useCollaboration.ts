@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import keycloak from '../auth/keycloak';
+import { getBaseURL } from '../api/client';
 import { useCanvasStore } from '../store/canvasStore';
 import { usePcbStore } from '../store/pcbStore';
 import { useProjectStore } from '../store/projectStore';
@@ -35,14 +36,13 @@ const FRAME_ENCODER = new TextEncoder();
 const TERMINAL_CLOSE_CODES = new Set([1002, 1003, 1007, 1008, 1009]);
 
 function resolveNativeWsUrl(): string {
+  const runtimeWs = typeof window !== 'undefined' ? window.config?.api?.wsUrl : undefined;
+  if (runtimeWs) return runtimeWs;
+
   const explicit = import.meta.env.VITE_WS_BASE_URL as string | undefined;
   if (explicit) return explicit;
 
-  const apiBase =
-    import.meta.env.VITE_API_BASE_URL ||
-    (import.meta.env.DEV
-      ? 'http://localhost:2001/voltForge-app/api/v1'
-      : `${window.location.origin}/voltForge-app/api/v1`);
+  const apiBase = getBaseURL();
 
   const url = new URL(apiBase, window.location.origin);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';

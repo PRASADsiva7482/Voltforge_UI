@@ -5,14 +5,14 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean
 }
 
-const getBaseURL = () => {
-  let url = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:2001/voltForge-app/api/v1' : '/voltForge-app/api/v1');
+export const getBaseURL = () => {
+  const runtimeApi = typeof window !== 'undefined' ? window.config?.api?.baseUrl : undefined;
+  let url = runtimeApi || import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:2001/voltForge-app/api/v1' : '/voltForge-app/api/v1');
   if (!url.endsWith('/api/v1')) {
     url = url.replace(/\/+$/, '') + '/api/v1';
   }
   return url;
 };
-
 
 const api = axios.create({
   baseURL: getBaseURL(),
@@ -23,6 +23,7 @@ const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
+  config.baseURL = getBaseURL()
   if (keycloak.token) {
     config.headers.Authorization = `Bearer ${keycloak.token}`
   }

@@ -1,4 +1,4 @@
-import api from './client'
+import api, { getBaseURL } from './client'
 import keycloak from '../auth/keycloak'
 import type {
   AiChatRequest,
@@ -27,11 +27,7 @@ import type { DrcViolation, PcbFootprint, PcbTrace, PcbVia } from '../store/pcbS
 
 /** Base URL for direct fetch() calls (SSE streaming bypasses Axios). */
 function getStreamBaseURL(): string {
-  let url = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:2001/voltForge-app/api/v1' : '/voltForge-app/api/v1')
-  if (!url.endsWith('/api/v1')) {
-    url = url.replace(/\/+$/, '') + '/api/v1'
-  }
-  return url
+  return getBaseURL()
 }
 
 
