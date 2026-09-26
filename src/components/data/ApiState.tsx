@@ -15,7 +15,7 @@ export function ErrorState({ label = 'Unable to load data', onRetry }: { label?:
     <Card className="api-state">
       <AlertTriangle size={24} />
       <strong>{label}</strong>
-      <p className="vf-muted">Check that VoltForge BL is running on `localhost:2001`.</p>
+      <p className="vf-muted">Check that the VoltForge backend is running.</p>
       {onRetry ? <Button onClick={onRetry}>Retry</Button> : null}
     </Card>
   )

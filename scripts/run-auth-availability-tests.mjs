@@ -11,6 +11,19 @@ const origin = 'http://localhost:3101'
 const outputDir = path.join(root, 'docs/reports')
 const results = []
 const development = process.argv.includes('--dev')
+const liveLoginProbe = process.argv.includes('--live-login')
+function configuredUrl(name, fallback) {
+  if (process.env[name]) return process.env[name]
+  for (const file of ['.env.local', '.env.development.local', '.env.development', '.env']) {
+    const envPath = path.join(root, file)
+    if (!fs.existsSync(envPath)) continue
+    const line = fs.readFileSync(envPath, 'utf8').split(/\r?\n/).find(entry => entry.trim().startsWith(`${name}=`))
+    if (line) return line.slice(line.indexOf('=') + 1).trim().replace(/^(['"])(.*)\1$/, '$2')
+  }
+  return fallback
+}
+const developmentApiOrigin = new URL(configuredUrl('VITE_API_BASE_URL', 'http://localhost:2001/voltForge-app/api/v1')).origin
+const developmentKeycloakOrigin = new URL(configuredUrl('VITE_KEYCLOAK_URL', 'http://localhost:8080')).origin
 const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', ...(development ? [] : ['preview']), '--host', 'localhost', '--port', '3101', '--strictPort'], {
   cwd: root, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
 })
@@ -39,7 +52,7 @@ async function makePage(options = {}) {
   const page = await context.newPage()
   page.setDefaultTimeout(10000)
   page.setDefaultNavigationTimeout(15000)
-  const record = { api: [], topLevelExternalNavigations: 0, tokenExchanges: 0, refreshes: 0, errors: [], consoleErrors: [], signInRedirect: null }
+  const record = { api: [], identityProviderOrigins: [], flowSequence: 0, availabilitySequence: null, authorizationSequence: null, topLevelExternalNavigations: 0, tokenExchanges: 0, refreshes: 0, errors: [], consoleErrors: [], signInRedirect: null }
   const codes = new Map()
   page.on('pageerror', error => record.errors.push(error.message))
   page.on('console', message => {
@@ -62,8 +75,9 @@ async function makePage(options = {}) {
     const url = new URL(request.url())
     if (url.pathname.includes('/api/v1/')) {
       const apiPath = url.pathname.slice(url.pathname.indexOf('/api/v1/') + 7)
-      record.api.push({ path: apiPath, method: request.method(), hasBearer: Boolean(request.headers().authorization) })
+      record.api.push({ path: apiPath, method: request.method(), origin: url.origin, hasBearer: Boolean(request.headers().authorization) })
       if (apiPath === '/auth/identity-health') {
+        record.availabilitySequence = ++record.flowSequence
         if (options.realIdentity) return route.continue()
         if (options.networkFailure || options.http404) return route.fulfill({ status: 503, json: { success: false } })
         if (options.discoveryStalls || options.probeStalls) return
@@ -83,6 +97,10 @@ async function makePage(options = {}) {
       return route.fulfill({ json: { success: true, data: apiPath === '/projects' ? { content: [], totalElements: 0, totalPages: 0 } : [] } })
     }
     if (!url.pathname.includes('/realms/')) return route.continue()
+    if (!record.identityProviderOrigins.includes(url.origin)) record.identityProviderOrigins.push(url.origin)
+    if (url.pathname.endsWith('/auth') && url.searchParams.get('prompt') !== 'none') {
+      record.authorizationSequence = ++record.flowSequence
+    }
     if (options.realIdentity) return route.continue()
     if (options.networkFailure) return route.abort('namenotresolved')
     if (options.http404) return route.fulfill({ status: 404, contentType: 'text/html', body: '<h1>Identity offline fixture</h1>' })
@@ -131,7 +149,7 @@ async function makePage(options = {}) {
 }
 
 async function run(name, options, check) {
-  const filter = process.argv.slice(2).filter(arg => arg !== '--dev').join(' ').toLowerCase()
+  const filter = process.argv.slice(2).filter(arg => !['--dev', '--live-login'].includes(arg)).join(' ').toLowerCase()
   if (filter && !name.toLowerCase().includes(filter)) return
   const fixture = await makePage(options)
   try {
@@ -189,6 +207,13 @@ try {
     const before = await page.locator('html').getAttribute('class')
     await page.getByRole('button', { name: 'Toggle theme' }).click()
     assert.notEqual(await page.locator('html').getAttribute('class'), before)
+    if (liveLoginProbe) {
+      await page.getByRole('button', { name: 'Login', exact: true }).first().click()
+      await page.getByText('Sign-in is unavailable right now. Please try again in a moment.', { exact: true }).first().waitFor({ timeout: 12000 })
+      assert(record.api.some(request => request.path === '/auth/identity-health' && request.origin === developmentApiOrigin), 'Live sign-in preflight must reach the configured backend')
+      assert.equal(record.authorizationSequence, null, 'Unavailable backend provider must block interactive authorization')
+      assert.equal(record.topLevelExternalNavigations, 0, 'Unavailable identity provider must not redirect away')
+    }
     await page.screenshot({ path: path.join(outputDir, 'vfopt-ui-001-home.png'), fullPage: true })
     return { headingVisibleMs, performance: await page.evaluate(() => window.__authAudit), viewport: { width: 1366, height: 768 } }
   })
@@ -239,6 +264,13 @@ try {
     await privateGate(page)
     await page.getByRole('button', { name: 'Sign in', exact: true }).click()
     await page.getByRole('heading', { name: 'Fixture sign-in page' }).waitFor()
+    assert(record.availabilitySequence !== null, 'Login button must check backend identity availability')
+    assert(record.authorizationSequence !== null, 'Available identity provider must receive interactive authorization')
+    assert(record.availabilitySequence < record.authorizationSequence, 'Backend availability must pass before interactive Keycloak authorization')
+    if (development) {
+      assert(record.api.some(request => request.path === '/auth/identity-health' && request.origin === developmentApiOrigin), 'Development availability check must use VITE_API_BASE_URL')
+      assert(record.identityProviderOrigins.includes(developmentKeycloakOrigin), 'Development Keycloak requests must use VITE_KEYCLOAK_URL')
+    }
     assert.equal(record.signInRedirect, origin + '/projects?sort=recent')
     await page.goto(record.completeLoginUrl)
     await page.waitForFunction(() => Boolean(document.querySelector('.app-shell')))
@@ -313,7 +345,7 @@ try {
 } finally {
   const report = {
     task: 'VFOPT-UI-001', capturedAt: new Date().toISOString(), browser: browser ? await browser.version() : null,
-    fullSuite: !process.argv.slice(2).some(arg => arg !== '--dev'), expectedFullSuiteScenarios: 20,
+    fullSuite: !process.argv.slice(2).some(arg => !['--dev', '--live-login'].includes(arg)), liveLoginProbe, expectedFullSuiteScenarios: 20,
     buildMode: development ? 'development' : 'production-preview', viewport: { width: 1366, height: 768 },
     methodology: 'Real Chromium and installed Keycloak adapter. Network/protocol responses are fixtures except the explicitly labeled configured-endpoint scenario. Synthetic tokens are test-only and never accepted by a real backend. No real account sign-in or live backend authorization claim.',
     passed: results.filter(r => r.passed).length, failed: results.filter(r => !r.passed).length, results,

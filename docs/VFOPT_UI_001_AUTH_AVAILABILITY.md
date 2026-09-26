@@ -47,11 +47,10 @@ identity endpoint check. Synthetic tokens remain inside test contexts and are
 never submitted to a real backend. Tests assert private-route gating, deep-link
 return, public shares, failed account sync, delayed tokens and refresh failures.
 
-The machine-readable results are in
-[reports/vfopt-ui-001-auth-availability.json](reports/vfopt-ui-001-auth-availability.json).
+The runner writes machine-readable results and screenshots under `docs/reports/`
+while it runs. These generated artifacts are temporary; remove them after review.
 They distinguish real-endpoint availability from simulated authenticated flows.
-Screenshots capture the public page and private sign-in gate. A development-mode
-check can be run with `-- --dev "Explicit login"`; its report is separate.
+A development-mode check can be run with `-- --dev "Explicit login"`.
 
 The earlier audit reproduced a top-level redirect to an offline identity endpoint
 instead of the public home page. Its elapsed observation window was not a render
@@ -81,3 +80,34 @@ were submitted: full real-account login, sync, private project operations and
 deployed redirect/CORS/CSP acceptance remain pending. The next implementation
 item is **VFOPT-UI-011**, runtime-only dirty detection, following the measured
 editor subscription changes in VFOPT-UI-010.
+
+## Login handoff follow-up, 2026-09-26
+
+The development runtime defaults in `public/config.js` set both service URLs to
+the UI origin. Those defaults masked the configured `VITE_API_BASE_URL` and
+`VITE_KEYCLOAK_URL`, so the login preflight could call the UI server instead of
+the backend and the adapter could try Keycloak on the UI host. Development now
+uses the Vite service URLs when the runtime values match those generated
+same-origin defaults; explicit runtime endpoints and deployed same-origin
+configuration retain precedence. The collaboration WebSocket follows the same
+rule and derives its endpoint from the selected API URL when no explicit WS URL
+is configured.
+
+The interactive flow is now verified in order: the Login button awaits
+`GET /auth/identity-health`, checks that the backend-reported issuer matches
+the configured realm, and only then lets the Keycloak adapter start interactive
+authorization. The browser regression verifies callback, account sync, and
+return to the requested private route. Public startup no longer falls back from
+silent SSO to a full-page redirect. Session discovery and explicit availability
+checks are bounded at 3.5 seconds; account sync is bounded at 5 seconds. The
+runtime selects PKCE S256 whenever browser Web Crypto is available.
+
+Validation on 2026-09-26: production build and bundle budget passed; all 20
+production auth browser scenarios passed; the development service-origin and
+callback scenario passed. A real-browser login attempt against the currently
+running services also stayed on the app and hit the configured backend. The
+backend returned `available: false` (HTTP 503), and Keycloak discovery for
+`voltforge-realm` returned HTTP 404. Therefore real account sign-in and
+Dashboard access remain unavailable until that realm, client, and user
+configuration are restored. The availability gate remains closed, and no live
+credentials were submitted.

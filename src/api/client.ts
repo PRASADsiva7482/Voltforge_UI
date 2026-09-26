@@ -5,14 +5,9 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean
 }
 
-export const getBaseURL = () => {
-  const runtimeApi = typeof window !== 'undefined' ? window.config?.api?.baseUrl : undefined;
-  let url = runtimeApi || import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:2001/voltForge-app/api/v1' : '/voltForge-app/api/v1');
-  if (!url.endsWith('/api/v1')) {
-    url = url.replace(/\/+$/, '') + '/api/v1';
-  }
-  return url;
-};
+export const getBaseURL = (): string => {
+  return (typeof window !== 'undefined' ? window.config?.baseUrls?.BL : '') || ''
+}
 
 const api = axios.create({
   baseURL: getBaseURL(),

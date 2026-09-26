@@ -1,8 +1,8 @@
 import keycloak, { getKeycloakConfig } from './keycloak'
 import api, { getBaseURL } from '../api/client'
 
-export const SESSION_CHECK_TIMEOUT_MS = 10000
-export const USER_SYNC_TIMEOUT_MS = 10000
+export const SESSION_CHECK_TIMEOUT_MS = 3500
+export const USER_SYNC_TIMEOUT_MS = 5000
 
 type SessionCheck = { authenticated: boolean; error: string | null }
 let sessionCheck: Promise<SessionCheck> | undefined
@@ -58,7 +58,9 @@ export function checkSession(): Promise<SessionCheck> {
       ...(hasLoginCallback() ? {} : {
         onLoad: 'check-sso' as const,
         silentCheckSsoRedirectUri: new URL('silent-check-sso.html', window.location.origin).href,
-        silentCheckSsoFallback: true,
+        // Public startup must never turn an unavailable silent check into a
+        // top-level identity-provider navigation. Explicit login owns redirects.
+        silentCheckSsoFallback: false,
       }),
     }).then((authenticated) => {
       if (settled) {

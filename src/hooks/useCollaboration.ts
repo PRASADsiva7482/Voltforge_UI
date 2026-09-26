@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import keycloak from '../auth/keycloak';
-import { getBaseURL } from '../api/client';
 import { useCanvasStore } from '../store/canvasStore';
 import { usePcbStore } from '../store/pcbStore';
 import { useProjectStore } from '../store/projectStore';
@@ -36,22 +35,7 @@ const FRAME_ENCODER = new TextEncoder();
 const TERMINAL_CLOSE_CODES = new Set([1002, 1003, 1007, 1008, 1009]);
 
 function resolveNativeWsUrl(): string {
-  const runtimeWs = typeof window !== 'undefined' ? window.config?.api?.wsUrl : undefined;
-  if (runtimeWs) return runtimeWs;
-
-  const explicit = import.meta.env.VITE_WS_BASE_URL as string | undefined;
-  if (explicit) return explicit;
-
-  const apiBase = getBaseURL();
-
-  const url = new URL(apiBase, window.location.origin);
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  if (/\/api\/v1\/?$/.test(url.pathname)) {
-    url.pathname = url.pathname.replace(/\/api\/v1\/?$/, '/ws-native');
-  } else {
-    url.pathname = `${url.pathname.replace(/\/$/, '')}/ws-native`;
-  }
-  return url.toString();
+  return (typeof window !== 'undefined' ? window.config?.baseUrls?.WS : '') || '';
 }
 
 function buildStompFrame(command: string, headers: Record<string, string>, body?: unknown): string {
