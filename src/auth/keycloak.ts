@@ -18,12 +18,12 @@ declare global {
 }
 
 export function getKeycloakConfig() {
-  const url = (typeof window !== 'undefined' ? window.config?.baseUrls?.KEYCLOAK : '') || ''
-  const clientId = (typeof window !== 'undefined' ? window.config?.keycloak?.clientId : '') || ''
-  const realm = (typeof window !== 'undefined' ? window.config?.keycloak?.realm : '') || ''
+  const runtimeUrl = (typeof window !== 'undefined' ? (window.config?.baseUrls?.KEYCLOAK || (window.config as any)?.keycloak?.url) : '') || (typeof window !== 'undefined' ? window.location.origin : '')
+  const clientId = (typeof window !== 'undefined' ? window.config?.keycloak?.clientId : '') || 'VOLT-UI'
+  const realm = (typeof window !== 'undefined' ? window.config?.keycloak?.realm : '') || 'voltforge-realm'
   const pkceMethod: 'S256' | false = typeof window !== 'undefined' && Boolean(window.crypto?.subtle) ? 'S256' : false
 
-  return { url, clientId, realm, pkceMethod }
+  return { url: runtimeUrl, clientId, realm, pkceMethod }
 }
 
 const { url: keycloakUrl, clientId, realm } = getKeycloakConfig()

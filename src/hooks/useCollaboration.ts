@@ -35,7 +35,13 @@ const FRAME_ENCODER = new TextEncoder();
 const TERMINAL_CLOSE_CODES = new Set([1002, 1003, 1007, 1008, 1009]);
 
 function resolveNativeWsUrl(): string {
-  return (typeof window !== 'undefined' ? window.config?.baseUrls?.WS : '') || '';
+  if (typeof window !== 'undefined') {
+    if (window.config?.baseUrls?.WS) return window.config.baseUrls.WS;
+    if ((window.config as any)?.api?.wsUrl) return (window.config as any).api.wsUrl;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${window.location.host}/voltForge-app/ws-native`;
+  }
+  return '';
 }
 
 function buildStompFrame(command: string, headers: Record<string, string>, body?: unknown): string {

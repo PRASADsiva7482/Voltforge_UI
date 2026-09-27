@@ -6,7 +6,12 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
 }
 
 export const getBaseURL = (): string => {
-  return (typeof window !== 'undefined' ? window.config?.baseUrls?.BL : '') || ''
+  if (typeof window !== 'undefined') {
+    if (window.config?.baseUrls?.BL) return window.config.baseUrls.BL
+    if ((window.config as any)?.api?.baseUrl) return (window.config as any).api.baseUrl
+    return '/voltForge-app/api/v1'
+  }
+  return '/voltForge-app/api/v1'
 }
 
 const api = axios.create({
