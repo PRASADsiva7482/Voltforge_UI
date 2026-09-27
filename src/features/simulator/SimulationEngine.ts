@@ -366,6 +366,9 @@ private resultRequestTimerId: number | null = null;
 private resultRequestOutstanding = false;
 private scopeCaptureRevision = 0;
   private simulationNodeIndex = new RuntimeReconciliationIndex<CanvasNode>();
+  private connectedPinsWires: Wire[] | null = null;
+  private connectedPinsRevision = -1;
+  private connectedPinsCache = new Map<string, ReadonlyArray<{ nodeId: string; pinId: string }>>();
   private localSerialBuffer = '';
   private sensorAutoIntervalId: number | null = null;
   private sensorStartTime = 0;
@@ -387,6 +390,7 @@ private scopeCaptureRevision = 0;
 
   public async start(code: string, nodes: CanvasNode[], wires: Wire[], hex?: string, boardType?: string) {
     if (this.isRunning) return;
+    this.clearConnectedPinsCache();
     const runGeneration = ++this.runGeneration;
     this.isRunning = true;
     this.isPaused = false;
@@ -2154,7 +2158,18 @@ private scopeCaptureRevision = 0;
   }
 
   private getConnectedPins(nodeId: string, pinId: string, wires: Wire[]) {
+    // GPIO edges repeatedly query the same net. Runtime feedback does not
+    // change connectivity; authored pin/type edits and resets advance the
+    // model revision, while rewiring replaces the immutable wire snapshot.
+    const revision = useCanvasStore.getState().modelRevision;
+    if (this.connectedPinsWires !== wires || this.connectedPinsRevision !== revision) {
+      this.connectedPinsCache.clear();
+      this.connectedPinsWires = wires;
+      this.connectedPinsRevision = revision;
+    }
     const start = `${nodeId}:${pinId}`;
+    const cached = this.connectedPinsCache.get(start);
+    if (cached) return cached;
     const visited = new Set<string>([start]);
     const queue = [start];
 
@@ -2184,10 +2199,20 @@ private scopeCaptureRevision = 0;
       });
     }
 
-    return Array.from(visited).map(key => {
+    const connected = Array.from(visited).map(key => {
       const [connectedNodeId, connectedPinId] = key.split(':');
       return { nodeId: connectedNodeId, pinId: connectedPinId };
     });
+    // Cache each starting pin separately: voltageAtPin relies on the existing
+    // breadth-first order when more than one source is present on a net.
+    this.connectedPinsCache.set(start, connected);
+    return connected;
+  }
+
+  private clearConnectedPinsCache() {
+    this.connectedPinsCache.clear();
+    this.connectedPinsWires = null;
+    this.connectedPinsRevision = -1;
   }
 
   private getBreadboardLinkedPins(pinId: string, pins: Array<{ id: string }>): string[] {
@@ -2683,6 +2708,7 @@ private scopeCaptureRevision = 0;
     this.runGeneration += 1;
     this.isRunning = false;
     this.isPaused = false;
+    this.clearConnectedPinsCache();
     this.clearSolverResultSchedule();
     if (this.intervalId) {
       clearInterval(this.intervalId);

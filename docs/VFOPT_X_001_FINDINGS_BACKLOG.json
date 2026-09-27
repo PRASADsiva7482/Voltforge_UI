@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "auditId": "VFOPT-X-001",
-  "updatedAt": "2026-09-27T09:01:15.135Z",
+  "updatedAt": "2026-09-27T14:42:47.186Z",
   "scope": [
     "Voltforge_UI",
     "Voltforge_BL"
@@ -2213,6 +2213,596 @@
               "sha256": "5db9868eeb3d9ae751efdc5e55c4d9d0c19086a1cb0f39740579cceb47103f25"
             }
           ]
+        },
+        "connectivityCache2026_09_27": {
+          "capturedAt": "2026-09-27T14:42:47.186Z",
+          "status": "targeted_lookup_optimization_validated_full_F003_acceptance_not_met",
+          "change": "Cache connected-pin BFS results per starting pin, wire snapshot and electrical model revision. Preserve each start-specific traversal order and read live electrical values. Clear the cache on start/stop and rebuild it after model/wire edits.",
+          "sourceHashes": {
+            "before": "5db9868eeb3d9ae751efdc5e55c4d9d0c19086a1cb0f39740579cceb47103f25",
+            "after": "32120dc4e4d09ffadfa7330f9d64d97fec70562916b85e47d9bedb0445b3ca85"
+          },
+          "environment": {
+            "build": {
+              "mode": "production",
+              "production": true,
+              "nodeEnv": "production"
+            },
+            "reactRendererBundleTypes": [
+              0
+            ],
+            "browser": "153.0.8010.53",
+            "browserViewport": "1440x900 CSS pixels",
+            "canvasViewport": "800x600 CSS pixels in the full editor fixture",
+            "fixture": {
+              "nodes": 36,
+              "wires": 75,
+              "sha256": "ab4d3bc31fa61747a98c84353a7949937c84a755595023a8e852e959e198a02e"
+            },
+            "compiledFirmwareSha256": "b17545cb64be48ba83c89a9c48266216b7234ac5216a55ed292e46825676591c",
+            "gpu": "ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00003EA0) Direct3D11 vs_5_0 ps_5_0, D3D11-27.20.100.9749)",
+            "hardwareCompositing": "enabled",
+            "scope": "Production CircuitEditorPage with AuthContext, project/API and STOMP fixtures. Actual AVR8js and compiled firmware; no authenticated backend or database writes."
+          },
+          "lookupBenchmark": {
+            "method": "Five runs of 10000 synchronous lookups on the unchanged 36-node/75-wire fixture. Cycle board pins d3,d5,d6,d9,d10,d11,d12,a0,a1; include returned pin counts in a checksum. Same diagnostic wrapper in both builds; isolated lookup timing is not whole-app CPU or pan performance.",
+            "control": {
+              "callsPerRun": 10000,
+              "runsMs": [
+                1256.199999999255,
+                1421.5,
+                1531.300000000745,
+                989.5,
+                976.8000000007451
+              ],
+              "checksum": 205560
+            },
+            "candidate": {
+              "callsPerRun": 10000,
+              "runsMs": [
+                22.800000000745058,
+                19.800000000745058,
+                13,
+                20.399999998509884,
+                14.400000002235174
+              ],
+              "checksum": 205560
+            },
+            "controlMedianMs": 1256.199999999255,
+            "candidateMedianMs": 19.800000000745058,
+            "medianReductionPercent": 98.4238178633373
+          },
+          "liveLookupDiagnostic": {
+            "windowSeconds": 5,
+            "control": {
+              "calls": 40,
+              "ms": 19.600000005215406,
+              "hits": 0,
+              "keys": {
+                "max_board:d3": 7,
+                "max_board:d6": 12,
+                "max_board:d5": 12,
+                "max_board:d9": 6,
+                "max_board:d10": 1,
+                "max_board:d11": 1,
+                "max_board:d12": 1
+              }
+            },
+            "candidate": {
+              "calls": 63,
+              "ms": 2.1000000201165676,
+              "hits": 63,
+              "keys": {
+                "max_board:d5": 21,
+                "max_board:d6": 19,
+                "max_board:d9": 10,
+                "max_board:d3": 10,
+                "max_board:d10": 1,
+                "max_board:d11": 1,
+                "max_board:d12": 1
+              }
+            },
+            "caveat": "Instrumented diagnostic with differing delivered event counts, not a matched whole-app performance window."
+          },
+          "sustainedSimulation": {
+            "method": "Three 30-second windows in each production build; no canvas pixel readback before timing.",
+            "control": {
+              "windows": [
+                {
+                  "seconds": 30.014918700000003,
+                  "mainThreadPercent": 37.66241085970357,
+                  "chromiumPercent": 245.42014501608486,
+                  "time": "t=3.670s"
+                },
+                {
+                  "seconds": 30.021437400000003,
+                  "mainThreadPercent": 36.836560663814176,
+                  "chromiumPercent": 252.36115776388502,
+                  "time": "t=2.175s"
+                },
+                {
+                  "seconds": 30.026898400000004,
+                  "mainThreadPercent": 35.947945259640925,
+                  "chromiumPercent": 240.5377573062957,
+                  "time": "t=2.240s"
+                }
+              ],
+              "mainThreadMeanPercent": 36.81563892771956,
+              "chromiumMeanPercent": 246.10635336208853
+            },
+            "candidate": {
+              "windows": [
+                {
+                  "seconds": 30.0974449,
+                  "mainThreadPercent": 38.51279415416423,
+                  "chromiumPercent": 240.3268358504413,
+                  "time": "t=1.430s"
+                },
+                {
+                  "seconds": 30.048710300000007,
+                  "mainThreadPercent": 38.210438602418144,
+                  "chromiumPercent": 253.87885948635878,
+                  "time": "t=1.500s"
+                },
+                {
+                  "seconds": 30.064847900000007,
+                  "mainThreadPercent": 36.22951639811888,
+                  "chromiumPercent": 228.31927581446377,
+                  "time": "t=0.865s"
+                }
+              ],
+              "mainThreadMeanPercent": 37.65091638490042,
+              "chromiumMeanPercent": 240.84165705042128
+            },
+            "conclusion": "Main-thread and aggregate CPU did not improve consistently. This change is retained for the directly measured lookup reduction and verified behavior, without claiming an overall CPU gain."
+          },
+          "pan": {
+            "metric": "Native mousemove arrival to the last Layer.draw within two requestAnimationFrame callbacks; first-draw time is a diagnostic only. These are draw-event latencies, not GPU presentation timestamps.",
+            "targetP95Ms": 50,
+            "separateFreshSessions": {
+              "control": {
+                "events": 40,
+                "stageMoves": 40,
+                "samples": 40,
+                "firstLayerDraw": {
+                  "p95": 43.80000000074506,
+                  "max": 51.400000002235174
+                },
+                "lastLayerDraw": {
+                  "p95": 363.19999999925494,
+                  "max": 478.9000000022352
+                }
+              },
+              "candidate": {
+                "events": 40,
+                "stageMoves": 40,
+                "samples": 40,
+                "firstLayerDraw": {
+                  "p95": 133.19999999925494,
+                  "max": 157.60000000149012
+                },
+                "lastLayerDraw": {
+                  "p95": 1058.5,
+                  "max": 1282.7000000029802
+                }
+              }
+            },
+            "pairedSameBrowser": {
+              "order": "control,candidate,candidate,control; restart simulation and reset viewport for each condition; 10-second CPU diagnostic then 40 actual Stage moves",
+              "runs": [
+                {
+                  "cached": false,
+                  "cpu": {
+                    "mainThreadPercent": 41.56833973274286,
+                    "chromiumPercent": 254.93928607665498
+                  },
+                  "pan": {
+                    "events": 40,
+                    "stageMoves": 40,
+                    "samples": 40,
+                    "firstLayerDraw": {
+                      "p95": 95.30000000074506,
+                      "max": 129
+                    },
+                    "lastLayerDraw": {
+                      "p95": 869,
+                      "max": 966.3000000007451
+                    }
+                  }
+                },
+                {
+                  "cached": true,
+                  "cpu": {
+                    "mainThreadPercent": 41.78565037796778,
+                    "chromiumPercent": 239.34769373417194
+                  },
+                  "pan": {
+                    "events": 40,
+                    "stageMoves": 40,
+                    "samples": 40,
+                    "firstLayerDraw": {
+                      "p95": 138.19999999925494,
+                      "max": 178.19999999925494
+                    },
+                    "lastLayerDraw": {
+                      "p95": 820.6999999992549,
+                      "max": 1537.3999999985099
+                    }
+                  }
+                },
+                {
+                  "cached": true,
+                  "cpu": {
+                    "mainThreadPercent": 44.31698169044468,
+                    "chromiumPercent": 219.80652708746533
+                  },
+                  "pan": {
+                    "events": 40,
+                    "stageMoves": 40,
+                    "samples": 40,
+                    "firstLayerDraw": {
+                      "p95": 144.30000000074506,
+                      "max": 208.5
+                    },
+                    "lastLayerDraw": {
+                      "p95": 1199.199999999255,
+                      "max": 1522.0999999977648
+                    }
+                  }
+                },
+                {
+                  "cached": false,
+                  "cpu": {
+                    "mainThreadPercent": 40.092743058565695,
+                    "chromiumPercent": 215.50431512346032
+                  },
+                  "pan": {
+                    "events": 40,
+                    "stageMoves": 40,
+                    "samples": 40,
+                    "firstLayerDraw": {
+                      "p95": 174.60000000149012,
+                      "max": 357.80000000074506
+                    },
+                    "lastLayerDraw": {
+                      "p95": 1327.300000000745,
+                      "max": 1572.800000000745
+                    }
+                  }
+                }
+              ]
+            },
+            "excluded": "The initial baseline gesture missed the Stage and failed the Stage-position assertion; its timings were excluded. Candidate timing after three CPU runs is also excluded from a fresh-session A/B comparison.",
+            "conclusion": "Pan varies substantially across runs and remains above 50 ms in both implementations. No pan improvement or F003 completion is claimed."
+          },
+          "remainingHotspot": {
+            "control": {
+              "1": {
+                "count": 24,
+                "ms": 1109.4000000096858
+              }
+            },
+            "candidate": {
+              "1": {
+                "count": 25,
+                "ms": 1032.900000013411
+              }
+            },
+            "trigger": "Motor opacity/rotation and board TX/RX indicators invalidate the shared component layer. Unchanged component images, glows and pins are drawn again.",
+            "next": "Prototype partial component-layer redraw for bounded dirty regions, preserving overlap order, shadows and full redraw on pan/zoom/resize. Require held-pointer visual checks and controlled production CPU/pan comparisons before retaining it."
+          },
+          "validation": {
+            "runtimeDelta": "passed, including cyclic nets, breadboard row/rail isolation, live pin propagation/voltages, source traversal order, runtime reuse, pin/type edits, wire rewiring/removal, undo/redo and stop/reset cleanup",
+            "fullPackageTest": "passed: TypeScript, lint and all 21 contract suites; one existing palette fixture Fast Refresh warning",
+            "productionBuildAndBundleBudget": {
+              "status": "passed",
+              "initialStaticJsKiB": 505.3,
+              "limitKiB": 550,
+              "initialChunks": 13,
+              "largestChunkKiB": 188.4
+            },
+            "productionBrowserErrors": [],
+            "standaloneTestFilesAdded": 0
+          },
+          "acceptanceMet": false
+        },
+        "rejectedRasterCandidates2026_09_27": {
+          "status": "rejected_no_rendering_source_changes_retained",
+          "candidates": [
+            {
+              "name": "Crop the source rectangle of full-stage circle buffers",
+              "result": "Changed glow pixels and showed no consistent main-thread benefit."
+            },
+            {
+              "name": "Supply tightly bounded scratch canvases for buffered circles",
+              "result": "Changed glow pixels at fractional zoom and increased main-thread work in short diagnostics."
+            },
+            {
+              "name": "Reuse screen-resolution component image/shadow rasters",
+              "result": "Changed visible image/shadow pixels and increased main-thread work in short diagnostics."
+            }
+          ],
+          "limitation": "Those short CPU diagnostics followed getImageData visual checks, which may alter the browser canvas backend. They are rejected experiments, not accepted performance A/B evidence.",
+          "measurements": [
+            {
+              "candidate": "source-rectangle",
+              "visual": [
+                {
+                  "viewport": {
+                    "x": 5,
+                    "y": 5,
+                    "scale": 0.65
+                  },
+                  "changedPixels": 9667,
+                  "maxChannelDelta": 255,
+                  "totalChannelDelta": 593618,
+                  "cropDraws": 16
+                },
+                {
+                  "viewport": {
+                    "x": -7.25,
+                    "y": 1.75,
+                    "scale": 0.65
+                  },
+                  "changedPixels": 9507,
+                  "maxChannelDelta": 255,
+                  "totalChannelDelta": 550904,
+                  "cropDraws": 32
+                },
+                {
+                  "viewport": {
+                    "x": 11.2,
+                    "y": -35.3,
+                    "scale": 1
+                  },
+                  "changedPixels": 368,
+                  "maxChannelDelta": 1,
+                  "totalChannelDelta": 523,
+                  "cropDraws": 48
+                },
+                {
+                  "viewport": {
+                    "x": -201.75,
+                    "y": -47,
+                    "scale": 1.5
+                  },
+                  "changedPixels": 762,
+                  "maxChannelDelta": 2,
+                  "totalChannelDelta": 1177,
+                  "cropDraws": 64
+                },
+                {
+                  "viewport": {
+                    "x": -25,
+                    "y": 9,
+                    "scale": 0.3
+                  },
+                  "changedPixels": 0,
+                  "maxChannelDelta": 0,
+                  "totalChannelDelta": 0,
+                  "cropDraws": 80
+                }
+              ],
+              "shortDiagnosticWindows": [
+                {
+                  "crop": false,
+                  "seconds": 5.014658200000001,
+                  "mainThreadPercent": 42.43625218564246,
+                  "chromiumPercent": 244.05444024081237
+                },
+                {
+                  "crop": true,
+                  "seconds": 5.0124604,
+                  "mainThreadPercent": 44.216508922444554,
+                  "chromiumPercent": 237.12446685863085
+                },
+                {
+                  "crop": false,
+                  "seconds": 5.025020199999999,
+                  "mainThreadPercent": 39.05552459271708,
+                  "chromiumPercent": 229.54108721791803
+                },
+                {
+                  "crop": true,
+                  "seconds": 5.055867199999997,
+                  "mainThreadPercent": 43.73904441160956,
+                  "chromiumPercent": 237.27931382374933
+                }
+              ]
+            },
+            {
+              "candidate": "bounded-buffer",
+              "visual": [
+                {
+                  "viewport": {
+                    "x": 5,
+                    "y": 5,
+                    "scale": 0.65
+                  },
+                  "changedPixels": 9667,
+                  "maxChannelDelta": 255,
+                  "totalChannelDelta": 593618,
+                  "maxCompositedDelta": 3.0823529411764707,
+                  "changedBeyondTwo": 138,
+                  "cropDraws": 16
+                },
+                {
+                  "viewport": {
+                    "x": -7.25,
+                    "y": 1.75,
+                    "scale": 0.65
+                  },
+                  "changedPixels": 9507,
+                  "maxChannelDelta": 255,
+                  "totalChannelDelta": 550904,
+                  "maxCompositedDelta": 3.227450980392157,
+                  "changedBeyondTwo": 127,
+                  "cropDraws": 32
+                },
+                {
+                  "viewport": {
+                    "x": 11.2,
+                    "y": -35.3,
+                    "scale": 1
+                  },
+                  "changedPixels": 375,
+                  "maxChannelDelta": 2,
+                  "totalChannelDelta": 531,
+                  "maxCompositedDelta": 2,
+                  "changedBeyondTwo": 0,
+                  "cropDraws": 36
+                },
+                {
+                  "viewport": {
+                    "x": -201.75,
+                    "y": -47,
+                    "scale": 1.5
+                  },
+                  "changedPixels": 762,
+                  "maxChannelDelta": 2,
+                  "totalChannelDelta": 1177,
+                  "maxCompositedDelta": 2,
+                  "changedBeyondTwo": 0,
+                  "cropDraws": 40
+                },
+                {
+                  "viewport": {
+                    "x": -25,
+                    "y": 9,
+                    "scale": 0.3
+                  },
+                  "changedPixels": 0,
+                  "maxChannelDelta": 0,
+                  "totalChannelDelta": 0,
+                  "maxCompositedDelta": 0,
+                  "changedBeyondTwo": 0,
+                  "cropDraws": 56
+                }
+              ],
+              "shortDiagnosticWindows": [
+                {
+                  "crop": false,
+                  "seconds": 5.018358299999998,
+                  "mainThreadPercent": 42.18794022738473,
+                  "chromiumPercent": 231.47938639614478
+                },
+                {
+                  "crop": true,
+                  "seconds": 5.0138853999999995,
+                  "mainThreadPercent": 45.153684605555604,
+                  "chromiumPercent": 240.705322064202
+                },
+                {
+                  "crop": false,
+                  "seconds": 5.0085275000000005,
+                  "mainThreadPercent": 41.57187916009245,
+                  "chromiumPercent": 235.85101609205483
+                },
+                {
+                  "crop": true,
+                  "seconds": 5.016329099999999,
+                  "mainThreadPercent": 43.69155125807039,
+                  "chromiumPercent": 241.6148095227643
+                }
+              ]
+            },
+            {
+              "candidate": "image-cache",
+              "visual": [
+                {
+                  "viewport": {
+                    "x": 5,
+                    "y": 5,
+                    "scale": 0.65
+                  },
+                  "changedPixels": 3439,
+                  "maxChannelDelta": 191,
+                  "totalChannelDelta": 36997,
+                  "maxCompositedDelta": 90,
+                  "changedBeyondTwo": 969,
+                  "cropDraws": 36
+                },
+                {
+                  "viewport": {
+                    "x": -7.25,
+                    "y": 1.75,
+                    "scale": 0.65
+                  },
+                  "changedPixels": 3299,
+                  "maxChannelDelta": 79,
+                  "totalChannelDelta": 25694,
+                  "maxCompositedDelta": 79,
+                  "changedBeyondTwo": 643,
+                  "cropDraws": 72
+                },
+                {
+                  "viewport": {
+                    "x": 11.2,
+                    "y": -35.3,
+                    "scale": 1
+                  },
+                  "changedPixels": 776,
+                  "maxChannelDelta": 12,
+                  "totalChannelDelta": 1600,
+                  "maxCompositedDelta": 4.682352941176471,
+                  "changedBeyondTwo": 13,
+                  "cropDraws": 108
+                },
+                {
+                  "viewport": {
+                    "x": -201.75,
+                    "y": -47,
+                    "scale": 1.5
+                  },
+                  "changedPixels": 966,
+                  "maxChannelDelta": 99,
+                  "totalChannelDelta": 7586,
+                  "maxCompositedDelta": 99,
+                  "changedBeyondTwo": 142,
+                  "cropDraws": 144
+                },
+                {
+                  "viewport": {
+                    "x": -25,
+                    "y": 9,
+                    "scale": 0.3
+                  },
+                  "changedPixels": 613,
+                  "maxChannelDelta": 41,
+                  "totalChannelDelta": 2670,
+                  "maxCompositedDelta": 41,
+                  "changedBeyondTwo": 61,
+                  "cropDraws": 180
+                }
+              ],
+              "shortDiagnosticWindows": [
+                {
+                  "crop": false,
+                  "seconds": 5.010771799999999,
+                  "mainThreadPercent": 42.87351501419403,
+                  "chromiumPercent": 234.40089608550926
+                },
+                {
+                  "crop": true,
+                  "seconds": 5.005283200000002,
+                  "mainThreadPercent": 56.952381835257555,
+                  "chromiumPercent": 227.66106421310977
+                },
+                {
+                  "crop": false,
+                  "seconds": 5.0233583000000035,
+                  "mainThreadPercent": 42.2931607327313,
+                  "chromiumPercent": 230.55906643171338
+                },
+                {
+                  "crop": true,
+                  "seconds": 5.023074,
+                  "mainThreadPercent": 58.53606775452641,
+                  "chromiumPercent": 252.01273164600002
+                }
+              ]
+            }
+          ]
         }
       },
       "rootCauseConfidence": "profiling_identifies_drawing_hotspots; complete_cpu_attribution_not_claimed",
@@ -3999,7 +4589,7 @@
     "id": "VFOPT-X-001-F003",
     "title": "Reduce visible-scene drawing cost during sustained mixed-component simulation",
     "status": "in_progress",
-    "reason": "F004 lifecycle/memory fixes pass the 20-cycle production fixture and regression checks. F003 idle-shadow/dash/hit-graph changes remain, but the Stage-pan compositor was reverted for missing held-pan pixels and prior offline production claims were corrected. Current verified-production sampling averages 38.0811% main-thread activity and 239.5183% aggregate Chromium CPU; active pan p95 is 135.4 ms, above 50 ms. Next isolate visible component image/shadow drawing cost against the same compiled-AVR fixture, then require three controlled runs and unchanged visual/simulation behavior. F005 project summaries follows F003.",
+    "reason": "F004 remains completed for scoped lifecycle acceptance. F003 now includes a validated connectivity cache with about 98% lower repeated-lookup benchmark time, but whole-app CPU and pan acceptance are still unmet. Motor and board indicator changes continue to redraw unchanged component artwork. Next validate bounded component-layer redraws with full redraw on viewport/geometry changes, preserved overlap/shadows and held-pointer pixels. F005 project-list summaries follows F003.",
     "backlog": "docs/VFOPT_X_001_FINDINGS_BACKLOG.json"
   },
   "artifactRetention": {
@@ -4033,6 +4623,13 @@
       "generatedBuildDirectoriesRemoved": 1,
       "bytesRemovedExcludingCleanupScript": 104228916,
       "retained": "Aggregate CPU/pan/heap measurements, retaining-path diagnosis, source hashes and validation results embedded in this backlog; existing reusable regression suites. Temporary helpers, heap snapshots, logs, screenshots, reports and the alternate production build were removed. Pre-existing reusable authenticated profiling harness and compiled firmware remain."
+    },
+    "connectivityCache2026_09_27": {
+      "status": "removed",
+      "generatedFilesRemoved": 65,
+      "generatedBuildDirectoriesRemoved": 1,
+      "bytesRemoved": 1854787,
+      "retained": "Source implementation, assertions in the existing runtime-delta suite, and aggregate benchmark/validation evidence in this backlog. Preserved the pre-existing profiling harness, service/firmware helpers and compiled firmware fixture. No standalone test file was added."
     }
   },
   "databaseLocationCorrection": {
