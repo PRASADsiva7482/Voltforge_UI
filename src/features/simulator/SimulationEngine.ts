@@ -303,11 +303,11 @@ class LcdTWIEventHandler {
  */
 export class SimulationEngine {
   private isRunning = false;
+  private runGeneration = 0;
   private isPaused = false;
   private simulationSpeed = 1;
   private isBatching = false;
   private runtimeDeltaCollector = new RuntimeDeltaCollector();
-  private originalUpdateNode: any = null;
   private intervalId: number | null = null;
   private callbacks: SimulationCallbacks;
   private pins: Record<string, PinInfo> = {};
@@ -387,6 +387,7 @@ private scopeCaptureRevision = 0;
 
   public async start(code: string, nodes: CanvasNode[], wires: Wire[], hex?: string, boardType?: string) {
     if (this.isRunning) return;
+    const runGeneration = ++this.runGeneration;
     this.isRunning = true;
     this.isPaused = false;
     this.tick = 0;
@@ -774,11 +775,13 @@ private scopeCaptureRevision = 0;
 
       this.callbacks.onSerialOutput('> Starting compatibility interpreter...');
       await new Promise(resolve => setTimeout(resolve, 500));
+      if (!this.isRunning || runGeneration !== this.runGeneration) return;
 
       this.parseCode(code);
 
       this.callbacks.onSerialOutput('> Compiled firmware not available; falling back to code-compatibility interpreter');
       await new Promise(resolve => setTimeout(resolve, 300));
+      if (!this.isRunning || runGeneration !== this.runGeneration) return;
       this.callbacks.onSerialOutput('> Physics-based MNA solver active');
       this.callbacks.onSerialOutput('> Compatibility CPU Started');
       this.callbacks.onSerialOutput('────────────────────────────────');
@@ -2638,40 +2641,46 @@ private scopeCaptureRevision = 0;
     this.isBatching = true;
     this.runtimeDeltaCollector.reset();
 
-    const store = useCanvasStore.getState() as any;
-    this.originalUpdateNode = store.updateRuntimeNode;
+    const store = useCanvasStore.getState();
+    const originalUpdateNode = store.updateRuntimeNode;
 
-    store.updateRuntimeNode = (id: string, updates: Partial<CanvasNode>) => {
+    const collectRuntimeUpdate = (id: string, updates: Partial<CanvasNode>) => {
       const hasGeometry = Object.keys(updates).some(k =>
         k === 'x' || k === 'y' || k === 'width' || k === 'height' || k === 'rotation' || k === 'pins'
       );
       if (hasGeometry) {
-        this.originalUpdateNode.call(store, id, updates);
+        originalUpdateNode(id, updates);
         return;
       }
 
-      const currentNode = store.nodesById.get(id);
+      const currentNode = useCanvasStore.getState().nodesById.get(id);
       this.runtimeDeltaCollector.stage(id, currentNode, updates);
     };
+    store.updateRuntimeNode = collectRuntimeUpdate;
 
     try {
       return fn();
     } finally {
       this.isBatching = false;
-      if (this.originalUpdateNode) {
-        store.updateRuntimeNode = this.originalUpdateNode;
-        this.originalUpdateNode = null;
+      store.updateRuntimeNode = originalUpdateNode;
+      // Other store writes inside the batch create a new immutable snapshot
+      // containing the temporary action. Restore that snapshot too, or it keeps
+      // this engine and every earlier editor reachable through a callback chain.
+      const currentStore = useCanvasStore.getState();
+      if (currentStore.updateRuntimeNode === collectRuntimeUpdate) {
+        currentStore.updateRuntimeNode = originalUpdateNode;
       }
 
-      const batch = this.runtimeDeltaCollector.materialize(store.nodesById);
+      const batch = this.runtimeDeltaCollector.materialize(currentStore.nodesById);
       if (batch.length > 0) {
-        store.batchUpdateRuntimeNodes(batch);
+        currentStore.batchUpdateRuntimeNodes(batch);
       }
       this.runtimeDeltaCollector.reset();
     }
   }
 
   public stop() {
+    this.runGeneration += 1;
     this.isRunning = false;
     this.isPaused = false;
     this.clearSolverResultSchedule();

@@ -31,6 +31,7 @@ const sourceFiles = ['src/features/editor/CircuitEditorPage.tsx', 'src/features/
 const sha = value => crypto.createHash('sha256').update(value).digest('hex')
 const measured = [], checks = [], errors = [], requests = []
 const saves = []
+let compileBarrier
 let savedProject = structuredClone(fixture)
 let browser
 let browserServer, clipboardPage, previousClipboard
@@ -47,7 +48,7 @@ const server = await createServer({ root, server: { host: 'localhost', port: 310
   configureServer(vite) {
     vite.middlewares.use(async (request, response, next) => {
       if (!request.headers.accept?.includes('text/html') || !/^\/(editor|outside)(\/|\?|$)/.test(request.url)) return next()
-      const html = await vite.transformIndexHtml(request.url, '<!doctype html><html><head><title>Editor render audit</title></head><body><div id="root"></div><script type="module" src="/scripts/fixtures/editor-render-entry.tsx"></script></body></html>')
+      const html = await vite.transformIndexHtml(request.url, '<!doctype html><html><head><title>Editor render audit</title><script src="/config.js"></script></head><body><div id="root"></div><script type="module" src="/scripts/fixtures/editor-render-entry.tsx"></script></body></html>')
       response.setHeader('Content-Type', 'text/html'); response.end(html)
     })
   },
@@ -111,6 +112,11 @@ try {
   browser = await chromium.connect(browserServer.wsEndpoint())
   const context = await browser.newContext({ viewport: { width: 1366, height: 768 }, permissions: ['clipboard-read','clipboard-write'] })
   await context.addInitScript(() => { window.__editorAudit = { commits: {} } })
+  await context.routeWebSocket(/\/ws-native(?:\?|$)/, socket => {
+    socket.onMessage(message => {
+      if (String(message).startsWith('CONNECT\n')) socket.send('CONNECTED\nversion:1.2\nheart-beat:0,0\n\n\0')
+    })
+  })
   await context.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url())
     if (url.pathname.includes('/api/v1/')) {
@@ -125,7 +131,10 @@ try {
         }
         return route.fulfill({ json: { success: true, data: savedProject } })
       }
-      if (/compile/.test(api)) return route.fulfill({ json: { success: true, data: { success: false, compiler: 'audit-unavailable', stderr: 'No real compiler in editor render fixture' } } })
+      if (/compile/.test(api)) {
+        if (compileBarrier) { compileBarrier.started(); await compileBarrier.wait }
+        return route.fulfill({ json: { success: true, data: { success: false, compiler: 'audit-unavailable', stderr: 'No real compiler in editor render fixture' } } })
+      }
       if (api.startsWith('/ai/')) return route.fulfill({ status: 503, json: { success: false } })
       return route.fulfill({ json: { success: true, data: [] } })
     }
@@ -134,7 +143,6 @@ try {
   })
   const page = await context.newPage()
   clipboardPage = page
-  if (codeEditorOnly) await page.clock.install()
   page.on('pageerror', error => errors.push(error.message))
   page.setDefaultTimeout(15000)
   await page.goto(origin + '/editor/render-owned', { waitUntil: 'domcontentloaded' })
@@ -144,6 +152,18 @@ try {
   await settle(page)
   previousClipboard = await page.evaluate(() => navigator.clipboard.readText())
   if (codeEditorOnly) {
+    // Playwright's fake performance object returns no User Timing entries.
+    // Monaco reads those entries after typing, so preserve the native methods
+    // while controlling timers/RAF for the immediate-edit regression below.
+    await page.evaluate(() => {
+      const nativePerformance = window.performance
+      window.__editorAudit.userTiming = Object.fromEntries(
+        ['mark', 'measure', 'getEntries', 'getEntriesByName', 'getEntriesByType', 'clearMarks', 'clearMeasures']
+          .map(name => [name, nativePerformance[name].bind(nativePerformance)])
+      )
+    })
+    await page.clock.install()
+    await page.evaluate(() => Object.assign(window.performance, window.__editorAudit.userTiming))
     await check('Immediate typing after a file switch reaches the document without a timed ignore window', async () => {
       await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
       try {
@@ -215,13 +235,14 @@ try {
   } else {
   await measure(page,'First runtime feedback on a clean document','runtime',1)
   for (const kind of ['runtime','clock','avr','diagnostics','viewport','code','pcb']) {
-    // Keep the before/after steady-state comparison independent of autosave and the first dirty transition.
+    // Start clean so the two-second autosave cannot create unrelated shell
+    // commits during runtime-only samples. Real edits reset its debounce.
     await page.evaluate(() => { window.__editorAudit.stores.project.getState().setDirty(false) })
     await settle(page)
-    await page.evaluate(() => { window.__editorAudit.stores.project.getState().setDirty(true) })
-    await settle(page)
+    const savesBeforeSample = saves.length
     const r = await measure(page, `${kind}: 60 independent updates`, kind)
     if (phase === 'after') await check(`${kind}: editor shell and palette stay isolated`, () => {
+      assert.equal(saves.length, savesBeforeSample, 'The isolation sample must not include an autosave')
       assert.equal(r.commits.CircuitEditorPage || 0, 0)
       assert.equal(r.commits.ComponentPanel || 0, 0)
       if (kind !== 'code') assert.equal(r.commits.CodeEditor || 0, 0)
@@ -306,7 +327,7 @@ try {
       await page.evaluate(async () => {
         const { SimulationEngine } = await import('/src/features/simulator/SimulationEngine.ts')
         window.__editorAudit.engineCalls={}
-        for (const name of ['start','pause','step','resume','stop']) {
+        for (const name of ['start','pause','step','resume','stop','startMNASolver']) {
           const original=SimulationEngine.prototype[name]
           SimulationEngine.prototype[name]=function(...args) {
             const calls=window.__editorAudit.engineCalls; calls[name]=(calls[name]||0)+1
@@ -372,20 +393,46 @@ try {
       await settle(page); await page.keyboard.press('Control+s'); await settle(page)
       assert.equal(saves.length,before)
     })
-    await check('Unmount removes autosave and route-owned consumers', async () => {
+    await check('Unmount stops active simulation, autosave and route-owned consumers', async () => {
       await page.evaluate(() => {
         window.__editorAudit.setUser({id:'render-owner',keycloakId:'render-owner',displayName:'Render fixture',username:'render-owner',role:'USER'})
         const store=window.__editorAudit.stores.project
         store.setState({currentProject:{...store.getState().currentProject,owner:{keycloakId:'render-owner'}},isDirty:true})
       })
       await page.getByRole('button',{name:'Save project',exact:true}).waitFor()
+      const starts = await page.evaluate(() => window.__editorAudit.engineCalls.start || 0)
+      await page.getByRole('button', { name: 'Start simulation', exact: true }).click()
+      await page.waitForFunction(starts => window.__editorAudit.engineCalls.start > starts, starts)
+      const solverStarts = await page.evaluate(() => window.__editorAudit.engineCalls.startMNASolver || 0)
       const before=saves.length
       await page.evaluate(() => { history.pushState({},'', '/outside'); window.dispatchEvent(new PopStateEvent('popstate')) })
       await page.getByRole('heading',{name:'Outside editor fixture'}).waitFor()
+      assert.equal(await page.evaluate(() => window.__editorAudit.stores.simulation.getState().isSimulating), false)
       await page.evaluate(() => { window.__editorAudit.commits={}; window.__editorAudit.stores.canvas.getState().updateRuntimeNode('led-0',{properties:{isLit:true}}) })
       await page.waitForTimeout(10500)
       assert.equal(saves.length,before)
       assert.deepEqual(await page.evaluate(() => window.__editorAudit.commits),{})
+      assert.equal(await page.evaluate(() => window.__editorAudit.engineCalls.startMNASolver || 0), solverStarts, 'Leaving during interpreter startup must not start a late worker')
+    })
+    await check('A compiler response after navigation cannot restart simulation or overwrite its state', async () => {
+      let release
+      const started = new Promise(resolve => { compileBarrier = { started: resolve, wait: new Promise(done => { release = done }) } })
+      try {
+        await page.evaluate(() => { history.pushState({}, '', '/editor/render-owned'); window.dispatchEvent(new PopStateEvent('popstate')) })
+        await page.getByRole('button', { name: 'Start simulation', exact: true }).waitFor()
+        const starts = await page.evaluate(() => window.__editorAudit.engineCalls.start || 0)
+        await page.getByRole('button', { name: 'Start simulation', exact: true }).click()
+        await started
+        await page.evaluate(() => { history.pushState({}, '', '/outside'); window.dispatchEvent(new PopStateEvent('popstate')) })
+        await page.getByRole('heading', { name: 'Outside editor fixture' }).waitFor()
+        // Sentinel mode belongs to the next screen; a late compiler fallback
+        // must not write interpreter mode back into the singleton store.
+        await page.evaluate(() => window.__editorAudit.stores.simulation.getState().setExecutionMode('avr8js'))
+        release()
+        await page.waitForTimeout(1000)
+        const state = await page.evaluate(() => ({ starts: window.__editorAudit.engineCalls.start || 0, running: window.__editorAudit.stores.simulation.getState().isSimulating, mode: window.__editorAudit.stores.simulation.getState().executionMode }))
+        assert.equal(state.starts, starts); assert.equal(state.running, false); assert.equal(state.mode, 'avr8js')
+      } finally { release(); compileBarrier = undefined }
     })
   }
   }

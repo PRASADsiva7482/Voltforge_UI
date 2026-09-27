@@ -42,6 +42,52 @@ try {
     layer.on('draw.drag-audit',()=>{if(a.lastMove){a.latencies.push(performance.now()-a.lastMove);a.lastMove=0}})
     a.unsubscribe=a.store.subscribe((state,previous)=>{if(state.documentNodes!==previous.documentNodes)a.geometryPublications++;if(state.wires!==previous.wires)a.wirePublications++})
   })
+  await check('Held Stage pan paints the newly exposed grid before pointer release', async () => {
+    const point = await page.evaluate(() => {
+      const stage = window.__dragAudit.Konva.stages[0], rect = stage.content.getBoundingClientRect()
+      return { x: rect.left + 1000, y: rect.top + 25 }
+    })
+    try {
+      await page.mouse.move(point.x, point.y)
+      await page.mouse.down()
+      await page.mouse.move(point.x - 300, point.y, { steps: 5 })
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      const diff = await page.evaluate(() => {
+        const a = window.__dragAudit, stage = a.Konva.stages[0], grid = stage.getLayers()[0]
+        const native = grid.getNativeCanvasElement(), composite = document.createElement('canvas')
+        composite.width = native.width; composite.height = native.height
+        const context = composite.getContext('2d'), ratio = grid.getCanvas().getPixelRatio()
+        const transform = new DOMMatrix(native.style.transform || undefined)
+        context.drawImage(native, transform.e * ratio, transform.f * ratio)
+        const held = context.getImageData(0, 0, composite.width, composite.height).data
+        // Invoke the real draw to compare with the complete scene at the same
+        // held pointer position, even if an optimization suppresses instance draws.
+        a.Konva.Layer.prototype.draw.call(grid)
+        const expected = native.getContext('2d').getImageData(0, 0, native.width, native.height).data
+        let missingPixels = 0
+        for (let i = 0; i < expected.length; i += 4) {
+          if (expected[i + 3] > 0 && held[i + 3] === 0) missingPixels++
+        }
+        return { missingPixels, stageX: stage.x() }
+      })
+      assert(diff.stageX < -200, 'The test must pan the Stage')
+      assert.equal(diff.missingPixels, 0, 'The grid must cover the exposed viewport while the pointer is held')
+    } finally {
+      await page.mouse.up()
+      await page.evaluate(() => {
+        const a = window.__dragAudit, stage = a.Konva.stages[0]
+        stage.position({ x: 0, y: 0 })
+        a.store.getState().setViewport({ x: 0, y: 0, scale: 0.65 })
+        stage.draw()
+      })
+    }
+  })
+  // Exclude earlier correctness checks from the component-drag timing sample.
+  await page.evaluate(() => {
+    const a = window.__dragAudit
+    a.lastMove = 0; a.latencies = []; a.events = []
+    a.geometryPublications = 0; a.wirePublications = 0
+  })
   // Actual mouse gesture across 30 separately painted positions, including final mouseup.
   await page.mouse.move(76,60); await page.mouse.down(); await page.mouse.move(84,68)
   for(let i=0;i<30;i++) { await page.mouse.move(90+i*3,75+i*2); await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))) }

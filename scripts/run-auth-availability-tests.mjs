@@ -268,8 +268,8 @@ try {
     assert(record.authorizationSequence !== null, 'Available identity provider must receive interactive authorization')
     assert(record.availabilitySequence < record.authorizationSequence, 'Backend availability must pass before interactive Keycloak authorization')
     if (development) {
-      assert(record.api.some(request => request.path === '/auth/identity-health' && request.origin === developmentApiOrigin), 'Development availability check must use VITE_API_BASE_URL')
-      assert(record.identityProviderOrigins.includes(developmentKeycloakOrigin), 'Development Keycloak requests must use VITE_KEYCLOAK_URL')
+      assert(record.api.some(request => request.path === '/auth/identity-health' && request.origin === developmentApiOrigin), 'Development availability check must use the configured backend API origin')
+      assert(record.identityProviderOrigins.includes(developmentKeycloakOrigin), 'Development Keycloak requests must use the configured identity-provider origin')
     }
     assert.equal(record.signInRedirect, origin + '/projects?sort=recent')
     await page.goto(record.completeLoginUrl)

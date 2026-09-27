@@ -7,7 +7,12 @@ import { Loader2, Maximize2, Minimize2, AlignLeft, Eye, EyeOff, Cpu, Upload, X }
 import type { OnMount } from '@monaco-editor/react';
 import { getBoardPinNumber, getBoardProfile, isBoardComponentType, supportsAvr8js } from '../canvas/boardCatalog';
 
-const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.default })));
+const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => {
+  // 0.55.1 retains a detached stylesheet on every editor disposal. Pin the
+  // compatible release that removes it from Monaco's global stylesheet map.
+  m.loader.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.56.0/min/vs' } });
+  return { default: m.default };
+}));
 
 // ── Arduino framework boilerplate generator ──
 function generateFullCode(userCode: string, boardType?: string): string {

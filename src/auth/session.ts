@@ -1,5 +1,5 @@
 import keycloak, { getKeycloakConfig } from './keycloak'
-import api, { getBaseURL } from '../api/client'
+import { getBaseURL } from '../api/client'
 
 export const SESSION_CHECK_TIMEOUT_MS = 3500
 export const USER_SYNC_TIMEOUT_MS = 5000

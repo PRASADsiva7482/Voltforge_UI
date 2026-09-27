@@ -83,15 +83,12 @@ editor subscription changes in VFOPT-UI-010.
 
 ## Login handoff follow-up, 2026-09-26
 
-The development runtime defaults in `public/config.js` set both service URLs to
-the UI origin. Those defaults masked the configured `VITE_API_BASE_URL` and
-`VITE_KEYCLOAK_URL`, so the login preflight could call the UI server instead of
-the backend and the adapter could try Keycloak on the UI host. Development now
-uses the Vite service URLs when the runtime values match those generated
-same-origin defaults; explicit runtime endpoints and deployed same-origin
-configuration retain precedence. The collaboration WebSocket follows the same
-rule and derives its endpoint from the selected API URL when no explicit WS URL
-is configured.
+The earlier generated runtime config pointed the API and Keycloak URLs at the
+UI origin, masking the configured services. `public/config.js` now declares
+explicit `baseUrls` for the backend API, WebSocket, AI service and Keycloak;
+the API client, collaboration connection and Keycloak adapter consume those
+runtime values directly. Set these URLs to the matching service origins in the
+deployment runtime config.
 
 The interactive flow is now verified in order: the Login button awaits
 `GET /auth/identity-health`, checks that the backend-reported issuer matches
@@ -104,10 +101,11 @@ runtime selects PKCE S256 whenever browser Web Crypto is available.
 
 Validation on 2026-09-26: production build and bundle budget passed; all 20
 production auth browser scenarios passed; the development service-origin and
-callback scenario passed. A real-browser login attempt against the currently
-running services also stayed on the app and hit the configured backend. The
-backend returned `available: false` (HTTP 503), and Keycloak discovery for
-`voltforge-realm` returned HTTP 404. Therefore real account sign-in and
-Dashboard access remain unavailable until that realm, client, and user
-configuration are restored. The availability gate remains closed, and no live
-credentials were submitted.
+callback scenario passed. An earlier live probe that day found identity
+unavailable, but the services were restored afterward. The current backend
+returns `available: true` with the configured issuer, and Keycloak discovery
+for `voltforge-realm` returns HTTP 200. A real browser sign-in, account sync,
+Dashboard return and editor access then succeeded using the previously
+authorized local test account. Credentials are not recorded here. The sign-in
+availability gate remains active and checks both backend availability and
+issuer equality before redirecting.

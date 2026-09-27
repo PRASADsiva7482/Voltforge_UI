@@ -257,6 +257,9 @@ const ComponentNodeWrapper = memo(({
   isDark,
   onComponentInteraction,
   onProbeToggle,
+  onHitGraphInvalidated,
+  onHitGraphInteractionStart,
+  onHitGraphInteractionEnd,
   readOnly,
   isProbeMode,
   isSimulating,
@@ -266,6 +269,9 @@ const ComponentNodeWrapper = memo(({
   isDark: boolean;
   onComponentInteraction?: (nodeId: string, event: 'press' | 'release') => void;
   onProbeToggle?: (target: { nodeId: string; pinId: string; x: number; y: number }) => void;
+  onHitGraphInvalidated?: () => void;
+  onHitGraphInteractionStart?: () => void;
+  onHitGraphInteractionEnd?: () => void;
   readOnly?: boolean;
   isProbeMode?: boolean;
   isSimulating?: boolean;
@@ -290,19 +296,24 @@ const ComponentNodeWrapper = memo(({
       node={node}
       isSelected={isSelected}
       isDark={isDark}
-      onSelect={() => selectNode(node.id)}
+      onSelect={() => { onHitGraphInvalidated?.(); selectNode(node.id); }}
       onChange={(a) => updateNode(node.id, a)}
       onDragMove={(a) => { if (!readOnly) useCanvasStore.getState().queueNodeGesture(node.id, a); }}
       onGestureStart={() => {
+        onHitGraphInteractionStart?.();
         if (!readOnly) useCanvasStore.getState().beginNodeGesture(node.id);
       }}
-      onDragEnd={(a) => { if (!readOnly) useCanvasStore.getState().endNodeGesture(node.id, a); }}
+      onDragEnd={(a) => {
+        if (!readOnly) useCanvasStore.getState().endNodeGesture(node.id, a);
+        onHitGraphInteractionEnd?.();
+      }}
       isWiring={isWiring}
       wiringFromNodeId={wiringFromNodeId}
       startWiring={readOnly ? () => {} : startWiring}
       finishWiring={readOnly ? () => {} : finishWiring}
       onInteraction={onComponentInteraction}
       onProbeToggle={onProbeToggle}
+      onHitGraphInvalidated={onHitGraphInvalidated}
       readOnly={readOnly}
       isProbeMode={isProbeMode}
       isSimulating={isSimulating}
@@ -352,6 +363,8 @@ export default function CircuitCanvas({
 
   const stageRef = useRef<Konva.Stage>(null);
   const gridLayerRef = useRef<Konva.Layer>(null);
+  const componentLayerRef = useRef<Konva.Layer>(null);
+  const componentHitGraphStateRef = useRef({ dirty: true, interactionActive: false });
   const viewportRenderAnchorRef = useRef(viewport);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [activeNewBendPoint, setActiveNewBendPoint] = useState<ActiveBendPoint | null>(null);
@@ -370,11 +383,58 @@ export default function CircuitCanvas({
   const visibleNodes = useMemo(() => componentIndex.select(viewport, width, height, previousVisible.current, retainedNodeIds), [componentIndex, viewport, width, height, retainedNodeIds]);
   useLayoutEffect(() => { previousVisible.current = new Set(visibleNodes.map(node => node.id)); }, [visibleNodes]);
 
+  const invalidateComponentHitGraph = useCallback(() => {
+    componentHitGraphStateRef.current.dirty = true;
+  }, []);
+  const beginComponentHitGraphInteraction = useCallback(() => {
+    if (isSimulating) componentHitGraphStateRef.current.interactionActive = true;
+  }, [isSimulating]);
+  const finishComponentHitGraphInteraction = useCallback(() => {
+    const state = componentHitGraphStateRef.current;
+    if (!isSimulating || !state.interactionActive) return;
+    state.interactionActive = false;
+    state.dirty = true;
+    componentLayerRef.current?.batchDraw();
+  }, [isSimulating]);
+
+  useLayoutEffect(() => {
+    const layer = componentLayerRef.current;
+    const state = componentHitGraphStateRef.current;
+    state.dirty = true;
+    if (!layer || !isSimulating) {
+      state.interactionActive = false;
+      return;
+    }
+
+    const drawHit = layer.drawHit;
+    const cachedDrawHit: typeof layer.drawHit = function (...args) {
+      if (state.interactionActive || !state.dirty) return layer;
+      state.dirty = false;
+      return drawHit.apply(layer, args);
+    };
+    layer.drawHit = cachedDrawHit;
+    layer.batchDraw();
+
+    return () => {
+      if (layer.drawHit === cachedDrawHit) layer.drawHit = drawHit;
+      state.dirty = true;
+      state.interactionActive = false;
+    };
+  }, [isSimulating]);
+
+  useLayoutEffect(() => {
+    invalidateComponentHitGraph();
+  }, [invalidateComponentHitGraph, documentNodes, visibleNodes, selectedNodeId, viewport, width, height, viewMode, readOnly, isProbeMode, activeInteractionId]);
+
   // Native DOM capture runs before controls stop Konva event bubbling. Keep
   // dials, momentary buttons and nested sensor drag handles alive until release.
   useEffect(() => {
     let frame = 0;
-    const release = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(() => setActiveInteractionId(null)); };
+    const release = () => {
+      cancelAnimationFrame(frame);
+      finishComponentHitGraphInteraction();
+      frame = requestAnimationFrame(() => setActiveInteractionId(null));
+    };
     window.addEventListener('pointerup', release);
     window.addEventListener('pointercancel', release);
     window.addEventListener('blur', release);
@@ -384,7 +444,7 @@ export default function CircuitCanvas({
       window.removeEventListener('pointercancel', release);
       window.removeEventListener('blur', release);
     };
-  }, []);
+  }, [finishComponentHitGraphInteraction]);
 
   const wireRenderContext = useMemo(() => {
     const nodesById = useCanvasStore.getState().nodesById;
@@ -542,6 +602,9 @@ export default function CircuitCanvas({
           y={viewport.y}
           scaleX={viewport.scale}
           scaleY={viewport.scale}
+          onDragStart={() => {
+            beginComponentHitGraphInteraction();
+          }}
           onDragMove={(e: KonvaEventObject<DragEvent>) => {
             // Konva drag events from a component bubble to the Stage. Only a
             // drag that began on the Stage itself is canvas panning; otherwise
@@ -556,14 +619,16 @@ export default function CircuitCanvas({
             setViewport(nextViewport);
           }}
           onDragEnd={(e: KonvaEventObject<DragEvent>) => {
+            finishComponentHitGraphInteraction();
             if (e.target !== e.currentTarget) return;
-            const nextViewport = { ...viewport, x: e.target.x(), y: e.target.y() };
+            const nextViewport = { ...viewportRenderAnchorRef.current, x: e.target.x(), y: e.target.y() };
             viewportRenderAnchorRef.current = nextViewport;
             setViewport(nextViewport);
           }}
           onWheel={handleWheel}
           onClick={(e: KonvaEventObject<MouseEvent>) => {
             if (e.target === e.target.getStage()) {
+              invalidateComponentHitGraph();
               selectNode(null);
               selectWire(null);
               if (isWiring) cancelWiring();
@@ -613,7 +678,7 @@ export default function CircuitCanvas({
           )}
 
           {/* Component layer (below wires) */}
-          <Layer opacity={viewMode === 'pcb' ? 0.35 : 1}>
+          <Layer ref={componentLayerRef} opacity={viewMode === 'pcb' ? 0.35 : 1}>
             {visibleNodes.map(({ id }) => (
               <ComponentNodeWrapper
                 key={id}
@@ -625,6 +690,9 @@ export default function CircuitCanvas({
                 isProbeMode={isProbeMode}
                 isSimulating={isSimulating}
                 detailed={viewport.scale >= COMPONENT_DETAIL_SCALE || retainedNodeIds.has(id)}
+                onHitGraphInvalidated={invalidateComponentHitGraph}
+                onHitGraphInteractionStart={beginComponentHitGraphInteraction}
+                onHitGraphInteractionEnd={finishComponentHitGraphInteraction}
               />
             ))}
           </Layer>

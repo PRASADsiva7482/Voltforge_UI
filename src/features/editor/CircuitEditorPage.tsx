@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useCallback, useState, useRef, type ReactNode } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, type QueryFunctionContext } from '@tanstack/react-query'
 import { useShallow } from 'zustand/react/shallow'
 import {
   ArrowLeft,
@@ -98,6 +98,15 @@ const ProjectSettingsModal = lazy(() => import('./ProjectSettingsModal'))
 const SolverDiagnosticsPanel = lazy(() => import('./SolverDiagnosticsPanel'))
 
 type ViewMode = 'canvas' | 'code' | 'split' | 'pcb'
+
+// Queries outlive the editor until cache eviction. Keep their fetch function
+// outside the component so the cache cannot retain a closed editor's scope.
+async function fetchEditorProject({ queryKey }: QueryFunctionContext<readonly ['project', string | undefined]>) {
+  const projectId = queryKey[1]
+  if (!projectId) throw new Error('Project ID is required')
+  const response = await projectApi.getById(projectId)
+  return response.data.data
+}
 
 function EditorFeatureBoundary({ children, label }: { children: ReactNode; label: string }) {
   return (
@@ -327,6 +336,9 @@ export default function CircuitEditorPage() {
   // singleton, so without this a project with no layout could display the
   // previous project's components and PCB footprints.
   useEffect(() => {
+    setIsSimulating(false)
+    setIsSimulationPaused(false)
+    setSimulating(false)
     resetCanvas()
     resetPcb()
     setCurrentProject(null)
@@ -334,16 +346,20 @@ export default function CircuitEditorPage() {
     sharedCanvasStateRef.current = null
     sharedCodeStateRef.current = null
     setDirty(false)
-    return cancelCanvasRouting
-  }, [projectId, resetCanvas, resetPcb, setCurrentProject, setDirty, cancelCanvasRouting])
+    return () => {
+      // A compiler response can arrive after navigation, even before an engine
+      // exists. Invalidate that request as well as stopping the active engine.
+      simulationRequestRef.current += 1
+      stopSimulationEngine()
+      setSimulating(false)
+      cancelCanvasRouting()
+    }
+  }, [projectId, resetCanvas, resetPcb, setCurrentProject, setDirty, cancelCanvasRouting, setSimulating, stopSimulationEngine])
 
   // ── Load project ──
   const { data: fetchedProject, isLoading } = useQuery({
-    queryKey: ['project', projectId],
-    queryFn: async () => {
-      const r = await projectApi.getById(projectId!)
-      return r.data.data
-    },
+    queryKey: ['project', projectId] as const,
+    queryFn: fetchEditorProject,
     enabled: !!projectId && !isPreset,
   })
 
@@ -750,6 +766,7 @@ export default function CircuitEditorPage() {
             boardType: selectedBoardType,
             sketchName: currentProject?.name || 'VoltForgeSketch',
           })
+          if (requestId !== simulationRequestRef.current) return
           const result = compile.data.data
           const resultBoardType = result.boardType || selectedBoardType
           const canRunCompiledHex = Boolean(result.success && result.hex && supportsAvr8js(resultBoardType))
@@ -768,6 +785,7 @@ export default function CircuitEditorPage() {
               : `> Firmware compile failed: ${result.stderr || result.diagnostics?.[0] || 'unknown compiler error'}`
           )
         } catch (err: any) {
+          if (requestId !== simulationRequestRef.current) return
           useSimulationStore.getState().setExecutionMode('interpreter');
           writeSerial(`> Firmware compiler unavailable: ${err?.message || 'request failed'}`)
         }

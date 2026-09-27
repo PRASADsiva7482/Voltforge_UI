@@ -429,8 +429,8 @@
   "nextWorkItem": {
     "id": "VFOPT-X-001-F003",
     "title": "Reduce visible-scene drawing cost during sustained mixed-component simulation",
-    "status": "recommended_not_started",
-    "reason": "F009 editor checks and save recovery are complete. Resume the measured sustained-simulation CPU/drawing hotspot after the completed transport and persistence prerequisites.",
+    "status": "in_progress",
+    "reason": "F004 lifecycle/memory fixes pass the 20-cycle production fixture and regression checks. F003 idle-shadow/dash/hit-graph changes remain, but the Stage-pan compositor was reverted for missing held-pan pixels and prior offline production claims were corrected. Current verified-production sampling averages 38.0811% main-thread activity and 239.5183% aggregate Chromium CPU; active pan p95 is 135.4 ms, above 50 ms. Next isolate visible component image/shadow drawing cost against the same compiled-AVR fixture, then require three controlled runs and unchanged visual/simulation behavior. F005 project summaries follows F003.",
     "backlog": "docs/VFOPT_X_001_FINDINGS_BACKLOG.json"
   },
   "evidence": {
@@ -472,9 +472,9 @@
     "appCompletelyReady": false
   },
   "continuation": {
-    "updatedAt": "2026-09-21T03:39:25.708Z",
-    "completed": "VFOPT-X-001-F009",
-    "previousCompleted": "VFOPT-X-001-F008",
+    "updatedAt": "2026-09-27T09:01:15.135Z",
+    "completed": "VFOPT-X-001-F004",
+    "previousCompleted": "VFOPT-X-001-F009",
     "next": "VFOPT-X-001-F003",
     "backlog": "docs/VFOPT_X_001_FINDINGS_BACKLOG.json"
   },

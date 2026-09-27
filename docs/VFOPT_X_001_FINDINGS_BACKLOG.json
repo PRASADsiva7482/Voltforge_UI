@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "auditId": "VFOPT-X-001",
-  "updatedAt": "2026-09-21T03:39:25.708Z",
+  "updatedAt": "2026-09-27T09:01:15.135Z",
   "scope": [
     "Voltforge_UI",
     "Voltforge_BL"
@@ -10,8 +10,8 @@
   "idPolicy": "These F001-F007 IDs are new follow-ups defined by this measured audit, not reconstructed entries from the removed root backlog. F008 was added from live boundary testing during F002. F009 was added from production code-paste testing during F008.",
   "counts": {
     "total": 9,
-    "open": 5,
-    "completed": 4
+    "open": 4,
+    "completed": 5
   },
   "recommendedOrder": [
     "VFOPT-X-001-F001",
@@ -647,19 +647,1586 @@
             "line": 13,
             "ms": 36
           }
-        ]
+        ],
+        "interimSceneRegression": {
+          "date": "2026-09-26",
+          "change": "Idle pin shadows are enabled only while hovered, avoiding shadow buffers during ordinary scene redraws while preserving pin pixels and hover glow.",
+          "componentSceneContractChecksPassed": 11,
+          "productionBrowserChecksPassed": 14,
+          "stressSamples": [
+            {
+              "nodes": 500,
+              "mountedComponentsAfterPan": 42,
+              "panP95Ms": 21.4,
+              "zoomP95Ms": 17.6
+            },
+            {
+              "nodes": 1000,
+              "mountedComponentsAfterPan": 42,
+              "panP95Ms": 22.5,
+              "zoomP95Ms": 13.7
+            }
+          ],
+          "limitation": "These canvas regression checks alone do not satisfy the sustained compiled-firmware CPU and active-input acceptance criteria. The identity services were restored later on 2026-09-26 and authenticated profiling now runs against the real editor."
+        },
+        "compiledFirmwareAfterAnimationGate": {
+          "date": "2026-09-26",
+          "rerunHarness": {
+            "script": "node_modules/.cache/vfopt-f003/profile.mjs",
+            "compiledFirmware": "node_modules/.cache/vfopt-f003/firmware/sketch.ino.hex",
+            "credentialEnvironmentVariables": [
+              "VFOPT_TEST_USERNAME",
+              "VFOPT_TEST_PASSWORD"
+            ],
+            "credentialsPersistedInHarness": false
+          },
+          "fixtureSha256": "ab4d3bc31fa61747a98c84353a7949937c84a755595023a8e852e959e198a02e",
+          "firmwareSha256": "b17545cb64be48ba83c89a9c48266216b7234ac5216a55ed292e46825676591c",
+          "candidate": "Schedule the ComponentNode animation-frame loop only for active DC/BLDC shaft motors; other active components use solver updates and do not rotate a shaft.",
+          "beforePinOnlyRuns": [
+            {
+              "mainThreadBusyPercentOfOneCore": 45.575,
+              "chromiumCpuPercentOfOneCore": 265.819
+            },
+            {
+              "mainThreadBusyPercentOfOneCore": 44.817,
+              "chromiumCpuPercentOfOneCore": 267.178
+            },
+            {
+              "mainThreadBusyPercentOfOneCore": 44.4,
+              "chromiumCpuPercentOfOneCore": 260.794
+            }
+          ],
+          "beforeMean": {
+            "mainThreadBusyPercentOfOneCore": 44.93,
+            "chromiumCpuPercentOfOneCore": 264.6
+          },
+          "afterAnimationGateRuns": [
+            {
+              "mainThreadBusyPercentOfOneCore": 46.566,
+              "chromiumCpuPercentOfOneCore": 264.109
+            },
+            {
+              "mainThreadBusyPercentOfOneCore": 45.155,
+              "chromiumCpuPercentOfOneCore": 266.636
+            },
+            {
+              "mainThreadBusyPercentOfOneCore": 45.615,
+              "chromiumCpuPercentOfOneCore": 259.6
+            }
+          ],
+          "afterMean": {
+            "mainThreadBusyPercentOfOneCore": 45.78,
+            "chromiumCpuPercentOfOneCore": 263.45
+          },
+          "deltaPercentagePoints": {
+            "mainThreadBusyPercentOfOneCore": 0.85,
+            "chromiumCpuPercentOfOneCore": -1.15
+          },
+          "interaction": {
+            "kind": "40 native Stage drag movements during compiled simulation, event arrival to last layer draw",
+            "p95Ms": 146.3,
+            "maxMs": 156.9,
+            "targetMs": 50,
+            "targetMet": false
+          },
+          "postChangeDiagnostic": {
+            "cpuProfileWindowMs": 8000,
+            "mainThreadSamplesMs": {
+              "nativeDrawImage": 659.057,
+              "simulationVendorFunction": 218.426,
+              "konvaSetAttr": 111.074,
+              "getConnectedPins": 88.842,
+              "konvaApplyShadow": 58.669,
+              "simulationRunFrame": 49.602
+            },
+            "componentLayer": {
+              "index": 1,
+              "drawCallsInFiveSeconds": 95,
+              "drawTimeMsInFiveSeconds": 1119.3
+            },
+            "leadingShape": {
+              "component": "max_board",
+              "shape": "Circle",
+              "drawCallsInFiveSeconds": 3564,
+              "drawTimeMsInFiveSeconds": 93.3
+            },
+            "interpretation": "Native image drawing and repeated component-layer rasterization remain measurable hotspots. The profile does not yet identify a safe cache or invalidation change that improves the full workload; trace which simulation updates redraw the shared component layer before changing it."
+          },
+          "longTasksAcrossThreeRuns": 0,
+          "fixtureAndFirmwareMatched": true,
+          "acceptanceMet": false,
+          "conclusion": "The RAF gate removes no-op per-frame callbacks from active non-motor components, but the matched runs show slightly higher main-thread busy time, only a small aggregate CPU decrease, and active pan p95 almost three times the 50 ms target. Keep F003 open; do not claim this candidate as a measured performance win."
+        },
+        "controlledRerun2026_09_26": {
+          "status": "measured_not_accepted",
+          "environment": {
+            "browser": "Chrome 153.0.8010.53",
+            "context": "Playwright-owned ephemeral browser context; no existing user browser profile or tabs",
+            "application": "Built UI on localhost:3000 and configured API on localhost:2001",
+            "viewport": "1440x900 CSS pixels",
+            "fixture": {
+              "nodes": 36,
+              "wires": 75,
+              "viewport": {
+                "x": 5,
+                "y": 5,
+                "scale": 0.65
+              },
+              "sha256": "ab4d3bc31fa61747a98c84353a7949937c84a755595023a8e852e959e198a02e"
+            },
+            "compiledFirmwareSha256": "b17545cb64be48ba83c89a9c48266216b7234ac5216a55ed292e46825676591c",
+            "samples": "Three 30-second sustained simulation windows per condition; 40 native Stage drag movements during compiled simulation",
+            "optionalServiceErrors": "AI component-coverage returned HTTP 500 during startup in both conditions, outside the timed windows."
+          },
+          "control": {
+            "sourceHash": "31697cc01f18d71681cbf0e93d95bb56f8ecd1b40682095183acf636bfd240ea",
+            "mainThreadBusyPercentOfOneCore": [
+              50.89,
+              50.033,
+              49.771
+            ],
+            "mainThreadBusyMeanPercent": 50.231,
+            "chromiumCpuPercentOfOneCore": [
+              250.932,
+              248.441,
+              245.929
+            ],
+            "chromiumCpuMeanPercent": 248.434,
+            "longTasks": {
+              "count": 9,
+              "totalMs": 513
+            },
+            "activePan": {
+              "p95Ms": 213.6,
+              "maxMs": 257.8,
+              "targetMs": 50
+            }
+          },
+          "candidate": {
+            "sourceHash": "68eb3d1fc4fd1011014169b46aa0b150ace50640e1eceb264a25b4228b508f44",
+            "changes": [
+              "Limit active-component requestAnimationFrame callbacks to DC/BLDC shaft motors.",
+              "Skip the board TX/RX timer layer draw when neither indicator changes."
+            ],
+            "mainThreadBusyPercentOfOneCore": [
+              51.352,
+              51.34,
+              51.437
+            ],
+            "mainThreadBusyMeanPercent": 51.376,
+            "chromiumCpuPercentOfOneCore": [
+              249.508,
+              256.692,
+              246.438
+            ],
+            "chromiumCpuMeanPercent": 250.879,
+            "longTasks": {
+              "count": 36,
+              "totalMs": 1975
+            },
+            "activePan": {
+              "p95Ms": 341.7,
+              "maxMs": 359.4,
+              "targetMs": 50
+            }
+          },
+          "deltaCandidateMinusControl": {
+            "mainThreadBusyPercentagePoints": 1.145,
+            "chromiumCpuPercentagePoints": 2.446,
+            "longTaskCount": 27,
+            "longTaskTotalMs": 1462,
+            "activePanP95Ms": 128.1
+          },
+          "acceptanceMet": false,
+          "disposition": "Both ComponentNode experiments were reverted after the matched run. Native input events were observed in the isolated context; prior isolated runs with zero delivered mouse events were invalid and excluded."
+        },
+        "baselineRenderDiagnostic2026_09_26": {
+          "browser": "Chrome 153.0.8010.53",
+          "compiledFixtureSha256": "ab4d3bc31fa61747a98c84353a7949937c84a755595023a8e852e959e198a02e",
+          "cpuProfileWindowMs": 8000,
+          "profileTopMs": {
+            "nativeDrawImage": 948.997,
+            "simulationVendorFunction": 161.005,
+            "konvaSetAttr": 150.683,
+            "konvaApplyShadow": 73.321,
+            "getConnectedPins": 53.335
+          },
+          "componentLayer": {
+            "index": 1,
+            "drawsInFiveSeconds": 63,
+            "drawTimeMsInFiveSeconds": 1364.2
+          },
+          "repeatedSceneShapes": {
+            "maximumBoardCircles": {
+              "drawsInFiveSeconds": 2412,
+              "drawTimeMs": 110.4
+            },
+            "individualLedCircles": {
+              "drawsInFiveSeconds": 201,
+              "drawTimeMsRangeMs": [
+                21.4,
+                59.1
+              ]
+            },
+            "maximumBoardImage": {
+              "drawsInFiveSeconds": 67,
+              "drawTimeMs": 22.5
+            }
+          },
+          "pinDetail": {
+            "sampledPinShadowEnabled": false,
+            "sampledPinBufferCanvasEnabled": false,
+            "conclusion": "Pin shadows and pin buffer canvases were already disabled in the tested baseline; the shadow-off diagnostic was not a valid improvement candidate."
+          },
+          "interpretation": "The shared component layer is repeatedly rasterized during simulation. Native drawImage dominates the sampled main-thread profile, while the maximum-board circle group and LED circles are the leading repeatedly drawn component shapes. The maximum-board bitmap is a smaller measured cost. Trace which simulation attributes invalidate or repaint this shared layer, then isolate only the necessary dynamic indicators without altering solver updates, visual fidelity, or interaction handling."
+        },
+        "attributeUpdateTrace2026_09_26": {
+          "environment": "The same compiled 36-node fixture, with runtime-only counters enabled for five seconds after simulation start; this instrumentation adds overhead and is diagnostic only, not performance evidence.",
+          "componentLayerBatchDrawRequests": {
+            "layer": 1,
+            "countInFiveSeconds": 941,
+            "dominantCallers": [
+              {
+                "attribute": "max_motor Circle dash",
+                "count": 208
+              },
+              {
+                "attribute": "max_motor Rect opacity",
+                "count": 171
+              },
+              {
+                "attribute": "max_motor Group rotation",
+                "count": 92
+              },
+              {
+                "attribute": "max_motor Circle opacity",
+                "count": 57
+              },
+              {
+                "attribute": "max_board Circle fill",
+                "count": 36
+              },
+              {
+                "attribute": "max_board Circle stroke",
+                "count": 36
+              },
+              {
+                "attribute": "max_board Circle shadowBlur",
+                "count": 36
+              },
+              {
+                "attribute": "max_board Text fill",
+                "count": 36
+              }
+            ]
+          },
+          "callPath": "Konva attribute setter -> Node._setAttr -> Layer._requestDraw / batchDraw",
+          "interpretation": "An active MOTOR_DC (max_motor in the fixture) changes dashed-circle, opacity and shaft-rotation attributes repeatedly. The TX/RX board indicator is a much smaller periodic source. This explains why suppressing the motor’s no-op RAF callbacks and one redundant board batchDraw did not reduce sustained raster or active-pan cost. The requests coalesce at the layer scheduler, but a changed animated attribute still invalidates the shared component layer.",
+          "nextCandidate": "Separate animated motor/indicator visuals from static component bodies so animation invalidates only the small dynamic overlay. First map each mutated shape and its layer ownership, then test native pan, screenshot fidelity, disposal and the same three-run compiled workload."
+        },
+        "stableDashReuse2026_09_26": {
+          "status": "measured_partial_improvement_acceptance_not_met",
+          "environment": {
+            "browser": "Chrome 153.0.8010.53",
+            "context": "Playwright-owned ephemeral browser context",
+            "viewport": "1440x900 CSS pixels",
+            "fixture": {
+              "nodes": 36,
+              "wires": 75,
+              "sha256": "ab4d3bc31fa61747a98c84353a7949937c84a755595023a8e852e959e198a02e"
+            },
+            "compiledFirmwareSha256": "b17545cb64be48ba83c89a9c48266216b7234ac5216a55ed292e46825676591c",
+            "method": "Three 30-second compiled-simulation windows and 40 native Stage drag movements per condition; candidate followed by an adjacent clean-control rerun on the same setup."
+          },
+          "candidate": {
+            "change": "Hoist static Konva dash patterns into stable module-scoped arrays so repeated ComponentNode renders do not pass new array identities for unchanged dash attributes.",
+            "sourceHash": "40512bc1f5893c445e6ad8c17d132c4f8a3b614cf895959fabe3cdb39bd84ccf",
+            "mainThreadBusyPercentOfOneCore": [
+              46.0982,
+              45.2373,
+              45.1834
+            ],
+            "mainThreadBusyMeanPercent": 45.5063,
+            "chromiumCpuPercentOfOneCore": [
+              264.6292,
+              265.1191,
+              257.6207
+            ],
+            "chromiumCpuMeanPercent": 262.4563,
+            "longTasks": [
+              {
+                "count": 1,
+                "totalMs": 53,
+                "maxMs": 53
+              },
+              {
+                "count": 0,
+                "totalMs": 0,
+                "maxMs": 0
+              },
+              {
+                "count": 0,
+                "totalMs": 0,
+                "maxMs": 0
+              }
+            ],
+            "activePan": {
+              "p95Ms": 118.3,
+              "maxMs": 145.4,
+              "targetMs": 50,
+              "targetMet": false
+            }
+          },
+          "adjacentControl": {
+            "sourceHash": "31697cc01f18d71681cbf0e93d95bb56f8ecd1b40682095183acf636bfd240ea",
+            "mainThreadBusyPercentOfOneCore": [
+              46.4503,
+              45.8833,
+              46.0964
+            ],
+            "mainThreadBusyMeanPercent": 46.1433,
+            "chromiumCpuPercentOfOneCore": [
+              264.302,
+              261.6763,
+              260.9982
+            ],
+            "chromiumCpuMeanPercent": 262.3255,
+            "longTasks": [
+              {
+                "count": 0,
+                "totalMs": 0,
+                "maxMs": 0
+              },
+              {
+                "count": 0,
+                "totalMs": 0,
+                "maxMs": 0
+              },
+              {
+                "count": 0,
+                "totalMs": 0,
+                "maxMs": 0
+              }
+            ],
+            "activePan": {
+              "p95Ms": 123.3,
+              "maxMs": 182.2,
+              "targetMs": 50,
+              "targetMet": false
+            }
+          },
+          "deltaCandidateMinusAdjacentControl": {
+            "mainThreadBusyPercentagePoints": -0.637,
+            "chromiumCpuPercentagePoints": 0.131,
+            "activePanP95Ms": -5
+          },
+          "comparison": {
+            "fixtureAndFirmwareMatched": true,
+            "optionalAiComponentCoverageHttp500OccurredOutsideTimedWindowsInBothConditions": true,
+            "interpretation": "Main-thread busy time and drag p95 moved slightly in the favorable direction, but aggregate Chromium CPU was effectively unchanged and both drag p95 values exceed 50 ms. Treat this as a small behavior-preserving reduction in redundant attribute writes, not as an accepted sustained-performance win. An earlier control measured under different host load is not used for this adjacent comparison."
+          },
+          "validation": {
+            "productionBuildAndBundleBudget": "passed",
+            "componentSceneContract": "11/11 passed",
+            "componentSceneBrowser": "14/14 functional and visual-interaction checks passed",
+            "canvasRender": "passed"
+          }
+        },
+        "componentHitGraphCache2026_09_26": {
+          "status": "measured_partial_improvement_acceptance_not_met",
+          "environment": {
+            "browser": "Chrome 153.0.8010.53",
+            "context": "Playwright-owned ephemeral browser context",
+            "viewport": "1440x900 CSS pixels",
+            "fixture": {
+              "nodes": 36,
+              "wires": 75,
+              "sha256": "ab4d3bc31fa61747a98c84353a7949937c84a755595023a8e852e959e198a02e"
+            },
+            "compiledFirmwareSha256": "b17545cb64be48ba83c89a9c48266216b7234ac5216a55ed292e46825676591c",
+            "method": "Three 30-second compiled-simulation windows and 40 native Stage drag movements per condition; a fresh stable-source control followed the candidate on the same setup."
+          },
+          "diagnostic": {
+            "windowSeconds": 5,
+            "componentLayerHitDraws": 132,
+            "componentLayerHitDrawTimeMs": 296.4,
+            "listeningShapeGeometryWrites": 0,
+            "leadingHitShapes": [
+              {
+                "component": "max_board",
+                "shape": "Circle",
+                "calls": 4752,
+                "drawTimeMs": 35.6
+              },
+              {
+                "component": "max_ic_595",
+                "shape": "Circle",
+                "calls": 2112,
+                "drawTimeMs": 21.1
+              },
+              {
+                "component": "max_ic_165",
+                "shape": "Circle",
+                "calls": 2112,
+                "drawTimeMs": 19
+              },
+              {
+                "component": "max_ic_138",
+                "shape": "Circle",
+                "calls": 2112,
+                "drawTimeMs": 18.3
+              },
+              {
+                "component": "max_ic_4017",
+                "shape": "Circle",
+                "calls": 2112,
+                "drawTimeMs": 17.6
+              }
+            ],
+            "interpretation": "The layer repeatedly rebuilt hit shapes during simulation even though the trace recorded no geometry writes to listening shapes."
+          },
+          "candidate": {
+            "change": "Reuse the component layer hit canvas during idle simulation and invalidate it on scene, viewport, selection, hover and mode changes; refresh it when pan, component gestures, pointer release, pointer cancellation or window blur ends an interaction.",
+            "componentNodeSourceSha256": "cec22f714cec97eaa7265a71c44e3bac12cad62cfc19a0aab361762b2f39a98d",
+            "mainThreadBusyPercentOfOneCore": [
+              40.5111,
+              40.0711,
+              39.9392
+            ],
+            "mainThreadBusyMeanPercent": 40.1738,
+            "chromiumCpuPercentOfOneCore": [
+              247.3098,
+              250.2638,
+              241.7538
+            ],
+            "chromiumCpuMeanPercent": 246.4424,
+            "longTasks": {
+              "count": 0,
+              "totalMs": 0
+            },
+            "activePan": {
+              "p95Ms": 111.9,
+              "maxMs": 141.5,
+              "targetMs": 50,
+              "targetMet": false
+            }
+          },
+          "freshStableSourceControl": {
+            "componentNodeSourceSha256": "24ba850755d8b75c2e4dd8118698a5ea792653be5ca9c1fbca0db5f5a487c1d5",
+            "mainThreadBusyPercentOfOneCore": [
+              44.5435,
+              44.023,
+              43.9454
+            ],
+            "mainThreadBusyMeanPercent": 44.1706,
+            "chromiumCpuPercentOfOneCore": [
+              263.0379,
+              264.4231,
+              258.2841
+            ],
+            "chromiumCpuMeanPercent": 261.915,
+            "longTasks": {
+              "count": 1,
+              "totalMs": 56
+            },
+            "activePan": {
+              "p95Ms": 110.1,
+              "maxMs": 181.2,
+              "targetMs": 50,
+              "targetMet": false
+            }
+          },
+          "deltaCandidateMinusControl": {
+            "mainThreadBusyPercentagePoints": -3.9968,
+            "chromiumCpuPercentagePoints": -15.4726,
+            "activePanP95Ms": 1.8
+          },
+          "comparison": {
+            "fixtureAndFirmwareMatched": true,
+            "acceptanceMet": false,
+            "interpretation": "The candidate consistently reduced main-thread busy time and aggregate Chromium CPU against the fresh stable-source control. Pan p95 was effectively unchanged and remains more than twice the 50 ms target, so F003 acceptance is not met. Retain this behavior-checked cache as a partial CPU improvement while investigating the active-pan render path."
+          },
+          "interactionValidation": {
+            "productionBuildAndBundleBudget": "passed; initial static JavaScript 505.1 kB / 550 kB",
+            "componentSceneContract": "11/11 passed",
+            "canvasRender": "passed",
+            "componentSceneBrowser": "14/14 passed; native pan/zoom, hover, wiring, probe, drag, culling and PNG export",
+            "compiledSimulationPointerCancel": "passed; component hit draws increased from 121 to 123 after pointercancel",
+            "additionalSmoke": "A pin remained clickable after pan and after a 100-pixel component drag."
+          },
+          "disposition": "Keep the hit-graph cache as a partial optimization; keep F003 open until matched active-pan p95 is at most 50 ms."
+        },
+        "activePanRenderTrace2026_09_26": {
+          "status": "diagnostic_only",
+          "environment": {
+            "browser": "Chrome 153.0.8010.53",
+            "fixtureSha256": "ab4d3bc31fa61747a98c84353a7949937c84a755595023a8e852e959e198a02e",
+            "compiledFirmwareSha256": "b17545cb64be48ba83c89a9c48266216b7234ac5216a55ed292e46825676591c",
+            "interaction": "40 native Stage drag movements during compiled simulation",
+            "instrumentation": "Layer and shape timing wrappers plus Chrome CPU sampling; instrumentation adds overhead, so timings are for hotspot location only."
+          },
+          "layerDrawsAcross40Movements": [
+            {
+              "layerIndex": 0,
+              "totalDrawMs": 5.7,
+              "meanDrawMsPerMovement": 0.14
+            },
+            {
+              "layerIndex": 1,
+              "role": "component scene",
+              "totalDrawMs": 949.4,
+              "meanDrawMsPerMovement": 23.73,
+              "p95DrawMsPerMovement": 43.2
+            },
+            {
+              "layerIndex": 2,
+              "role": "wires",
+              "totalDrawMs": 170.4,
+              "meanDrawMsPerMovement": 4.26,
+              "p95DrawMsPerMovement": 7.3
+            },
+            {
+              "layerIndex": 3,
+              "totalDrawMs": 0.5,
+              "meanDrawMsPerMovement": 0.01
+            }
+          ],
+          "leadingComponentShapesAcross40Movements": [
+            {
+              "shape": "max_board:Circle",
+              "drawCalls": 4392,
+              "drawTimeMs": 94
+            },
+            {
+              "shape": "other:Text",
+              "drawCalls": 2960,
+              "drawTimeMs": 77.4
+            },
+            {
+              "shape": "other:Line",
+              "drawCalls": 5920,
+              "drawTimeMs": 74.8
+            },
+            {
+              "shape": "max_led_1:Circle",
+              "drawCalls": 366,
+              "drawTimeMs": 46.9
+            },
+            {
+              "shape": "max_board:Text",
+              "drawCalls": 488,
+              "drawTimeMs": 31
+            },
+            {
+              "shape": "max_led_2:Circle",
+              "drawCalls": 366,
+              "drawTimeMs": 21.4
+            },
+            {
+              "shape": "max_led_3:Circle",
+              "drawCalls": 366,
+              "drawTimeMs": 20.2
+            },
+            {
+              "shape": "max_led_7:Circle",
+              "drawCalls": 366,
+              "drawTimeMs": 20
+            },
+            {
+              "shape": "max_led_12:Circle",
+              "drawCalls": 366,
+              "drawTimeMs": 19.2
+            },
+            {
+              "shape": "max_motor:Rect",
+              "drawCalls": 1310,
+              "drawTimeMs": 18.7
+            },
+            {
+              "shape": "max_board:Image",
+              "drawCalls": 122,
+              "drawTimeMs": 18.6
+            }
+          ],
+          "cpuProfileTopMs": {
+            "drawImage": 392.06,
+            "simulationVendorFunction": 158.99,
+            "konvaSetAttr": 74.9,
+            "shapeDrawScene": 69.75,
+            "getConnectedPins": 56.11
+          },
+          "acceptanceEvidence": {
+            "uninstrumentedActivePanP95Ms": 111.9,
+            "targetMs": 50,
+            "targetMet": false
+          },
+          "interpretation": "The component scene layer is the largest per-movement render stage, with board and LED circles among its leading shapes. Wire text and lines also repeat. Native drawImage and the simulation runtime remain visible in the main-thread profile."
+        },
+        "simulationPanViewportCommitThreshold2026_09_26": {
+          "status": "measured_rejected_and_reverted",
+          "candidate": "Increase the Stage viewport/culling commit threshold from 64 to 120 screen pixels only while simulation is active; the 120-pixel threshold remained below the existing 128-pixel component entry overscan.",
+          "sameFixtureAndFirmware": true,
+          "nativeStageMovements": 40,
+          "candidatePanP95Ms": 112.5,
+          "candidatePanMaxMs": 176.4,
+          "previousHitGraphCandidatePanP95Ms": 111.9,
+          "targetMs": 50,
+          "disposition": "No measurable pan improvement; revert the threshold change and keep normal 64-pixel viewport commits."
+        },
+        "motorAnimationLayerIsolation2026_09_26": {
+          "status": "measured_rejected_and_reverted",
+          "environment": {
+            "browser": "Chrome 153.0.8010.53",
+            "context": "Playwright-owned ephemeral browser context",
+            "viewport": "1440x900 CSS pixels",
+            "fixture": {
+              "nodes": 36,
+              "wires": 75,
+              "sha256": "ab4d3bc31fa61747a98c84353a7949937c84a755595023a8e852e959e198a02e"
+            },
+            "compiledFirmwareSha256": "b17545cb64be48ba83c89a9c48266216b7234ac5216a55ed292e46825676591c",
+            "method": "Three 30-second compiled-simulation windows and 40 native Stage drag movements per condition; candidate followed by an adjacent no-offload control using the same fixture and browser setup."
+          },
+          "candidate": {
+            "change": "Render eligible active DC-motor visuals in one shared non-interactive Konva layer; keep selected, dragged, wired, probed and overlapping motors in the normal component layer.",
+            "layerCount": 5,
+            "mainThreadBusyPercentOfOneCore": [
+              57.7481,
+              56.2819,
+              56.1423
+            ],
+            "mainThreadBusyMeanPercent": 56.7241,
+            "chromiumCpuPercentOfOneCore": [
+              211.6513,
+              212.1014,
+              208.831
+            ],
+            "chromiumCpuMeanPercent": 210.8612,
+            "longTasks": [
+              {
+                "count": 0,
+                "totalMs": 0,
+                "maxMs": 0
+              },
+              {
+                "count": 0,
+                "totalMs": 0,
+                "maxMs": 0
+              },
+              {
+                "count": 1,
+                "totalMs": 52,
+                "maxMs": 52
+              }
+            ],
+            "activePan": {
+              "p95Ms": 227.5,
+              "maxMs": 267.5,
+              "targetMs": 50,
+              "targetMet": false
+            }
+          },
+          "adjacentControlAfter": {
+            "layerCount": 4,
+            "mainThreadBusyPercentOfOneCore": [
+              51.8911,
+              49.6387,
+              49.6172
+            ],
+            "mainThreadBusyMeanPercent": 50.3823,
+            "chromiumCpuPercentOfOneCore": [
+              248.3437,
+              246.8463,
+              248.483
+            ],
+            "chromiumCpuMeanPercent": 247.891,
+            "activePan": {
+              "p95Ms": 181.2,
+              "maxMs": 299.3,
+              "targetMs": 50,
+              "targetMet": false
+            }
+          },
+          "deltaCandidateMinusAdjacentControl": {
+            "mainThreadBusyPercentagePoints": 6.3418,
+            "chromiumCpuPercentagePoints": -37.0298,
+            "activePanP95Ms": 46.3
+          },
+          "comparison": {
+            "fixtureAndFirmwareMatched": true,
+            "acceptanceMet": false,
+            "interpretation": "Aggregate Chromium CPU fell in the candidate windows, but main-thread busy time and active-pan p95 worsened against the adjacent control. Since F003 requires both CPU measures to fall and active interaction p95 to meet 50 ms, the layer-isolation candidate was rejected and its implementation reverted. The measurements support another targeted draw-cost investigation, not an accepted performance win."
+          },
+          "validation": {
+            "candidateProductionBuild": "passed",
+            "componentSceneContract": "11/11 passed",
+            "componentSceneBrowser": "14/14 functional and visual-interaction checks passed",
+            "canvasRender": "passed",
+            "revertedSourceRestoredSimulationFlag": true
+          },
+          "cleanup": {
+            "temporaryProfileResultsRemoved": 6,
+            "generatedTestReportsAndScreenshotRemoved": 3,
+            "retained": "Reusable profiling harness and firmware fixture; aggregate measurements remain in this backlog."
+          }
+        },
+        "motorAnimationCadence2026_09_26": {
+          "status": "measured_rejected_and_reverted",
+          "environment": {
+            "browser": "Chrome 153.0.8010.53",
+            "context": "Playwright-owned ephemeral browser context",
+            "viewport": "1440x900 CSS pixels",
+            "fixture": {
+              "nodes": 36,
+              "wires": 75,
+              "sha256": "ab4d3bc31fa61747a98c84353a7949937c84a755595023a8e852e959e198a02e"
+            },
+            "compiledFirmwareSha256": "b17545cb64be48ba83c89a9c48266216b7234ac5216a55ed292e46825676591c",
+            "method": "Three 30-second compiled-simulation windows plus 40 native Stage drag movements for the candidate, bracketed by matching three-window controls with the same fixture, viewport and browser setup."
+          },
+          "candidate": {
+            "change": "Advance DC/BLDC visual rotation from elapsed wall time and submit layer redraws no faster than 30 Hz; solver cadence and RPM were unchanged.",
+            "mainThreadBusyPercentOfOneCore": [
+              54.7327,
+              56.1405,
+              55.1416
+            ],
+            "mainThreadBusyMeanPercent": 55.3382,
+            "chromiumCpuPercentOfOneCore": [
+              251.3888,
+              255.5347,
+              253.6238
+            ],
+            "chromiumCpuMeanPercent": 253.5158,
+            "longTasks": [
+              {
+                "count": 0,
+                "totalMs": 0,
+                "maxMs": 0
+              },
+              {
+                "count": 2,
+                "totalMs": 107,
+                "maxMs": 54
+              },
+              {
+                "count": 0,
+                "totalMs": 0,
+                "maxMs": 0
+              }
+            ],
+            "activePan": {
+              "p95Ms": 122.8,
+              "maxMs": 143.7,
+              "targetMs": 50,
+              "targetMet": false
+            }
+          },
+          "controlBefore": {
+            "mainThreadBusyMeanPercent": 44.5969,
+            "chromiumCpuMeanPercent": 260.2074,
+            "activePanP95Ms": 173.9
+          },
+          "controlAfter": {
+            "mainThreadBusyPercentOfOneCore": [
+              45.1043,
+              45.2552,
+              44.9121
+            ],
+            "mainThreadBusyMeanPercent": 45.0905,
+            "chromiumCpuPercentOfOneCore": [
+              261.4674,
+              261.1521,
+              256.9551
+            ],
+            "chromiumCpuMeanPercent": 259.8582,
+            "activePanP95Ms": 110.1
+          },
+          "deltaCandidateMinusAdjacentControlAfter": {
+            "mainThreadBusyPercentagePoints": 10.2477,
+            "chromiumCpuPercentagePoints": -6.3424,
+            "activePanP95Ms": 12.7
+          },
+          "comparison": {
+            "fixtureAndFirmwareMatched": true,
+            "acceptanceMet": false,
+            "interpretation": "The throttled animation reduced aggregate Chromium CPU slightly against the after-control, but main-thread busy time rose by 10.25 percentage points and active-pan p95 worsened by 12.7 ms against that adjacent control. Pan remained above the 50 ms target in all conditions. The candidate was rejected and the original RAF cadence restored."
+          },
+          "exploratoryDiagnostics": {
+            "ledGlowCacheProbe": "Not evaluated as a candidate: all 12 LED glow groups were inactive at the sampled point, so the fixture did not exercise this path. No LED cache change was retained."
+          },
+          "validation": {
+            "candidateProductionBuildAndBundleBudget": "passed",
+            "componentSceneContract": "11/11 passed",
+            "componentSceneBrowser": "14/14 functional and visual-interaction checks passed",
+            "revertedSourceRestoredOriginalMotorCadence": true
+          },
+          "cleanup": {
+            "temporaryProfileResultsRemoved": 13,
+            "generatedTestReportsAndScreenshotRemoved": 8,
+            "retained": "Raw candidate/control measurements are embedded in this backlog; reusable profiling harness and firmware fixture remain."
+          }
+        },
+        "boardLayerRedrawInvestigation2026_09_26": {
+          "status": "measured_rejected_and_reverted",
+          "environment": {
+            "browser": "Chrome 153.0.8010.53",
+            "application": "Built production UI on localhost:3000 with configured API on localhost:2001",
+            "viewport": "1440x900 CSS pixels",
+            "fixture": {
+              "nodes": 36,
+              "wires": 75,
+              "sha256": "ab4d3bc31fa61747a98c84353a7949937c84a755595023a8e852e959e198a02e",
+              "viewport": {
+                "x": 5,
+                "y": 5,
+                "scale": 0.65
+              }
+            },
+            "compiledFirmwareSha256": "b17545cb64be48ba83c89a9c48266216b7234ac5216a55ed292e46825676591c",
+            "method": "Three 30-second simulation windows and 40 native Stage drags per condition; candidate bracketed by stable-source before/after controls."
+          },
+          "diagnostic": {
+            "cpuProfileWindowMs": 8000,
+            "profileMs": {
+              "nativeDrawImage": 610.5,
+              "konvaDrawHit": 64.3
+            },
+            "componentLayer": {
+              "index": 1,
+              "listening": true,
+              "topLevelComponents": 36,
+              "drawCallsInFiveSeconds": 136,
+              "sceneDrawMsInFiveSeconds": 941.5,
+              "hitGraphDrawMsInFiveSeconds": 204.9
+            },
+            "wireLayer": {
+              "listening": true,
+              "children": 222
+            },
+            "repeatedComponentShapes": {
+              "arduinoUnoCircles": {
+                "drawCallsInFiveSeconds": 4860,
+                "drawMs": 90.8
+              },
+              "arduinoUnoImage": {
+                "drawCallsInFiveSeconds": 135,
+                "drawMs": 17.7
+              },
+              "ledCircles": {
+                "drawCallsPerLed": 405,
+                "drawMsRangePerLed": [
+                  15,
+                  44.3
+                ]
+              }
+            },
+            "measurementNote": "Layer and shape timings came from temporary instrumentation and are diagnostic only; instrumentation was removed before matched CPU and pan runs."
+          },
+          "controlBefore": {
+            "sourceHash": "24ba850755d8b75c2e4dd8118698a5ea792653be5ca9c1fbca0db5f5a487c1d5",
+            "mainThreadBusyPercentOfOneCore": [
+              41.5141,
+              45.91,
+              45.1414
+            ],
+            "mainThreadBusyMeanPercent": 44.1885,
+            "chromiumCpuPercentOfOneCore": [
+              155.009,
+              254.9575,
+              259.7891
+            ],
+            "chromiumCpuMeanPercent": 223.2519,
+            "activePanP95Ms": 133.1,
+            "longTaskCount": 1,
+            "longTaskTotalMs": 87
+          },
+          "candidate": {
+            "sourceHash": "e1658d251b2cefa23d90678fe027eb2f5b121e847d05abaaf90568310b03ad60",
+            "change": "Request the board-layer redraw from the 300 ms TX/RX timer only when at least one indicator enters its blink state; keep the 80 ms on/off redraws.",
+            "mainThreadBusyPercentOfOneCore": [
+              45.2841,
+              44.247,
+              44.8614
+            ],
+            "mainThreadBusyMeanPercent": 44.7975,
+            "chromiumCpuPercentOfOneCore": [
+              260.9455,
+              262.9978,
+              259.4128
+            ],
+            "chromiumCpuMeanPercent": 261.1187,
+            "activePanP95Ms": 111.2,
+            "longTaskCount": 1,
+            "longTaskTotalMs": 53
+          },
+          "controlAfter": {
+            "sourceHash": "24ba850755d8b75c2e4dd8118698a5ea792653be5ca9c1fbca0db5f5a487c1d5",
+            "mainThreadBusyPercentOfOneCore": [
+              45.449,
+              44.3229,
+              44.4236
+            ],
+            "mainThreadBusyMeanPercent": 44.7318,
+            "chromiumCpuPercentOfOneCore": [
+              261.8891,
+              263.3197,
+              256.8969
+            ],
+            "chromiumCpuMeanPercent": 260.7019,
+            "activePanP95Ms": 115.6,
+            "longTaskCount": 0,
+            "longTaskTotalMs": 0
+          },
+          "deltaCandidateMinusAdjacentControlAfter": {
+            "mainThreadBusyPercentagePoints": 0.0657,
+            "chromiumCpuPercentagePoints": 0.4168,
+            "activePanP95Ms": -4.4
+          },
+          "comparison": {
+            "fixtureFirmwareAndStableSourceMatched": true,
+            "optionalAiComponentCoverageHttp500OccurredOutsideTimedWindowsInAllConditions": true,
+            "acceptanceMet": false,
+            "interpretation": "Candidate main-thread busy time and aggregate Chromium CPU were effectively unchanged or slightly worse against its adjacent control. The 4.4 ms pan p95 difference is within observed run variation; all pan p95 values remain above the 50 ms target. The no-op redraw candidate was reverted."
+          },
+          "validation": {
+            "candidateProductionBuildAndBundleBudget": "passed",
+            "revertedSourceProductionBuildAndBundleBudget": "passed",
+            "temporaryAuthenticatedFixturesDeleted": true
+          },
+          "cleanup": {
+            "temporaryProfilesAndScreenshots": "removed after recording aggregate measurements",
+            "reusableHarnessAndFirmwareFixture": "retained"
+          }
+        },
+        "renderCandidateExperiments2026_09_27": {
+          "status": "measured_candidates_rejected_or_reverted",
+          "environment": {
+            "browser": "Chrome 153.0.8010.53",
+            "fixture": {
+              "nodes": 36,
+              "wires": 75,
+              "sha256": "ab4d3bc31fa61747a98c84353a7949937c84a755595023a8e852e959e198a02e",
+              "viewport": {
+                "x": 5,
+                "y": 5,
+                "scale": 0.65
+              }
+            },
+            "compiledFirmwareSha256": "b17545cb64be48ba83c89a9c48266216b7234ac5216a55ed292e46825676591c",
+            "profileHarness": "node_modules/.cache/vfopt-f003/profile.mjs"
+          },
+          "bufferCanvasReduction": {
+            "bufferedShapes": 16,
+            "directShapes": 454,
+            "totalShapes": 470,
+            "changedPixelsWhenPerfectDrawWasDisabled": 16752,
+            "layerPixels": 480000,
+            "pixelChangeFraction": 0.0349,
+            "maxChannelDelta": 255,
+            "mainTargets": "12 blown-LED circles and four board-indicator circles",
+            "conclusion": "Rejected: direct drawing changes 3.49% of the component-layer pixels, including full-channel differences."
+          },
+          "zeroBlurShadowCandidate": {
+            "candidateShapes": 2,
+            "bufferedBefore": 16,
+            "bufferedAfter": 16,
+            "changedPixels": 11,
+            "maxChannelDelta": 1,
+            "conclusion": "No source change: the two sampled no-blur shapes did not reduce total buffered-shape count; remaining buffers are driven by opacity or live LED state."
+          },
+          "blownLedShapeCache": {
+            "shapeCount": 12,
+            "cachedCount": 12,
+            "changedPixels": 12971,
+            "layerPixels": 480000,
+            "pixelChangeFraction": 0.027022916666666667,
+            "maxChannelDelta": 255,
+            "activePanP95Ms": 99.80000001192093,
+            "activePanTargetMs": 50,
+            "conclusion": "Rejected: caching changes 2.70% of layer pixels and still misses the 50 ms pan target."
+          },
+          "boardTimerNoOpRedrawRerun": {
+            "temporaryCandidate": "The 300 ms TX/RX timer skips its unconditional batchDraw when neither LED changes; this was restored after measurement.",
+            "sourceHash": "de622ed21707a5fa968272536f365096e053fce2a40e8da3da08b021bf247679",
+            "buildManifestSha256": "29ed66fa81ff57799ad13a0550125cc0db015a44292f76b8d1f614853f4da2b9",
+            "runs": [
+              {
+                "seconds": 30.109,
+                "mainThreadBusyPercentOfOneCore": 41.0354,
+                "chromiumCpuPercentOfOneCore": 246.2306,
+                "longTasks": 0
+              },
+              {
+                "seconds": 30.077,
+                "mainThreadBusyPercentOfOneCore": 40.7739,
+                "chromiumCpuPercentOfOneCore": 248.2512,
+                "longTasks": 0
+              },
+              {
+                "seconds": 30.087,
+                "mainThreadBusyPercentOfOneCore": 40.7695,
+                "chromiumCpuPercentOfOneCore": 244.2594,
+                "longTasks": 0
+              }
+            ],
+            "meanMainThreadBusyPercentOfOneCore": 40.8596,
+            "meanChromiumCpuPercentOfOneCore": 246.2471,
+            "activePanP95Ms": 123.09999999403954,
+            "activePanMaxMs": 149.70000000298023,
+            "activePanTargetMs": 50,
+            "longTasksTotal": 0,
+            "optionalAiCoverageHttp500s": 2,
+            "conclusion": "Rejected and reverted: three runs show no measurable improvement, and the 123.1 ms active-pan p95 remains above 50 ms. The prior adjacent-control experiment recorded the same no-op redraw candidate as neutral."
+          },
+          "validation": {
+            "productionBuildAndBundleBudget": "passed before and after restoring the board timer",
+            "canvasRenderContract": "passed",
+            "componentSceneContractChecks": 11,
+            "renderIsolationContractChecks": 6,
+            "contractChecksRerunSequentially": true,
+            "temporaryAuthenticatedFixturesDeleted": true,
+            "bufferAndShapeCacheChangesRetained": false
+          }
+        },
+        "compositorPanSourceIntegration2026_09_27": {
+          "date": "2026-09-27",
+          "status": "rejected_and_reverted_after_held_pan_visual_regression",
+          "reviewCorrection": "Review on 2026-09-27 added a held-pointer raster comparison and found 180350 missing grid pixels during a 300px pan. The old test checked two final redraws after release, which could not establish visual correctness during the gesture. Unbounded suppression also freezes simulation visuals and newly exposed component artwork until release. The compositor implementation was removed; the held-pan regression now passes.",
+          "source": {
+            "file": "src/features/canvas/CircuitCanvas.tsx",
+            "sha256": "87f20ec96774f2733c38da0b94deb5f9072b3b6b03a61135e584f16728cf41b8",
+            "change": "During Stage-only pan, suppress layer draws and batchDraws, translate existing scene canvases with CSS, then restore methods and perform one final stage draw. Pointer release, cancel, blur, and unmount restore transforms and rendering methods."
+          },
+          "browserEvidence": {
+            "fixture": "scripts/fixtures/drag-entry.tsx",
+            "realPointerStagePan": "passed",
+            "canvasTransformsDuringPan": "all visible layer canvases moved with the stage",
+            "pointerCancelCleanup": "passed; every temporary canvas transform cleared",
+            "finalRasterRepeat": {
+              "changedPixels": 0,
+              "interpretation": "two final stage renders produced identical scene-layer pixels"
+            },
+            "componentDragAndWireBehavior": "passed",
+            "dragUndoRedoAndUnmountRegressions": "passed",
+            "panCycles": 2,
+            "pointerCancelAndNormalRelease": "passed",
+            "layerDrawMethodRestoration": "exact original own-property descriptors preserved after repeated pans"
+          },
+          "validation": {
+            "productionBuildAndBundleBudget": "passed after final method-restoration change",
+            "dragBrowserRegression": "passed, including repeated Stage pan, pointer-cancel, normal release, final-raster repeat, component drag, wire routing and lifecycle assertions",
+            "canvasRenderContract": "passed",
+            "componentSceneContract": "passed (11 checks; test process reported a pre-existing WebSocket port 24678 collision)",
+            "productionRenderIsolationBrowser": "passed",
+            "authAvailabilityBrowserSuite": "passed (20 checks; generated report removed)",
+            "lint": "passed with one existing react(only-export-components) warning",
+            "authenticatedCompiledSimulationProfile": "incomplete; Keycloak rejected the local test login with invalid_grant before fixture creation; no sustained CPU windows or source-candidate 40-move pan p95 were recorded",
+            "fullPackageTest": "passed (TypeScript, lint, and all package contract tests; existing lint warning and non-fatal Vite dependency-scan shutdown diagnostics)"
+          },
+          "acceptanceMet": false,
+          "next": "Keep F003 open; any future pan optimization must paint exposed content and live simulation updates while the pointer is held, in addition to satisfying CPU and input-latency gates."
+        },
+        "offlineCompiledSimulationRerun2026_09_27": {
+          "date": "2026-09-27",
+          "status": "invalidated_as_production_evidence",
+          "reviewCorrection": "The temporary runner called Vite createServer before build in the same process without resetting NODE_ENV. Reproducing that sequence returns NODE_ENV=development and build isProduction=false even when mode=production. These measurements must not be presented as production performance or compared with the earlier separately built authenticated application. Both conditions shared the same development mode, but the compositor was subsequently rejected for incorrect held-pan pixels. Values are retained only as historical diagnostic data.",
+          "environment": {
+            "browser": "Chrome 153.0.8010.53",
+            "application": "Built CircuitEditorPage with development NODE_ENV, a local AuthContext and intercepted project, API and STOMP fixtures; no database writes",
+            "viewport": "1440x900",
+            "fixture": {
+              "nodes": 36,
+              "wires": 75,
+              "sha256": "ab4d3bc31fa61747a98c84353a7949937c84a755595023a8e852e959e198a02e",
+              "compiledFirmwareSha256": "3d6852805a0c852efd49a99919a9b054abb50ba1517efdbfb4a95bea25b109df",
+              "executionMode": "avr8js"
+            }
+          },
+          "comparison": {
+            "control": "Matched production bundle with only the component hit-graph cache effect removed",
+            "candidate": "Current production bundle with the component hit-graph cache effect retained",
+            "otherSource": "Identical in both conditions, including Stage-pan compositor reuse",
+            "windows": "Three 30-second simulation windows and one 40-move Stage-pan trace per condition",
+            "order": "Repeated in both control-then-candidate and candidate-then-control order; the reverse-order pass also observed long tasks"
+          },
+          "controlThenCandidateMeans": {
+            "control": {
+              "mainThreadBusyPercentOfOneCore": 86.9561,
+              "chromiumCpuPercentOfOneCore": 295.1304,
+              "activePanP95Ms": 164.2
+            },
+            "candidate": {
+              "mainThreadBusyPercentOfOneCore": 91.9464,
+              "chromiumCpuPercentOfOneCore": 300.151,
+              "activePanP95Ms": 166.5
+            }
+          },
+          "candidateThenControlMeansWithLongTaskObserver": {
+            "candidate": {
+              "mainThreadBusyPercentOfOneCore": 87.0183,
+              "chromiumCpuPercentOfOneCore": 298.3851,
+              "activePanP95Ms": 160.3
+            },
+            "control": {
+              "mainThreadBusyPercentOfOneCore": 85.6734,
+              "chromiumCpuPercentOfOneCore": 294.8946,
+              "activePanP95Ms": 163.2
+            },
+            "candidateDelta": {
+              "mainThreadBusyPercentagePoints": 1.3449,
+              "chromiumCpuPercentOfOneCore": 3.4905,
+              "activePanP95Ms": -2.9
+            }
+          },
+          "compositorIsolatedPanProfile": {
+            "comparison": "Same compiled editor fixture and hit-graph cache in both conditions; the temporary control build removed only the Stage event calls that begin, update and finish compositor raster reuse.",
+            "controlThenCandidate": {
+              "withoutCompositorP95Ms": 261,
+              "withCompositorP95Ms": 172.7
+            },
+            "candidateThenControl": {
+              "withCompositorP95Ms": 166.8,
+              "withoutCompositorP95Ms": 251.8
+            },
+            "meanP95Ms": {
+              "withoutCompositor": 256.4,
+              "withCompositor": 169.75,
+              "reductionPercent": 33.8
+            },
+            "samplesPerCondition": 40,
+            "stageDragEvents": "120 drag-move events in each condition; compositor transforms observed on all 40 candidate samples and none in control",
+            "targetMs": 50,
+            "targetMet": false,
+            "interpretation": "Historical diagnostic only: this development-mode run showed lower timing while draws were suppressed, but the implementation omitted newly exposed pixels during held pan and was rejected and reverted. It is not an accepted performance improvement."
+          },
+          "longTaskObservation": "Both conditions repeatedly produced tasks of 50ms or longer during compiled simulation, with observed spikes above 600ms; the profile confirms substantial main-thread contention in this fixture.",
+          "acceptanceMet": false,
+          "interpretation": "Superseded by the 2026-09-27 review: these are development-mode diagnostics. They do not supersede the earlier authenticated production cache comparison, prove production regression, or validate the compositor's visual correctness. The Stage compositor was removed after a held-pointer pixel test failed.",
+          "next": "Keep F003 open. Profile component image, shadow, hit-shape and current-flow costs separately to reduce main-thread contention, then test one isolated change against the same fixture and acceptance gates."
+        },
+        "review2026_09_27": {
+          "capturedAt": "2026-09-27T09:01:15.135Z",
+          "status": "reviewed_corrected_and_remeasured_target_not_met",
+          "retainedChanges": [
+            "Idle pins disable transparent shadows; native idle pixels and hover glow pass.",
+            "Stable dash-array references avoid unnecessary Konva attribute writes.",
+            "Simulation component hit-graph caching retains geometry/hover/interaction invalidation."
+          ],
+          "revertedChange": {
+            "change": "CSS translation of cached layer canvases with draw/batchDraw suppressed during Stage pan",
+            "reason": "A new held-pan pixel test found 180350 missing grid pixels before pointer release. The older post-release comparison only compared complete redraws and missed the regression.",
+            "result": "Removed the compositor suppression/translation path; normal Stage drawing passes the same held-pan regression."
+          },
+          "measurementCorrection": "Earlier offline production-page evidence was actually a development React build because createServer set NODE_ENV before build. The historical records are explicitly invalidated as production evidence; the discarded compositor gain is not an accepted optimization.",
+          "productionRerun": {
+            "mode": "cpu",
+            "build": {
+              "mode": "production",
+              "isProduction": true,
+              "nodeEnv": "production"
+            },
+            "windows": [
+              {
+                "seconds": 30.0686988,
+                "mainThreadPercent": 38.73401399065529,
+                "chromiumPercent": 237.30269964325822,
+                "longTasks": {
+                  "count": 3,
+                  "maxMs": 61
+                },
+                "time": "t=6.660s"
+              },
+              {
+                "seconds": 30.053761600000005,
+                "mainThreadPercent": 37.81556582254913,
+                "chromiumPercent": 241.79125051687365,
+                "longTasks": {
+                  "count": 0,
+                  "maxMs": 0
+                },
+                "time": "t=6.615s"
+              },
+              {
+                "seconds": 30.05377440000001,
+                "mainThreadPercent": 37.69362160381424,
+                "chromiumPercent": 239.46089446921513,
+                "longTasks": {
+                  "count": 1,
+                  "maxMs": 60
+                },
+                "time": "t=6.995s"
+              }
+            ],
+            "cycles": [],
+            "errors": [],
+            "limitations": [
+              "Local AuthContext and API/STOMP fixtures; real production editor and compiled AVR; no authenticated backend coverage",
+              "Alternative production fixture entry uses configFile=false and the React plugin; normal application manual chunk groups are covered separately by the normal production build/auth suite.",
+              "This is a current-state measurement, not a new controlled A/B against the historical authenticated baseline.",
+              "Aggregate Chromium CPU sums browser processes and may exceed 100%; it is not percent of the entire machine."
+            ],
+            "firmwareSha256": "b17545cb64be48ba83c89a9c48266216b7234ac5216a55ed292e46825676591c",
+            "browser": "153.0.8010.53",
+            "fixture": {
+              "nodes": 36,
+              "wires": 75,
+              "sha256": "ab4d3bc31fa61747a98c84353a7949937c84a755595023a8e852e959e198a02e"
+            },
+            "bundleTypes": [
+              0
+            ],
+            "interaction": {
+              "kind": "40 native Stage pan moves during compiled AVR; event arrival to last layer draw, not hardware paint latency",
+              "samples": [
+                145.40000000596046,
+                100.69999998807907,
+                49,
+                75.5,
+                124.69999998807907,
+                96.7999999821186,
+                88.7000000178814,
+                18.30000001192093,
+                91.69999998807907,
+                80.39999997615814,
+                91,
+                95.80000001192093,
+                85.40000000596046,
+                89.09999999403954,
+                52.79999998211861,
+                135.40000000596046,
+                93.5,
+                51.5,
+                124,
+                88.19999998807907,
+                15.199999988079071,
+                90.5,
+                34.5,
+                123.59999999403954,
+                88.59999999403954,
+                14.400000005960464,
+                144,
+                106.40000000596046,
+                97.5,
+                89.5,
+                54,
+                66.60000002384186,
+                113.10000002384186,
+                15.800000011920929,
+                46.80000001192093,
+                120.69999998807907,
+                102.60000002384186,
+                93.59999999403954,
+                101,
+                103.2000000178814
+              ],
+              "p95Ms": 135.40000000596046,
+              "maxMs": 145.40000000596046,
+              "targetMs": 50
+            },
+            "meanMainThreadPercent": 38.08106713900622,
+            "meanChromiumPercent": 239.51828154311565,
+            "acceptance": "Open: interaction p95 exceeds 50 ms. No claim of F003 completion or comparable CPU improvement."
+          },
+          "browserChecks": [
+            {
+              "suite": "vfopt-ui-014-scene-after.json",
+              "passed": 14,
+              "checks": [
+                {
+                  "name": "500 nodes: bounded mounts and intact document, required pan/zoom p95 <= 50 ms",
+                  "passed": true
+                },
+                {
+                  "name": "1000 nodes: bounded mounts and intact document (additional stress timing recorded)",
+                  "passed": true
+                },
+                {
+                  "name": "Idle pins skip invisible shadow buffers, preserve pixels, and restore glow on native hover",
+                  "passed": true
+                },
+                {
+                  "name": "Native Stage drag mounts newly visible components before release without changing saved nodes/wires",
+                  "passed": true
+                },
+                {
+                  "name": "Selected, dragged, probed and wiring-source components remain mounted offscreen",
+                  "passed": true
+                },
+                {
+                  "name": "Distant zoom removes pin labels while retaining native wiring and hover hit targets",
+                  "passed": true
+                },
+                {
+                  "name": "Wiring completes using full document geometry when its source is offscreen",
+                  "passed": true
+                },
+                {
+                  "name": "Readonly pin probes stay usable, persist across culling, and cannot start wiring",
+                  "passed": true
+                },
+                {
+                  "name": "A component drag remains live across culling and commits exactly one undoable move",
+                  "passed": true
+                },
+                {
+                  "name": "Rotated external pins, spanning wires and dense breadboards survive viewport-edge culling",
+                  "passed": true
+                },
+                {
+                  "name": "Offscreen runtime audio continues once, never restarts on pan, and stops on simulation stop/unmount",
+                  "passed": true
+                },
+                {
+                  "name": "Nested sensor drag is retained by DOM capture even when it stops Konva event bubbling",
+                  "passed": true
+                },
+                {
+                  "name": "Legacy PCB pads are culled with their components while full routing data remains available",
+                  "passed": true
+                },
+                {
+                  "name": "PNG export still captures the visible scene after culling",
+                  "passed": true
+                }
+              ]
+            },
+            {
+              "suite": "vfopt-ui-017-drag-after.json",
+              "passed": 10,
+              "checks": [
+                {
+                  "name": "Held Stage pan paints the newly exposed grid before pointer release",
+                  "passed": true
+                },
+                {
+                  "name": "Real component drag moves the component and preserves the viewport",
+                  "passed": true
+                },
+                {
+                  "name": "Drag previews preserve wires and the final worker preserves endpoints and equivalent routes",
+                  "passed": true
+                },
+                {
+                  "name": "Browser undo and redo restore exactly one completed gesture",
+                  "passed": true
+                },
+                {
+                  "name": "Drag-end dispatch stays below 50 ms",
+                  "passed": true
+                },
+                {
+                  "name": "Mouse-to-canvas-draw p95 stays below 50 ms on the dense fixture",
+                  "passed": true
+                },
+                {
+                  "name": "Actual Konva event bursts coalesce to one frame and release keeps the newest coordinates",
+                  "passed": true
+                },
+                {
+                  "name": "Current-flow paths pause only moving connections and resume without recompiling every frame",
+                  "passed": true
+                },
+                {
+                  "name": "Read-only changes cancel pending movement before it can modify the document",
+                  "passed": true
+                },
+                {
+                  "name": "Unmount cancels pending gesture frames without a late document write",
+                  "passed": true
+                }
+              ]
+            }
+          ],
+          "finalValidation": {
+            "npmTest": {
+              "result": "passed",
+              "detail": "TypeScript, lint and all 21 contract suites pass, including runtime action restoration on normal and exception paths.",
+              "warnings": [
+                "Existing Fast Refresh warning in the palette fixture.",
+                "Vite dependency scan shutdown warnings from short-lived SSR test servers; assertions and exit code pass."
+              ]
+            },
+            "productionBuild": {
+              "result": "passed",
+              "initialStaticJsKiB": 505.1,
+              "initialBudgetKiB": 550,
+              "initialChunks": 13,
+              "largestChunkKiB": 188.4
+            },
+            "editor": {
+              "status": "passed",
+              "checks": [
+                {
+                  "name": "Real Monaco editor loads",
+                  "passed": true
+                },
+                {
+                  "name": "runtime: editor shell and palette stay isolated",
+                  "passed": true
+                },
+                {
+                  "name": "clock: editor shell and palette stay isolated",
+                  "passed": true
+                },
+                {
+                  "name": "avr: editor shell and palette stay isolated",
+                  "passed": true
+                },
+                {
+                  "name": "diagnostics: editor shell and palette stay isolated",
+                  "passed": true
+                },
+                {
+                  "name": "viewport: editor shell and palette stay isolated",
+                  "passed": true
+                },
+                {
+                  "name": "code: editor shell and palette stay isolated",
+                  "passed": true
+                },
+                {
+                  "name": "pcb: editor shell and palette stay isolated",
+                  "passed": true
+                },
+                {
+                  "name": "Project metadata updates remain visible",
+                  "passed": true
+                },
+                {
+                  "name": "Real Monaco typing updates the active file without shell or palette commits",
+                  "passed": true
+                },
+                {
+                  "name": "Share action captures the latest code, geometry, viewport and PCB",
+                  "passed": true
+                },
+                {
+                  "name": "Save uses the latest document and code revision",
+                  "passed": true
+                },
+                {
+                  "name": "Real canvas drag pans without shell or code-editor commits",
+                  "passed": true
+                },
+                {
+                  "name": "Simulation start reads fresh source; pause, step, resume and stop reach the real engine",
+                  "passed": true
+                },
+                {
+                  "name": "Autosave remains scheduled during continuous edits and saves the latest snapshot",
+                  "passed": true
+                },
+                {
+                  "name": "Owner changes revoke editing and save shortcuts without stale closures",
+                  "passed": true
+                },
+                {
+                  "name": "Unmount stops active simulation, autosave and route-owned consumers",
+                  "passed": true
+                },
+                {
+                  "name": "A compiler response after navigation cannot restart simulation or overwrite its state",
+                  "passed": true
+                }
+              ],
+              "errors": [],
+              "measured": []
+            },
+            "monacoInputCompatibility": {
+              "status": "passed",
+              "checks": [
+                {
+                  "name": "Real Monaco editor loads",
+                  "passed": true
+                },
+                {
+                  "name": "Immediate typing after a file switch reaches the document without a timed ignore window",
+                  "passed": true
+                },
+                {
+                  "name": "Full Sketch is read-only; immediate typing on return persists without generated text",
+                  "passed": true
+                },
+                {
+                  "name": "Native clipboard paste of large single line stays responsive, supports undo/redo and saves intact",
+                  "passed": true
+                },
+                {
+                  "name": "Native clipboard paste of large multiline stays responsive, supports undo/redo and saves intact",
+                  "passed": true
+                }
+              ],
+              "errors": [],
+              "measured": [
+                {
+                  "name": "Native clipboard single line",
+                  "characters": 920003,
+                  "pasteToTwoFramesMs": 185,
+                  "budgetMs": 1500
+                },
+                {
+                  "name": "Native clipboard multiline",
+                  "characters": 930000,
+                  "pasteToTwoFramesMs": 223,
+                  "budgetMs": 1500
+                }
+              ]
+            },
+            "harnessCorrections": [
+              "Load public/config.js in the test HTML, matching actual app bootstrap.",
+              "Intercept native collaboration STOMP, keeping the test independent of live services.",
+              "Start render-isolation samples clean and assert no autosave occurs during sampling; independently verify actual autosave.",
+              "Preserve native User Timing mark/measure/entry methods while Playwright controls timers/RAF. Its empty fake entry list caused a Monaco telemetry error and left the earlier run clock paused; the corrected run passes all five input checks with no page errors."
+            ],
+            "productionAuth": {
+              "passed": 20,
+              "failed": 0,
+              "mode": "production-preview",
+              "methodology": "Real Chromium and installed Keycloak adapter. Network/protocol responses are fixtures except the explicitly labeled configured-endpoint scenario. Synthetic tokens are test-only and never accepted by a real backend. No real account sign-in or live backend authorization claim."
+            }
+          },
+          "sourceEvidence": [
+            {
+              "file": "src/features/canvas/CircuitCanvas.tsx",
+              "sha256": "613332159b6b36d3a1b6393835b745577daa901ecdd444ff605b165f87e03ba3"
+            },
+            {
+              "file": "src/features/canvas/components/ComponentNode.tsx",
+              "sha256": "cec22f714cec97eaa7265a71c44e3bac12cad62cfc19a0aab361762b2f39a98d"
+            },
+            {
+              "file": "src/features/canvas/components/PinDot.tsx",
+              "sha256": "6e922a6f1338341c7a34fe83ad0d8b239f334a7c53293393fd51475d367e7c05"
+            },
+            {
+              "file": "src/features/editor/CircuitEditorPage.tsx",
+              "sha256": "de82aef4615bfcfdb287cb0bcadbedc091c93d11c57913e7441604aac9fe865d"
+            },
+            {
+              "file": "src/features/editor/CodeEditor.tsx",
+              "sha256": "a5c472b707590d55625f65e52b7598deb6cbfc9643e6d5da325656ac280de14b"
+            },
+            {
+              "file": "src/features/simulator/SimulationEngine.ts",
+              "sha256": "5db9868eeb3d9ae751efdc5e55c4d9d0c19086a1cb0f39740579cceb47103f25"
+            }
+          ]
+        }
       },
       "rootCauseConfidence": "profiling_identifies_drawing_hotspots; complete_cpu_attribution_not_claimed",
       "rootCause": "The independent 10-second main-thread CPU profile is dominated among identifiable active functions by native drawImage and Konva scene/shadow work. React memoization does not prevent native layer rasterization. Chromium aggregate CPU also includes workers, rendering/GPU process work and browser overhead outside that main-thread profile.",
       "sourceRefs": [
         "Voltforge_UI/src/features/canvas/components/ComponentNode.tsx",
+        "Voltforge_UI/src/features/canvas/components/PinDot.tsx",
         "Voltforge_UI/src/features/canvas/CircuitCanvas.tsx",
         "Voltforge_UI/src/features/canvas/CurrentFlowLayer.tsx",
         "Voltforge_UI/src/features/simulator/SimulationEngine.ts"
       ],
       "proposedWork": [
-        "Repeat profiling after the transport loop is fixed to avoid treating reconnect overhead as rendering cost.",
-        "Separate static component artwork from changing indicators; evaluate bounded raster caches and narrower redraw scheduling.",
+        "Keep authenticated production profiling on the same compiled fixture. The component layer redraws scene and hit canvases together; map per-component hit-shape work and isolate geometry-stable artwork from simulation visuals before selecting another candidate. Preserve component drag, pin/probe, board-control, and wire interactions.",
+        "The bounded image-cache experiment increased CPU and input latency; it was reverted. Any new raster cache must prove stable source/dimension invalidation and pass the same three-run comparison.",
         "Measure current-flow, pin-detail, shadow and board-image costs separately before reducing work.",
         "Preserve all solver results, firmware instructions, peripheral ticks and active input handling."
       ],
@@ -682,7 +2249,7 @@
       "id": "VFOPT-X-001-F004",
       "priority": "P2",
       "category": "ui_memory_investigation",
-      "status": "open",
+      "status": "completed_scoped_acceptance",
       "title": "Trace retained memory across repeated editor navigation",
       "repositories": [
         "Voltforge_UI"
@@ -813,14 +2380,881 @@
             "canvasElements": 0
           }
         ],
-        "productionGrowthBytes": 1993204
+        "productionGrowthBytes": 1993204,
+        "review2026_09_27": {
+          "capturedAt": "2026-09-27T09:01:15.135Z",
+          "conditions": {
+            "mode": "production",
+            "isProduction": true,
+            "nodeEnv": "production",
+            "reactRendererBundleTypes": [
+              0
+            ],
+            "browser": "153.0.8010.53",
+            "viewport": "1440x900",
+            "fixture": {
+              "nodes": 36,
+              "wires": 75,
+              "sha256": "ab4d3bc31fa61747a98c84353a7949937c84a755595023a8e852e959e198a02e"
+            },
+            "firmwareSha256": "b17545cb64be48ba83c89a9c48266216b7234ac5216a55ed292e46825676591c",
+            "cycle": "Open the actual editor; wait for actual Monaco; run compiled AVR for 1 second; navigate outside without manually stopping; wait 1 second; collect garbage; record resources. Repeat 20 times."
+          },
+          "baselineCycles": [
+            {
+              "cycle": 1,
+              "heap": 19620308,
+              "dom": {
+                "documents": 16,
+                "nodes": 1535,
+                "jsEventListeners": 292
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 2,
+              "heap": 20869608,
+              "dom": {
+                "documents": 17,
+                "nodes": 2890,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 3,
+              "heap": 21758236,
+              "dom": {
+                "documents": 17,
+                "nodes": 2892,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 4,
+              "heap": 22343636,
+              "dom": {
+                "documents": 17,
+                "nodes": 2894,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 5,
+              "heap": 23004244,
+              "dom": {
+                "documents": 17,
+                "nodes": 2896,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 6,
+              "heap": 23297868,
+              "dom": {
+                "documents": 17,
+                "nodes": 2898,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 7,
+              "heap": 23556808,
+              "dom": {
+                "documents": 17,
+                "nodes": 2900,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 8,
+              "heap": 23811248,
+              "dom": {
+                "documents": 17,
+                "nodes": 2902,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 9,
+              "heap": 25234712,
+              "dom": {
+                "documents": 17,
+                "nodes": 2904,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 10,
+              "heap": 25460276,
+              "dom": {
+                "documents": 17,
+                "nodes": 2906,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 11,
+              "heap": 25615248,
+              "dom": {
+                "documents": 17,
+                "nodes": 2908,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 12,
+              "heap": 25754844,
+              "dom": {
+                "documents": 17,
+                "nodes": 2910,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 13,
+              "heap": 25942516,
+              "dom": {
+                "documents": 17,
+                "nodes": 2912,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 14,
+              "heap": 26094448,
+              "dom": {
+                "documents": 17,
+                "nodes": 2914,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 15,
+              "heap": 26246860,
+              "dom": {
+                "documents": 17,
+                "nodes": 2916,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 16,
+              "heap": 26395636,
+              "dom": {
+                "documents": 17,
+                "nodes": 2918,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 17,
+              "heap": 26555952,
+              "dom": {
+                "documents": 17,
+                "nodes": 2920,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 18,
+              "heap": 26694500,
+              "dom": {
+                "documents": 17,
+                "nodes": 2922,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 19,
+              "heap": 26855876,
+              "dom": {
+                "documents": 17,
+                "nodes": 2924,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            },
+            {
+              "cycle": 20,
+              "heap": 27022292,
+              "dom": {
+                "documents": 17,
+                "nodes": 2926,
+                "jsEventListeners": 389
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": true
+            }
+          ],
+          "afterCycles": [
+            {
+              "cycle": 1,
+              "heap": 19198844,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 214
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 2,
+              "heap": 20139984,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 3,
+              "heap": 20902700,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 4,
+              "heap": 21306764,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 5,
+              "heap": 21879436,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 6,
+              "heap": 22047848,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 7,
+              "heap": 22235372,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 8,
+              "heap": 22399808,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 9,
+              "heap": 23828216,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 10,
+              "heap": 23933664,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 11,
+              "heap": 23985360,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 12,
+              "heap": 24034280,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 13,
+              "heap": 24066756,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 14,
+              "heap": 24145264,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 15,
+              "heap": 24161568,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 16,
+              "heap": 24190884,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 17,
+              "heap": 24201564,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 18,
+              "heap": 24231140,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 19,
+              "heap": 24246876,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            },
+            {
+              "cycle": 20,
+              "heap": 24269872,
+              "dom": {
+                "documents": 16,
+                "nodes": 199,
+                "jsEventListeners": 218
+              },
+              "workers": 0,
+              "sockets": 0,
+              "canvases": 0,
+              "stages": 0,
+              "models": 0,
+              "queries": 3,
+              "simulationRunning": false
+            }
+          ],
+          "cycle20HeapReductionBytes": 2752420,
+          "postWarmup": {
+            "window": "cycles 10 through 20",
+            "firstHeapBytes": 23933664,
+            "lastHeapBytes": 24269872,
+            "growthBytes": 336208,
+            "growthPercent": 1.4047493939916595,
+            "tolerance": "At most 1 MiB and 5% after warmup; stable exited-editor DOM/listeners; zero models/workers/sockets/canvases/stages on every exit.",
+            "passed": true
+          },
+          "heapSnapshotDiagnosis": {
+            "snapshots": "Cycles 5 and 20; generated raw snapshots removed after analysis.",
+            "before": "Added copies of geometry and wire-signature strings retained through nested runtime-action closures and previous simulation engines. Detached style and Text nodes grew by one each per visit through the Monaco global stylesheet Map.",
+            "after": "No accumulating engine/geometry callback chain or new detached Monaco styles. The current canvas store still intentionally retains the latest document/route cache; three query entries remain stable. Most cycle-5-to-20 self-size growth is V8 compiled code/feedback rather than old editor instances.",
+            "intermediate": "Restoring the runtime action removed the engine chain. Before the Monaco pin, two DOM nodes still accumulated per visit; after the pin DOM nodes stayed at 199 and listeners stayed at 218 after cycle 2."
+          },
+          "upstreamEvidence": [
+            "https://cdn.jsdelivr.net/npm/monaco-editor@0.55.1/esm/vs/base/browser/domStylesheets.js",
+            "https://cdn.jsdelivr.net/npm/monaco-editor@0.56.0/esm/vs/base/browser/domStylesheets.js",
+            "https://raw.githubusercontent.com/microsoft/vscode/main/src/vs/base/browser/domStylesheets.ts"
+          ],
+          "limitations": [
+            "Local AuthContext and API/STOMP fixtures; real production editor and compiled AVR; no authenticated backend coverage",
+            "Single fixed 36-node/75-wire project; this is bounded lifecycle acceptance, not a proof about unlimited distinct project/cache growth.",
+            "Heap includes JIT/browser warmup. Acceptance records the post-warmup tolerance instead of claiming zero byte growth.",
+            "The alternate production fixture does not use normal app manual chunk groups; the actual app build is separately validated."
+          ],
+          "sourceEvidence": [
+            {
+              "file": "src/features/canvas/CircuitCanvas.tsx",
+              "sha256": "613332159b6b36d3a1b6393835b745577daa901ecdd444ff605b165f87e03ba3"
+            },
+            {
+              "file": "src/features/canvas/components/ComponentNode.tsx",
+              "sha256": "cec22f714cec97eaa7265a71c44e3bac12cad62cfc19a0aab361762b2f39a98d"
+            },
+            {
+              "file": "src/features/canvas/components/PinDot.tsx",
+              "sha256": "6e922a6f1338341c7a34fe83ad0d8b239f334a7c53293393fd51475d367e7c05"
+            },
+            {
+              "file": "src/features/editor/CircuitEditorPage.tsx",
+              "sha256": "de82aef4615bfcfdb287cb0bcadbedc091c93d11c57913e7441604aac9fe865d"
+            },
+            {
+              "file": "src/features/editor/CodeEditor.tsx",
+              "sha256": "a5c472b707590d55625f65e52b7598deb6cbfc9643e6d5da325656ac280de14b"
+            },
+            {
+              "file": "src/features/simulator/SimulationEngine.ts",
+              "sha256": "5db9868eeb3d9ae751efdc5e55c4d9d0c19086a1cb0f39740579cceb47103f25"
+            }
+          ],
+          "finalValidation": {
+            "npmTest": {
+              "result": "passed",
+              "detail": "TypeScript, lint and all 21 contract suites pass, including runtime action restoration on normal and exception paths.",
+              "warnings": [
+                "Existing Fast Refresh warning in the palette fixture.",
+                "Vite dependency scan shutdown warnings from short-lived SSR test servers; assertions and exit code pass."
+              ]
+            },
+            "productionBuild": {
+              "result": "passed",
+              "initialStaticJsKiB": 505.1,
+              "initialBudgetKiB": 550,
+              "initialChunks": 13,
+              "largestChunkKiB": 188.4
+            },
+            "editor": {
+              "status": "passed",
+              "checks": [
+                {
+                  "name": "Real Monaco editor loads",
+                  "passed": true
+                },
+                {
+                  "name": "runtime: editor shell and palette stay isolated",
+                  "passed": true
+                },
+                {
+                  "name": "clock: editor shell and palette stay isolated",
+                  "passed": true
+                },
+                {
+                  "name": "avr: editor shell and palette stay isolated",
+                  "passed": true
+                },
+                {
+                  "name": "diagnostics: editor shell and palette stay isolated",
+                  "passed": true
+                },
+                {
+                  "name": "viewport: editor shell and palette stay isolated",
+                  "passed": true
+                },
+                {
+                  "name": "code: editor shell and palette stay isolated",
+                  "passed": true
+                },
+                {
+                  "name": "pcb: editor shell and palette stay isolated",
+                  "passed": true
+                },
+                {
+                  "name": "Project metadata updates remain visible",
+                  "passed": true
+                },
+                {
+                  "name": "Real Monaco typing updates the active file without shell or palette commits",
+                  "passed": true
+                },
+                {
+                  "name": "Share action captures the latest code, geometry, viewport and PCB",
+                  "passed": true
+                },
+                {
+                  "name": "Save uses the latest document and code revision",
+                  "passed": true
+                },
+                {
+                  "name": "Real canvas drag pans without shell or code-editor commits",
+                  "passed": true
+                },
+                {
+                  "name": "Simulation start reads fresh source; pause, step, resume and stop reach the real engine",
+                  "passed": true
+                },
+                {
+                  "name": "Autosave remains scheduled during continuous edits and saves the latest snapshot",
+                  "passed": true
+                },
+                {
+                  "name": "Owner changes revoke editing and save shortcuts without stale closures",
+                  "passed": true
+                },
+                {
+                  "name": "Unmount stops active simulation, autosave and route-owned consumers",
+                  "passed": true
+                },
+                {
+                  "name": "A compiler response after navigation cannot restart simulation or overwrite its state",
+                  "passed": true
+                }
+              ],
+              "errors": [],
+              "measured": []
+            },
+            "monacoInputCompatibility": {
+              "status": "passed",
+              "checks": [
+                {
+                  "name": "Real Monaco editor loads",
+                  "passed": true
+                },
+                {
+                  "name": "Immediate typing after a file switch reaches the document without a timed ignore window",
+                  "passed": true
+                },
+                {
+                  "name": "Full Sketch is read-only; immediate typing on return persists without generated text",
+                  "passed": true
+                },
+                {
+                  "name": "Native clipboard paste of large single line stays responsive, supports undo/redo and saves intact",
+                  "passed": true
+                },
+                {
+                  "name": "Native clipboard paste of large multiline stays responsive, supports undo/redo and saves intact",
+                  "passed": true
+                }
+              ],
+              "errors": [],
+              "measured": [
+                {
+                  "name": "Native clipboard single line",
+                  "characters": 920003,
+                  "pasteToTwoFramesMs": 185,
+                  "budgetMs": 1500
+                },
+                {
+                  "name": "Native clipboard multiline",
+                  "characters": 930000,
+                  "pasteToTwoFramesMs": 223,
+                  "budgetMs": 1500
+                }
+              ]
+            },
+            "harnessCorrections": [
+              "Load public/config.js in the test HTML, matching actual app bootstrap.",
+              "Intercept native collaboration STOMP, keeping the test independent of live services.",
+              "Start render-isolation samples clean and assert no autosave occurs during sampling; independently verify actual autosave.",
+              "Preserve native User Timing mark/measure/entry methods while Playwright controls timers/RAF. Its empty fake entry list caused a Monaco telemetry error and left the earlier run clock paused; the corrected run passes all five input checks with no page errors."
+            ],
+            "productionAuth": {
+              "passed": 20,
+              "failed": 0,
+              "mode": "production-preview",
+              "methodology": "Real Chromium and installed Keycloak adapter. Network/protocol responses are fixtures except the explicitly labeled configured-endpoint scenario. Synthetic tokens are test-only and never accepted by a real backend. No real account sign-in or live backend authorization claim."
+            }
+          }
+        }
       },
-      "rootCauseConfidence": "growth_measured; leak_not_proven",
-      "rootCause": "Five cycles are insufficient to distinguish cache warmup from a continuing leak. Investigate retained paths in Monaco models, image caches, query data, observers and detached nodes. ComponentNode has a strong global SVG image cache with no explicit eviction; causation of this measured growth is not yet established.",
+      "rootCauseConfidence": "retaining_paths_identified_and_regression_reproduced",
+      "rootCause": "SimulationEngine.runBatched temporarily replaced a Zustand action. An immutable write copied that closure to the latest snapshot, but cleanup restored only the captured older snapshot. The live action retained the engine and earlier editor scopes. The cached project query also captured the editor render scope. Separately, Monaco 0.55.1 removed disposed styles from the DOM without deleting them from its global stylesheet map. Navigation also left the global running flag true and allowed pending compilation/interpreter startup to finish after exit.",
       "sourceRefs": [
-        "Voltforge_UI/src/features/canvas/components/ComponentNode.tsx:70",
+        "Voltforge_UI/src/features/simulator/SimulationEngine.ts",
+        "Voltforge_UI/src/features/editor/CircuitEditorPage.tsx",
         "Voltforge_UI/src/features/editor/CodeEditor.tsx",
-        "Voltforge_UI/src/App.tsx"
+        "Voltforge_UI/scripts/run-runtime-delta-tests.mjs",
+        "Voltforge_UI/scripts/run-editor-render-tests.mjs"
       ],
       "proposedWork": [
         "Capture heap snapshots after warmup and after at least 20 equivalent navigation cycles.",
@@ -835,7 +3269,16 @@
       "dependsOn": [],
       "evidenceFiles": [
         "docs/reports/vfopt-x-001-production.json"
-      ]
+      ],
+      "completedAt": "2026-09-27T09:01:15.135Z",
+      "implementation": [
+        "Restore the original runtime action on both captured and current snapshots; stage/materialize against the current node map. Regression first failed, then passed for normal completion and exceptions.",
+        "Move the cached project query function outside CircuitEditorPage. This removes an editor-scope retaining path; the query change alone did not resolve the main engine chain.",
+        "Invalidate pending compilation on navigation, stop the active engine and clear global running state; ignore late compiler success/failure responses.",
+        "Invalidate asynchronous interpreter startup with a run generation so a stopped or replaced run cannot start its solver after a delay.",
+        "Pin the lazily loaded Monaco CDN runtime to 0.56.0, whose WrappedStyleElement disposes its stylesheet registration. Keep actual models disposed on unmount."
+      ],
+      "suggestedNext": false
     },
     {
       "id": "VFOPT-X-001-F005",
@@ -1555,8 +3998,8 @@
   "nextWorkItem": {
     "id": "VFOPT-X-001-F003",
     "title": "Reduce visible-scene drawing cost during sustained mixed-component simulation",
-    "status": "recommended_not_started",
-    "reason": "F009 editor checks and save recovery are complete. Resume the measured sustained-simulation CPU/drawing hotspot after the completed transport and persistence prerequisites.",
+    "status": "in_progress",
+    "reason": "F004 lifecycle/memory fixes pass the 20-cycle production fixture and regression checks. F003 idle-shadow/dash/hit-graph changes remain, but the Stage-pan compositor was reverted for missing held-pan pixels and prior offline production claims were corrected. Current verified-production sampling averages 38.0811% main-thread activity and 239.5183% aggregate Chromium CPU; active pan p95 is 135.4 ms, above 50 ms. Next isolate visible component image/shadow drawing cost against the same compiled-AVR fixture, then require three controlled runs and unchanged visual/simulation behavior. F005 project summaries follows F003.",
     "backlog": "docs/VFOPT_X_001_FINDINGS_BACKLOG.json"
   },
   "artifactRetention": {
@@ -1564,9 +4007,9 @@
     "oneOffAuditAndValidationScripts": "removed after validation",
     "retained": "Embedded measurements, live acceptance results, schema patch, implementation notes and reusable regression suites.",
     "cleanup": {
-      "generatedReportsScreenshotsProfiles": 56,
-      "bytes": 2554320,
-      "temporaryHelpersChecksAndLogs": 16,
+      "generatedReportsScreenshotsProfiles": 74,
+      "bytes": 3582061,
+      "temporaryHelpersChecksAndLogs": 24,
       "oneOffAuditRunners": 2,
       "temporaryAuditProjectsRemaining": 0
     },
@@ -1578,6 +4021,18 @@
       "temporaryArtifacts": "removed",
       "retained": "Embedded input-path diagnosis, before/after acceptance evidence and the existing reusable editor browser suite.",
       "temporaryArtifactFilesRemoved": 7
+    },
+    "f003": {
+      "temporaryProfilesScreenshotsAndReportsRemoved": 18,
+      "temporaryHarnessCopiesAndUpdaterRemoved": 8,
+      "temporaryBrowserBuildOutputsRemoved": 8,
+      "retained": "Embedded layer, hit-graph, CPU and pan measurements; reusable authenticated profile harness and compiled firmware fixture."
+    },
+    "review2026_09_27": {
+      "generatedFilesRemoved": 75,
+      "generatedBuildDirectoriesRemoved": 1,
+      "bytesRemovedExcludingCleanupScript": 104228916,
+      "retained": "Aggregate CPU/pan/heap measurements, retaining-path diagnosis, source hashes and validation results embedded in this backlog; existing reusable regression suites. Temporary helpers, heap snapshots, logs, screenshots, reports and the alternate production build were removed. Pre-existing reusable authenticated profiling harness and compiled firmware remain."
     }
   },
   "databaseLocationCorrection": {

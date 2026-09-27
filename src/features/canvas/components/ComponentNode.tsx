@@ -69,6 +69,14 @@ import {
 // ── Global SVG image cache ── prevents re-parsing SVG data URIs on every render
 const svgImageCache = new Map<string, HTMLImageElement>();
 
+// Reuse dash arrays across simulation renders so Konva does not rewrite an
+// unchanged attribute with a new array identity on every component render.
+const DASH_3_3 = [3, 3];
+const DASH_2_2 = [2, 2];
+const DASH_6_10 = [6, 10];
+const DASH_8_12 = [8, 12];
+const DASH_4_6 = [4, 6];
+
 const NAMED_LED_COLORS: Record<string, string> = {
   red: '#ef4444',
   crimson: '#dc2626',
@@ -246,7 +254,7 @@ const PirOverlay = memo(({ isSimulating, motionDetected, width, height }: {
       {/* Detection range circle */}
       <Circle x={cx} y={cy} radius={18}
         fill="transparent" stroke={motionDetected ? PIR_ACTIVE_COLOR : PIR_IDLE_COLOR}
-        strokeWidth={1} opacity={0.3} dash={[3, 3]} />
+        strokeWidth={1} opacity={0.3} dash={DASH_3_3} />
       {/* Motion alert flash */}
       {motionDetected && (
         <>
@@ -324,6 +332,7 @@ interface ComponentNodeProps {
   finishWiring: (nodeId: string, pinId: string) => void;
   onInteraction?: (nodeId: string, event: 'press' | 'release') => void;
   onProbeToggle?: (target: { nodeId: string; pinId: string; x: number; y: number }) => void;
+  onHitGraphInvalidated?: () => void;
   readOnly?: boolean;
   isProbeMode?: boolean;
   isSimulating?: boolean;
@@ -346,6 +355,7 @@ const ComponentNode = ({
   finishWiring,
   onInteraction,
   onProbeToggle,
+  onHitGraphInvalidated,
   readOnly,
   isProbeMode,
   isSimulating,
@@ -898,7 +908,7 @@ const ComponentNode = ({
                 strokeWidth={1.5}
               />
               {/* Inner concentric ring */}
-              <Circle radius={11} stroke="#94a3b8" strokeWidth={0.5} dash={[2, 2]} />
+              <Circle radius={11} stroke="#94a3b8" strokeWidth={0.5} dash={DASH_2_2} />
               {/* Pointer Tick Line */}
               <Group rotation={displayAngle}>
                 <Line points={[0, 0, 13, 0]} stroke="#f97316" strokeWidth={2} lineCap="round" />
@@ -1179,7 +1189,7 @@ const ComponentNode = ({
                     />
                     <Circle
                       x={node.width / 2} y={MOTOR_BELL_CENTER_Y} radius={26}
-                      stroke="#f97316" strokeWidth={1} opacity={0.5} dash={[6, 10]}
+                      stroke="#f97316" strokeWidth={1} opacity={0.5} dash={DASH_6_10}
                       listening={false}
                     />
                   </>
@@ -1236,13 +1246,13 @@ const ComponentNode = ({
                   <Circle
                     x={30} y={25} radius={26}
                     stroke={ACTIVE_GLOW_COLOR} strokeWidth={1.5}
-                    opacity={0.4} dash={[8, 12]}
+                    opacity={0.4} dash={DASH_8_12}
                     listening={false}
                   />
                   <Circle
                     x={30} y={25} radius={20}
                     stroke="rgba(239,68,68,0.25)" strokeWidth={1}
-                    opacity={0.3} dash={[4, 6]}
+                    opacity={0.3} dash={DASH_4_6}
                     listening={false}
                   />
                 </>
@@ -1839,7 +1849,7 @@ const ComponentNode = ({
                 points={[cx, cy, cx + dist, cy]}
                 stroke="#eab308"
                 strokeWidth={1.5}
-                dash={[3, 3]}
+                dash={DASH_3_3}
                 opacity={0.6}
               />
               <Group
@@ -1916,7 +1926,7 @@ const ComponentNode = ({
                 fill="rgba(239,68,68,0.04)"
                 stroke="#ef4444"
                 strokeWidth={1}
-                dash={[3, 3]}
+                dash={DASH_3_3}
                 opacity={0.4}
               />
               <Group
@@ -1994,7 +2004,7 @@ const ComponentNode = ({
                 points={[cx, cy, cx + dist, cy]}
                 stroke="#3b82f6"
                 strokeWidth={1.5}
-                dash={[3, 3]}
+                dash={DASH_3_3}
                 opacity={0.6}
               />
               <Group
@@ -2060,6 +2070,7 @@ const ComponentNode = ({
             readOnly={readOnly}
             isProbeMode={isProbeMode}
             onProbeToggle={onProbeToggle}
+            onHitGraphInvalidated={onHitGraphInvalidated}
             detailed={detailed}
           />
         ))}

@@ -32,6 +32,7 @@ interface PinDotProps {
   isProbeMode?: boolean;
   detailed?: boolean;
   onProbeToggle?: (target: { nodeId: string; pinId: string; x: number; y: number }) => void;
+  onHitGraphInvalidated?: () => void;
 }
 
 function resolvePinColors(type: PinPosition['type']) {
@@ -110,6 +111,7 @@ const PinDot = memo(function PinDot({
   isProbeMode,
   detailed = true,
   onProbeToggle,
+  onHitGraphInvalidated,
 }: PinDotProps) {
   const [hovered, setHovered] = useState(false);
   const isValidTarget = isWiring && wiringFromNodeId !== nodeId;
@@ -198,11 +200,13 @@ const PinDot = memo(function PinDot({
         }}
         onMouseEnter={(e: KonvaEventObject<MouseEvent>) => {
           setHovered(true);
+          onHitGraphInvalidated?.();
           const c = e.target.getStage()?.container();
           if (c) c.style.cursor = 'crosshair';
         }}
         onMouseLeave={(e: KonvaEventObject<MouseEvent>) => {
           setHovered(false);
+          onHitGraphInvalidated?.();
           const c = e.target.getStage()?.container();
           if (c) c.style.cursor = 'default';
         }}
