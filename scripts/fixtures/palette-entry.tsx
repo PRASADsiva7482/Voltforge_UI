@@ -1,7 +1,7 @@
 // Isolated UI-012 browser fixture; not part of the application entry graph.
 import { StrictMode, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { focusManager, onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import ComponentPanel from '../../src/features/editor/ComponentPanel'
 import { builtinCanvasComponents } from '../../src/features/canvas/componentCatalog'
 import { useCanvasStore } from '../../src/store/canvasStore'
@@ -24,11 +24,15 @@ useCanvasStore.getState().loadCanvas([{ id: 'runtime-led', type: 'LED_STANDARD',
 
 function Fixture() {
   const [readOnly, setReadOnly] = useState(false)
+  const [mounted, setMounted] = useState(true)
   window.__paletteAudit.store = useCanvasStore
   window.__paletteAudit.queryClient = client
   window.__paletteAudit.catalogue = catalogue
   window.__paletteAudit.coverage = coverage
   window.__paletteAudit.setReadOnly = setReadOnly
-  return <div style={{ width: 272, height: '100vh' }}><ComponentPanel readOnly={readOnly} /></div>
+  window.__paletteAudit.setMounted = setMounted
+  window.__paletteAudit.focusManager = focusManager
+  window.__paletteAudit.onlineManager = onlineManager
+  return <div style={{ width: 272, height: '100vh' }}>{mounted && <ComponentPanel readOnly={readOnly} />}</div>
 }
 createRoot(document.getElementById('root')!).render(<StrictMode><QueryClientProvider client={client}><Fixture /></QueryClientProvider></StrictMode>)

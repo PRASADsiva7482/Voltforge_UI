@@ -434,6 +434,9 @@ try {
         assert.equal(state.starts, starts); assert.equal(state.running, false); assert.equal(state.mode, 'avr8js')
       } finally { release(); compileBarrier = undefined }
     })
+    await check('Editor visits, saves and simulation do not request optional AI component coverage', () => {
+      assert.equal(requests.filter(request => request.path.endsWith('/ai/component-coverage')).length, 0)
+    })
   }
   }
 } catch (error) {

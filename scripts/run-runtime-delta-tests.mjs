@@ -94,6 +94,82 @@ try {
   useCanvasStore.getState().clearCanvas();
   assert.deepEqual(connectivity.getConnectedPins('board', 'd3', useCanvasStore.getState().wires), [{ nodeId: 'board', pinId: 'd3' }], 'Clearing the canvas cannot reuse an old net');
   console.log('runtime delta contract: connectivity reuse, live voltage/propagation, breadboard isolation, rewiring, undo/redo and stop/reset assertions passed');
+
+  // Drive actual AVR port registers and timer overrides. Every voltage edge
+  // must survive, while unchanged output resistance needs no worker message.
+  const { portDConfig } = await import('avr8js');
+  const { PinOverrideMode } = await import('avr8js/dist/cjs/peripherals/gpio.js');
+  const savedWindow = globalThis.window, savedWorker = globalThis.Worker;
+  const pinMessages = [], workers = [];
+  globalThis.window = {
+    requestAnimationFrame: () => 1, cancelAnimationFrame() {},
+    setTimeout: () => 1, clearTimeout() {}, setInterval: () => 1, clearInterval() {},
+  };
+  globalThis.Worker = class {
+    constructor() { workers.push(this); }
+    postMessage(message) { pinMessages.push(structuredClone(message)); }
+    terminate() { this.terminated = true; }
+  };
+  const avr = new SimulationEngine({ onSerialOutput() {}, onPinStateChange() {}, onError(error) { throw new Error(error); } });
+  const avrBoard = structuredClone(preset.nodes.find(node => node.type === 'ARDUINO_UNO'));
+  const resistanceId = `r_mcu_pin_${avrBoard.id}_d3`, voltageId = `vs_mcu_${avrBoard.id}_d3_src`;
+  const values = id => pinMessages.filter(message => message.type === 'UPDATE_PIN' && message.elementId === id).map(message => message.voltage);
+  const startAvr = async () => {
+    useCanvasStore.getState().loadCanvas([avrBoard], [], { x: 0, y: 0, scale: 1 });
+    await avr.start('void setup() {}\nvoid loop() {}', useCanvasStore.getState().nodes, [], ':00000001FF', 'ARDUINO_UNO');
+    assert(avr.avrCpu && avr.mnaCircuit && avr.solverWorker, 'Real engine AVR and MNA lifecycle must initialize');
+  };
+  try {
+    await startAvr();
+    const cpu = avr.avrCpu, port = avr.avrPorts.D;
+    cpu.writeData(portDConfig.DDR, 8);
+    assert.deepEqual(values(resistanceId), [40], 'Output mode configures the driver once');
+    pinMessages.length = 0;
+    for (const value of [8, 0, 8, 0]) cpu.writeData(portDConfig.PORT, value);
+    assert.deepEqual(values(voltageId), [5, 0, 5, 0], 'No GPIO edge may be coalesced');
+    assert.deepEqual(values(resistanceId), [], 'GPIO level edges must not resend unchanged resistance');
+    port.timerOverridePin(3, PinOverrideMode.Enable);
+    pinMessages.length = 0;
+    for (const mode of [PinOverrideMode.Set, PinOverrideMode.Clear, PinOverrideMode.Set]) port.timerOverridePin(3, mode);
+    assert.deepEqual(values(voltageId), [5, 0, 5], 'Timer/PWM edges must retain order and voltage');
+    assert.deepEqual(values(resistanceId), [], 'PWM must not resend unchanged resistance');
+    port.timerOverridePin(3, PinOverrideMode.None);
+    pinMessages.length = 0;
+    cpu.writeData(portDConfig.DDR, 0);
+    cpu.writeData(portDConfig.PORT, 8);
+    cpu.writeData(portDConfig.DDR, 8);
+    assert.deepEqual(values(resistanceId), [1e8, 40000, 40], 'Input, pull-up and output mode transitions retain their electrical resistance');
+
+    const result = { type: 'RESULT', nodeIndices: [], nodeVoltages: new Float64Array(), converged: true, timestamp: 0.01, timeStep: 0.005, stepsThisFrame: 1, fidelityMode: 'adaptive' };
+    pinMessages.length = 0;
+    useCanvasStore.getState().updateRuntimeNode(avrBoard.id, { properties: { usbConnected: 'No' } });
+    avr.handleSolverResult(result, []);
+    assert.equal(useCanvasStore.getState().nodesById.get(avrBoard.id).properties.boardPowered, false);
+    assert.equal(values(resistanceId).at(-1), 1e8, 'Power loss disconnects even an unchanged OUTPUT mode');
+    useCanvasStore.getState().updateRuntimeNode(avrBoard.id, { properties: { usbConnected: 'Yes' } });
+    avr.handleSolverResult(result, []);
+    assert.equal(values(resistanceId).at(-1), 40, 'Power recovery reconnects the unchanged OUTPUT mode');
+
+    pinMessages.length = 0;
+    avr.refreshMnaElements(useCanvasStore.getState().nodes, []);
+    assert.equal(avr.mnaCircuit.elements.find(element => element.id === resistanceId)?.value, 40, 'Netlist refresh retains the current mode');
+    avr.stopMNASolver(true);
+    avr.startMNASolver(useCanvasStore.getState().nodes, []);
+    const init = pinMessages.findLast(message => message.type === 'INIT');
+    assert.equal(init.elements.find(element => element.id === resistanceId)?.value, 40, 'A replacement worker receives the existing mode in INIT');
+    avr.stop();
+    await startAvr();
+    pinMessages.length = 0;
+    avr.avrCpu.writeData(portDConfig.DDR, 8);
+    assert.deepEqual(values(resistanceId), [40], 'A fresh simulation reinitializes the output resistance');
+  } finally {
+    avr.stop();
+    assert(workers.every(worker => worker.terminated), 'All test worker generations must be disposed');
+    if (savedWindow === undefined) delete globalThis.window; else globalThis.window = savedWindow;
+    if (savedWorker === undefined) delete globalThis.Worker; else globalThis.Worker = savedWorker;
+    useCanvasStore.getState().clearCanvas();
+  }
+  console.log('runtime delta contract: AVR GPIO/PWM voltage ordering, mode resistance, power loss/recovery, netlist refresh, worker replacement and restart passed');
 } finally {
   await vite.close();
 }

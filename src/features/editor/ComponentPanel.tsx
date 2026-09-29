@@ -81,14 +81,18 @@ function ComponentPanel({ readOnly }: { readOnly?: boolean }) {
   const componentCoverageQuery = useQuery({
     queryKey: ['ai', 'component-coverage'],
     queryFn: () => aiApi.getComponentCoverage().then((response) => response.data.data),
+    // Coverage is optional; editor visits and reconnects must not contact the AI service.
+    enabled: false,
+    retry: false,
   });
 
   const componentLibrary = useMemo(() => mergeComponentLibrary(data || []), [data]);
   const componentCoverageByType = useMemo(
     () => new Map(
-      (componentCoverageQuery.data?.entries ?? []).map((entry) => [entry.componentType, entry])
+      (componentCoverageQuery.isError ? [] : componentCoverageQuery.data?.entries ?? [])
+        .map((entry) => [entry.componentType, entry])
     ),
-    [componentCoverageQuery.data]
+    [componentCoverageQuery.data, componentCoverageQuery.isError]
   );
 
   useEffect(() => { setComponentLibrary(componentLibrary); }, [componentLibrary, setComponentLibrary]);
@@ -155,12 +159,24 @@ function ComponentPanel({ readOnly }: { readOnly?: boolean }) {
         <option value="">{normalizedSearch ? 'Searching all categories' : 'All categories'}</option>
         {categories.map(value => <option key={value} value={value}>{value}</option>)}
       </select>
-      <div className="vf-component-panel__coverage-summary" role="status" aria-live="polite">
-        {componentCoverageQuery.isLoading
-          ? 'Checking AI component coverage...'
-          : componentCoverageQuery.isError
-            ? 'AI component coverage unavailable'
-            : `${componentCoverageQuery.data?.summary.verified ?? 0} exact / ${componentCoverageQuery.data?.summary.variantRequired ?? 0} require a variant / ${componentCoverageQuery.data?.summary.simulationOnly ?? 0} simulation-only`}
+      <div className="vf-component-panel__coverage-summary">
+        <span role="status" aria-live="polite">
+          {componentCoverageQuery.isFetching
+            ? 'Checking AI component coverage...'
+            : componentCoverageQuery.isError
+              ? 'AI component coverage unavailable'
+              : componentCoverageQuery.data
+                ? `${componentCoverageQuery.data.summary.verified} exact / ${componentCoverageQuery.data.summary.variantRequired} require a variant / ${componentCoverageQuery.data.summary.simulationOnly} simulation-only`
+                : 'AI coverage not checked'}
+        </span>
+        <button
+          type="button"
+          className="vf-component-panel__coverage-action"
+          disabled={componentCoverageQuery.isFetching}
+          onClick={() => { void componentCoverageQuery.refetch({ cancelRefetch: false }); }}
+        >
+          {componentCoverageQuery.isError ? 'Retry AI coverage' : componentCoverageQuery.data ? 'Refresh AI coverage' : 'Check AI coverage'}
+        </button>
       </div>
       <div className="vf-component-panel__list" ref={listRef} id={listId} tabIndex={-1} role="region" aria-label="Component results">
         {[...page.groups].map(([category, components]) => {

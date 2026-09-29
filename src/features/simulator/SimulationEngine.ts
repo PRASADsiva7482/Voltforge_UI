@@ -2469,17 +2469,17 @@ private scopeCaptureRevision = 0;
             isBoardComponentType(n.type)
           );
           if (mcuNode) {
-            const isPowered = mcuNode.properties?.boardPowered !== false;
-            let resistance = 1e8; // Default to input high impedance
-            if (isPowered) {
-              if (isOutput) resistance = 40;
-              else if (isPullUp) resistance = 40000;
+            // GPIO/PWM level edges do not change the pin's output resistance.
+            // Power transitions and netlist refreshes update it separately.
+            if (prevPin?.mode !== mode) {
+              const isPowered = mcuNode.properties?.boardPowered !== false;
+              const resistance = isPowered ? isOutput ? 40 : isPullUp ? 40000 : 1e8 : 1e8;
+              this.solverWorker?.postMessage({
+                type: 'UPDATE_PIN',
+                elementId: `r_mcu_pin_${mcuNode.id}_${this.mnaPinSuffix(pin)}`,
+                voltage: resistance,
+              });
             }
-            this.solverWorker?.postMessage({
-              type: 'UPDATE_PIN',
-              elementId: `r_mcu_pin_${mcuNode.id}_${this.mnaPinSuffix(pin)}`,
-              voltage: resistance,
-            });
             this.updateMNAPinVoltage(pin, high ? this.boardLogicVoltage(mcuNode.type) : 0);
           }
         }

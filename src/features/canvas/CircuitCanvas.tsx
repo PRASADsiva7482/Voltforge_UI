@@ -38,6 +38,7 @@ import { indexIncidentWires } from './dragRouting';
 import { ComponentBoundsCache, ComponentSpatialIndex, createComponentVisibilitySnapshot, COMPONENT_DETAIL_SCALE } from './componentVisibility';
 import { CanvasAudioBridge } from './CanvasAudioBridge';
 import { WireRoutingPeerCache } from './wireRoutingPeers';
+import { installComponentRegionRedraw } from './componentRegionRedraw';
 
 interface Props {
   width: number;
@@ -425,6 +426,11 @@ export default function CircuitCanvas({
   useLayoutEffect(() => {
     invalidateComponentHitGraph();
   }, [invalidateComponentHitGraph, documentNodes, visibleNodes, selectedNodeId, viewport, width, height, viewMode, readOnly, isProbeMode, activeInteractionId]);
+
+  useLayoutEffect(() => {
+    const layer = componentLayerRef.current;
+    if (layer && isSimulating) return installComponentRegionRedraw(layer);
+  }, [isSimulating, viewMode]);
 
   // Native DOM capture runs before controls stop Konva event bubbling. Keep
   // dials, momentary buttons and nested sensor drag handles alive until release.

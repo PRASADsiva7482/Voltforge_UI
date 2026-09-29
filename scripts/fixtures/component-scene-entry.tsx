@@ -7,6 +7,8 @@ import { useSimulationStore } from '../../src/store/simulationStore'
 import { AudioEngine } from '../../src/features/simulator/AudioEngine'
 import { createCanvasNodeFromComponent } from '../../src/features/canvas/componentFactory'
 import { builtinCanvasComponents } from '../../src/features/canvas/componentCatalog'
+import { createMaximumComponentRegressionPreset } from '../../src/store/maxComponentRegressionPreset'
+import { installComponentRegionRedraw } from '../../src/features/canvas/componentRegionRedraw'
 import '../../src/index.css'
 import '../../src/styles/editor.css'
 
@@ -15,6 +17,8 @@ const resistor = builtinCanvasComponents.find(c => c.type === 'RESISTOR')!
 audit.store = useCanvasStore
 audit.simulation = useSimulationStore
 audit.Konva = Konva
+audit.makePreset = createMaximumComponentRegressionPreset
+audit.installRegionRedraw = installComponentRegionRedraw
 audit.makeNode = (type: string, id: string, x: number, y: number) => ({ ...createCanvasNodeFromComponent(builtinCanvasComponents.find(c => c.type === type)!, { x, y }), id })
 audit.audio = []
 AudioEngine.playTone = (...args) => { audit.audio.push(['tone', ...args]) }

@@ -862,11 +862,27 @@
 }
 
 .vf-component-panel__coverage-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   margin: -2px 12px 7px;
   color: var(--vf-text-muted, #475569);
   font-size: 9px;
   line-height: 1.35;
 }
+
+.vf-component-panel__coverage-action {
+  min-height: 24px;
+  padding: 3px 7px;
+  border: 1px solid var(--vf-border, #dce5de);
+  border-radius: 5px;
+  background: var(--vf-surface, #ffffff);
+  color: var(--vf-text, #26302d);
+  font-size: 11px;
+  cursor: pointer;
+}
+.vf-component-panel__coverage-action:disabled { opacity: 0.6; cursor: default; }
 
 .vf-component-panel__list {
   flex: 1;
@@ -903,6 +919,7 @@
 .vf-component-panel__list:focus-visible,
 .vf-component-panel__item:focus-visible,
 .vf-component-panel__category-header:focus-visible,
+.vf-component-panel__coverage-action:focus-visible,
 .vf-component-panel__page-buttons button:focus-visible {
   outline: 2px solid var(--vf-teal, #087f83);
   outline-offset: -2px;

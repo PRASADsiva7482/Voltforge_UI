@@ -3,23 +3,28 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
-import { createServer } from 'vite'
+import { build, createServer, preview } from 'vite'
 import ts from 'typescript'
 import { chromium } from '@playwright/test'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const phase = process.argv.includes('--before') ? 'before' : 'after'
+const production = process.argv.includes('--production'), coverageOnly = process.argv.includes('--coverage-only')
+const cache = path.join(root, 'node_modules/.cache/vfopt-palette-browser')
+const mode = production ? 'production' : 'development'
+const reportName = coverageOnly ? `vfopt-x-001-f007-${phase}-${mode}` : `vfopt-ui-012-palette-${phase}${production ? '-production' : ''}`
 const output = path.join(root, 'docs/reports'), origin = 'http://localhost:3104'
 const checks = [], measurements = {}, errors = [], requests = []
 const sha = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
 let browser
-const server = await createServer({ root, server: { host: 'localhost', port: 3104, strictPort: true }, plugins: [{
+let coverageRequests = 0, coverageStatus = 500, coverageGate, releaseCoverage
+const html = '<!doctype html><html><head><title>Palette audit</title></head><body><div id="root"></div><script type="module" src="/scripts/fixtures/palette-entry.tsx"></script></body></html>'
+const plugin = {
   name: 'palette-audit-only', enforce: 'pre',
   configureServer(vite) {
     vite.middlewares.use(async (request, response, next) => {
       if (!request.headers.accept?.includes('text/html')) return next()
-      const html = await vite.transformIndexHtml(request.url, '<!doctype html><html><head><title>Palette audit</title></head><body><div id="root"></div><script type="module" src="/scripts/fixtures/palette-entry.tsx"></script></body></html>')
-      response.setHeader('Content-Type', 'text/html'); response.end(html)
+      response.setHeader('Content-Type', 'text/html'); response.end(await vite.transformIndexHtml(request.url, html))
     })
   },
   transform(code, id) {
@@ -35,7 +40,19 @@ const server = await createServer({ root, server: { host: 'localhost', port: 310
     for (const insertion of insertions.sort((a,b) => b.position-a.position)) code = code.slice(0,insertion.position) + insertion.text + code.slice(insertion.position)
     return { code: "import { useLayoutEffect as __auditLayoutEffect } from 'react';\n" + code, map: null }
   },
-}] })
+}
+let server
+if (production) {
+  process.env.NODE_ENV = 'production'
+  fs.mkdirSync(cache, { recursive: true })
+  const input = path.join(cache, 'index.html'), outDir = path.join(cache, 'dist')
+  fs.writeFileSync(input, html)
+  await build({ root, configFile: false, logLevel: 'error', plugins: [plugin], build: { outDir, emptyOutDir: true, rollupOptions: { input } } })
+  const files = fs.readdirSync(outDir, { recursive: true }).filter(file => file.endsWith('index.html'))
+  assert.equal(files.length, 1); fs.copyFileSync(path.join(outDir, files[0]), path.join(outDir, 'index.html'))
+  const running = await preview({ root, configFile: false, build: { outDir }, preview: { host: 'localhost', port: 3104, strictPort: true } })
+  server = { listen: async () => {}, close: () => new Promise(resolve => running.httpServer.close(resolve)) }
+} else server = await createServer({ root, server: { host: 'localhost', port: 3104, strictPort: true }, plugins: [plugin] })
 const check = async (name, action) => {
   try { await action(); checks.push({ name, passed: true }); console.log('PASS ' + name) }
   catch (error) { checks.push({ name, passed: false, error: error.message }); console.error('FAIL ' + name + ': ' + error.message) }
@@ -48,8 +65,11 @@ try {
   await server.listen()
   browser = await chromium.launch({ channel: 'chrome', headless: true })
   const context = await browser.newContext({ viewport: { width: 1366, height: 768 } })
-  await context.addInitScript(() => {
-    window.__paletteAudit = { commits: {}, sorts: 0, typing: [] }
+  await context.addInitScript(production => {
+    window.__paletteAudit = { commits: {}, sorts: 0, typing: [], bundleTypes: [] }
+    if (production) window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = { supportsFiber: true,
+      inject(renderer) { window.__paletteAudit.bundleTypes.push(renderer.bundleType); return 1 },
+      onCommitFiberRoot() {}, onCommitFiberUnmount() {} }
     const original = Array.prototype.sort
     Array.prototype.sort = function (...args) {
       if (this[0]?.category && this[0]?.name && this[0]?.type) window.__paletteAudit.sorts++
@@ -60,19 +80,28 @@ try {
       const started = performance.now()
       requestAnimationFrame(() => requestAnimationFrame(() => window.__paletteAudit.typing.push(performance.now() - started)))
     }, true)
-  })
-  await context.route('**/*', route => {
+  }, production)
+  await context.route('**/*', async route => {
     const url = new URL(route.request().url()); requests.push(url.pathname)
+    if (url.pathname.endsWith('/ai/component-coverage')) {
+      coverageRequests++
+      if (coverageGate) await coverageGate
+      const data = { entries: [{ componentType: 'RESISTOR', status: 'verified', reason: 'Recovered coverage' }], summary: { verified: 1, variantRequired: 0, simulationOnly: 0 } }
+      return route.fulfill({ status: coverageStatus, json: coverageStatus === 200 ? { success: true, data } : { success: false, message: 'Coverage unavailable' } })
+    }
     if (url.pathname.includes('/api/v1/')) return route.fulfill({ status: 503, json: { success: false } })
     return url.origin === origin ? route.continue() : route.abort()
   })
   const page = await context.newPage()
-  page.on('pageerror', error => errors.push(error.message))
+  page.on('pageerror', error => errors.push(error.stack || error.message))
   page.setDefaultTimeout(12000)
   await page.goto(origin, { waitUntil: 'networkidle' })
   await page.waitForFunction(() => window.__paletteAudit.store?.getState().componentLibrary.length === 1000)
-  measurements.initial = await page.evaluate(() => ({ rows: document.querySelectorAll('.vf-component-panel__item').length, categories: document.querySelectorAll('.vf-component-panel__category-header').length, sorts: window.__paletteAudit.sorts, studioRequested: performance.getEntriesByType('resource').some(entry => entry.name.includes('/CustomComponentStudio.tsx')) }))
+  measurements.initial = await page.evaluate(() => ({ rows: document.querySelectorAll('.vf-component-panel__item').length, categories: document.querySelectorAll('.vf-component-panel__category-header').length, sorts: window.__paletteAudit.sorts, studioRequested: performance.getEntriesByType('resource').some(entry => /\/CustomComponentStudio(?:\.tsx|-[^/]+\.js)$/.test(entry.name)) }))
   console.log('Initial ' + JSON.stringify(measurements.initial))
+  measurements.bundleTypes = await page.evaluate(() => window.__paletteAudit.bundleTypes)
+  if (production) assert.deepEqual(measurements.bundleTypes, [0], 'Production React is required')
+  if (!coverageOnly) {
   await check(phase === 'before' ? 'Record mounted rows for the 1000-component baseline' : 'Catalogue contains 1000 components with bounded mounted rows', async () => {
     assert.equal(await page.evaluate(() => window.__paletteAudit.store.getState().componentLibrary.length), 1000)
     if (phase === 'after') assert(measurements.initial.rows > 0 && measurements.initial.rows <= 40)
@@ -206,7 +235,7 @@ try {
       await page.getByRole('button', { name: 'Create custom component', exact: true }).click()
       assert.equal(await name.inputValue(), 'Retained palette draft')
       await page.keyboard.press('Escape')
-      assert(requests.some(request => request.includes('/CustomComponentStudio.tsx')))
+      assert(requests.some(request => /\/CustomComponentStudio(?:\.tsx|-[^/]+\.js)$/.test(request)))
     })
     await check('Narrow palette retains visible paging controls without horizontal overflow', async () => {
       await input.fill(''); await settle(page)
@@ -221,10 +250,103 @@ try {
     })
   }
   await input.fill(''); await settle(page)
-  await page.screenshot({ path: path.join(output, `vfopt-ui-012-palette-${phase}.png`) })
+  await page.screenshot({ path: path.join(output, `${reportName}.png`) })
+  }
+  const mount = async value => {
+    await page.evaluate(value => window.__paletteAudit.setMounted(value), value)
+    await page.locator('.vf-component-panel').waitFor({ state: value ? 'visible' : 'detached' })
+  }
+  await mount(false)
+  await page.evaluate(() => {
+    const a = window.__paletteAudit
+    a.queryClient.removeQueries({ queryKey: ['ai', 'component-coverage'], exact: true })
+    // Match the application's one retry; shorten only the delay. Exercise focus too.
+    a.queryClient.setQueryDefaults(['ai', 'component-coverage'], {
+      retry: 1, retryDelay: 50, staleTime: 0, refetchOnMount: true,
+      refetchOnWindowFocus: true, refetchOnReconnect: true,
+    })
+  })
+  for (let i = 0; i < 5; i++) {
+    await mount(true); await page.waitForTimeout(200)
+    if (i < 4) await mount(false)
+  }
+  measurements.coverage = { mounts: 5, requestsAfterMounts: coverageRequests }
+  const triggerAutomaticEvents = () => page.evaluate(async () => {
+    const a = window.__paletteAudit
+    a.focusManager.setFocused(false); a.focusManager.setFocused(true)
+    a.onlineManager.setOnline(false); a.onlineManager.setOnline(true)
+    await a.queryClient.invalidateQueries({ queryKey: ['ai', 'component-coverage'] })
+  })
+  await triggerAutomaticEvents(); await page.waitForTimeout(250)
+  measurements.coverage.requestsAfterFocusReconnectInvalidation = coverageRequests
+  if (phase === 'before') {
+    await check('Reproduce automatic failed coverage traffic across ordinary palette visits', () => assert(coverageRequests >= 10))
+  } else {
+    await check('Repeated palette mounts, focus, reconnect and invalidation make zero coverage requests', async () => {
+      assert.equal(coverageRequests, 0)
+      await page.getByText('AI coverage not checked', { exact: true }).waitFor()
+      assert.equal(await page.locator('.vf-component-panel__coverage-badge').count(), 0)
+    })
+    await check('An explicit check makes one request, disables repeat activation and does not retry a failure', async () => {
+      coverageGate = new Promise(resolve => { releaseCoverage = resolve })
+      await page.getByRole('button', { name: 'Check AI coverage', exact: true }).click()
+      await page.getByText('Checking AI component coverage...', { exact: true }).waitFor()
+      assert.equal(await page.getByRole('button', { name: 'Check AI coverage', exact: true }).isDisabled(), true)
+      assert.equal(coverageRequests, 1)
+      releaseCoverage(); coverageGate = undefined
+      await page.getByText('AI component coverage unavailable', { exact: true }).waitFor()
+      await page.waitForTimeout(250); assert.equal(coverageRequests, 1)
+    })
+    await check('Unavailable coverage does not block component search and keyboard placement', async () => {
+      await page.getByPlaceholder('Search components...').fill('Resistor'); await settle(page)
+      const before = await page.evaluate(() => window.__paletteAudit.store.getState().nodes.length)
+      await page.locator('[data-component-type="RESISTOR"]').focus(); await page.keyboard.press('Enter')
+      const result = await page.evaluate(() => ({ count: window.__paletteAudit.store.getState().nodes.length, type: window.__paletteAudit.store.getState().nodes.at(-1).type }))
+      assert.equal(result.count, before + 1); assert.equal(result.type, 'RESISTOR')
+    })
+    await check('Cached unavailability stays quiet after remount and automatic events', async () => {
+      for (let i = 0; i < 5; i++) { await mount(false); await mount(true); await page.waitForTimeout(100) }
+      await triggerAutomaticEvents(); await page.waitForTimeout(250)
+      assert.equal(coverageRequests, 1)
+      await page.getByText('AI component coverage unavailable', { exact: true }).waitFor()
+    })
+    await check('Explicit retry recovers counts and badges when coverage becomes available', async () => {
+      coverageStatus = 200
+      await page.getByRole('button', { name: 'Retry AI coverage', exact: true }).click()
+      await page.getByText('1 exact / 0 require a variant / 0 simulation-only', { exact: true }).waitFor()
+      await page.getByPlaceholder('Search components...').fill('Resistor'); await settle(page)
+      assert.equal(await page.locator('.vf-component-panel__coverage-badge').innerText(), 'AI exact')
+      assert.equal(coverageRequests, 2)
+    })
+    await check('A failed refresh hides obsolete coverage badges and offers an explicit retry', async () => {
+      coverageStatus = 503
+      await page.getByRole('button', { name: 'Refresh AI coverage', exact: true }).click()
+      await page.getByText('AI component coverage unavailable', { exact: true }).waitFor()
+      await page.waitForTimeout(250)
+      assert.equal(coverageRequests, 3)
+      assert.equal(await page.locator('.vf-component-panel__coverage-badge').count(), 0)
+      assert.equal(await page.getByRole('button', { name: 'Retry AI coverage', exact: true }).isEnabled(), true)
+    })
+    await check('Evicting the optional query cache still does not fetch on a later visit', async () => {
+      await mount(false)
+      await page.evaluate(() => window.__paletteAudit.queryClient.removeQueries({ queryKey: ['ai', 'component-coverage'], exact: true }))
+      await mount(true); await page.waitForTimeout(250)
+      await page.getByText('AI coverage not checked', { exact: true }).waitFor()
+      assert.equal(coverageRequests, 3)
+    })
+  }
+  measurements.coverage.finalRequests = coverageRequests
+} catch (error) {
+  checks.push({ name: 'Harness completed', passed: false, error: error.stack || error.message })
+  console.error(error)
 } finally {
-  const report = { task: 'VFOPT-UI-012', phase, capturedAt: new Date().toISOString(), status: checks.some(check => !check.passed) || errors.length ? 'failed' : 'passed', fixtureSha256: sha(path.join(root, 'scripts/fixtures/palette-entry.tsx')), browser: browser?.version(), node: process.version, measurements, checks, errors, sourceEvidence: ['src/features/editor/ComponentPanel.tsx', 'src/styles/editor.css'].map(file => ({ file, sha256: sha(path.join(root, file)) })), conditions: { catalogueSize: 1000, mode: 'Vite development with StrictMode; actual ComponentPanel, canvas store and custom studio; isolated query cache and blocked external requests', timing: 'Actual input event to second animation frame is a scheduling proxy, not pixel paint or total CPU attribution', powerMode: 'not recorded', backgroundActivity: 'not controlled' } }
-  fs.mkdirSync(output, { recursive: true }); fs.writeFileSync(path.join(output, `vfopt-ui-012-palette-${phase}.json`), JSON.stringify(report, null, 2) + '\n')
+  releaseCoverage?.()
+  const report = { task: coverageOnly ? 'VFOPT-X-001-F007' : 'VFOPT-UI-012', phase, capturedAt: new Date().toISOString(), status: checks.some(check => !check.passed) || errors.length ? 'failed' : 'passed', fixtureSha256: sha(path.join(root, 'scripts/fixtures/palette-entry.tsx')), browser: browser?.version(), node: process.version, measurements, checks, errors, sourceEvidence: ['src/features/editor/ComponentPanel.tsx', 'src/styles/editor.css'].map(file => ({ file, sha256: sha(path.join(root, file)) })), conditions: { catalogueSize: 1000, mode: `Vite ${mode}; actual ComponentPanel, canvas store and custom studio; isolated query cache and intercepted coverage HTTP 500/503/200 responses`, timing: 'Actual input event to second animation frame is a scheduling proxy, not pixel paint or total CPU attribution', powerMode: 'not recorded', backgroundActivity: 'not controlled' } }
+  fs.mkdirSync(output, { recursive: true }); fs.writeFileSync(path.join(output, `${reportName}.json`), JSON.stringify(report, null, 2) + '\n')
   await browser?.close(); await server.close()
+  if (production) {
+    assert(path.resolve(cache).startsWith(path.resolve(root, 'node_modules/.cache') + path.sep))
+    fs.rmSync(cache, { recursive: true, force: true })
+  }
 }
 assert(checks.every(check => check.passed) && errors.length === 0, 'Palette browser regression failed')
