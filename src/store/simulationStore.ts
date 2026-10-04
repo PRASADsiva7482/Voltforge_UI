@@ -241,6 +241,8 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   drainSerialInput: () => {
     let pending: string[] = [];
     set((state) => {
+      // AVR polls each frame, even when no serial input has arrived.
+      if (state.serialInputQueue.length === 0) return state;
       pending = state.serialInputQueue;
       return { serialInputQueue: [] };
     });
@@ -308,9 +310,12 @@ export const useSimulationStore = create<SimulationState>((set) => ({
       : state.simulationTime,
   })),
 
-  setLiveMeter: (measurement) => set((state) => ({
-    liveMeter: { ...state.liveMeter, ...measurement },
-  })),
+  setLiveMeter: (measurement) => set((state) => {
+    if (Object.entries(measurement).every(([key, value]) =>
+      Object.is(state.liveMeter[key as keyof LiveMeterMeasurement], value),
+    )) return state;
+    return { liveMeter: { ...state.liveMeter, ...measurement } };
+  }),
 
   setMeterMode: (meterMode) => set({ meterMode }),
 

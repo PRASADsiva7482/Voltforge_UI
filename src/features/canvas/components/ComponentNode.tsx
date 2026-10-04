@@ -577,7 +577,8 @@ const ComponentNode = ({
   }, [isSelected]);
 
   useEffect(() => {
-    if (!isActive) return;
+    // Only these two parts have a shaft driven by this animation loop.
+    if (!isActive || (!isDcMotor && node.type !== 'MOTOR_BLDC')) return;
     let animId: number;
     let angle = 0;
     const directionSign = node.properties?.direction === 'reverse' ? -1 : 1;

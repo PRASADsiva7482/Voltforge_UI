@@ -18,6 +18,53 @@ try {
   runtimeDelta.assertRuntimeDeltaContract(preset.nodes);
   console.log(`runtime delta contract: maximum-preset ${preset.nodes.length}-component assertions passed`);
 
+  const { useSimulationStore } = await vite.ssrLoadModule('/src/store/simulationStore.ts');
+  const initialSimulation = useSimulationStore.getState();
+  let publications = 0;
+  const unsubscribe = useSimulationStore.subscribe(() => { publications++; });
+  try {
+    for (let i = 0; i < 1000; i++) {
+      assert.deepEqual(useSimulationStore.getState().drainSerialInput(), []);
+      useSimulationStore.getState().setLiveMeter({ ...initialSimulation.liveMeter });
+    }
+    assert.equal(publications, 0, 'Empty polls and unchanged measurements must not notify subscribers');
+    assert.equal(useSimulationStore.getState(), initialSimulation);
+    const empty = useSimulationStore.getState().drainSerialInput();
+    empty.push('consumer-owned');
+    assert.deepEqual(useSimulationStore.getState().serialInputQueue, [], 'An empty drain still returns an independently owned array');
+    useSimulationStore.getState().sendSerialInput('first');
+    useSimulationStore.getState().sendSerialInput('second');
+    const queued = useSimulationStore.getState().serialInputQueue;
+    const drained = useSimulationStore.getState().drainSerialInput();
+    assert.equal(drained, queued);
+    assert.deepEqual(drained, ['first', 'second']);
+    assert.equal(publications, 3, 'Two arrivals and one nonempty drain each publish');
+    assert.deepEqual(useSimulationStore.getState().drainSerialInput(), []);
+    assert.equal(publications, 3);
+    let injectOnce = true;
+    const reentrant = useSimulationStore.subscribe((next, previous) => {
+      if (injectOnce && previous.serialInputQueue.length && !next.serialInputQueue.length) {
+        injectOnce = false;
+        next.sendSerialInput('during-drain');
+      }
+    });
+    try {
+      useSimulationStore.getState().sendSerialInput('before-drain');
+      assert.deepEqual(useSimulationStore.getState().drainSerialInput(), ['before-drain']);
+      assert.deepEqual(useSimulationStore.getState().drainSerialInput(), ['during-drain']);
+    } finally { reentrant(); }
+    for (const measurement of [{ voltage: -0 }, { voltage: 0 }, { voltage: 3.3, positiveLabel: 'D3' }, { resistanceUnsafe: true, resistance_ohm: Infinity }]) {
+      const before = useSimulationStore.getState().liveMeter, count = publications;
+      useSimulationStore.getState().setLiveMeter(measurement);
+      assert.equal(publications, count + 1);
+      assert.deepEqual(useSimulationStore.getState().liveMeter, { ...before, ...measurement });
+      const current = useSimulationStore.getState();
+      current.setLiveMeter(measurement);
+      assert.equal(useSimulationStore.getState(), current, 'A repeated measurement keeps its identity');
+    }
+    console.log('runtime delta contract: empty serial/meter no-ops, ordered drains, reentrant arrivals, and changed measurement publication passed');
+  } finally { unsubscribe(); useSimulationStore.setState(initialSimulation, true); }
+
   const { SimulationEngine } = await vite.ssrLoadModule('/src/features/simulator/SimulationEngine.ts');
   const { useCanvasStore } = await vite.ssrLoadModule('/src/store/canvasStore.ts');
   useCanvasStore.setState({ nodes: preset.nodes, nodesById: new Map(preset.nodes.map(n => [n.id, n])), nodeIndexById: new Map(preset.nodes.map((n, i) => [n.id, i])) });

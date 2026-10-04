@@ -331,7 +331,6 @@ export class SimulationEngine {
   private avrRuntimeTrace = new AvrRuntimeTraceCollector();
   // For toggling state with delay patterns (e.g., blink)
   private pinToggleState: Record<string, boolean> = {};
-  private lastDcMotorUpdateTime = 0;
 
   // ── LCD Display state ──
   private lcdRows = 2;
@@ -352,7 +351,6 @@ export class SimulationEngine {
   private digitalIcOutputVoltages = new Map<string, number>();
   private digitalIcPrimeRequests = new Set<string>();
   private virtualMeterSignature = '';
-  private dcMotorNodes: CanvasNode[] = [];  // DC motors on canvas
   private stepperNodes: CanvasNode[] = [];  // Stepper motors on canvas
 
   // ── MNA Solver Integration ──
@@ -428,7 +426,6 @@ private scopeCaptureRevision = 0;
     // Find ESC and BLDC motor nodes
     this.escNodes = nodes.filter(n => n.type === 'ESC_MODULE');
     this.bldcNodes = nodes.filter(n => n.type === 'MOTOR_BLDC');
-    this.dcMotorNodes = nodes.filter(n => n.type === 'MOTOR_DC');
     this.stepperNodes = nodes.filter(n => n.type === 'MOTOR_STEPPER' || n.type === 'STEPPER_MOTOR');
 
     // Reset MNA state
@@ -474,7 +471,6 @@ private scopeCaptureRevision = 0;
       } else if (node.type === 'MOTOR_DC') {
         updates.isSpinning = false;
         updates.rpm = 0;
-        updates.motorTick = 0;
         changed = true;
       } else if (node.type === 'ESC_MODULE') {
         updates.powered = false;
@@ -549,7 +545,6 @@ private scopeCaptureRevision = 0;
     );
     this.escNodes = initializedNodes.filter(n => n.type === 'ESC_MODULE');
     this.bldcNodes = initializedNodes.filter(n => n.type === 'MOTOR_BLDC');
-    this.dcMotorNodes = initializedNodes.filter(n => n.type === 'MOTOR_DC');
     this.stepperNodes = initializedNodes.filter(n => n.type === 'MOTOR_STEPPER' || n.type === 'STEPPER_MOTOR');
     this.registerVirtualI2cDevices(initializedNodes);
 
@@ -812,7 +807,6 @@ private scopeCaptureRevision = 0;
           if (!isPowered) return;
 
           this.updateBldcMotorAnimation();
-          this.updateDcMotorAnimation();
           this.emitDebugSnapshot(false);
           this.tick += 100;
         });
@@ -2081,50 +2075,6 @@ private scopeCaptureRevision = 0;
     });
   }
 
-  /**
-   * Animate DC motors: increment rotation if isSpinning is true.
-   * Called every tick (~100ms).
-   */
-  /**
-   * Animate DC motors: increment rotation if isSpinning is true.
-   * Throttled to 20fps to avoid freezing the React rendering main thread.
-   */
-  private updateDcMotorAnimation() {
-    const now = Date.now();
-    if (now - this.lastDcMotorUpdateTime < 50) return;
-    this.lastDcMotorUpdateTime = now;
-
-    const freshNodes = useCanvasStore.getState().nodes;
-    const updatesList: Array<{ id: string; changes: Partial<CanvasNode> }> = [];
-
-    this.dcMotorNodes.forEach(motor => {
-      const freshMotor = freshNodes.find(n => n.id === motor.id);
-      if (!freshMotor) return;
-
-      const isSpinning = Boolean(freshMotor.properties?.isSpinning);
-      if (!isSpinning) return;
-
-      const currentTick = Number(freshMotor.properties?.motorTick) || 0;
-      const newTick = (currentTick + 30) % 360; // 30° per tick = smooth rotation
-
-      this.callbacks.onPinStateChange(motor.id, '__dc_anim__', 'HIGH', newTick);
-
-      updatesList.push({
-        id: motor.id,
-        changes: {
-          properties: {
-            ...freshMotor.properties,
-            motorTick: newTick,
-          },
-        },
-      });
-    });
-
-    if (updatesList.length > 0) {
-      useCanvasStore.getState().batchUpdateRuntimeNodes(updatesList);
-    }
-  }
-
   private voltageAtPin(nodeId: string, pinId: string, nodes: CanvasNode[], wires: Wire[]): number {
     const connectedPins = this.getConnectedPins(nodeId, pinId, wires);
 
@@ -2560,7 +2510,6 @@ private scopeCaptureRevision = 0;
             }, instructionRuntime);
 
             this.updateBldcMotorAnimation();
-            this.updateDcMotorAnimation();
             this.pushLcdToCanvas(currentNodes);
             this.emitDebugSnapshot(false);
             return result;
@@ -2765,7 +2714,6 @@ private scopeCaptureRevision = 0;
         } else if (node.type === 'MOTOR_DC') {
           updates.isSpinning = false;
           updates.rpm = 0;
-          updates.motorTick = 0;
           changed = true;
         } else if (node.type === 'MOTOR_BLDC') {
           updates.bldcRpm = 0;

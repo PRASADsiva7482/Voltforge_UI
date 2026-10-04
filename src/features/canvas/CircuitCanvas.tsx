@@ -620,6 +620,16 @@ export default function CircuitCanvas({
             const nextX = e.target.x();
             const nextY = e.target.y();
             if (Math.max(Math.abs(nextX - anchor.x), Math.abs(nextY - anchor.y)) < 64) return;
+
+            // Batch viewport updates: only commit when the pan has moved
+            // more than 5 pixels from the last committed position. This reduces
+            // the number of store/React re-renders during smooth drag gestures,
+            // since Konva onDragMove fires ~60fps but the viewport only needs
+            // to update when the visual position actually changes perceptibly.
+            const deltaX = nextX - anchor.x;
+            const deltaY = nextY - anchor.y;
+            if (Math.hypot(deltaX, deltaY) < 5) return;
+
             const nextViewport = { ...anchor, x: nextX, y: nextY };
             viewportRenderAnchorRef.current = nextViewport;
             setViewport(nextViewport);

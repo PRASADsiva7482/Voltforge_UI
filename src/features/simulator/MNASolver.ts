@@ -138,13 +138,23 @@ function solveLinearSystem(A: number[][], b: number[]): number[] | null {
       [b[col], b[maxRow]] = [b[maxRow], b[col]];
     }
 
+    // Most MNA rows are disconnected from this pivot. Skip exact-zero
+    // elimination only when its products are finite; 0 * Infinity/NaN must
+    // still follow the original arithmetic for malformed/overflowing models.
+    const pivotRow = A[col];
+    const pivotValue = pivotRow[col];
+    const pivotRhs = b[col];
+    const finitePivot = Number.isFinite(pivotRhs) && pivotRow.every(Number.isFinite);
+
     // Eliminate below
     for (let row = col + 1; row < n; row++) {
-      const factor = A[row][col] / A[col][col];
+      const targetRow = A[row];
+      const factor = targetRow[col] / pivotValue;
+      if (factor === 0 && finitePivot) continue;
       for (let j = col; j < n; j++) {
-        A[row][j] -= factor * A[col][j];
+        targetRow[j] -= factor * pivotRow[j];
       }
-      b[row] -= factor * b[col];
+      b[row] -= factor * pivotRhs;
     }
   }
 

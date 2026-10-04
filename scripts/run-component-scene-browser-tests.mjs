@@ -407,6 +407,48 @@ try {
       await page.evaluate(() => { const a = window.__componentSceneAudit; a.setSimulating(false); a.setMounted(true) }); await paint()
     })
   }
+  if (phase === 'after') await check('Active LEDs stay idle between updates while DC motor rotation survives start, reverse, stop and unmount', async () => {
+    await page.evaluate(() => {
+      const a = window.__componentSceneAudit
+      a.setSimulating(false)
+      const led = a.makeNode('LED_STANDARD', 'animation-led', 120, 120)
+      led.properties = { ...led.properties, isLit: true, isBlown: false }
+      a.store.getState().loadCanvas([led], [], { x: 0, y: 0, scale: 1 })
+      a.setSimulating(true)
+    }); await paint(); await paint()
+    await page.waitForFunction(() => window.__componentSceneAudit.Konva.stages[0].find('Image').every(n => n.image()?.complete))
+    await page.waitForTimeout(150)
+    await page.evaluate(() => {
+      const a = window.__componentSceneAudit
+      a.nativeRaf = window.requestAnimationFrame; a.idleAnimationRequests = 0
+      window.requestAnimationFrame = function (callback) { a.idleAnimationRequests++; return a.nativeRaf.call(window, callback) }
+    })
+    try {
+      await page.waitForTimeout(250)
+      assert.equal(await page.evaluate(() => window.__componentSceneAudit.idleAnimationRequests), 0, 'A steady lit LED must not schedule a motor callback')
+    } finally { await page.evaluate(() => { window.requestAnimationFrame = window.__componentSceneAudit.nativeRaf }) }
+    await page.evaluate(() => {
+      const a = window.__componentSceneAudit, motor = a.makeNode('MOTOR_DC', 'animation-motor', 120, 120)
+      motor.properties = { ...motor.properties, isSpinning: true, rpm: 1200, direction: 'forward' }
+      a.store.getState().loadCanvas([motor], [], { x: 0, y: 0, scale: 1 })
+      a.shaft = () => a.Konva.stages[0].findOne('#animation-motor').findOne(n => n.getClassName() === 'Group' && n.x() === 30 && n.y() === 25 && n.getChildren().length === 4)
+    }); await paint(); await paint()
+    const angle = await page.evaluate(() => window.__componentSceneAudit.shaft().rotation())
+    await page.waitForTimeout(180)
+    assert.notEqual(await page.evaluate(() => window.__componentSceneAudit.shaft().rotation()), angle, 'The shaft must still rotate at its existing frame cadence')
+    await page.evaluate(() => window.__componentSceneAudit.store.getState().updateRuntimeNode('animation-motor', { properties: { direction: 'reverse' } }))
+    await page.waitForTimeout(180)
+    assert(await page.evaluate(() => window.__componentSceneAudit.shaft().rotation() < 0), 'Reverse rotation remains reactive')
+    await page.evaluate(() => window.__componentSceneAudit.setSimulating(false)); await paint(); await paint()
+    const stopped = await page.evaluate(() => window.__componentSceneAudit.shaft().rotation())
+    await page.waitForTimeout(180)
+    assert.equal(await page.evaluate(() => window.__componentSceneAudit.shaft().rotation()), stopped, 'Stopping simulation must cancel the motor animation')
+    await page.evaluate(() => window.__componentSceneAudit.setSimulating(true)); await paint(); await paint()
+    await page.evaluate(() => window.__componentSceneAudit.setMounted(false)); await paint(); await paint()
+    assert.equal(await page.evaluate(() => window.__componentSceneAudit.Konva.stages.length), 0)
+    await page.waitForTimeout(180)
+    await page.evaluate(() => { const a = window.__componentSceneAudit; a.setSimulating(false); a.setMounted(true) }); await paint()
+  })
   assert.deepEqual(errors, [])
   assert(checks.every(c => c.passed), 'One or more scene checks failed')
 } catch (e) { failure = e; console.error(e.stack) }
