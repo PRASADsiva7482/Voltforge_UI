@@ -72,10 +72,16 @@ const TRANSFORMER_PINS: PinPosition[] = [
   pin('secondary2', 'S2', 100, 52, 'bidirectional'),
 ];
 
-// CAPACITOR: SVG viewBox 40×50
+// CAPACITOR: SVG viewBox 44×60 (ceramic disc package with bottom leads)
 const CAPACITOR_PINS: PinPosition[] = [
+  pin('p1', 'Pin 1', 16, 60, 'bidirectional'),
+  pin('p2', 'Pin 2', 28, 60, 'bidirectional'),
+];
+
+// VARIABLE_CAPACITOR: SVG viewBox 44×60 (trimmer capacitor with top/bottom leads)
+const VARIABLE_CAPACITOR_PINS: PinPosition[] = [
   pin('pos', '+', 20, 0, 'bidirectional'),
-  pin('neg', '−', 20, 50, 'bidirectional'),
+  pin('neg', '−', 20, 60, 'bidirectional'),
 ];
 
 // LED_STANDARD: SVG viewBox 40×80, leads end at y≈74-80
@@ -114,7 +120,7 @@ const VOLTAGE_REGULATOR_PINS: PinPosition[] = [
 
 const LED_PINS: PinPosition[] = [
   pin('anode', 'Anode (+)', 16, 80, 'input'),
-  pin('cathode', 'Cathode (−)', 25, 80, 'input'),
+  pin('cathode', 'Cathode (−)', 24, 80, 'input'),
 ];
 
 // LED_RGB: SVG viewBox 50×80, leads end at y≈74-78
@@ -157,8 +163,8 @@ const MULTIMETER_PINS: PinPosition[] = [
 
 // MOTOR_DC: SVG viewBox 70×50, terminals on left side
 const DC_MOTOR_PINS: PinPosition[] = [
-  pin('m1', 'M+', 5, 20, 'input'),
-  pin('m2', 'M−', 5, 30, 'input'),
+  pin('m1', 'M+', 4, 14, 'input'),
+  pin('m2', 'M−', 4, 36, 'input'),
 ];
 
 // RELAY: SVG viewBox 70×50
@@ -242,130 +248,134 @@ const BRIDGE_RECTIFIER_PINS: PinPosition[] = [
   pin('negative', '−', 70, 45, 'ground'),
 ];
 
-// IC_555: SVG viewBox 90×50, leads: left at x=8 (y=12,20,28,36), right at x=82 (y=12,20,28,36)
-// Physical DIP-8 standard: Pin 1 GND (top-left), Pin 4 RESET (bottom-left), Pin 5 CTRL (bottom-right), Pin 8 VCC (top-right)
+// IC_555: SVG viewBox 90×50 (DIP-8)
+// Pins 1-4 along bottom (y=50), pins 5-8 along top (y=0)
 const IC_555_PINS: PinPosition[] = [
-  pin('gnd', 'GND', 8, 12, 'ground'),
-  pin('trig', 'TRIG', 8, 20, 'input'),
-  pin('out', 'OUT', 8, 28, 'output'),
-  pin('reset', 'RESET', 8, 36, 'input'),
-  pin('ctrl', 'CTRL', 82, 36, 'input'),
-  pin('thresh', 'THRESH', 82, 28, 'input'),
-  pin('disch', 'DISCH', 82, 20, 'output'),
-  pin('vcc', 'VCC', 82, 12, 'power'),
+  pin('gnd', 'GND', 23, 50, 'ground'),
+  pin('trig', 'TRIG', 35, 50, 'input'),
+  pin('out', 'OUT', 47, 50, 'output'),
+  pin('reset', 'RESET', 59, 50, 'input'),
+  pin('ctrl', 'CTRL', 59, 0, 'input'),
+  pin('thresh', 'THRESH', 47, 0, 'input'),
+  pin('disch', 'DISCH', 35, 0, 'output'),
+  pin('vcc', 'VCC', 23, 0, 'power'),
 ];
 
-// IC_74HC595: SVG viewBox 120×50
+// IC_74HC595: SVG viewBox 120×50 (DIP-16)
+// Pins 1-8 along bottom (y=50), pins 9-16 along top (y=0)
 const IC_74HC595_PINS: PinPosition[] = [
-  pin('qb', 'QB', 7, 8, 'output'),
-  pin('qc', 'QC', 7, 14, 'output'),
-  pin('qd', 'QD', 7, 20, 'output'),
-  pin('qe', 'QE', 7, 26, 'output'),
-  pin('qf', 'QF', 7, 32, 'output'),
-  pin('qg', 'QG', 7, 38, 'output'),
-  pin('qh', 'QH', 7, 44, 'output'),
-  pin('gnd', 'GND', 7, 50, 'ground'),
-  pin('qhp', 'QH_OUT', 113, 8, 'output'),
-  pin('srclr', 'SRCLR', 113, 14, 'input'),
-  pin('srclk', 'SRCLK', 113, 20, 'input'),
-  pin('rclk', 'RCLK', 113, 26, 'input'),
-  pin('oe', 'OE', 113, 32, 'input'),
-  pin('ser', 'SER', 113, 38, 'input'),
-  pin('qa', 'QA', 113, 44, 'output'),
-  pin('vcc', 'VCC', 113, 50, 'power'),
+  pin('qb', 'QB', 16, 50, 'output'),
+  pin('qc', 'QC', 28.5, 50, 'output'),
+  pin('qd', 'QD', 41, 50, 'output'),
+  pin('qe', 'QE', 53.5, 50, 'output'),
+  pin('qf', 'QF', 66, 50, 'output'),
+  pin('qg', 'QG', 78.5, 50, 'output'),
+  pin('qh', 'QH', 91, 50, 'output'),
+  pin('gnd', 'GND', 103.5, 50, 'ground'),
+  pin('qhp', 'QH_OUT', 103.5, 0, 'output'),
+  pin('srclr', 'SRCLR', 91, 0, 'input'),
+  pin('srclk', 'SRCLK', 78.5, 0, 'input'),
+  pin('rclk', 'RCLK', 66, 0, 'input'),
+  pin('oe', 'OE', 53.5, 0, 'input'),
+  pin('ser', 'SER', 41, 0, 'input'),
+  pin('qa', 'QA', 28.5, 0, 'output'),
+  pin('vcc', 'VCC', 16, 0, 'power'),
 ];
 
 // IC_74HC165: 8-bit PISO Shift Register (DIP-16)
 const IC_74HC165_PINS: PinPosition[] = [
-  pin('pl', 'PL', 7, 8, 'input'),
-  pin('clk', 'CLK', 7, 14, 'input'),
-  pin('d4', 'D4', 7, 20, 'input'),
-  pin('d5', 'D5', 7, 26, 'input'),
-  pin('d6', 'D6', 7, 32, 'input'),
-  pin('d7', 'D7', 7, 38, 'input'),
-  pin('q7_bar', 'Q7_BAR', 7, 44, 'output'),
-  pin('gnd', 'GND', 7, 50, 'ground'),
-  pin('q7', 'Q7', 113, 8, 'output'),
-  pin('ser', 'SER', 113, 14, 'input'),
-  pin('d0', 'D0', 113, 20, 'input'),
-  pin('d1', 'D1', 113, 26, 'input'),
-  pin('d2', 'D2', 113, 32, 'input'),
-  pin('d3', 'D3', 113, 38, 'input'),
-  pin('ce', 'CE', 113, 44, 'input'),
-  pin('vcc', 'VCC', 113, 50, 'power'),
+  pin('pl', 'PL', 16, 50, 'input'),
+  pin('clk', 'CLK', 28.5, 50, 'input'),
+  pin('d4', 'D4', 41, 50, 'input'),
+  pin('d5', 'D5', 53.5, 50, 'input'),
+  pin('d6', 'D6', 66, 50, 'input'),
+  pin('d7', 'D7', 78.5, 50, 'input'),
+  pin('q7_bar', 'Q7_BAR', 91, 50, 'output'),
+  pin('gnd', 'GND', 103.5, 50, 'ground'),
+  pin('q7', 'Q7', 103.5, 0, 'output'),
+  pin('ser', 'SER', 91, 0, 'input'),
+  pin('d0', 'D0', 78.5, 0, 'input'),
+  pin('d1', 'D1', 66, 0, 'input'),
+  pin('d2', 'D2', 53.5, 0, 'input'),
+  pin('d3', 'D3', 41, 0, 'input'),
+  pin('ce', 'CE', 28.5, 0, 'input'),
+  pin('vcc', 'VCC', 16, 0, 'power'),
 ];
 
 // IC_74HC138: 3-to-8 Line Decoder/Demux (DIP-16)
 const IC_74HC138_PINS: PinPosition[] = [
-  pin('a0', 'A0', 7, 8, 'input'),
-  pin('a1', 'A1', 7, 14, 'input'),
-  pin('a2', 'A2', 7, 20, 'input'),
-  pin('e1_bar', 'E1_BAR', 7, 26, 'input'),
-  pin('e2_bar', 'E2_BAR', 7, 32, 'input'),
-  pin('e3', 'E3', 7, 38, 'input'),
-  pin('y7', 'Y7', 7, 44, 'output'),
-  pin('gnd', 'GND', 7, 50, 'ground'),
-  pin('y6', 'Y6', 113, 8, 'output'),
-  pin('y5', 'Y5', 113, 14, 'output'),
-  pin('y4', 'Y4', 113, 20, 'output'),
-  pin('y3', 'Y3', 113, 26, 'output'),
-  pin('y2', 'Y2', 113, 32, 'output'),
-  pin('y1', 'Y1', 113, 38, 'output'),
-  pin('y0', 'Y0', 113, 44, 'output'),
-  pin('vcc', 'VCC', 113, 50, 'power'),
+  pin('a0', 'A0', 16, 50, 'input'),
+  pin('a1', 'A1', 28.5, 50, 'input'),
+  pin('a2', 'A2', 41, 50, 'input'),
+  pin('e1_bar', 'E1_BAR', 53.5, 50, 'input'),
+  pin('e2_bar', 'E2_BAR', 66, 50, 'input'),
+  pin('e3', 'E3', 78.5, 50, 'input'),
+  pin('y7', 'Y7', 91, 50, 'output'),
+  pin('gnd', 'GND', 103.5, 50, 'ground'),
+  pin('y6', 'Y6', 103.5, 0, 'output'),
+  pin('y5', 'Y5', 91, 0, 'output'),
+  pin('y4', 'Y4', 78.5, 0, 'output'),
+  pin('y3', 'Y3', 66, 0, 'output'),
+  pin('y2', 'Y2', 53.5, 0, 'output'),
+  pin('y1', 'Y1', 41, 0, 'output'),
+  pin('y0', 'Y0', 28.5, 0, 'output'),
+  pin('vcc', 'VCC', 16, 0, 'power'),
 ];
 
 // IC_74HC151: 8-to-1 Multiplexer (DIP-16)
 const IC_74HC151_PINS: PinPosition[] = [
-  pin('d3', 'D3', 7, 8, 'input'),
-  pin('d2', 'D2', 7, 14, 'input'),
-  pin('d1', 'D1', 7, 20, 'input'),
-  pin('d0', 'D0', 7, 26, 'input'),
-  pin('y', 'Y', 7, 32, 'output'),
-  pin('w', 'W', 7, 38, 'output'),
-  pin('e_bar', 'E_BAR', 7, 44, 'input'),
-  pin('gnd', 'GND', 7, 50, 'ground'),
-  pin('c', 'C', 113, 8, 'input'),
-  pin('b', 'B', 113, 14, 'input'),
-  pin('a', 'A', 113, 20, 'input'),
-  pin('d7', 'D7', 113, 26, 'input'),
-  pin('d6', 'D6', 113, 32, 'input'),
-  pin('d5', 'D5', 113, 38, 'input'),
-  pin('d4', 'D4', 113, 44, 'input'),
-  pin('vcc', 'VCC', 113, 50, 'power'),
+  pin('d3', 'D3', 16, 50, 'input'),
+  pin('d2', 'D2', 28.5, 50, 'input'),
+  pin('d1', 'D1', 41, 50, 'input'),
+  pin('d0', 'D0', 53.5, 50, 'input'),
+  pin('y', 'Y', 66, 50, 'output'),
+  pin('w', 'W', 78.5, 50, 'output'),
+  pin('e_bar', 'E_BAR', 91, 50, 'input'),
+  pin('gnd', 'GND', 103.5, 50, 'ground'),
+  pin('c', 'C', 103.5, 0, 'input'),
+  pin('b', 'B', 91, 0, 'input'),
+  pin('a', 'A', 78.5, 0, 'input'),
+  pin('d7', 'D7', 66, 0, 'input'),
+  pin('d6', 'D6', 53.5, 0, 'input'),
+  pin('d5', 'D5', 41, 0, 'input'),
+  pin('d4', 'D4', 28.5, 0, 'input'),
+  pin('vcc', 'VCC', 16, 0, 'power'),
 ];
 
 // IC_CD4017: Johnson Decade Counter (DIP-16)
 const IC_CD4017_PINS: PinPosition[] = [
-  pin('q5', 'Q5', 7, 8, 'output'),
-  pin('q1', 'Q1', 7, 14, 'output'),
-  pin('q0', 'Q0', 7, 20, 'output'),
-  pin('q2', 'Q2', 7, 26, 'output'),
-  pin('q6', 'Q6', 7, 32, 'output'),
-  pin('q7', 'Q7', 7, 38, 'output'),
-  pin('q3', 'Q3', 7, 44, 'output'),
-  pin('gnd', 'GND', 7, 50, 'ground'),
-  pin('q8', 'Q8', 113, 8, 'output'),
-  pin('q4', 'Q4', 113, 14, 'output'),
-  pin('q9', 'Q9', 113, 20, 'output'),
-  pin('co', 'CO', 113, 26, 'output'),
-  pin('clk_inh', 'CLK_INH', 113, 32, 'input'),
-  pin('clk', 'CLK', 113, 38, 'input'),
-  pin('reset', 'RESET', 113, 44, 'input'),
-  pin('vcc', 'VDD', 113, 50, 'power'),
+  pin('q5', 'Q5', 16, 50, 'output'),
+  pin('q1', 'Q1', 28.5, 50, 'output'),
+  pin('q0', 'Q0', 41, 50, 'output'),
+  pin('q2', 'Q2', 53.5, 50, 'output'),
+  pin('q6', 'Q6', 66, 50, 'output'),
+  pin('q7', 'Q7', 78.5, 50, 'output'),
+  pin('q3', 'Q3', 91, 50, 'output'),
+  pin('gnd', 'GND', 103.5, 50, 'ground'),
+  pin('q8', 'Q8', 103.5, 0, 'output'),
+  pin('q4', 'Q4', 91, 0, 'output'),
+  pin('q9', 'Q9', 78.5, 0, 'output'),
+  pin('co', 'CO', 66, 0, 'output'),
+  pin('clk_inh', 'CLK_INH', 53.5, 0, 'input'),
+  pin('clk', 'CLK', 41, 0, 'input'),
+  pin('reset', 'RESET', 28.5, 0, 'input'),
+  pin('vcc', 'VDD', 16, 0, 'power'),
 ];
 
-// DISPLAY_7SEG: SVG viewBox 50×70
+// DISPLAY_7SEG: SVG viewBox 50×70 (Standard 10-pin DIP layout)
+// Top row: Pins 10 (G), 9 (F), 8 (COM1), 7 (A), 6 (B) at y=0
+// Bottom row: Pins 1 (E), 2 (D), 3 (COM2), 4 (C), 5 (DP) at y=70
 const SEG7_PINS: PinPosition[] = [
-  pin('a', 'A', 3, 70, 'input'),
-  pin('b', 'B', 9, 70, 'input'),
-  pin('c', 'C', 15, 70, 'input'),
-  pin('d', 'D', 21, 70, 'input'),
-  pin('e', 'E', 29, 70, 'input'),
-  pin('f', 'F', 35, 70, 'input'),
-  pin('g', 'G', 41, 70, 'input'),
-  pin('dp', 'DP', 47, 70, 'input'),
+  pin('g', 'G', 5, 0, 'input'),
+  pin('f', 'F', 15, 0, 'input'),
   pin('com', 'COM', 25, 0, 'bidirectional'),
+  pin('a', 'A', 35, 0, 'input'),
+  pin('b', 'B', 45, 0, 'input'),
+  pin('e', 'E', 5, 70, 'input'),
+  pin('d', 'D', 15, 70, 'input'),
+  pin('com2', 'COM2', 25, 70, 'bidirectional'),
+  pin('c', 'C', 35, 70, 'input'),
+  pin('dp', 'DP', 45, 70, 'input'),
 ];
 
 // BREADBOARD: SVG viewBox 220x120 - power rails + terminal strips
@@ -517,7 +527,7 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
   INDUCTOR: INDUCTOR_PINS,
   TRANSFORMER: TRANSFORMER_PINS,
   CAPACITOR: CAPACITOR_PINS,
-  VARIABLE_CAPACITOR: CAPACITOR_PINS,
+  VARIABLE_CAPACITOR: VARIABLE_CAPACITOR_PINS,
   CERAMIC_CAPACITOR: CERAMIC_CAPACITOR_PINS,
   ELECTROLYTIC_CAPACITOR: ELECTROLYTIC_CAPACITOR_PINS,
   DIODE: DIODE_PINS,

@@ -1,5 +1,5 @@
 import { memo, useState } from 'react';
-import { Group, Circle, Line, Text } from 'react-konva';
+import { Group, Circle, Line, Text, Rect } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { CanvasNode, PinPosition } from '../canvasTypes';
 import { PinVoltageTooltip } from './ProbeVoltageTooltip';
@@ -53,51 +53,6 @@ function resolvePinColors(type: PinPosition['type']) {
   return { fill, glow };
 }
 
-function computeLabelLayout(pin: PinPosition, node: Pick<CanvasNode, 'width' | 'height'>) {
-  const isLeft = pin.x <= 5;
-  const isRight = pin.x >= node.width - 5;
-  const isTop = pin.y <= 5;
-  const isBottom = pin.y >= node.height - 5;
-
-  let labelX: number;
-  let labelY: number;
-  let rotation: number;
-  let labelWidth: number | undefined;
-  let labelAlign: string | undefined;
-
-  if (isLeft) {
-    rotation = 0;
-    labelX = pin.x + 10;
-    labelY = pin.y - 4;
-    labelAlign = 'left';
-  } else if (isRight) {
-    rotation = 0;
-    labelX = pin.x - 50;
-    labelY = pin.y - 4;
-    labelWidth = 42;
-    labelAlign = 'right';
-  } else if (isTop) {
-    rotation = -90;
-    labelX = pin.x - 3;
-    labelY = pin.y + 10;
-  } else if (isBottom) {
-    rotation = -90;
-    labelX = pin.x - 3;
-    labelY = pin.y - 10;
-    labelWidth = 42;
-    labelAlign = 'right';
-  } else {
-    const isTopHalf = pin.y < node.height / 2;
-    rotation = -90;
-    labelX = pin.x - 3;
-    labelY = isTopHalf ? pin.y + 10 : pin.y - 10;
-    labelWidth = isTopHalf ? undefined : 42;
-    labelAlign = isTopHalf ? undefined : 'right';
-  }
-
-  return { labelX, labelY, rotation, labelWidth, labelAlign };
-}
-
 const PinDot = memo(function PinDot({
   pin,
   nodeId,
@@ -116,8 +71,6 @@ const PinDot = memo(function PinDot({
   const [hovered, setHovered] = useState(false);
   const isValidTarget = isWiring && wiringFromNodeId !== nodeId;
   const { fill: pinColor, glow: glowColor } = resolvePinColors(pin.type);
-
-  const { labelX, labelY, rotation, labelWidth, labelAlign } = computeLabelLayout(pin, node);
 
   return (
     <Group name="schematic-pin" id={`${nodeId}:${pin.id}`}>
@@ -212,35 +165,38 @@ const PinDot = memo(function PinDot({
         }}
       />
 
-      {/* Pin label */}
-      {(!detailed && !hovered && !isWiring && !isProbeMode) || (node.type === 'BREADBOARD' && !hovered) ? null : (
-        <Text
-          text={pin.name}
-          x={labelX}
-          y={labelY}
-          fontSize={8}
-          rotation={rotation}
-          width={labelWidth}
-          align={labelAlign}
-          fill={
-            hovered
-              ? isDark
-                ? 'rgba(255,255,255,1)'
-                : 'rgba(15,23,42,0.95)'
-              : isWiring
-                ? isDark
-                  ? 'rgba(255,255,255,0.85)'
-                  : 'rgba(15,23,42,0.82)'
-                : isDark
-                  ? 'rgba(255,255,255,0.48)'
-                  : 'rgba(15,23,42,0.58)'
-          }
-          fontFamily="JetBrains Mono"
-          fontStyle={hovered ? '700' : '400'}
-          shadowColor="black"
-          shadowBlur={4}
+      {/* Pin tooltip — only revealed on hover, eliminating workspace visual clutter */}
+      {hovered && !isProbeMode && (
+        <Group
+          x={pin.x}
+          y={pin.y < 22 ? pin.y + 14 : pin.y - 22}
           listening={false}
-        />
+        >
+          <Rect
+            x={-(Math.max(pin.name.length * 7 + 14, 28)) / 2}
+            y={0}
+            width={Math.max(pin.name.length * 7 + 14, 28)}
+            height={18}
+            cornerRadius={4}
+            fill="#0f172a"
+            stroke={isValidTarget ? WIRING_PREVIEW_COLOR : '#38bdf8'}
+            strokeWidth={1}
+            shadowColor="rgba(0,0,0,0.6)"
+            shadowBlur={6}
+            shadowOffset={{ x: 0, y: 2 }}
+          />
+          <Text
+            text={pin.name}
+            x={-(Math.max(pin.name.length * 7 + 14, 28)) / 2}
+            y={3}
+            width={Math.max(pin.name.length * 7 + 14, 28)}
+            align="center"
+            fontSize={10}
+            fontFamily="JetBrains Mono, monospace"
+            fontStyle="600"
+            fill="#f8fafc"
+          />
+        </Group>
       )}
 
       {isProbeMode && hovered && <PinVoltageTooltip nodeId={nodeId} pin={pin} />}

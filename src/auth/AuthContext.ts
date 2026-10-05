@@ -9,6 +9,9 @@ export type AuthContextValue = {
   login: () => void
   logout: () => void
   signup: () => void
+  changePassword: () => void
+  configureTotp: () => void
+  manageAccount: () => void
   user: AppUser | null
 }
 

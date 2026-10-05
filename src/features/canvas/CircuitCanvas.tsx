@@ -532,14 +532,49 @@ export default function CircuitCanvas({
     [viewport, setViewport]
   );
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts (Wokwi Standard: Escape, Delete/Backspace, R to rotate, A to search components)
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable ||
+          target.closest('.monaco-editor'))
+      ) {
+        return;
+      }
+
       if (e.key === 'Escape') {
         selectNode(null);
         selectWire(null);
         cancelWiring();
       }
+
+      // Rotate selected component by 90 degrees (Wokwi R shortcut)
+      if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey && !readOnly && !isSimulating) {
+        const state = useCanvasStore.getState();
+        if (state.selectedNodeId) {
+          const node = state.nodes.find((n) => n.id === state.selectedNodeId);
+          if (node && !node.properties?.locked) {
+            e.preventDefault();
+            const newRotation = ((node.rotation || 0) + 90) % 360;
+            state.updateNode(state.selectedNodeId, { rotation: newRotation });
+          }
+        }
+      }
+
+      // 'A' to focus component search (Wokwi shortcut)
+      if ((e.key === 'a' || e.key === 'A') && !e.ctrlKey && !e.metaKey && !readOnly && !isSimulating) {
+        const input = document.querySelector<HTMLInputElement>('.vf-component-panel__input');
+        if (input) {
+          e.preventDefault();
+          input.focus();
+          input.select();
+        }
+      }
+
       if ((e.key === 'Delete' || e.key === 'Backspace') && !e.ctrlKey && !readOnly) {
         const state = useCanvasStore.getState();
         if (
@@ -553,7 +588,7 @@ export default function CircuitCanvas({
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [selectNode, selectWire, cancelWiring, readOnly]);
+  }, [selectNode, selectWire, cancelWiring, readOnly, isSimulating]);
 
   // Get wiring start position
   const getWiringFromPos = () => {
@@ -775,35 +810,53 @@ export default function CircuitCanvas({
       {/* Wire toolbar overlay (HTML, not canvas) */}
       {!readOnly && <WireToolbar />}
 
-      <button
-        onClick={handleExportImage}
-        className="vf-canvas-overlay-btn"
-        title="Export circuit PNG"
-      >
-        <Download size={14} />
-        PNG
-      </button>
+      {/* Floating Canvas Quick-Actions Dock (top-left) */}
+      <div className="vf-canvas-dock">
+        <button
+          onClick={handleExportImage}
+          className="vf-canvas-dock-btn"
+          title="Export circuit diagram as PNG"
+        >
+          <Download size={12} />
+          <span>PNG</span>
+        </button>
 
-      <button
-        onClick={() => useCanvasStore.getState().autoArrangeLayout()}
-        disabled={readOnly}
-        className="vf-canvas-overlay-btn"
-        style={{ left: 80 }}
-        title="Auto-arrange component layout with orthogonal routing"
-      >
-        <LayoutGrid size={14} />
-        Auto-Arrange
-      </button>
+        <button
+          onClick={() => useCanvasStore.getState().autoArrangeLayout()}
+          disabled={readOnly}
+          className="vf-canvas-dock-btn"
+          title="Auto-arrange component layout with orthogonal routing"
+        >
+          <LayoutGrid size={12} />
+          <span>Auto-Arrange</span>
+        </button>
 
-      <button
-        onClick={() => useSimulationStore.getState().setShowCurrentFlow(!useSimulationStore.getState().showCurrentFlow)}
-        className="vf-canvas-overlay-btn"
-        style={{ left: 195, color: showCurrentFlow ? '#38bdf8' : 'inherit' }}
-        title="Toggle animated current flow particles on wires"
-      >
-        <Zap size={14} />
-        Current Flow
-      </button>
+        <span className="vf-canvas-dock-divider" />
+
+        <button
+          onClick={() => useSimulationStore.getState().setShowCurrentFlow(!useSimulationStore.getState().showCurrentFlow)}
+          className={`vf-canvas-dock-btn ${showCurrentFlow ? 'is-active' : ''}`}
+          title="Toggle animated current flow particles on wires"
+        >
+          <Zap size={12} />
+          <span>Current Flow</span>
+        </button>
+
+        <button
+          onClick={() => useSimulationStore.getState().setThermalHeatmapEnabled(!useSimulationStore.getState().thermalHeatmapEnabled)}
+          className={`vf-canvas-dock-btn ${thermalHeatmapEnabled ? 'is-active' : ''}`}
+          title="Toggle live component power and thermal stress heat map"
+        >
+          <span>Thermal Map</span>
+        </button>
+
+        {viewMode === 'pcb' && (
+          <div className="vf-canvas-dock-btn">
+            <Layers size={12} />
+            <span>2-layer PCB traces</span>
+          </div>
+        )}
+      </div>
 
       {showCurrentFlow && (currentFlowBudget.isLimited || currentFlowQualityMode === 'full') && (
         <button
@@ -819,22 +872,6 @@ export default function CircuitCanvas({
             ? 'Flow detail: Full · Use adaptive'
             : 'Flow detail limited · Use full'}
         </button>
-      )}
-
-      <button
-        onClick={() => useSimulationStore.getState().setThermalHeatmapEnabled(!useSimulationStore.getState().thermalHeatmapEnabled)}
-        className="vf-canvas-overlay-btn"
-        style={{ left: 310, color: thermalHeatmapEnabled ? '#f97316' : 'inherit' }}
-        title="Toggle live component power and thermal stress heat map"
-      >
-        Thermal Map
-      </button>
-
-      {viewMode === 'pcb' && (
-        <div className="vf-canvas-overlay-btn" style={{ left: 410 }}>
-          <Layers size={14} />
-          2-layer PCB traces
-        </div>
       )}
 
 

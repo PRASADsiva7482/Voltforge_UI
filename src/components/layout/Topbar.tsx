@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Bell, Search, Settings, Sun, Moon, Globe } from 'lucide-react'
+import { Bell, Search, Settings, Sun, Moon, Globe, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button, IconButton, TextInput } from '../ui'
@@ -81,6 +81,7 @@ export function Topbar({ eyebrow = 'Voltforge workspace', title }: TopbarProps) 
 
         <IconButton icon={theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />} label={t("Toggle theme")} onClick={toggleTheme} />
         <IconButton icon={<Bell size={17} />} label={t("Notifications")} />
+        <IconButton icon={<User size={17} />} label={t("Profile")} onClick={() => navigate('/profile')} />
         <IconButton icon={<Settings size={17} />} label={t("Settings")} onClick={() => navigate('/settings')} />
         <Button onClick={() => navigate('/projects/new')} variant="primary">
           {t("New project")}

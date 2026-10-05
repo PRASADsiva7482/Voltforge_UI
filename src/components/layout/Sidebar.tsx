@@ -27,8 +27,14 @@ export function Sidebar() {
       </nav>
       <Box tone="accent">
         <p className="vf-eyebrow">{t("Session")}</p>
-        <strong>{auth.user?.displayName ?? t("Voltforge user")}</strong>
-        <span className="app-sidebar__note">{auth.user?.email ?? auth.user?.username}</span>
+        <NavLink
+          to="/profile"
+          style={{ textDecoration: 'none', color: 'inherit', display: 'block', marginBottom: '8px' }}
+          title={t("View Profile")}
+        >
+          <strong>{auth.user?.displayName ?? t("Voltforge user")}</strong>
+          <span className="app-sidebar__note" style={{ display: 'block' }}>{auth.user?.email ?? auth.user?.username}</span>
+        </NavLink>
         <div className="app-sidebar__session">
           <Badge dot tone="success">
             {t("Active")}

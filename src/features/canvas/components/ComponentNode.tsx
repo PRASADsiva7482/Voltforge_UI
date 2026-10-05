@@ -892,6 +892,14 @@ const ComponentNode = ({
               y={25}
               onWheel={handleWheel}
               onMouseDown={handleDialMouseDown}
+              onMouseEnter={(e) => {
+                const stage = e.target.getStage();
+                if (stage) stage.container().style.cursor = 'grab';
+              }}
+              onMouseLeave={(e) => {
+                const stage = e.target.getStage();
+                if (stage) stage.container().style.cursor = 'default';
+              }}
             >
               {/* Dial Background Shadow */}
               <Circle radius={16} fill="rgba(0,0,0,0.15)" y={1} />
@@ -1317,20 +1325,28 @@ const ComponentNode = ({
         {/* 7-Segment Display — lit segments overlay */}
         {is7Seg && (() => {
           const segs = (node.properties?.segments || {}) as Record<string, boolean>;
-          const litColor = '#ef4444';
-          const dimColor = 'rgba(239,68,68,0.12)';
-          // Segment geometry (relative to 50×70 viewBox)
-          // We can't render SVG path in Konva directly, but we use Rects as approximation
-          // For a realistic 7-seg, overlay colored rectangles at segment positions
-          const segRects: { key: string; x: number; y: number; w: number; h: number; rot?: number }[] = [
-            { key: 'a', x: 14, y: 7, w: 22, h: 4 },       // top horizontal
-            { key: 'b', x: 36, y: 12, w: 4, h: 20 },      // top-right vertical
-            { key: 'c', x: 36, y: 40, w: 4, h: 20 },      // bottom-right vertical
-            { key: 'd', x: 14, y: 60, w: 22, h: 4 },      // bottom horizontal
-            { key: 'e', x: 8, y: 40, w: 4, h: 20 },       // bottom-left vertical
-            { key: 'f', x: 8, y: 12, w: 4, h: 20 },       // top-left vertical
-            { key: 'g', x: 14, y: 34, w: 22, h: 4 },      // middle horizontal
+          const rawColor = String(node.properties?.color || 'red').toLowerCase();
+          const colorMap: Record<string, { lit: string; dim: string }> = {
+            red: { lit: '#ef4444', dim: 'rgba(239,68,68,0.12)' },
+            green: { lit: '#22c55e', dim: 'rgba(34,197,94,0.12)' },
+            blue: { lit: '#3b82f6', dim: 'rgba(59,130,246,0.12)' },
+            yellow: { lit: '#eab308', dim: 'rgba(234,179,8,0.12)' },
+            white: { lit: '#f8fafc', dim: 'rgba(248,250,252,0.15)' },
+          };
+          const colors = colorMap[rawColor] || colorMap.red;
+          const litColor = colors.lit;
+          const dimColor = colors.dim;
+          // Segment geometry aligned with 50×70 DISPLAY_7SEG SVG:
+          const segRects: { key: string; x: number; y: number; w: number; h: number }[] = [
+            { key: 'a', x: 18, y: 12, w: 14, h: 4 },       // top horizontal
+            { key: 'b', x: 33, y: 16, w: 4, h: 15 },      // top-right vertical
+            { key: 'c', x: 33, y: 35, w: 4, h: 15 },      // bottom-right vertical
+            { key: 'd', x: 18, y: 51, w: 14, h: 4 },      // bottom horizontal
+            { key: 'e', x: 13, y: 35, w: 4, h: 15 },      // bottom-left vertical
+            { key: 'f', x: 13, y: 16, w: 4, h: 15 },      // top-left vertical
+            { key: 'g', x: 18, y: 31.5, w: 14, h: 3.5 },  // middle horizontal
           ];
+          const dpLit = Boolean(isSimulating) && Boolean(segs['dp']);
           return (
             <>
               {segRects.map(seg => {
@@ -1349,6 +1365,17 @@ const ComponentNode = ({
                   />
                 );
               })}
+              {/* Decimal point DP */}
+              <Circle
+                x={39}
+                y={53}
+                radius={2}
+                fill={dpLit ? litColor : dimColor}
+                shadowColor={dpLit ? litColor : 'transparent'}
+                shadowBlur={dpLit ? 8 : 0}
+                opacity={dpLit ? 0.95 : 0.3}
+                listening={false}
+              />
             </>
           );
         })()}
@@ -1359,6 +1386,19 @@ const ComponentNode = ({
           const offsetY = pressed ? BUTTON_PRESS_DEPTH : 0;
           const shadowBlur = pressed ? BUTTON_SHADOW_PRESSED : BUTTON_SHADOW_NORMAL;
           const capRadius = node.width * 0.225;
+          const rawColor = String(node.properties?.color || 'red').toLowerCase();
+          const colorMap: Record<string, { normal: string; pressed: string; stroke: string; strokePressed: string }> = {
+            red: { normal: '#dc2626', pressed: '#991b1b', stroke: '#b91c1c', strokePressed: '#7f1d1d' },
+            green: { normal: '#16a34a', pressed: '#15803d', stroke: '#15803d', strokePressed: '#166534' },
+            blue: { normal: '#2563eb', pressed: '#1d4ed8', stroke: '#1d4ed8', strokePressed: '#1e40af' },
+            yellow: { normal: '#eab308', pressed: '#ca8a04', stroke: '#ca8a04', strokePressed: '#a16207' },
+            white: { normal: '#f1f5f9', pressed: '#cbd5e1', stroke: '#cbd5e1', strokePressed: '#94a3b8' },
+            black: { normal: '#334155', pressed: '#1e293b', stroke: '#1e293b', strokePressed: '#0f172a' },
+            orange: { normal: '#ea580c', pressed: '#c2410c', stroke: '#c2410c', strokePressed: '#9a3412' },
+          };
+          const btnColors = colorMap[rawColor] || (rawColor.startsWith('#') ? {
+            normal: rawColor, pressed: rawColor, stroke: '#333333', strokePressed: '#111111'
+          } : colorMap.red);
           return (
             <>
               {/* Shadow beneath button cap */}
@@ -1376,8 +1416,8 @@ const ComponentNode = ({
                 x={node.width / 2}
                 y={node.height / 2 + offsetY}
                 radius={capRadius}
-                fill={pressed ? '#991b1b' : '#dc2626'}
-                stroke={pressed ? '#7f1d1d' : '#b91c1c'}
+                fill={pressed ? btnColors.pressed : btnColors.normal}
+                stroke={pressed ? btnColors.strokePressed : btnColors.stroke}
                 strokeWidth={1.2}
                 shadowColor="rgba(0,0,0,0.3)"
                 shadowBlur={pressed ? 2 : 6}
@@ -1403,7 +1443,13 @@ const ComponentNode = ({
                     if (onInteraction) onInteraction(node.id, 'release');
                   }
                 }}
+                onMouseEnter={(e) => {
+                  const stage = e.target.getStage();
+                  if (stage) stage.container().style.cursor = 'pointer';
+                }}
                 onMouseLeave={(e) => {
+                  const stage = e.target.getStage();
+                  if (stage) stage.container().style.cursor = 'default';
                   if (readOnly) return;
                   e.cancelBubble = true;
                   const buttonType = node.properties?.buttonType || 'Momentary';

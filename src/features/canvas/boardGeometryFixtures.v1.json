@@ -24,7 +24,8 @@
       "connectors": [
         {
           "id": "power-analog",
-          "edge": "left",
+          "edge": "bottom",
+          "inset": 6,
           "pins": [
             { "id": "nc", "name": "NC", "type": "input" },
             { "id": "ioref", "name": "IOREF", "type": "power" },
@@ -44,7 +45,8 @@
         },
         {
           "id": "digital",
-          "edge": "right",
+          "edge": "top",
+          "inset": 6,
           "pins": [
             { "id": "scl", "name": "SCL/D19", "type": "bidirectional" },
             { "id": "sda", "name": "SDA/D18", "type": "bidirectional" },
@@ -324,7 +326,8 @@
       "connectors": [
         {
           "id": "power-analog",
-          "edge": "left",
+          "edge": "bottom",
+          "inset": 6,
           "pins": [
             { "id": "nc", "name": "NC", "type": "input" }, { "id": "ioref", "name": "IOREF", "type": "power" },
             { "id": "rst", "name": "RESET", "type": "input" }, { "id": "3v3", "name": "3.3V", "type": "power" },
@@ -337,7 +340,8 @@
         },
         {
           "id": "digital",
-          "edge": "right",
+          "edge": "top",
+          "inset": 6,
           "pins": [
             { "id": "scl", "name": "SCL/D3", "type": "bidirectional" }, { "id": "sda", "name": "SDA/D2", "type": "bidirectional" },
             { "id": "aref", "name": "AREF", "type": "input" }, { "id": "gnd3", "name": "GND", "type": "ground" },

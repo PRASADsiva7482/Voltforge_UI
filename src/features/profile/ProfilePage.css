@@ -1,0 +1,222 @@
+.vf-profile-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.vf-profile-hero {
+  position: relative;
+  border-radius: 16px;
+  border: 1px solid var(--vf-border, #e2e8f0);
+  background: var(--vf-surface, #ffffff);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.dark .vf-profile-hero {
+  background: rgba(15, 23, 42, 0.75);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+
+.vf-profile-banner {
+  height: 120px;
+  background: linear-gradient(135deg, rgba(8, 127, 131, 0.35), rgba(6, 182, 212, 0.25), rgba(59, 130, 246, 0.2));
+  position: relative;
+}
+
+.dark .vf-profile-banner {
+  background: linear-gradient(135deg, rgba(8, 127, 131, 0.5), rgba(6, 182, 212, 0.3), rgba(15, 23, 42, 0.8));
+}
+
+.vf-profile-body {
+  padding: 0 24px 24px;
+  position: relative;
+}
+
+.vf-profile-avatar-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: -45px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.vf-profile-avatar-wrapper {
+  position: relative;
+  border-radius: 9999px;
+  border: 4px solid var(--vf-surface, #ffffff);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.dark .vf-profile-avatar-wrapper {
+  border-color: #0f172a;
+}
+
+.vf-profile-avatar {
+  width: 90px;
+  height: 90px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #087f83, #06b6d4);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.vf-profile-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vf-profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vf-profile-name {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--vf-text-strong, #0f172a);
+}
+
+.dark .vf-profile-name {
+  color: #f8fafc;
+}
+
+.vf-profile-handle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--vf-text-muted, #64748b);
+}
+
+.vf-profile-bio {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--vf-text, #334155);
+  max-width: 720px;
+}
+
+.dark .vf-profile-bio {
+  color: #cbd5e1;
+}
+
+/* Stats row */
+.vf-profile-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.vf-profile-stat-card {
+  padding: 18px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--vf-border, #e2e8f0);
+  background: var(--vf-surface, #ffffff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.dark .vf-profile-stat-card {
+  background: rgba(15, 23, 42, 0.7);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.vf-profile-stat-num {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--vf-teal, #087f83);
+}
+
+.dark .vf-profile-stat-num {
+  color: #38bdf8;
+}
+
+.vf-profile-stat-label {
+  font-size: 12px;
+  color: var(--vf-text-muted, #64748b);
+  margin-top: 4px;
+}
+
+/* Project cards */
+.vf-profile-projects {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.vf-profile-section-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--vf-text-strong, #0f172a);
+}
+
+.dark .vf-profile-section-title {
+  color: #f8fafc;
+}
+
+.vf-profile-projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.vf-profile-project-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 18px;
+  border-radius: 12px;
+  border: 1px solid var(--vf-border, #e2e8f0);
+  background: var(--vf-surface, #ffffff);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.dark .vf-profile-project-card {
+  background: rgba(15, 23, 42, 0.7);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.vf-profile-project-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--vf-teal, #087f83);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.dark .vf-profile-project-card:hover {
+  border-color: rgba(6, 182, 212, 0.45);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.vf-project-card__title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--vf-text-strong, #0f172a);
+}
+
+.dark .vf-project-card__title {
+  color: #f8fafc;
+}
+
+.vf-project-card__desc {
+  font-size: 12px;
+  color: var(--vf-text-muted, #64748b);
+  line-height: 1.4;
+  margin: 0 0 12px;
+}

@@ -1,0 +1,490 @@
+/* ==========================================================================
+   Voltforge Settings Page - Uniform 860px Architecture
+   - Strict Uniform Width Across All 3 Tabs
+   - Presentation (View) Mode vs. Interactive Edit Mode for Profile
+   - 100% White-Label Voltforge Security Branding
+   - Custom Cyber Scrollbars (Zero Native Windows UI Leakage)
+   ========================================================================== */
+
+.vf-settings-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 20px 20px 60px;
+  box-sizing: border-box;
+}
+
+.vf-settings-tabs {
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+/* Alert Notification */
+.vf-settings-alert-success {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #059669;
+  font-size: 13.5px;
+  font-weight: 500;
+  animation: vf-fade-in 0.25s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.dark .vf-settings-alert-success {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: #34d399;
+}
+
+/* Base Uniform Card */
+.vf-settings-card {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--vf-surface, #ffffff);
+  border: 1px solid var(--vf-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 28px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.dark .vf-settings-card {
+  background: #242424;
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* ==========================================================================
+   TAB 1: PROFILE PRESENTATION & EDIT MODES
+   ========================================================================== */
+.vf-profile-view {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.vf-profile-view__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--vf-border, #e2e8f0);
+}
+
+.dark .vf-profile-view__header {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.vf-profile-view__user {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.vf-profile-avatar-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #2196f3;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+  flex-shrink: 0;
+}
+
+.vf-profile-view__name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--vf-text-strong, #0f172a);
+}
+
+.dark .vf-profile-view__name {
+  color: #f8fafc;
+}
+
+.vf-profile-view__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--vf-text-muted, #64748b);
+}
+
+.vf-profile-view__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.vf-profile-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vf-profile-info-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--vf-text-muted, #64748b);
+}
+
+.vf-profile-info-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--vf-text-strong, #0f172a);
+  word-break: break-all;
+}
+
+.dark .vf-profile-info-value {
+  color: #e2e8f0;
+}
+
+.vf-profile-bio-box {
+  background: var(--vf-bg, #f8fafc);
+  border: 1px solid var(--vf-border, #e2e8f0);
+  border-radius: 12px;
+  padding: 16px 20px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--vf-text-body, #334155);
+}
+
+.dark .vf-profile-bio-box {
+  background: rgba(0, 0, 0, 0.25);
+  border-color: rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
+}
+
+/* Edit Mode Form */
+.vf-profile-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Textarea Custom Cyber Scrollbar */
+.vf-bio-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 1.5;
+  border-radius: 10px;
+  border: 1px solid var(--vf-border, #cbd5e1);
+  padding: 12px 14px;
+  resize: vertical;
+  min-height: 90px;
+  background: var(--vf-surface, #ffffff);
+  color: var(--vf-text-strong, #0f172a);
+  scrollbar-width: thin;
+  scrollbar-color: #087f83 transparent;
+}
+
+.dark .vf-bio-textarea {
+  background: rgba(8, 12, 20, 0.85);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+  scrollbar-color: #06b6d4 transparent;
+}
+
+.vf-bio-textarea:focus {
+  outline: none;
+  border-color: var(--vf-teal, #087f83);
+  box-shadow: 0 0 0 2px rgba(8, 127, 131, 0.2);
+}
+
+.dark .vf-bio-textarea:focus {
+  border-color: #06b6d4;
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.25);
+}
+
+.vf-bio-textarea::-webkit-scrollbar {
+  width: 6px;
+}
+
+.vf-bio-textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.vf-bio-textarea::-webkit-scrollbar-thumb {
+  background: #087f83;
+  border-radius: 6px;
+}
+
+.dark .vf-bio-textarea::-webkit-scrollbar-thumb {
+  background: #06b6d4;
+}
+
+/* ==========================================================================
+   TAB 2: SECURITY & CREDENTIALS (UNIFORM 860px)
+   ========================================================================== */
+.vf-security-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.vf-security-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  border-radius: 8px;
+  border: 1px solid var(--vf-border, #e2e8f0);
+  background: var(--vf-surface, #ffffff);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  transition: all 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.dark .vf-security-card {
+  background: #242424;
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.vf-security-card:hover {
+  border-color: var(--vf-teal, #2196f3);
+}
+
+.dark .vf-security-card:hover {
+  border-color: #2196f3;
+}
+
+.vf-security-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.vf-security-card__info {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex: 1;
+  min-width: 280px;
+}
+
+.vf-security-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: rgba(33, 150, 243, 0.12);
+  color: #2196f3;
+  flex-shrink: 0;
+}
+
+.dark .vf-security-card__icon {
+  background: rgba(33, 150, 243, 0.15);
+  color: #2196f3;
+}
+
+.vf-security-card__title {
+  margin: 0 0 4px;
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--vf-text-strong, #0f172a);
+}
+
+.dark .vf-security-card__title {
+  color: #f8fafc;
+}
+
+.vf-security-card__desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--vf-text-muted, #64748b);
+  line-height: 1.5;
+}
+
+.vf-security-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--vf-text-muted, #64748b);
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--vf-bg, #f8fafc);
+  border: 1px solid var(--vf-border, #e2e8f0);
+}
+
+.dark .vf-security-meta {
+  background: rgba(0, 0, 0, 0.25);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+/* ==========================================================================
+   TAB 3: PREFERENCES (SEGMENTED PILLS & SWITCHES)
+   ========================================================================== */
+.vf-pref-group {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  width: 100%;
+}
+
+.vf-pref-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--vf-border, #e2e8f0);
+}
+
+.dark .vf-pref-row {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.vf-pref-row:last-child {
+  border-bottom: none;
+}
+
+.vf-pref-label {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--vf-text-strong, #0f172a);
+}
+
+.dark .vf-pref-label {
+  color: #f8fafc;
+}
+
+.vf-pref-desc {
+  font-size: 12.5px;
+  color: var(--vf-text-muted, #64748b);
+  margin-top: 2px;
+}
+
+/* Segmented Pill Group */
+.vf-segmented-pills {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--vf-bg, #f1f5f9);
+  border: 1px solid var(--vf-border, #e2e8f0);
+}
+
+.dark .vf-segmented-pills {
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.vf-pill-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--vf-text-muted, #64748b);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.vf-pill-btn:hover {
+  color: var(--vf-text-strong, #0f172a);
+}
+
+.dark .vf-pill-btn:hover {
+  color: #ffffff;
+}
+
+.vf-pill-btn.is-active {
+  background: #ffffff;
+  color: #2196f3;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dark .vf-pill-btn.is-active {
+  background: #2196f3;
+  color: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Cyber Switch Toggle */
+.vf-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.vf-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.vf-switch-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: #cbd5e1;
+  transition: 0.15s ease;
+  border-radius: 24px;
+}
+
+.dark .vf-switch-slider {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.vf-switch-slider::before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  transition: 0.15s ease;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.vf-switch input:checked + .vf-switch-slider {
+  background: #2196f3;
+}
+
+.dark .vf-switch input:checked + .vf-switch-slider {
+  background: #2196f3;
+  box-shadow: none;
+}
+
+.vf-switch input:checked + .vf-switch-slider::before {
+  transform: translateX(20px);
+}
+
+@keyframes vf-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

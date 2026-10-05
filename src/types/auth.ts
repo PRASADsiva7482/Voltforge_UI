@@ -5,6 +5,7 @@ export type UserRole = 'USER' | 'ADMIN'
 export type AppUser = {
   accountStatus?: string
   avatarUrl?: string
+  bio?: string
   displayName: string
   email?: string
   id?: string

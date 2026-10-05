@@ -204,40 +204,11 @@ export class MultimeterLogic implements IComponentLogic {
   }
 }
 
-/**
- * Logic for Relay — supports single, double (2CH), and quad (4CH) relays
- */
 export class RelayLogic implements IComponentLogic {
-  onPinStateChange(componentId: string, pinId: string, state: PinState): void {
-    const { updateRuntimeNode, nodes } = useCanvasStore.getState();
-    const node = nodes.find(n => n.id === componentId);
-    if (!node) return;
-
-    const pinLower = pinId.toLowerCase();
-    if (!pinLower.includes('coil') && !pinLower.includes('in')) return;
-
-    const props = { ...(node.properties || {}) };
-
-    // Determine which channel this coil pin belongs to
-    const channelMatch = pinLower.match(/(\d+)/);
-    if (channelMatch) {
-      const ch = channelMatch[1];
-      props[`isSwitched_${ch}`] = state === 'HIGH';
-      if (ch === '1') {
-        props.isSwitched = state === 'HIGH';
-      }
-    } else {
-      // Single relay — no channel number
-      props.isSwitched = state === 'HIGH';
-      props.isSwitched_1 = state === 'HIGH';
-    }
-
-    // Overall active state — any channel switched
-    const anySwitched = props.isSwitched ||
-      Object.keys(props).some(k => k.startsWith('isSwitched_') && props[k]);
-    props.isActive = anySwitched;
-
-    updateRuntimeNode(componentId, { properties: props });
+  onPinStateChange(_componentId: string, _pinId: string, _state: PinState): void {
+    // Relay contact switching, coil energization, and visual state are physics-based
+    // and solved by SimulationEngine.handleSolverResult based on analog coil voltages,
+    // trigger type (Active High / Active Low), and power rail availability.
   }
 }
 

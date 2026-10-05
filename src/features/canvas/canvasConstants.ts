@@ -25,12 +25,12 @@ export const PIN_GLOW_POWER = '#ef4444';
 export const PIN_GLOW_GROUND = '#64748b';
 export const PIN_GLOW_DEFAULT = '#60a5fa';
 
-// ── Pin hit areas ─────────────────────────────────────────────────────────
-export const PIN_HIT_STROKE_WIDTH = 36;
-export const PIN_RADIUS_DEFAULT = 6;
-export const PIN_RADIUS_HOVERED = 8;
-export const PIN_SNAP_RADIUS_DEFAULT = 14;
-export const PIN_SNAP_RADIUS_HOVERED = 18;
+// ── Pin hit areas (tuned for precision, effortless component selection, and zero noise)
+export const PIN_HIT_STROKE_WIDTH = 8;
+export const PIN_RADIUS_DEFAULT = 3.5;
+export const PIN_RADIUS_HOVERED = 5.5;
+export const PIN_SNAP_RADIUS_DEFAULT = 8;
+export const PIN_SNAP_RADIUS_HOVERED = 12;
 
 // ── Bend point ────────────────────────────────────────────────────────────
 export const BEND_POINT_RADIUS_DEFAULT = 5;

@@ -82,62 +82,186 @@ const boardComponentDimensions = Object.fromEntries(
 
 const additionalComponentSvgs: Record<string, string> = {
   INDUCTOR: svg('0 0 90 24',
-    '<path d="M8 12c4-12 8 12 12 0s8 12 12 0 8 12 12 0 8 12 12 0 8 12 12 0" fill="none" stroke="%2338bdf8" stroke-width="3"/>' +
-    '<path d="M0 12h8M68 12h22" stroke="%2394a3b8" stroke-width="2"/>'
+    '<defs>' +
+      '<linearGradient id="ind_lead" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="ind_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%235eead4"/><stop offset="35%25" stop-color="%2314b8a6"/><stop offset="85%25" stop-color="%230f766e"/><stop offset="100%25" stop-color="%23115e59"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="0" y="10.5" width="23" height="3" rx="0.5" fill="url(%23ind_lead)"/>' +
+    '<rect x="67" y="10.5" width="23" height="3" rx="0.5" fill="url(%23ind_lead)"/>' +
+    '<circle cx="0.5" cy="12" r="1.5" fill="%2364748b"/><circle cx="89.5" cy="12" r="1.5" fill="%2364748b"/>' +
+    '<path d="M 23 7 C 23 4.5 25 3.5 27 3.5 L 63 3.5 C 65 3.5 67 4.5 67 7 L 67 17 C 67 19.5 65 20.5 63 20.5 L 27 20.5 C 25 20.5 23 19.5 23 17 Z" fill="url(%23ind_body)" stroke="%23042f2e" stroke-width="0.75"/>' +
+    '<rect x="21" y="4" width="6" height="16" rx="2" fill="url(%23ind_body)" stroke="%23042f2e" stroke-width="0.6"/>' +
+    '<rect x="63" y="4" width="6" height="16" rx="2" fill="url(%23ind_body)" stroke="%23042f2e" stroke-width="0.6"/>' +
+    '<rect x="29" y="3.5" width="4.5" height="17" fill="%2378350f"/>' +
+    '<rect x="39" y="3.5" width="4.5" height="17" fill="%230f172a"/>' +
+    '<rect x="49" y="3.5" width="4.5" height="17" fill="%23dc2626"/>' +
+    '<rect x="59" y="3.5" width="3.5" height="17" fill="%23cbd5e1"/>' +
+    '<path d="M 24 5.5 L 66 5.5" stroke="%23ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.45"/>'
   ),
   TRANSFORMER: svg('0 0 100 70',
-    '<path d="M0 18h28m0 34H0M72 18h28m-28 34h28" stroke="%2394a3b8" stroke-width="2"/>' +
-    '<path d="M28 10v16c0 8 12 8 12 0V10c0-8 12-8 12 0v16c0 8 12 8 12 0V10" fill="none" stroke="%2338bdf8" stroke-width="2"/>' +
-    '<path d="M28 44v16c0 8 12 8 12 0V44c0-8 12-8 12 0v16c0 8 12 8 12 0V44" fill="none" stroke="%23f59e0b" stroke-width="2"/>' +
-    '<path d="M49 5v60" stroke="%2364758b" stroke-width="2" stroke-dasharray="3 3"/>'
+    '<defs>' +
+      '<linearGradient id="trans_iron" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2364748b"/><stop offset="50%25" stop-color="%23334155"/><stop offset="100%25" stop-color="%231e293b"/></linearGradient>' +
+      '<linearGradient id="trans_tape" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23fef08a"/><stop offset="50%25" stop-color="%23eab308"/><stop offset="100%25" stop-color="%23ca8a04"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="0" y="16.5" width="22" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="0.5" cy="18" r="1.5" fill="%23475569"/>' +
+    '<rect x="0" y="50.5" width="22" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="0.5" cy="52" r="1.5" fill="%23475569"/>' +
+    '<rect x="78" y="16.5" width="22" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="99.5" cy="18" r="1.5" fill="%23475569"/>' +
+    '<rect x="78" y="50.5" width="22" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="99.5" cy="52" r="1.5" fill="%23475569"/>' +
+    '<rect x="18" y="6" width="64" height="58" rx="4" fill="url(%23trans_iron)" stroke="%231e293b" stroke-width="1"/>' +
+    '<rect x="26" y="12" width="48" height="46" rx="3" fill="url(%23trans_tape)" stroke="%23854d0e" stroke-width="0.8"/>' +
+    '<rect x="34" y="8" width="32" height="54" rx="2" fill="url(%23trans_iron)" stroke="%230f172a" stroke-width="0.8"/>' +
+    '<line x1="38" y1="12" x2="62" y2="12" stroke="%23475569" stroke-width="0.8"/>' +
+    '<line x1="38" y1="58" x2="62" y2="58" stroke="%23475569" stroke-width="0.8"/>' +
+    '<text x="50" y="32" font-size="6" fill="%23451a03" font-family="Arial" font-weight="bold" text-anchor="middle">PRI 230V</text>' +
+    '<text x="50" y="42" font-size="6" fill="%23451a03" font-family="Arial" font-weight="bold" text-anchor="middle">SEC 12V</text>'
   ),
   ZENER_DIODE: svg('0 0 72 28',
-    '<path d="M0 14h20m32 0h20" stroke="%2394a3b8" stroke-width="2"/>' +
-    '<path d="M20 4l10 10-10 10z" fill="%23f8fafc" stroke="%2338bdf8" stroke-width="2"/>' +
-    '<path d="M42 4l-4 5m4 10-4 5" stroke="%23f59e0b" stroke-width="2"/>'
+    '<defs>' +
+      '<linearGradient id="zen_lead" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="zen_glass" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23fdba74" stop-opacity="0.9"/><stop offset="35%25" stop-color="%23fb923c" stop-opacity="0.85"/><stop offset="100%25" stop-color="%23c2410c" stop-opacity="0.95"/></linearGradient>' +
+      '<linearGradient id="zen_slug" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23fed7aa"/><stop offset="50%25" stop-color="%23f97316"/><stop offset="100%25" stop-color="%239a3412"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="0" y="12.5" width="22" height="3" rx="0.5" fill="url(%23zen_lead)"/>' +
+    '<circle cx="0.5" cy="14" r="1.5" fill="%2364748b"/>' +
+    '<rect x="50" y="12.5" width="22" height="3" rx="0.5" fill="url(%23zen_lead)"/>' +
+    '<circle cx="71.5" cy="14" r="1.5" fill="%2364748b"/>' +
+    '<rect x="23" y="10" width="7" height="8" rx="1" fill="url(%23zen_slug)"/>' +
+    '<rect x="42" y="10" width="7" height="8" rx="1" fill="url(%23zen_slug)"/>' +
+    '<rect x="33" y="12" width="6" height="4" rx="0.5" fill="%231e293b"/>' +
+    '<rect x="20" y="7" width="32" height="14" rx="4" fill="url(%23zen_glass)" stroke="%23ea580c" stroke-width="0.75"/>' +
+    '<rect x="43" y="7" width="4.5" height="14" fill="%230f172a" opacity="0.9"/>' +
+    '<text x="32" y="16.5" font-size="5" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle" opacity="0.85">5V1</text>' +
+    '<line x1="22" y1="8.5" x2="50" y2="8.5" stroke="%23ffffff" stroke-width="0.8" opacity="0.6"/>'
   ),
   SCHOTTKY_DIODE: svg('0 0 72 28',
-    '<path d="M0 14h20m32 0h20" stroke="%2394a3b8" stroke-width="2"/>' +
-    '<path d="M20 4l10 10-10 10z" fill="%23f8fafc" stroke="%2338bdf8" stroke-width="2"/>' +
-    '<path d="M42 4v20m5-20v20" stroke="%23fbbf24" stroke-width="2"/>'
+    '<defs>' +
+      '<linearGradient id="sch_lead" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="sch_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2327272a"/><stop offset="50%25" stop-color="%2318181b"/><stop offset="100%25" stop-color="%2309090b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="0" y="12.5" width="20" height="3" rx="0.5" fill="url(%23sch_lead)"/>' +
+    '<circle cx="0.5" cy="14" r="1.5" fill="%2364748b"/>' +
+    '<rect x="52" y="12.5" width="20" height="3" rx="0.5" fill="url(%23sch_lead)"/>' +
+    '<circle cx="71.5" cy="14" r="1.5" fill="%2364748b"/>' +
+    '<rect x="18" y="6" width="36" height="16" rx="2.5" fill="url(%23sch_body)" stroke="%233f3f46" stroke-width="0.75"/>' +
+    '<rect x="43" y="6" width="3" height="16" fill="%23cbd5e1"/>' +
+    '<rect x="48" y="6" width="2" height="16" fill="%23cbd5e1"/>' +
+    '<text x="31" y="16.5" font-size="6" fill="%23facc15" font-family="Arial" font-weight="bold" text-anchor="middle">1N5819</text>' +
+    '<line x1="20" y1="7.5" x2="52" y2="7.5" stroke="%23ffffff" stroke-width="0.8" opacity="0.4"/>'
   ),
   NMOS: svg('0 0 56 70',
-    '<path d="M28 0v18m0 34v18M0 35h17m22 0h17" stroke="%2394a3b8" stroke-width="2"/>' +
-    '<path d="M22 18v34m12-34v34M18 22h4m-4 10h4m-4 10h4m12-20h4m-4 10h4m-4 10h4" stroke="%2338bdf8" stroke-width="3"/>' +
-    '<path d="M8 35h10" stroke="%23f59e0b" stroke-width="2"/>'
+    '<defs>' +
+      '<linearGradient id="nmos_tab" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+      '<linearGradient id="nmos_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23334155"/><stop offset="50%25" stop-color="%231e293b"/><stop offset="100%25" stop-color="%230f172a"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="0" y="33.5" width="16" height="3" rx="0.5" fill="%2394a3b8"/>' +
+    '<circle cx="0.5" cy="35" r="1.5" fill="%23475569"/>' +
+    '<rect x="26.5" y="0" width="3" height="15" rx="0.5" fill="%2394a3b8"/>' +
+    '<circle cx="28" cy="0.5" r="1.5" fill="%23475569"/>' +
+    '<rect x="26.5" y="55" width="3" height="15" rx="0.5" fill="%2394a3b8"/>' +
+    '<circle cx="28" cy="69.5" r="1.5" fill="%23475569"/>' +
+    '<rect x="12" y="8" width="32" height="20" rx="2" fill="url(%23nmos_tab)" stroke="%2364748b" stroke-width="0.75"/>' +
+    '<circle cx="28" cy="18" r="4.2" fill="%23475569"/><circle cx="28" cy="18" r="2.8" fill="%230f172a"/>' +
+    '<rect x="8" y="24" width="40" height="32" rx="3" fill="url(%23nmos_body)" stroke="%23475569" stroke-width="0.8"/>' +
+    '<rect x="10" y="26" width="36" height="4" rx="1" fill="%230f172a" opacity="0.4"/>' +
+    '<text x="28" y="42" font-size="7" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">IRF540N</text>' +
+    '<text x="28" y="50" font-size="4.5" fill="%2338bdf8" font-family="Arial" text-anchor="middle">N-CH MOSFET</text>' +
+    '<text x="6" y="32" font-size="4" fill="%2394a3b8" font-family="Arial">G</text>' +
+    '<text x="33" y="10" font-size="4" fill="%2394a3b8" font-family="Arial">D</text>' +
+    '<text x="33" y="66" font-size="4" fill="%2394a3b8" font-family="Arial">S</text>'
   ),
   PMOS: svg('0 0 56 70',
-    '<path d="M28 0v18m0 34v18M0 35h17m22 0h17" stroke="%2394a3b8" stroke-width="2"/>' +
-    '<path d="M22 18v34m12-34v34M18 22h4m-4 10h4m-4 10h4m12-20h4m-4 10h4m-4 10h4" stroke="%23f472b6" stroke-width="3"/>' +
-    '<circle cx="18" cy="35" r="4" fill="none" stroke="%23fbbf24" stroke-width="2"/>'
+    '<defs>' +
+      '<linearGradient id="pmos_tab" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+      '<linearGradient id="pmos_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23334155"/><stop offset="50%25" stop-color="%231e293b"/><stop offset="100%25" stop-color="%230f172a"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="0" y="33.5" width="16" height="3" rx="0.5" fill="%2394a3b8"/>' +
+    '<circle cx="0.5" cy="35" r="1.5" fill="%23475569"/>' +
+    '<rect x="26.5" y="0" width="3" height="15" rx="0.5" fill="%2394a3b8"/>' +
+    '<circle cx="28" cy="0.5" r="1.5" fill="%23475569"/>' +
+    '<rect x="26.5" y="55" width="3" height="15" rx="0.5" fill="%2394a3b8"/>' +
+    '<circle cx="28" cy="69.5" r="1.5" fill="%23475569"/>' +
+    '<rect x="12" y="8" width="32" height="20" rx="2" fill="url(%23pmos_tab)" stroke="%2364748b" stroke-width="0.75"/>' +
+    '<circle cx="28" cy="18" r="4.2" fill="%23475569"/><circle cx="28" cy="18" r="2.8" fill="%230f172a"/>' +
+    '<rect x="8" y="24" width="40" height="32" rx="3" fill="url(%23pmos_body)" stroke="%23475569" stroke-width="0.8"/>' +
+    '<rect x="10" y="26" width="36" height="4" rx="1" fill="%230f172a" opacity="0.4"/>' +
+    '<text x="28" y="42" font-size="7" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">IRF9540</text>' +
+    '<text x="28" y="50" font-size="4.5" fill="%23f472b6" font-family="Arial" text-anchor="middle">P-CH MOSFET</text>' +
+    '<text x="6" y="32" font-size="4" fill="%2394a3b8" font-family="Arial">G</text>' +
+    '<text x="33" y="10" font-size="4" fill="%2394a3b8" font-family="Arial">D</text>' +
+    '<text x="33" y="66" font-size="4" fill="%2394a3b8" font-family="Arial">S</text>'
   ),
   OPAMP_IDEAL: svg('0 0 70 70',
-    '<path d="M0 20h17m-17 30h17M35 0v15m0 40v15M53 35h17" stroke="%2394a3b8" stroke-width="2"/>' +
-    '<path d="M17 8l0 54 36-27z" fill="%231e293b" stroke="%2338bdf8" stroke-width="2"/>' +
-    '<text x="22" y="26" font-size="10" fill="white">+</text><text x="22" y="49" font-size="10" fill="white">−</text>'
+    '<rect x="0" y="18.5" width="18" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="0.5" cy="20" r="1.5" fill="%23475569"/>' +
+    '<rect x="0" y="48.5" width="18" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="0.5" cy="50" r="1.5" fill="%23475569"/>' +
+    '<rect x="33.5" y="0" width="3" height="16" rx="0.5" fill="%2394a3b8"/><circle cx="35" cy="0.5" r="1.5" fill="%23475569"/>' +
+    '<rect x="33.5" y="54" width="3" height="16" rx="0.5" fill="%2394a3b8"/><circle cx="35" cy="69.5" r="1.5" fill="%23475569"/>' +
+    '<rect x="52" y="33.5" width="18" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="69.5" cy="35" r="1.5" fill="%23475569"/>' +
+    '<polygon points="18,10 18,60 54,35" fill="%231e293b" stroke="%2338bdf8" stroke-width="1.5"/>' +
+    '<text x="24" y="24" font-size="10" fill="%2338bdf8" font-family="Arial" font-weight="bold">+</text>' +
+    '<text x="24" y="52" font-size="10" fill="%2338bdf8" font-family="Arial" font-weight="bold">−</text>' +
+    '<text x="35" y="40" font-size="6" fill="%23e2e8f0" font-family="Arial" font-weight="bold" text-anchor="middle">OPAMP</text>'
   ),
   OPAMP_LM358: svg('0 0 70 70',
-    '<path d="M0 20h17m-17 30h17M35 0v15m0 40v15M53 35h17" stroke="%2394a3b8" stroke-width="2"/>' +
-    '<path d="M17 8l0 54 36-27z" fill="%230f766e" stroke="%232dd4bf" stroke-width="2"/>' +
-    '<text x="21" y="27" font-size="9" fill="white">+</text><text x="21" y="49" font-size="9" fill="white">−</text>'
+    '<rect x="0" y="18.5" width="18" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="0.5" cy="20" r="1.5" fill="%23475569"/>' +
+    '<rect x="0" y="48.5" width="18" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="0.5" cy="50" r="1.5" fill="%23475569"/>' +
+    '<rect x="33.5" y="0" width="3" height="16" rx="0.5" fill="%2394a3b8"/><circle cx="35" cy="0.5" r="1.5" fill="%23475569"/>' +
+    '<rect x="33.5" y="54" width="3" height="16" rx="0.5" fill="%2394a3b8"/><circle cx="35" cy="69.5" r="1.5" fill="%23475569"/>' +
+    '<rect x="52" y="33.5" width="18" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="69.5" cy="35" r="1.5" fill="%23475569"/>' +
+    '<polygon points="18,10 18,60 54,35" fill="%230f766e" stroke="%232dd4bf" stroke-width="1.5"/>' +
+    '<text x="24" y="24" font-size="10" fill="%23ffffff" font-family="Arial" font-weight="bold">+</text>' +
+    '<text x="24" y="52" font-size="10" fill="%23ffffff" font-family="Arial" font-weight="bold">−</text>' +
+    '<text x="35" y="40" font-size="6" fill="%23ccfbf1" font-family="Arial" font-weight="bold" text-anchor="middle">LM358</text>'
   ),
   BRIDGE_RECTIFIER: svg('0 0 70 60',
-    '<rect x="10" y="8" width="50" height="44" rx="4" fill="%231e293b" stroke="%2338bdf8" stroke-width="2"/>' +
-    '<path d="M20 20l12 10-12 10m30-20L38 30l12 10M32 30h6" fill="none" stroke="%23f8fafc" stroke-width="2"/>' +
-    '<text x="16" y="7" font-size="8" fill="%23fbbf24">~</text><text x="52" y="7" font-size="8" fill="%23fbbf24">+</text>'
+    '<defs>' +
+      '<linearGradient id="br_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23334155"/><stop offset="50%25" stop-color="%231e293b"/><stop offset="100%25" stop-color="%230f172a"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="0" y="13.5" width="18" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="0.5" cy="15" r="1.5" fill="%23475569"/>' +
+    '<rect x="0" y="43.5" width="18" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="0.5" cy="45" r="1.5" fill="%23475569"/>' +
+    '<rect x="52" y="13.5" width="18" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="69.5" cy="15" r="1.5" fill="%23475569"/>' +
+    '<rect x="52" y="43.5" width="18" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="69.5" cy="45" r="1.5" fill="%23475569"/>' +
+    '<rect x="12" y="8" width="46" height="44" rx="5" fill="url(%23br_body)" stroke="%23475569" stroke-width="1"/>' +
+    '<path d="M 12 14 L 18 8 L 12 8 Z" fill="%23475569"/>' +
+    '<text x="17" y="18" font-size="8" fill="%23facc15" font-family="Arial" font-weight="bold">~</text>' +
+    '<text x="17" y="48" font-size="8" fill="%23facc15" font-family="Arial" font-weight="bold">~</text>' +
+    '<text x="50" y="18" font-size="8" fill="%23ef4444" font-family="Arial" font-weight="bold">+</text>' +
+    '<text x="50" y="48" font-size="8" fill="%2394a3b8" font-family="Arial" font-weight="bold">−</text>' +
+    '<text x="35" y="32" font-size="7" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">W04M</text>' +
+    '<text x="35" y="40" font-size="4.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle">1.5A 400V</text>'
   ),
   THERMISTOR_NTC: svg('0 0 90 24',
-    '<path d="M0 12h12m54 0h24" stroke="%2394a3b8" stroke-width="2"/>' +
-    '<path d="M12 12h8l5-8 10 16 10-16 10 16 5-8h8" fill="none" stroke="%23f97316" stroke-width="2"/>' +
-    '<path d="M39 2l12 20" stroke="%23f8fafc" stroke-width="2"/>'
+    '<defs>' +
+      '<radialGradient id="ntc_bead" cx="35%25" cy="35%25" r="65%25"><stop offset="0%25" stop-color="%2338bdf8"/><stop offset="35%25" stop-color="%230284c7"/><stop offset="85%25" stop-color="%230369a1"/><stop offset="100%25" stop-color="%230c4a6e"/></radialGradient>' +
+    '</defs>' +
+    '<rect x="0" y="10.5" width="30" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="0.5" cy="12" r="1.5" fill="%23475569"/>' +
+    '<rect x="60" y="10.5" width="30" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="89.5" cy="12" r="1.5" fill="%2364748b"/>' +
+    '<ellipse cx="45" cy="12" rx="16" ry="10" fill="url(%23ntc_bead)" stroke="%230c4a6e" stroke-width="0.8"/>' +
+    '<text x="45" y="14" font-size="6" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">NTC 10k</text>' +
+    '<path d="M 35 7 Q 45 4 55 7" fill="none" stroke="%23ffffff" stroke-width="1" opacity="0.5"/>'
   ),
   VARIABLE_CAPACITOR: svg('0 0 44 60',
-    '<path d="M22 0v18m0 24v18M8 18h28M8 42h28" stroke="%2394a3b8" stroke-width="2"/>' +
-    '<path d="M14 18v24m16-24v24M32 8l8-8" stroke="%2338bdf8" stroke-width="2"/>'
+    '<defs>' +
+      '<radialGradient id="trim_base" cx="40%25" cy="40%25" r="60%25"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="50%25" stop-color="%23e2e8f0"/><stop offset="100%25" stop-color="%2394a3b8"/></radialGradient>' +
+      '<radialGradient id="trim_rotor" cx="35%25" cy="35%25" r="65%25"><stop offset="0%25" stop-color="%2367e8f9"/><stop offset="50%25" stop-color="%2306b6d4"/><stop offset="100%25" stop-color="%230e7490"/></radialGradient>' +
+      '<linearGradient id="trim_screw" x1="0" y1="0" x2="1" y2="1"><stop offset="0%25" stop-color="%23fef08a"/><stop offset="45%25" stop-color="%23eab308"/><stop offset="100%25" stop-color="%23a16207"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="18.5" y="0" width="3" height="15" rx="0.5" fill="%2394a3b8"/><circle cx="20" cy="1" r="1.5" fill="%23475569"/>' +
+    '<rect x="18.5" y="35" width="3" height="25" rx="0.5" fill="%2394a3b8"/><circle cx="20" cy="59" r="1.5" fill="%23475569"/>' +
+    '<rect x="6" y="9" width="32" height="32" rx="4" fill="url(%23trim_base)" stroke="%2364748b" stroke-width="0.8"/>' +
+    '<circle cx="22" cy="25" r="12" fill="url(%23trim_rotor)" stroke="%230e7490" stroke-width="0.75"/>' +
+    '<circle cx="22" cy="25" r="5.5" fill="url(%23trim_screw)" stroke="%23854d0e" stroke-width="0.6"/>' +
+    '<line x1="18" y1="21" x2="26" y2="29" stroke="%23451a03" stroke-width="1.4" stroke-linecap="round"/>' +
+    '<text x="22" y="39" font-size="4.5" fill="%23334155" font-family="Arial" font-weight="bold" text-anchor="middle">TRIMMER</text>'
   ),
   THERMISTOR: svg('0 0 90 24',
-    '<path d="M0 12h12m54 0h24" stroke="%2394a3b8" stroke-width="2"/>' +
-    '<path d="M12 12h8l5-8 10 16 10-16 10 16 5-8h8" fill="none" stroke="%23f97316" stroke-width="2"/>'
+    '<defs>' +
+      '<radialGradient id="ntc_bead2" cx="35%25" cy="35%25" r="65%25"><stop offset="0%25" stop-color="%2338bdf8"/><stop offset="35%25" stop-color="%230284c7"/><stop offset="85%25" stop-color="%230369a1"/><stop offset="100%25" stop-color="%230c4a6e"/></radialGradient>' +
+    '</defs>' +
+    '<rect x="0" y="10.5" width="30" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="0.5" cy="12" r="1.5" fill="%23475569"/>' +
+    '<rect x="60" y="10.5" width="30" height="3" rx="0.5" fill="%2394a3b8"/><circle cx="89.5" cy="12" r="1.5" fill="%2364748b"/>' +
+    '<ellipse cx="45" cy="12" rx="16" ry="10" fill="url(%23ntc_bead2)" stroke="%230c4a6e" stroke-width="0.8"/>' +
+    '<text x="45" y="14" font-size="6" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">NTC 10k</text>' +
+    '<path d="M 35 7 Q 45 4 55 7" fill="none" stroke="%23ffffff" stroke-width="1" opacity="0.5"/>'
   ),
 };
 
@@ -147,484 +271,1905 @@ export const componentSvgs: Record<string, string> = {
 
   // ── Boards ──
   ARDUINO_UNO: svg('0 0 200 150',
-    '<rect width="200" height="150" rx="8" fill="%230d6ebd"/>' +
-    '<rect x="8" y="8" width="28" height="28" rx="2" fill="%23c0c0c0"/>' +
-    '<rect x="160" y="8" width="32" height="14" rx="2" fill="%23c0c0c0"/>' +
-    '<rect x="8" y="130" width="184" height="12" rx="2" fill="%23111"/>' +
-    '<rect x="8" y="44" width="184" height="4" rx="1" fill="%23111"/>' +
-    '<circle cx="16" cy="130" r="4" fill="%23222"/><circle cx="184" cy="130" r="4" fill="%23222"/>' +
-    '<rect x="52" y="60" width="16" height="16" fill="%23333"/>' +
-    '<text x="100" y="90" font-size="18" fill="white" font-weight="bold" text-anchor="middle" font-family="Arial">Arduino UNO</text>'
+    '<defs>' +
+      '<linearGradient id="uno_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2300979c"/><stop offset="100%25" stop-color="%23008184"/></linearGradient>' +
+      '<linearGradient id="uno_usb" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%2394a3b8"/><stop offset="35%25" stop-color="%23f8fafc"/><stop offset="70%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="uno_metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+      '<linearGradient id="uno_ic" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2327272a"/><stop offset="100%25" stop-color="%2318181b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="0" y="0" width="200" height="150" rx="7" fill="url(%23uno_pcb)" stroke="%23005f63" stroke-width="1.2"/>' +
+    '<path d="M 32 18 L 180 18 L 180 60 L 194 60 L 194 130 L 32 130 Z" fill="none" stroke="%2300a8ad" stroke-width="0.75" opacity="0.35"/>' +
+    '<circle cx="28" cy="14" r="4.2" fill="%23cbd5e1"/><circle cx="28" cy="14" r="2.4" fill="%23004649"/>' +
+    '<circle cx="28" cy="136" r="4.2" fill="%23cbd5e1"/><circle cx="28" cy="136" r="2.4" fill="%23004649"/>' +
+    '<circle cx="186" cy="20" r="4.2" fill="%23cbd5e1"/><circle cx="186" cy="20" r="2.4" fill="%23004649"/>' +
+    '<circle cx="186" cy="128" r="4.2" fill="%23cbd5e1"/><circle cx="186" cy="128" r="2.4" fill="%23004649"/>' +
+    '<rect x="0" y="23" width="28" height="26" rx="2" fill="url(%23uno_usb)" stroke="%23475569" stroke-width="0.8"/>' +
+    '<rect x="0" y="27" width="16" height="18" rx="1.5" fill="%23090d16"/>' +
+    '<rect x="2" y="31" width="10" height="2" fill="%23f59e0b"/><rect x="2" y="35" width="10" height="2" fill="%23f59e0b"/><rect x="2" y="39" width="10" height="2" fill="%23f59e0b"/>' +
+    '<rect x="18" y="25" width="8" height="22" rx="1" fill="%23475569" opacity="0.4"/>' +
+    '<rect x="0" y="85" width="30" height="34" rx="3" fill="%2318181b" stroke="%2327272a" stroke-width="1"/>' +
+    '<rect x="0" y="91" width="16" height="22" rx="2" fill="%2309090b"/>' +
+    '<rect x="3" y="99" width="9" height="6" rx="3" fill="%2394a3b8"/>' +
+    '<rect x="42" y="96" width="16" height="18" rx="1" fill="%2318181b"/>' +
+    '<rect x="44" y="93" width="12" height="3" fill="%2394a3b8"/>' +
+    '<rect x="44" y="114" width="3" height="5" fill="%23cbd5e1"/><rect x="49" y="114" width="3" height="5" fill="%23cbd5e1"/><rect x="54" y="114" width="3" height="5" fill="%23cbd5e1"/>' +
+    '<rect x="38" y="16" width="10" height="10" rx="1.5" fill="url(%23uno_metal)" stroke="%2364748b" stroke-width="0.6"/>' +
+    '<circle cx="43" cy="21" r="3" fill="%23ef4444" stroke="%23b91c1c" stroke-width="0.5"/>' +
+    '<text x="43" y="12" font-size="5" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">RESET</text>' +
+    '<rect x="58" y="44" width="18" height="10" rx="5" fill="url(%23uno_metal)" stroke="%2364748b" stroke-width="0.7"/>' +
+    '<rect x="54" y="47" width="4" height="4" fill="%23cbd5e1"/><rect x="76" y="47" width="4" height="4" fill="%23cbd5e1"/>' +
+    '<text x="67" y="51" font-size="4.5" fill="%23334155" font-family="Arial" font-weight="bold" text-anchor="middle">16.000</text>' +
+    '<rect x="42" y="34" width="14" height="14" rx="1" fill="%2318181b"/>' +
+    '<circle cx="44" cy="36" r="0.8" fill="%233f3f46"/>' +
+    '<rect x="94" y="66" width="76" height="24" rx="2" fill="%230f172a" stroke="%23334155" stroke-width="0.8"/>' +
+    '<rect x="96" y="68" width="72" height="20" rx="1.5" fill="url(%23uno_ic)" stroke="%233f3f46" stroke-width="0.5"/>' +
+    '<path d="M 96 75.5 A 2.5 2.5 0 0 1 96 80.5 Z" fill="%230f172a"/>' +
+    '<circle cx="102" cy="83.5" r="1.2" fill="%23090d16"/>' +
+    '<text x="132" y="80.5" font-size="6.5" fill="%23d4d4d8" font-family="Arial" font-weight="bold" letter-spacing="0.5" text-anchor="middle">ATMEGA328P-PU</text>' +
+    Array.from({ length: 14 }, (_, i) => `<rect x="${97.5 + i * 5}" y="64.5" width="2" height="2" fill="%23cbd5e1"/><rect x="${97.5 + i * 5}" y="89.5" width="2" height="2" fill="%23cbd5e1"/>`).join('') +
+    '<rect x="176" y="74" width="10" height="15" rx="1" fill="%2318181b"/>' +
+    '<circle cx="179" cy="77" r="1.2" fill="%23f59e0b"/><circle cx="183" cy="77" r="1.2" fill="%23f59e0b"/>' +
+    '<circle cx="179" cy="81.5" r="1.2" fill="%23f59e0b"/><circle cx="183" cy="81.5" r="1.2" fill="%23f59e0b"/>' +
+    '<circle cx="179" cy="86" r="1.2" fill="%23f59e0b"/><circle cx="183" cy="86" r="1.2" fill="%23f59e0b"/>' +
+    '<text x="181" y="71" font-size="4.5" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">ICSP</text>' +
+    '<rect x="33" y="28" width="4" height="3" rx="0.5" fill="%2318181b"/><text x="40" y="31" font-size="4.5" fill="%23ffffff" font-family="Arial" font-weight="bold">ON</text>' +
+    '<rect x="33" y="43" width="4" height="3" rx="0.5" fill="%2318181b"/><text x="40" y="46" font-size="4.5" fill="%23ffffff" font-family="Arial" font-weight="bold">L</text>' +
+    '<rect x="33" y="57" width="4" height="3" rx="0.5" fill="%2318181b"/><text x="40" y="60" font-size="4.5" fill="%23ffffff" font-family="Arial" font-weight="bold">TX</text>' +
+    '<rect x="33" y="68" width="4" height="3" rx="0.5" fill="%2318181b"/><text x="40" y="71" font-size="4.5" fill="%23ffffff" font-family="Arial" font-weight="bold">RX</text>' +
+    '<rect x="8" y="2" width="184" height="8.5" rx="1.2" fill="%2318181b" stroke="%2327272a" stroke-width="0.8"/>' +
+    Array.from({ length: 18 }, (_, i) => {
+      const x = 10 + i * (180 / 17);
+      return `<rect x="${(x - 1.8).toFixed(1)}" y="4.2" width="3.6" height="3.6" rx="0.5" fill="%2309090b" stroke="%233f3f46" stroke-width="0.5"/><circle cx="${x.toFixed(1)}" cy="6" r="0.9" fill="%23f59e0b" opacity="0.6"/>`;
+    }).join('') +
+    '<text x="100" y="16" font-size="5" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">DIGITAL (PWM ~)</text>' +
+    '<text x="10" y="16" font-size="4.2" fill="%23ffffff" font-family="Arial">SCL</text>' +
+    '<text x="21" y="16" font-size="4.2" fill="%23ffffff" font-family="Arial">SDA</text>' +
+    '<text x="32" y="16" font-size="4" fill="%23ffffff" font-family="Arial">AREF</text>' +
+    '<text x="42" y="16" font-size="4" fill="%23ffffff" font-family="Arial">GND</text>' +
+    '<text x="53" y="16" font-size="4.2" fill="%23ffffff" font-family="Arial">13</text>' +
+    '<text x="63" y="16" font-size="4.2" fill="%23ffffff" font-family="Arial">12</text>' +
+    '<text x="74" y="16" font-size="4.2" fill="%23ffffff" font-family="Arial">~11</text>' +
+    '<text x="84.5" y="16" font-size="4.2" fill="%23ffffff" font-family="Arial">~10</text>' +
+    '<text x="95" y="16" font-size="4.2" fill="%23ffffff" font-family="Arial">~9</text>' +
+    '<text x="106" y="16" font-size="4.2" fill="%23ffffff" font-family="Arial">8</text>' +
+    '<text x="116.5" y="16" font-size="4.2" fill="%23ffffff" font-family="Arial">7</text>' +
+    '<text x="127" y="16" font-size="4.2" fill="%23ffffff" font-family="Arial">~6</text>' +
+    '<text x="137.5" y="16" font-size="4.2" fill="%23ffffff" font-family="Arial">~5</text>' +
+    '<text x="148" y="16" font-size="4.2" fill="%23ffffff" font-family="Arial">4</text>' +
+    '<text x="159" y="16" font-size="4.2" fill="%23ffffff" font-family="Arial">~3</text>' +
+    '<text x="169.5" y="16" font-size="4.2" fill="%23ffffff" font-family="Arial">2</text>' +
+    '<text x="180" y="16" font-size="4" fill="%23ffffff" font-family="Arial">TX</text>' +
+    '<text x="190.5" y="16" font-size="4" fill="%23ffffff" font-family="Arial">RX</text>' +
+    '<rect x="8" y="139.5" width="184" height="8.5" rx="1.2" fill="%2318181b" stroke="%2327272a" stroke-width="0.8"/>' +
+    Array.from({ length: 14 }, (_, i) => {
+      const x = 10 + i * (180 / 13);
+      return `<rect x="${(x - 1.8).toFixed(1)}" y="142.2" width="3.6" height="3.6" rx="0.5" fill="%2309090b" stroke="%233f3f46" stroke-width="0.5"/><circle cx="${x.toFixed(1)}" cy="144" r="0.9" fill="%23f59e0b" opacity="0.6"/>`;
+    }).join('') +
+    '<text x="50" y="135" font-size="5" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">POWER</text>' +
+    '<text x="150" y="135" font-size="5" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">ANALOG IN</text>' +
+    '<text x="10" y="135" font-size="3.8" fill="%23ffffff" font-family="Arial">NC</text>' +
+    '<text x="24" y="135" font-size="3.6" fill="%23ffffff" font-family="Arial">IOREF</text>' +
+    '<text x="38" y="135" font-size="3.8" fill="%23ffffff" font-family="Arial">RST</text>' +
+    '<text x="52" y="135" font-size="3.8" fill="%23ffffff" font-family="Arial">3.3V</text>' +
+    '<text x="66" y="135" font-size="3.8" fill="%23ffffff" font-family="Arial">5V</text>' +
+    '<text x="79.5" y="135" font-size="3.8" fill="%23ffffff" font-family="Arial">GND</text>' +
+    '<text x="93.5" y="135" font-size="3.8" fill="%23ffffff" font-family="Arial">GND</text>' +
+    '<text x="107" y="135" font-size="3.8" fill="%23ffffff" font-family="Arial">VIN</text>' +
+    '<text x="121" y="135" font-size="4" fill="%23ffffff" font-family="Arial">A0</text>' +
+    '<text x="135" y="135" font-size="4" fill="%23ffffff" font-family="Arial">A1</text>' +
+    '<text x="149" y="135" font-size="4" fill="%23ffffff" font-family="Arial">A2</text>' +
+    '<text x="162.5" y="135" font-size="4" fill="%23ffffff" font-family="Arial">A3</text>' +
+    '<text x="176.5" y="135" font-size="4" fill="%23ffffff" font-family="Arial">A4</text>' +
+    '<text x="190.5" y="135" font-size="4" fill="%23ffffff" font-family="Arial">A5</text>' +
+    '<text x="132" y="44" font-size="14" fill="%23ffffff" font-family="Arial" font-weight="900" letter-spacing="1">UNO</text>' +
+    '<text x="132" y="54" font-size="6.5" fill="%23ffffff" font-family="Arial" font-weight="bold">ARDUINO</text>' +
+    '<text x="132" y="104" font-size="5" fill="%23ffffff" font-family="Arial" letter-spacing="0.5">MADE IN ITALY</text>'
   ),
   ARDUINO_MEGA: svg('0 0 280 120',
-    '<rect width="280" height="120" rx="6" fill="%230d6ebd"/>' +
-    '<rect x="6" y="6" width="24" height="24" rx="2" fill="%23c0c0c0"/>' +
-    '<rect x="6" y="100" width="268" height="12" rx="2" fill="%23111"/>' +
-    '<rect x="6" y="36" width="268" height="4" rx="1" fill="%23111"/>' +
-    '<text x="140" y="72" font-size="14" fill="white" font-weight="bold" text-anchor="middle" font-family="Arial">Arduino MEGA 2560</text>'
+    '<defs>' +
+      '<linearGradient id="mega_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2300979c"/><stop offset="100%25" stop-color="%23008184"/></linearGradient>' +
+      '<linearGradient id="mega_usb" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%2394a3b8"/><stop offset="35%25" stop-color="%23f8fafc"/><stop offset="70%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="mega_ic" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2327272a"/><stop offset="100%25" stop-color="%2318181b"/></linearGradient>' +
+    '</defs>' +
+    // PCB body
+    '<rect width="280" height="120" rx="7" fill="url(%23mega_pcb)" stroke="%23005f63" stroke-width="1.2"/>' +
+    // Mounting holes
+    '<circle cx="18" cy="10" r="3.8" fill="%23cbd5e1"/><circle cx="18" cy="10" r="2.2" fill="%23004649"/>' +
+    '<circle cx="18" cy="110" r="3.8" fill="%23cbd5e1"/><circle cx="18" cy="110" r="2.2" fill="%23004649"/>' +
+    '<circle cx="268" cy="10" r="3.8" fill="%23cbd5e1"/><circle cx="268" cy="10" r="2.2" fill="%23004649"/>' +
+    '<circle cx="268" cy="110" r="3.8" fill="%23cbd5e1"/><circle cx="268" cy="110" r="2.2" fill="%23004649"/>' +
+    // USB-B connector
+    '<rect x="0" y="18" width="26" height="24" rx="2" fill="url(%23mega_usb)" stroke="%23475569" stroke-width="0.8"/>' +
+    '<rect x="0" y="22" width="14" height="16" rx="1.5" fill="%23090d16"/>' +
+    '<rect x="2" y="26" width="8" height="2" fill="%23f59e0b"/><rect x="2" y="30" width="8" height="2" fill="%23f59e0b"/><rect x="2" y="34" width="8" height="2" fill="%23f59e0b"/>' +
+    // Barrel jack
+    '<rect x="0" y="72" width="28" height="24" rx="3" fill="%2318181b" stroke="%2327272a" stroke-width="1"/>' +
+    '<rect x="0" y="78" width="14" height="12" rx="2" fill="%2309090b"/>' +
+    '<circle cx="7" cy="84" r="4" fill="%2394a3b8"/><circle cx="7" cy="84" r="2" fill="%230f172a"/>' +
+    // Reset button
+    '<rect x="36" y="14" width="9" height="9" rx="1.5" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.6"/>' +
+    '<circle cx="40.5" cy="18.5" r="2.5" fill="%23ef4444" stroke="%23b91c1c" stroke-width="0.4"/>' +
+    '<text x="40.5" y="11" font-size="4" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">RST</text>' +
+    // Crystal oscillator
+    '<rect x="52" y="42" width="16" height="8" rx="4" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.6"/>' +
+    '<text x="60" y="48" font-size="3.5" fill="%23334155" font-family="Arial" font-weight="bold" text-anchor="middle">16.000</text>' +
+    // Status LEDs
+    '<rect x="32" y="28" width="3.5" height="2.5" rx="0.5" fill="%2318181b"/><text x="38" y="30.5" font-size="3.5" fill="%23ffffff" font-family="Arial">ON</text>' +
+    '<rect x="32" y="36" width="3.5" height="2.5" rx="0.5" fill="%2318181b"/><text x="38" y="38.5" font-size="3.5" fill="%23ffffff" font-family="Arial">L</text>' +
+    '<rect x="32" y="44" width="3.5" height="2.5" rx="0.5" fill="%2318181b"/><text x="38" y="46.5" font-size="3.5" fill="%23ffffff" font-family="Arial">TX</text>' +
+    '<rect x="32" y="52" width="3.5" height="2.5" rx="0.5" fill="%2318181b"/><text x="38" y="54.5" font-size="3.5" fill="%23ffffff" font-family="Arial">RX</text>' +
+    // ATmega2560 main IC
+    '<rect x="78" y="44" width="80" height="28" rx="2" fill="%230f172a" stroke="%23334155" stroke-width="0.8"/>' +
+    '<rect x="80" y="46" width="76" height="24" rx="1.5" fill="url(%23mega_ic)" stroke="%233f3f46" stroke-width="0.5"/>' +
+    '<path d="M 80 55 A 2.5 2.5 0 0 1 80 60 Z" fill="%230f172a"/>' +
+    '<text x="118" y="60" font-size="5.5" fill="%23d4d4d8" font-family="Arial" font-weight="bold" text-anchor="middle" letter-spacing="0.5">ATMEGA2560-16AU</text>' +
+    '<text x="118" y="66" font-size="3.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle">ATMEL 2430</text>' +
+    // ICSP header
+    '<rect x="264" y="50" width="10" height="14" rx="1" fill="%2318181b"/>' +
+    '<circle cx="267" cy="53" r="1" fill="%23f59e0b"/><circle cx="271" cy="53" r="1" fill="%23f59e0b"/>' +
+    '<circle cx="267" cy="57" r="1" fill="%23f59e0b"/><circle cx="271" cy="57" r="1" fill="%23f59e0b"/>' +
+    '<circle cx="267" cy="61" r="1" fill="%23f59e0b"/><circle cx="271" cy="61" r="1" fill="%23f59e0b"/>' +
+    '<text x="269" y="48" font-size="3.5" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">ICSP</text>' +
+    // Top digital pin header (54 pins = long row)
+    '<rect x="8" y="2" width="264" height="8" rx="1.2" fill="%2318181b" stroke="%2327272a" stroke-width="0.8"/>' +
+    Array.from({ length: 26 }, (_, i) => {
+      const x = 12 + i * (258 / 25);
+      return `<rect x="${(x - 1.5).toFixed(1)}" y="3.5" width="3" height="4" rx="0.5" fill="%2309090b" stroke="%233f3f46" stroke-width="0.4"/><circle cx="${x.toFixed(1)}" cy="5.5" r="0.7" fill="%23f59e0b" opacity="0.6"/>`;
+    }).join('') +
+    '<text x="140" y="16" font-size="4" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">DIGITAL (PWM ~) 0-53</text>' +
+    // Bottom analog/power pin header
+    '<rect x="8" y="110" width="264" height="8" rx="1.2" fill="%2318181b" stroke="%2327272a" stroke-width="0.8"/>' +
+    Array.from({ length: 18 }, (_, i) => {
+      const x = 12 + i * (258 / 17);
+      return `<rect x="${(x - 1.5).toFixed(1)}" y="112" width="3" height="4" rx="0.5" fill="%2309090b" stroke="%233f3f46" stroke-width="0.4"/><circle cx="${x.toFixed(1)}" cy="114" r="0.7" fill="%23f59e0b" opacity="0.6"/>`;
+    }).join('') +
+    '<text x="60" y="108" font-size="4" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">POWER</text>' +
+    '<text x="200" y="108" font-size="4" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">ANALOG IN A0-A15</text>' +
+    // Board labels
+    '<text x="200" y="38" font-size="14" fill="%23ffffff" font-family="Arial" font-weight="900" letter-spacing="1">MEGA</text>' +
+    '<text x="200" y="48" font-size="6.5" fill="%23ffffff" font-family="Arial" font-weight="bold">ARDUINO 2560</text>' +
+    '<text x="200" y="90" font-size="4.5" fill="%23ffffff" font-family="Arial" letter-spacing="0.5">MADE IN ITALY</text>'
   ),
   ARDUINO_NANO: svg('0 0 100 160',
-    '<rect width="100" height="160" rx="4" fill="%230d6ebd"/>' +
-    '<rect x="30" y="4" width="40" height="16" rx="2" fill="%23c0c0c0"/>' +
-    '<rect x="4" y="26" width="6" height="120" fill="%23111"/>' +
-    '<rect x="90" y="26" width="6" height="120" fill="%23111"/>' +
-    '<text x="50" y="90" font-size="11" fill="white" font-weight="bold" text-anchor="middle" font-family="Arial">NANO</text>'
+    '<defs>' +
+      '<linearGradient id="nano_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2300979c"/><stop offset="100%25" stop-color="%23008184"/></linearGradient>' +
+      '<linearGradient id="nano_usb" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%2394a3b8"/><stop offset="35%25" stop-color="%23f8fafc"/><stop offset="70%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect width="100" height="160" rx="4" fill="url(%23nano_pcb)" stroke="%23005f63" stroke-width="1"/>' +
+    // USB Mini connector
+    '<rect x="28" y="0" width="44" height="16" rx="2" fill="url(%23nano_usb)" stroke="%23475569" stroke-width="0.8"/>' +
+    '<rect x="34" y="0" width="32" height="8" rx="1.5" fill="%23090d16"/>' +
+    '<rect x="38" y="2" width="6" height="2" fill="%23f59e0b"/><rect x="46" y="2" width="6" height="2" fill="%23f59e0b"/><rect x="54" y="2" width="6" height="2" fill="%23f59e0b"/>' +
+    // Mounting holes
+    '<circle cx="10" cy="8" r="2.8" fill="%23cbd5e1"/><circle cx="10" cy="8" r="1.6" fill="%23004649"/>' +
+    '<circle cx="10" cy="152" r="2.8" fill="%23cbd5e1"/><circle cx="10" cy="152" r="1.6" fill="%23004649"/>' +
+    '<circle cx="90" cy="8" r="2.8" fill="%23cbd5e1"/><circle cx="90" cy="8" r="1.6" fill="%23004649"/>' +
+    '<circle cx="90" cy="152" r="2.8" fill="%23cbd5e1"/><circle cx="90" cy="152" r="1.6" fill="%23004649"/>' +
+    // ATmega328P IC
+    '<rect x="30" y="56" width="40" height="32" rx="2" fill="%230f172a" stroke="%23334155" stroke-width="0.7"/>' +
+    '<rect x="32" y="58" width="36" height="28" rx="1.5" fill="%2318181b" stroke="%233f3f46" stroke-width="0.4"/>' +
+    '<path d="M 32 68 A 2 2 0 0 1 32 74 Z" fill="%230f172a"/>' +
+    '<text x="50" y="74" font-size="5.5" fill="%23d4d4d8" font-family="Arial" font-weight="bold" text-anchor="middle">328P</text>' +
+    '<text x="50" y="80" font-size="3.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle">ATMEL</text>' +
+    // Crystal
+    '<rect x="40" y="44" width="12" height="6" rx="3" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.5"/>' +
+    '<text x="46" y="49" font-size="3" fill="%23334155" font-family="Arial" font-weight="bold" text-anchor="middle">16M</text>' +
+    // Reset button
+    '<rect x="72" y="22" width="8" height="8" rx="1" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.5"/>' +
+    '<circle cx="76" cy="26" r="2.5" fill="%23ef4444" stroke="%23b91c1c" stroke-width="0.4"/>' +
+    // Status LEDs
+    '<rect x="18" y="22" width="3" height="2" rx="0.4" fill="%2318181b"/><text x="22" y="24" font-size="3" fill="%23ffffff" font-family="Arial">ON</text>' +
+    '<rect x="18" y="28" width="3" height="2" rx="0.4" fill="%2318181b"/><text x="22" y="30" font-size="3" fill="%23ffffff" font-family="Arial">L</text>' +
+    '<rect x="18" y="34" width="3" height="2" rx="0.4" fill="%2318181b"/><text x="22" y="36" font-size="3" fill="%23ffffff" font-family="Arial">TX</text>' +
+    '<rect x="18" y="40" width="3" height="2" rx="0.4" fill="%2318181b"/><text x="22" y="42" font-size="3" fill="%23ffffff" font-family="Arial">RX</text>' +
+    // Left pin header
+    '<rect x="2" y="24" width="7" height="122" rx="1" fill="%2318181b" stroke="%2327272a" stroke-width="0.6"/>' +
+    Array.from({ length: 15 }, (_, i) => {
+      const y = 28 + i * 8;
+      return `<rect x="3.5" y="${y}" width="4" height="3.5" rx="0.5" fill="%2309090b" stroke="%233f3f46" stroke-width="0.3"/><circle cx="5.5" cy="${y + 1.75}" r="0.7" fill="%23f59e0b" opacity="0.6"/>`;
+    }).join('') +
+    // Right pin header
+    '<rect x="91" y="24" width="7" height="122" rx="1" fill="%2318181b" stroke="%2327272a" stroke-width="0.6"/>' +
+    Array.from({ length: 15 }, (_, i) => {
+      const y = 28 + i * 8;
+      return `<rect x="92.5" y="${y}" width="4" height="3.5" rx="0.5" fill="%2309090b" stroke="%233f3f46" stroke-width="0.3"/><circle cx="94.5" cy="${y + 1.75}" r="0.7" fill="%23f59e0b" opacity="0.6"/>`;
+    }).join('') +
+    // Labels
+    '<text x="50" y="102" font-size="12" fill="%23ffffff" font-family="Arial" font-weight="900" text-anchor="middle" letter-spacing="1">NANO</text>' +
+    '<text x="50" y="114" font-size="6" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">ARDUINO</text>' +
+    '<text x="50" y="135" font-size="4" fill="%23ffffff" font-family="Arial" text-anchor="middle" letter-spacing="0.5">V3.0 ATmega328P</text>'
   ),
   ESP32: svg('0 0 100 160',
-    '<rect width="100" height="160" rx="4" fill="%231a1a2e"/>' +
-    '<rect x="15" y="8" width="70" height="44" rx="2" fill="%23c0c0c0"/>' +
-    '<rect x="4" y="60" width="6" height="90" fill="%23b8860b"/>' +
-    '<rect x="90" y="60" width="6" height="90" fill="%23b8860b"/>' +
-    '<text x="50" y="120" font-size="14" fill="%2310b981" font-weight="bold" text-anchor="middle" font-family="Arial">ESP32</text>'
+    '<defs>' +
+      '<linearGradient id="esp_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23111827"/><stop offset="100%25" stop-color="%230a0f1a"/></linearGradient>' +
+      '<linearGradient id="esp_rf" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23374151"/><stop offset="50%25" stop-color="%231f2937"/><stop offset="100%25" stop-color="%23111827"/></linearGradient>' +
+    '</defs>' +
+    '<rect width="100" height="160" rx="4" fill="url(%23esp_pcb)" stroke="%23374151" stroke-width="1"/>' +
+    // RF shielded module at top
+    '<rect x="10" y="6" width="80" height="44" rx="3" fill="url(%23esp_rf)" stroke="%234b5563" stroke-width="0.8"/>' +
+    // Antenna pattern
+    '<rect x="32" y="2" width="36" height="12" rx="1" fill="%23111827" stroke="%234b5563" stroke-width="0.6"/>' +
+    '<path d="M 38 4 L 38 12 M 42 4 L 42 12 M 46 4 L 46 12 M 50 4 L 50 12 M 54 4 L 54 12 M 58 4 L 58 12 M 62 4 L 62 12" stroke="%2310b981" stroke-width="0.6" opacity="0.6"/>' +
+    '<path d="M 36 6 L 64 6 M 36 8 L 64 8 M 36 10 L 64 10" stroke="%2310b981" stroke-width="0.4" opacity="0.4"/>' +
+    // Module label
+    '<text x="50" y="28" font-size="6" fill="%23d1d5db" font-family="Arial" font-weight="bold" text-anchor="middle">ESP-WROOM-32</text>' +
+    '<text x="50" y="38" font-size="4" fill="%239ca3af" font-family="Arial" text-anchor="middle">FCC ID: 2AC7Z</text>' +
+    '<text x="50" y="46" font-size="3.5" fill="%236b7280" font-family="Arial" text-anchor="middle">Espressif Systems</text>' +
+    // USB Micro connector
+    '<rect x="33" y="150" width="34" height="10" rx="2" fill="%23c0c0c0" stroke="%23475569" stroke-width="0.7"/>' +
+    '<rect x="37" y="152" width="26" height="6" rx="1" fill="%23090d16"/>' +
+    // EN & BOOT buttons
+    '<rect x="16" y="56" width="10" height="6" rx="1" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<circle cx="21" cy="59" r="2" fill="%230f172a"/>' +
+    '<text x="21" y="54" font-size="3" fill="%2310b981" font-family="Arial" font-weight="bold" text-anchor="middle">EN</text>' +
+    '<rect x="74" y="56" width="10" height="6" rx="1" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<circle cx="79" cy="59" r="2" fill="%230f172a"/>' +
+    '<text x="79" y="54" font-size="3" fill="%2310b981" font-family="Arial" font-weight="bold" text-anchor="middle">BOOT</text>' +
+    // Power LED
+    '<rect x="42" y="58" width="3" height="2" rx="0.5" fill="%23ef4444"/>' +
+    '<text x="48" y="60" font-size="2.8" fill="%239ca3af" font-family="Arial">PWR</text>' +
+    // Left pin header
+    '<rect x="2" y="66" width="7" height="78" rx="1" fill="%2318181b" stroke="%2327272a" stroke-width="0.6"/>' +
+    Array.from({ length: 10 }, (_, i) => {
+      const y = 70 + i * 7.2;
+      return `<rect x="3.5" y="${y.toFixed(1)}" width="4" height="3.5" rx="0.5" fill="%2309090b" stroke="%233f3f46" stroke-width="0.3"/><circle cx="5.5" cy="${(y + 1.75).toFixed(1)}" r="0.7" fill="%23eab308" opacity="0.6"/>`;
+    }).join('') +
+    // Right pin header
+    '<rect x="91" y="66" width="7" height="78" rx="1" fill="%2318181b" stroke="%2327272a" stroke-width="0.6"/>' +
+    Array.from({ length: 10 }, (_, i) => {
+      const y = 70 + i * 7.2;
+      return `<rect x="92.5" y="${y.toFixed(1)}" width="4" height="3.5" rx="0.5" fill="%2309090b" stroke="%233f3f46" stroke-width="0.3"/><circle cx="94.5" cy="${(y + 1.75).toFixed(1)}" r="0.7" fill="%23eab308" opacity="0.6"/>`;
+    }).join('') +
+    // Board labels
+    '<text x="50" y="106" font-size="16" fill="%2310b981" font-family="Arial" font-weight="900" text-anchor="middle" letter-spacing="2">ESP32</text>' +
+    '<text x="50" y="118" font-size="5" fill="%239ca3af" font-family="Arial" text-anchor="middle">DevKitC V4</text>' +
+    '<text x="50" y="138" font-size="3.5" fill="%236b7280" font-family="Arial" text-anchor="middle">Dual Core 240MHz</text>'
   ),
   ESP32_S3: svg('0 0 100 160',
-    '<rect width="100" height="160" rx="4" fill="%231a1a2e"/>' +
-    '<rect x="15" y="8" width="70" height="44" rx="2" fill="%23c0c0c0"/>' +
-    '<rect x="4" y="60" width="6" height="90" fill="%23b8860b"/>' +
-    '<rect x="90" y="60" width="6" height="90" fill="%23b8860b"/>' +
-    '<text x="50" y="115" font-size="12" fill="%2310b981" font-weight="bold" text-anchor="middle" font-family="Arial">ESP32-S3</text>' +
-    '<text x="50" y="135" font-size="8" fill="%238b5cf6" text-anchor="middle" font-family="Arial">USB-OTG</text>'
+    '<defs>' +
+      '<linearGradient id="esp3_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23111827"/><stop offset="100%25" stop-color="%230a0f1a"/></linearGradient>' +
+      '<linearGradient id="esp3_rf" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23374151"/><stop offset="50%25" stop-color="%231f2937"/><stop offset="100%25" stop-color="%23111827"/></linearGradient>' +
+    '</defs>' +
+    '<rect width="100" height="160" rx="4" fill="url(%23esp3_pcb)" stroke="%23374151" stroke-width="1"/>' +
+    // RF shielded module at top
+    '<rect x="10" y="6" width="80" height="44" rx="3" fill="url(%23esp3_rf)" stroke="%234b5563" stroke-width="0.8"/>' +
+    // Antenna
+    '<rect x="32" y="2" width="36" height="12" rx="1" fill="%23111827" stroke="%234b5563" stroke-width="0.6"/>' +
+    '<path d="M 38 4 L 38 12 M 42 4 L 42 12 M 46 4 L 46 12 M 50 4 L 50 12 M 54 4 L 54 12 M 58 4 L 58 12 M 62 4 L 62 12" stroke="%238b5cf6" stroke-width="0.6" opacity="0.6"/>' +
+    '<path d="M 36 6 L 64 6 M 36 8 L 64 8 M 36 10 L 64 10" stroke="%238b5cf6" stroke-width="0.4" opacity="0.4"/>' +
+    // Module label
+    '<text x="50" y="28" font-size="5.5" fill="%23d1d5db" font-family="Arial" font-weight="bold" text-anchor="middle">ESP32-S3-WROOM</text>' +
+    '<text x="50" y="38" font-size="4" fill="%239ca3af" font-family="Arial" text-anchor="middle">FCC: 2AC7Z-S3</text>' +
+    '<text x="50" y="46" font-size="3.5" fill="%236b7280" font-family="Arial" text-anchor="middle">Espressif Systems</text>' +
+    // USB-C connector
+    '<rect x="33" y="150" width="34" height="10" rx="3" fill="%23c0c0c0" stroke="%23475569" stroke-width="0.7"/>' +
+    '<rect x="37" y="152" width="26" height="6" rx="2" fill="%23090d16"/>' +
+    '<text x="50" y="156.5" font-size="3" fill="%238b5cf6" font-family="Arial" font-weight="bold" text-anchor="middle">USB-C</text>' +
+    // Buttons
+    '<rect x="16" y="56" width="10" height="6" rx="1" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<circle cx="21" cy="59" r="2" fill="%230f172a"/>' +
+    '<text x="21" y="54" font-size="3" fill="%238b5cf6" font-family="Arial" font-weight="bold" text-anchor="middle">RST</text>' +
+    '<rect x="74" y="56" width="10" height="6" rx="1" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<circle cx="79" cy="59" r="2" fill="%230f172a"/>' +
+    '<text x="79" y="54" font-size="3" fill="%238b5cf6" font-family="Arial" font-weight="bold" text-anchor="middle">BOOT</text>' +
+    // Addressable RGB LED
+    '<rect x="42" y="58" width="3" height="2" rx="0.5" fill="%238b5cf6"/>' +
+    '<text x="48" y="60" font-size="2.8" fill="%239ca3af" font-family="Arial">RGB</text>' +
+    // Left pin header
+    '<rect x="2" y="66" width="7" height="78" rx="1" fill="%2318181b" stroke="%2327272a" stroke-width="0.6"/>' +
+    Array.from({ length: 10 }, (_, i) => {
+      const y = 70 + i * 7.2;
+      return `<rect x="3.5" y="${y.toFixed(1)}" width="4" height="3.5" rx="0.5" fill="%2309090b" stroke="%233f3f46" stroke-width="0.3"/><circle cx="5.5" cy="${(y + 1.75).toFixed(1)}" r="0.7" fill="%23eab308" opacity="0.6"/>`;
+    }).join('') +
+    // Right pin header
+    '<rect x="91" y="66" width="7" height="78" rx="1" fill="%2318181b" stroke="%2327272a" stroke-width="0.6"/>' +
+    Array.from({ length: 10 }, (_, i) => {
+      const y = 70 + i * 7.2;
+      return `<rect x="92.5" y="${y.toFixed(1)}" width="4" height="3.5" rx="0.5" fill="%2309090b" stroke="%233f3f46" stroke-width="0.3"/><circle cx="94.5" cy="${(y + 1.75).toFixed(1)}" r="0.7" fill="%23eab308" opacity="0.6"/>`;
+    }).join('') +
+    // Board labels
+    '<text x="50" y="102" font-size="13" fill="%2310b981" font-family="Arial" font-weight="900" text-anchor="middle" letter-spacing="1">ESP32-S3</text>' +
+    '<text x="50" y="116" font-size="5" fill="%238b5cf6" font-family="Arial" font-weight="bold" text-anchor="middle">USB-OTG</text>' +
+    '<text x="50" y="130" font-size="3.5" fill="%236b7280" font-family="Arial" text-anchor="middle">Xtensa LX7 240MHz</text>'
+  ),
+  ESP8266: svg('0 0 95 150',
+    '<defs>' +
+      '<linearGradient id="esp8266_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%231e293b"/><stop offset="100%25" stop-color="%230f172a"/></linearGradient>' +
+      '<linearGradient id="esp8266_rf" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23cbd5e1"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    // PCB Body
+    '<rect width="95" height="150" rx="5" fill="url(%23esp8266_pcb)" stroke="%23334155" stroke-width="1"/>' +
+    // 4 Corner mounting holes
+    '<circle cx="8" cy="8" r="2.8" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.5"/>' +
+    '<circle cx="87" cy="8" r="2.8" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.5"/>' +
+    '<circle cx="8" cy="142" r="2.8" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.5"/>' +
+    '<circle cx="87" cy="142" r="2.8" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.5"/>' +
+    // Meandering gold PCB antenna at top
+    '<rect x="25" y="4" width="45" height="18" rx="1.5" fill="%231e293b" stroke="%23b45309" stroke-width="0.5"/>' +
+    '<path d="M 28 8 L 67 8 M 32 8 L 32 18 M 38 8 L 38 18 M 44 8 L 44 18 M 50 8 L 50 18 M 56 8 L 56 18 M 62 8 L 62 18" stroke="%23f59e0b" stroke-width="1.2" stroke-linecap="round"/>' +
+    // ESP-12E RF Shielding Can
+    '<rect x="18" y="24" width="59" height="52" rx="2" fill="url(%23esp8266_rf)" stroke="%23475569" stroke-width="0.8"/>' +
+    '<circle cx="23" cy="29" r="1.5" fill="%23475569"/>' +
+    '<text x="47.5" y="40" font-size="5.5" fill="%231e293b" font-family="Arial" font-weight="900" text-anchor="middle">AI-THINKER</text>' +
+    '<text x="47.5" y="48" font-size="4.2" fill="%23334155" font-family="Arial" font-weight="bold" text-anchor="middle">ESP8266MOD</text>' +
+    '<text x="47.5" y="55" font-size="3" fill="%23475569" font-family="Arial" text-anchor="middle">ISM 2.4GHz</text>' +
+    '<text x="47.5" y="61" font-size="2.6" fill="%23475569" font-family="Arial" text-anchor="middle">FCC ID: 2ADUIESP-12</text>' +
+    // CP2102 USB-to-UART chip
+    '<rect x="36" y="90" width="23" height="23" rx="1.5" fill="%2309090b" stroke="%2327272a" stroke-width="0.6"/>' +
+    '<circle cx="40" cy="94" r="0.8" fill="%2371717a"/>' +
+    '<text x="47.5" y="100" font-size="3.5" fill="%23e4e4e7" font-family="Arial" font-weight="bold" text-anchor="middle">SILABS</text>' +
+    '<text x="47.5" y="105" font-size="3" fill="%23a1a1aa" font-family="Arial" text-anchor="middle">CP2102</text>' +
+    // Micro-USB connector at bottom
+    '<rect x="31" y="140" width="33" height="10" rx="2" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.8"/>' +
+    '<rect x="36" y="142" width="23" height="6" rx="1" fill="%230f172a"/>' +
+    // Flash & Reset buttons
+    '<rect x="18" y="124" width="8" height="8" rx="1" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<circle cx="22" cy="128" r="2.2" fill="%23ef4444"/>' +
+    '<text x="22" y="121" font-size="2.6" fill="%23f87171" font-family="Arial" font-weight="bold" text-anchor="middle">RST</text>' +
+    '<rect x="69" y="124" width="8" height="8" rx="1" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<circle cx="73" cy="128" r="2.2" fill="%230f172a"/>' +
+    '<text x="73" y="121" font-size="2.6" fill="%2394a3b8" font-family="Arial" font-weight="bold" text-anchor="middle">FLASH</text>' +
+    // Left pin header: y = 15, 30, 45, 60, 75, 90, 105, 120 at x=0
+    '<rect x="1" y="10" width="7" height="116" rx="1" fill="%230f172a" stroke="%23334155" stroke-width="0.5"/>' +
+    [15, 30, 45, 60, 75, 90, 105, 120].map((y, i) => {
+      const labels = ['A0', 'GND', 'D0', 'D1', 'D2', 'D3', 'D4', '3V3'];
+      return `<circle cx="4.5" cy="${y}" r="2" fill="%23f59e0b" stroke="%23b45309" stroke-width="0.3"/><circle cx="4.5" cy="${y}" r="0.9" fill="%230f172a"/><text x="10" y="${y + 2}" font-size="3" fill="%2394a3b8" font-family="Arial" font-weight="bold">${labels[i]}</text>`;
+    }).join('') +
+    // Right pin header: y = 15, 30, 45, 60, 75, 90, 105, 120 at x=95
+    '<rect x="87" y="10" width="7" height="116" rx="1" fill="%230f172a" stroke="%23334155" stroke-width="0.5"/>' +
+    [15, 30, 45, 60, 75, 90, 105, 120].map((y, i) => {
+      const labels = ['VIN', 'GND', 'D5', 'D6', 'D7', 'D8', 'RX', 'TX'];
+      return `<circle cx="90.5" cy="${y}" r="2" fill="%23f59e0b" stroke="%23b45309" stroke-width="0.3"/><circle cx="90.5" cy="${y}" r="0.9" fill="%230f172a"/><text x="85" y="${y + 2}" font-size="3" fill="%2394a3b8" font-family="Arial" font-weight="bold" text-anchor="end">${labels[i]}</text>`;
+    }).join('') +
+    // Board label
+    '<text x="47.5" y="84" font-size="5" fill="%2338bdf8" font-family="Arial" font-weight="900" text-anchor="middle" letter-spacing="1">NodeMCU V3</text>'
+  ),
+  RASPBERRY_PI_PICO: svg('0 0 100 180',
+    '<defs>' +
+      '<linearGradient id="pico_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23059669"/><stop offset="50%25" stop-color="%23047857"/><stop offset="100%25" stop-color="%23064e3b"/></linearGradient>' +
+      '<linearGradient id="pico_usb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23e2e8f0"/><stop offset="50%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+    '</defs>' +
+    // Green PCB with rounded corners
+    '<rect width="100" height="180" rx="6" fill="url(%23pico_pcb)" stroke="%23064e3b" stroke-width="1.2"/>' +
+    // 4 Corner mounting holes
+    '<circle cx="8" cy="18" r="2.8" fill="%23022c22" stroke="%2334d399" stroke-width="0.5"/>' +
+    '<circle cx="92" cy="18" r="2.8" fill="%23022c22" stroke="%2334d399" stroke-width="0.5"/>' +
+    '<circle cx="8" cy="162" r="2.8" fill="%23022c22" stroke="%2334d399" stroke-width="0.5"/>' +
+    '<circle cx="92" cy="162" r="2.8" fill="%23022c22" stroke="%2334d399" stroke-width="0.5"/>' +
+    // Micro-USB at top
+    '<rect x="36" y="0" width="28" height="14" rx="2" fill="url(%23pico_usb)" stroke="%23475569" stroke-width="0.8"/>' +
+    '<rect x="40" y="0" width="20" height="8" rx="1.5" fill="%23090d16"/>' +
+    // RP2040 Chip rotated at 45° in the middle
+    '<g transform="translate(50, 95) rotate(45)">' +
+      '<rect x="-14" y="-14" width="28" height="28" rx="2" fill="%230f172a" stroke="%23334155" stroke-width="0.8"/>' +
+      '<circle cx="-10" cy="-10" r="1" fill="%2371717a"/>' +
+      '<text x="0" y="-1" font-size="4" fill="%23e2e8f0" font-family="Arial" font-weight="900" text-anchor="middle">RP2040</text>' +
+      '<text x="0" y="5" font-size="2.6" fill="%2394a3b8" font-family="Arial" text-anchor="middle">Raspberry Pi</text>' +
+    '</g>' +
+    // Winbond SPI Flash IC
+    '<rect x="41" y="42" width="18" height="14" rx="1" fill="%2318181b" stroke="%23334155" stroke-width="0.6"/>' +
+    '<text x="50" y="50" font-size="2.6" fill="%23a1a1aa" font-family="Arial" text-anchor="middle">W25Q16JV</text>' +
+    // BOOTSEL push-button
+    '<rect x="22" y="38" width="10" height="8" rx="1" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.5"/>' +
+    '<circle cx="27" cy="42" r="2.5" fill="%23ffffff"/>' +
+    '<text x="27" y="35" font-size="2.6" fill="%23a7f3d0" font-family="Arial" font-weight="bold" text-anchor="middle">BOOTSEL</text>' +
+    // 12MHz crystal
+    '<rect x="68" y="38" width="12" height="7" rx="3.5" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.5"/>' +
+    '<text x="74" y="43" font-size="2.6" fill="%23334155" font-family="Arial" text-anchor="middle">12MHz</text>' +
+    // Debug 3-pin SWD header at bottom
+    '<rect x="40" y="162" width="20" height="7" rx="1" fill="%230f172a"/>' +
+    '<circle cx="44" cy="165.5" r="1.2" fill="%23f59e0b"/><circle cx="50" cy="165.5" r="1.2" fill="%23f59e0b"/><circle cx="56" cy="165.5" r="1.2" fill="%23f59e0b"/>' +
+    '<text x="50" y="176" font-size="2.6" fill="%23a7f3d0" font-family="Arial" text-anchor="middle">DEBUG</text>' +
+    // Left castellated pins: 20 pins, y = 10 + i * 8.4 at x=0
+    Array.from({ length: 20 }, (_, i) => {
+      const y = 10 + i * 8.4;
+      return `<path d="M 0 ${(y - 2.5).toFixed(1)} L 5 ${(y - 2.5).toFixed(1)} A 2.5 2.5 0 0 1 5 ${(y + 2.5).toFixed(1)} L 0 ${(y + 2.5).toFixed(1)} Z" fill="%23eab308" stroke="%23ca8a04" stroke-width="0.3"/><circle cx="5" cy="${y.toFixed(1)}" r="1.2" fill="%23064e3b"/>`;
+    }).join('') +
+    // Right castellated pins: 20 pins, y = 10 + i * 8.4 at x=100
+    Array.from({ length: 20 }, (_, i) => {
+      const y = 10 + i * 8.4;
+      return `<path d="M 100 ${(y - 2.5).toFixed(1)} L 95 ${(y - 2.5).toFixed(1)} A 2.5 2.5 0 0 0 95 ${(y + 2.5).toFixed(1)} L 100 ${(y + 2.5).toFixed(1)} Z" fill="%23eab308" stroke="%23ca8a04" stroke-width="0.3"/><circle cx="95" cy="${y.toFixed(1)}" r="1.2" fill="%23064e3b"/>`;
+    }).join('') +
+    // Raspberry Pi logo & text
+    '<text x="50" y="138" font-size="7" fill="%23ffffff" font-family="Arial" font-weight="900" text-anchor="middle">Raspberry Pi Pico</text>' +
+    '<text x="50" y="146" font-size="4" fill="%23a7f3d0" font-family="Arial" text-anchor="middle">\u00A9 2020 RP2040</text>'
+  ),
+  STM32_BLUE_PILL: svg('0 0 110 170',
+    '<defs>' +
+      '<linearGradient id="stm_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%231d4ed8"/><stop offset="50%25" stop-color="%231e40af"/><stop offset="100%25" stop-color="%23172554"/></linearGradient>' +
+      '<linearGradient id="stm_ic" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2327272a"/><stop offset="100%25" stop-color="%2318181b"/></linearGradient>' +
+    '</defs>' +
+    // Blue PCB
+    '<rect width="110" height="170" rx="5" fill="url(%23stm_pcb)" stroke="%231e3a8a" stroke-width="1.2"/>' +
+    // Micro-USB connector at top center
+    '<rect x="41" y="0" width="28" height="14" rx="2" fill="%23cbd5e1" stroke="%23475569" stroke-width="0.8"/>' +
+    '<rect x="45" y="0" width="20" height="8" rx="1.5" fill="%230f172a"/>' +
+    // Reset tactile button
+    '<rect x="22" y="18" width="8" height="8" rx="1" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<circle cx="26" cy="22" r="2.2" fill="%23ef4444"/>' +
+    '<text x="26" y="31" font-size="2.6" fill="%23bfdbfe" font-family="Arial" text-anchor="middle">RESET</text>' +
+    // Yellow BOOT0 and BOOT1 jumpers
+    '<rect x="76" y="16" width="12" height="18" rx="1" fill="%23eab308" stroke="%23ca8a04" stroke-width="0.6"/>' +
+    '<circle cx="80" cy="20" r="1" fill="%230f172a"/><circle cx="84" cy="20" r="1" fill="%230f172a"/>' +
+    '<circle cx="80" cy="25" r="1" fill="%230f172a"/><circle cx="84" cy="25" r="1" fill="%230f172a"/>' +
+    '<circle cx="80" cy="30" r="1" fill="%230f172a"/><circle cx="84" cy="30" r="1" fill="%230f172a"/>' +
+    '<text x="82" y="14" font-size="2.6" fill="%23fef08a" font-family="Arial" font-weight="bold" text-anchor="middle">BOOT</text>' +
+    // STM32F103C8T6 48-pin LQFP IC in center
+    '<rect x="36" y="60" width="38" height="38" rx="2" fill="url(%23stm_ic)" stroke="%233f3f46" stroke-width="0.8"/>' +
+    '<circle cx="41" cy="65" r="1.2" fill="%2371717a"/>' +
+    '<text x="55" y="75" font-size="4.2" fill="%23f4f4f5" font-family="Arial" font-weight="bold" text-anchor="middle">STM32F103</text>' +
+    '<text x="55" y="81" font-size="3.5" fill="%23cbd5e1" font-family="Arial" text-anchor="middle">C8T6 ARM</text>' +
+    '<text x="55" y="88" font-size="3" fill="%2394a3b8" font-family="Arial" text-anchor="middle">ST Micro</text>' +
+    // 8.000MHz main crystal
+    '<rect x="44" y="44" width="22" height="8" rx="4" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.5"/>' +
+    '<text x="55" y="50" font-size="3" fill="%23334155" font-family="Arial" font-weight="bold" text-anchor="middle">8.000 MHz</text>' +
+    // 32.768kHz RTC cylindrical crystal
+    '<rect x="25" y="70" width="5" height="16" rx="2.5" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.4"/>' +
+    // SWD 4-pin programming header at bottom
+    '<rect x="38" y="152" width="34" height="8" rx="1" fill="%231e293b"/>' +
+    '<circle cx="43" cy="156" r="1.4" fill="%23f59e0b"/><circle cx="51" cy="156" r="1.4" fill="%23f59e0b"/><circle cx="59" cy="156" r="1.4" fill="%23f59e0b"/><circle cx="67" cy="156" r="1.4" fill="%23f59e0b"/>' +
+    '<text x="55" y="167" font-size="2.6" fill="%2393c5fd" font-family="Arial" text-anchor="middle">3.3V  DIO  CLK  GND</text>' +
+    // Left header (14 pins): y = 12 + i * 10 at x=0
+    '<rect x="1" y="7" width="8" height="142" rx="1" fill="%230f172a" stroke="%23334155" stroke-width="0.5"/>' +
+    Array.from({ length: 14 }, (_, i) => {
+      const y = 12 + i * 10;
+      return `<circle cx="5" cy="${y}" r="2" fill="%23f59e0b" stroke="%23b45309" stroke-width="0.3"/><circle cx="5" cy="${y}" r="0.9" fill="%230f172a"/>`;
+    }).join('') +
+    // Right header (15 pins): y = 12 + i * 10 at x=110
+    '<rect x="101" y="7" width="8" height="152" rx="1" fill="%230f172a" stroke="%23334155" stroke-width="0.5"/>' +
+    Array.from({ length: 15 }, (_, i) => {
+      const y = 12 + i * 10;
+      return `<circle cx="105" cy="${y}" r="2" fill="%23f59e0b" stroke="%23b45309" stroke-width="0.3"/><circle cx="105" cy="${y}" r="0.9" fill="%230f172a"/>`;
+    }).join('') +
+    // Board text
+    '<text x="55" y="112" font-size="6" fill="%23ffffff" font-family="Arial" font-weight="900" text-anchor="middle">STM32 Blue Pill</text>' +
+    '<text x="55" y="120" font-size="3.5" fill="%2393c5fd" font-family="Arial" text-anchor="middle">Cortex-M3 72MHz</text>'
   ),
 
   // ── LEDs ──
   LED_STANDARD: svg('0 0 40 80',
-    '<defs><radialGradient id="lg"><stop offset="0%25" stop-color="white" stop-opacity="0.6"/><stop offset="100%25" stop-color="%23ef4444" stop-opacity="0.9"/></radialGradient></defs>' +
-    '<ellipse cx="20" cy="22" rx="14" ry="18" fill="url(%23lg)"/>' +
-    '<rect x="6" y="36" width="28" height="8" rx="2" fill="%23991b1b"/>' +
-    '<rect x="14" y="44" width="3" height="30" fill="%23a0a0a0"/>' +
-    '<rect x="23" y="44" width="3" height="36" fill="%23a0a0a0"/>'
+    '<defs>' +
+      '<linearGradient id="led_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="led_glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0%25" stop-color="%23fca5a5" stop-opacity="0.85"/><stop offset="35%25" stop-color="%23ef4444" stop-opacity="0.75"/><stop offset="100%25" stop-color="%23991b1b" stop-opacity="0.9"/></linearGradient>' +
+    '</defs>' +
+    '<path d="M 15 42 L 15 50 L 14 53 L 14 57 L 15 60 L 15 80 L 17.2 80 L 17.2 60 L 16.2 57 L 16.2 53 L 17.2 50 L 17.2 42 Z" fill="url(%23led_lead)"/>' +
+    '<path d="M 23 42 L 23 80 L 25.2 80 L 25.2 42 Z" fill="url(%23led_lead)"/>' +
+    '<rect x="15" y="27" width="2.2" height="15" fill="%23cbd5e1" stroke="%2394a3b8" stroke-width="0.4"/>' +
+    '<path d="M 22.8 42 L 22.8 28 L 20 24 L 25.5 24 L 25 42 Z" fill="%23e2e8f0" stroke="%2394a3b8" stroke-width="0.4"/>' +
+    '<rect x="21.5" y="24" width="2" height="1.8" fill="%23fbbf24"/>' +
+    '<path d="M 16.5 27 Q 18.5 20.5 22 24" fill="none" stroke="%23f59e0b" stroke-width="0.6" stroke-linecap="round"/>' +
+    '<path d="M 7 38 L 7 42 L 31 42 L 31 38 Z" fill="url(%23led_glass)" stroke="%237f1d1d" stroke-width="0.6"/>' +
+    '<line x1="31" y1="38" x2="31" y2="42" stroke="%23fca5a5" stroke-width="1.2"/>' +
+    '<path d="M 9 24 C 9 13.5 13.5 8 20 8 C 26.5 8 31 13.5 31 24 L 31 38 L 9 38 Z" fill="url(%23led_glass)" stroke="%23991b1b" stroke-width="0.8"/>' +
+    '<path d="M 13 15 C 15 11 18 9.5 22 9.5" fill="none" stroke="%23ffffff" stroke-width="1.4" stroke-linecap="round" opacity="0.75"/>' +
+    '<ellipse cx="14" cy="22" rx="1.5" ry="5" fill="%23ffffff" opacity="0.35"/>'
   ),
   LED_RGB: svg('0 0 50 80',
-    '<defs><radialGradient id="rg"><stop offset="0%25" stop-color="white" stop-opacity="0.8"/><stop offset="100%25" stop-color="%23e0e0e0" stop-opacity="0.3"/></radialGradient></defs>' +
-    '<ellipse cx="25" cy="20" rx="16" ry="18" fill="url(%23rg)" stroke="%23ccc" stroke-width="0.5"/>' +
-    '<rect x="9" y="34" width="32" height="8" rx="2" fill="%239ca3af"/>' +
-    '<rect x="13" y="42" width="2" height="32" fill="%23ef4444"/>' +
-    '<rect x="20" y="42" width="2" height="36" fill="%2322c55e"/>' +
-    '<rect x="27" y="42" width="2" height="32" fill="%233b82f6"/>' +
-    '<rect x="34" y="42" width="2" height="28" fill="%23666"/>'
+    '<defs>' +
+      '<linearGradient id="rgb_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="rgb_glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0%25" stop-color="%23ffffff" stop-opacity="0.95"/><stop offset="40%25" stop-color="%23f1f5f9" stop-opacity="0.8"/><stop offset="100%25" stop-color="%23cbd5e1" stop-opacity="0.85"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="13" y="42" width="2" height="38" fill="url(%23rgb_lead)"/>' +
+    '<rect x="20" y="42" width="2" height="38" fill="url(%23rgb_lead)"/>' +
+    '<rect x="27" y="42" width="2" height="38" fill="url(%23rgb_lead)"/>' +
+    '<rect x="34" y="42" width="2" height="38" fill="url(%23rgb_lead)"/>' +
+    '<rect x="13" y="28" width="2" height="14" fill="%23cbd5e1"/>' +
+    '<path d="M 20 42 L 20 26 L 18 22 L 31 22 L 29 26 L 22 26 L 22 42 Z" fill="%23e2e8f0"/>' +
+    '<rect x="27" y="28" width="2" height="14" fill="%23cbd5e1"/>' +
+    '<rect x="34" y="28" width="2" height="14" fill="%23cbd5e1"/>' +
+    '<rect x="20" y="22" width="2" height="1.8" fill="%23ef4444"/>' +
+    '<rect x="24" y="22" width="2" height="1.8" fill="%2322c55e"/>' +
+    '<rect x="28" y="22" width="2" height="1.8" fill="%233b82f6"/>' +
+    '<path d="M 10 38 L 10 42 L 40 42 L 40 38 Z" fill="url(%23rgb_glass)" stroke="%2394a3b8" stroke-width="0.6"/>' +
+    '<path d="M 12 24 C 12 13 17 7 25 7 C 33 7 38 13 38 24 L 38 38 L 12 38 Z" fill="url(%23rgb_glass)" stroke="%2394a3b8" stroke-width="0.8"/>' +
+    '<path d="M 16 14 C 18 10 22 8.5 27 8.5" fill="none" stroke="%23ffffff" stroke-width="1.5" stroke-linecap="round" opacity="0.85"/>'
   ),
   // ── Sensors ──
+  // ── Sensors ──
   SENSOR_PIR: svg('0 0 60 70',
-    '<rect x="5" y="20" width="50" height="50" rx="4" fill="%23059669"/>' +
-    '<circle cx="30" cy="28" r="18" fill="%23f8fafc" opacity="0.9"/>' +
-    '<circle cx="30" cy="28" r="10" fill="%23e2e8f0" opacity="0.7"/>' +
-    '<rect x="14" y="64" width="6" height="6" fill="%23b8860b"/>' +
-    '<rect x="27" y="64" width="6" height="6" fill="%23b8860b"/>' +
-    '<rect x="40" y="64" width="6" height="6" fill="%23b8860b"/>'
+    '<defs>' +
+      '<linearGradient id="pir_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23059669"/><stop offset="50%25" stop-color="%23047857"/><stop offset="100%25" stop-color="%23064e3b"/></linearGradient>' +
+      '<radialGradient id="pir_dome" cx="40%25" cy="40%25" r="60%25"><stop offset="0%25" stop-color="%23ffffff"/><stop offset="50%25" stop-color="%23f1f5f9"/><stop offset="85%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></radialGradient>' +
+      '<linearGradient id="pir_pin" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    // PCB
+    '<rect x="2" y="8" width="56" height="58" rx="3.5" fill="url(%23pir_pcb)" stroke="%23064e3b" stroke-width="0.8"/>' +
+    // Corner mounting holes
+    '<circle cx="6" cy="12" r="1.5" fill="%23022c22" stroke="%2334d399" stroke-width="0.3"/>' +
+    '<circle cx="54" cy="12" r="1.5" fill="%23022c22" stroke="%2334d399" stroke-width="0.3"/>' +
+    '<circle cx="6" cy="62" r="1.5" fill="%23022c22" stroke="%2334d399" stroke-width="0.3"/>' +
+    '<circle cx="54" cy="62" r="1.5" fill="%23022c22" stroke="%2334d399" stroke-width="0.3"/>' +
+    // Trimpots (Time & Sensitivity)
+    '<rect x="6" y="24" width="7" height="12" rx="1" fill="%23ea580c" stroke="%239a3412" stroke-width="0.5"/>' +
+    '<circle cx="9.5" cy="30" r="2.2" fill="%23e2e8f0" stroke="%23475569" stroke-width="0.3"/><line x1="8" y1="30" x2="11" y2="30" stroke="%230f172a" stroke-width="0.6"/>' +
+    '<text x="9.5" y="22" font-size="3" fill="%236ee7b7" font-family="Arial" font-weight="bold" text-anchor="middle">Tx</text>' +
+    '<rect x="47" y="24" width="7" height="12" rx="1" fill="%23ea580c" stroke="%239a3412" stroke-width="0.5"/>' +
+    '<circle cx="50.5" cy="30" r="2.2" fill="%23e2e8f0" stroke="%23475569" stroke-width="0.3"/><line x1="49" y1="30" x2="52" y2="30" stroke="%230f172a" stroke-width="0.6"/>' +
+    '<text x="50.5" y="22" font-size="3" fill="%236ee7b7" font-family="Arial" font-weight="bold" text-anchor="middle">Sx</text>' +
+    // Fresnel lens dome
+    '<circle cx="30" cy="32" r="19" fill="url(%23pir_dome)" stroke="%2394a3b8" stroke-width="0.8"/>' +
+    '<circle cx="30" cy="32" r="14" fill="none" stroke="%2394a3b8" stroke-width="0.5" opacity="0.6"/>' +
+    '<circle cx="30" cy="32" r="9" fill="none" stroke="%2394a3b8" stroke-width="0.5" opacity="0.6"/>' +
+    '<circle cx="30" cy="32" r="4" fill="none" stroke="%2394a3b8" stroke-width="0.5" opacity="0.7"/>' +
+    '<path d="M 14 32 L 46 32 M 30 16 L 30 48 M 19 21 L 41 43 M 19 43 L 41 21" stroke="%23cbd5e1" stroke-width="0.4" opacity="0.5"/>' +
+    '<path d="M 20 22 Q 28 17 38 22" fill="none" stroke="%23ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.7"/>' +
+    // Bottom 3-pin header: VCC (17, 70), OUT (30, 70), GND (43, 70)
+    '<rect x="12" y="56" width="36" height="7" rx="1" fill="%231e293b"/>' +
+    [17, 30, 43].map((x) =>
+      `<rect x="${x - 1.5}" y="60" width="3" height="10" rx="0.5" fill="url(%23pir_pin)"/>` +
+      `<circle cx="${x}" cy="69" r="1.5" fill="%23475569"/>`
+    ).join('') +
+    '<text x="17" y="54" font-size="3" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">VCC</text>' +
+    '<text x="30" y="54" font-size="3" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">OUT</text>' +
+    '<text x="43" y="54" font-size="3" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">GND</text>'
   ),
   PIR_SENSOR: svg('0 0 60 70',
-    '<rect x="5" y="20" width="50" height="50" rx="4" fill="%23059669"/>' +
-    '<circle cx="30" cy="28" r="18" fill="%23f8fafc" opacity="0.9"/>' +
-    '<path d="M18 28a12 12 0 0 1 24 0M22 28a8 8 0 0 1 16 0M26 28a4 4 0 0 1 8 0" stroke="%23cbd5e1" stroke-width="1.5" fill="none"/>' +
-    '<rect x="14" y="64" width="6" height="6" fill="%23b8860b"/>' +
-    '<rect x="27" y="64" width="6" height="6" fill="%23b8860b"/>' +
-    '<rect x="40" y="64" width="6" height="6" fill="%23b8860b"/>'
+    '<defs>' +
+      '<linearGradient id="pir_pcb2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23059669"/><stop offset="50%25" stop-color="%23047857"/><stop offset="100%25" stop-color="%23064e3b"/></linearGradient>' +
+      '<radialGradient id="pir_dome2" cx="40%25" cy="40%25" r="60%25"><stop offset="0%25" stop-color="%23ffffff"/><stop offset="50%25" stop-color="%23f1f5f9"/><stop offset="85%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></radialGradient>' +
+      '<linearGradient id="pir_pin2" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="8" width="56" height="58" rx="3.5" fill="url(%23pir_pcb2)" stroke="%23064e3b" stroke-width="0.8"/>' +
+    '<circle cx="6" cy="12" r="1.5" fill="%23022c22" stroke="%2334d399" stroke-width="0.3"/>' +
+    '<circle cx="54" cy="12" r="1.5" fill="%23022c22" stroke="%2334d399" stroke-width="0.3"/>' +
+    '<circle cx="6" cy="62" r="1.5" fill="%23022c22" stroke="%2334d399" stroke-width="0.3"/>' +
+    '<circle cx="54" cy="62" r="1.5" fill="%23022c22" stroke="%2334d399" stroke-width="0.3"/>' +
+    '<rect x="6" y="24" width="7" height="12" rx="1" fill="%23ea580c" stroke="%239a3412" stroke-width="0.5"/>' +
+    '<circle cx="9.5" cy="30" r="2.2" fill="%23e2e8f0" stroke="%23475569" stroke-width="0.3"/><line x1="8" y1="30" x2="11" y2="30" stroke="%230f172a" stroke-width="0.6"/>' +
+    '<text x="9.5" y="22" font-size="3" fill="%236ee7b7" font-family="Arial" font-weight="bold" text-anchor="middle">Tx</text>' +
+    '<rect x="47" y="24" width="7" height="12" rx="1" fill="%23ea580c" stroke="%239a3412" stroke-width="0.5"/>' +
+    '<circle cx="50.5" cy="30" r="2.2" fill="%23e2e8f0" stroke="%23475569" stroke-width="0.3"/><line x1="49" y1="30" x2="52" y2="30" stroke="%230f172a" stroke-width="0.6"/>' +
+    '<text x="50.5" y="22" font-size="3" fill="%236ee7b7" font-family="Arial" font-weight="bold" text-anchor="middle">Sx</text>' +
+    '<circle cx="30" cy="32" r="19" fill="url(%23pir_dome2)" stroke="%2394a3b8" stroke-width="0.8"/>' +
+    '<circle cx="30" cy="32" r="14" fill="none" stroke="%2394a3b8" stroke-width="0.5" opacity="0.6"/>' +
+    '<circle cx="30" cy="32" r="9" fill="none" stroke="%2394a3b8" stroke-width="0.5" opacity="0.6"/>' +
+    '<circle cx="30" cy="32" r="4" fill="none" stroke="%2394a3b8" stroke-width="0.5" opacity="0.7"/>' +
+    '<path d="M 14 32 L 46 32 M 30 16 L 30 48 M 19 21 L 41 43 M 19 43 L 41 21" stroke="%23cbd5e1" stroke-width="0.4" opacity="0.5"/>' +
+    '<path d="M 20 22 Q 28 17 38 22" fill="none" stroke="%23ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.7"/>' +
+    '<rect x="12" y="56" width="36" height="7" rx="1" fill="%231e293b"/>' +
+    [17, 30, 43].map((x) =>
+      `<rect x="${x - 1.5}" y="60" width="3" height="10" rx="0.5" fill="url(%23pir_pin2)"/>` +
+      `<circle cx="${x}" cy="69" r="1.5" fill="%23475569"/>`
+    ).join('') +
+    '<text x="17" y="54" font-size="3" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">VCC</text>' +
+    '<text x="30" y="54" font-size="3" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">OUT</text>' +
+    '<text x="43" y="54" font-size="3" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">GND</text>'
   ),
   SENSOR_LDR: svg('0 0 40 40',
-    '<circle cx="20" cy="20" r="16" fill="%23d97706" stroke="%23a16207" stroke-width="2"/>' +
-    '<path d="M12 12 L28 28 M12 28 L28 12" stroke="%23fbbf24" stroke-width="2"/>' +
-    '<rect x="8" y="34" width="4" height="6" fill="%23a0a0a0"/>' +
-    '<rect x="28" y="34" width="4" height="6" fill="%23a0a0a0"/>'
+    '<defs>' +
+      '<linearGradient id="ldr_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<radialGradient id="ldr_body" cx="35%25" cy="35%25" r="65%25"><stop offset="0%25" stop-color="%23fef3c7"/><stop offset="40%25" stop-color="%23fde68a"/><stop offset="85%25" stop-color="%23f59e0b"/><stop offset="100%25" stop-color="%23b45309"/></radialGradient>' +
+    '</defs>' +
+    // Solder leads at (10, 40) and (30, 40)
+    '<rect x="8.8" y="24" width="2.4" height="16" rx="0.5" fill="url(%23ldr_lead)"/>' +
+    '<circle cx="10" cy="39" r="1.5" fill="%23475569"/>' +
+    '<rect x="28.8" y="24" width="2.4" height="16" rx="0.5" fill="url(%23ldr_lead)"/>' +
+    '<circle cx="30" cy="39" r="1.5" fill="%23475569"/>' +
+    // Ceramic disc
+    '<circle cx="20" cy="18" r="15" fill="url(%23ldr_body)" stroke="%2378350f" stroke-width="0.8"/>' +
+    // Interlocking comb electrodes & CdS zigzag track
+    '<path d="M 11 11 L 11 25 M 29 11 L 29 25" stroke="%23cbd5e1" stroke-width="1.2" stroke-linecap="round"/>' +
+    '<path d="M 12 13 L 27 13 M 13 16 L 28 16 M 12 19 L 27 19 M 13 22 L 28 22" stroke="%23991b1b" stroke-width="1.3" stroke-linecap="round"/>' +
+    // Clear epoxy glossy highlight
+    '<path d="M 10 13 Q 19 8 29 13" fill="none" stroke="%23ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.6"/>'
   ),
   // ── Displays ──
   DISPLAY_LCD_I2C: svg('0 0 120 60',
-    '<rect width="120" height="60" rx="4" fill="%230369a1"/>' +
-    '<rect x="6" y="6" width="108" height="36" rx="2" fill="%2364d475"/>' +
-    '<rect x="10" y="12" width="100" height="6" rx="1" fill="%23006400" opacity="0.4"/>' +
-    '<rect x="10" y="28" width="100" height="6" rx="1" fill="%23006400" opacity="0.4"/>' +
-    '<rect x="10" y="48" width="8" height="6" fill="%23b8860b"/>' +
-    '<rect x="24" y="48" width="8" height="6" fill="%23b8860b"/>' +
-    '<rect x="38" y="48" width="8" height="6" fill="%23b8860b"/>' +
-    '<rect x="52" y="48" width="8" height="6" fill="%23b8860b"/>'
+    '<defs>' +
+      '<linearGradient id="lcd_pcb_i2c" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%230369a1"/><stop offset="50%25" stop-color="%230284c7"/><stop offset="100%25" stop-color="%23075985"/></linearGradient>' +
+      '<linearGradient id="lcd_glass_i2c" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2384cc16"/><stop offset="100%25" stop-color="%2365a30d"/></linearGradient>' +
+      '<linearGradient id="lcd_pin_i2c" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="116" height="56" rx="3.5" fill="url(%23lcd_pcb_i2c)" stroke="%23075985" stroke-width="0.8"/>' +
+    '<circle cx="5" cy="5" r="1.5" fill="%23082f49" stroke="%2338bdf8" stroke-width="0.3"/>' +
+    '<circle cx="115" cy="5" r="1.5" fill="%23082f49" stroke="%2338bdf8" stroke-width="0.3"/>' +
+    // Black metal bezel frame
+    '<rect x="6" y="6" width="108" height="38" rx="2" fill="%231e293b" stroke="%23334155" stroke-width="0.8"/>' +
+    '<rect x="8" y="8" width="104" height="34" rx="1.5" fill="url(%23lcd_glass_i2c)"/>' +
+    // LCD 16x2 character grid texture
+    Array.from({ length: 16 }, (_, c) =>
+      `<rect x="${11 + c * 6.2}" y="11" width="5.2" height="12" fill="%234d7c0f" opacity="0.3"/>` +
+      `<rect x="${11 + c * 6.2}" y="26" width="5.2" height="12" fill="%234d7c0f" opacity="0.3"/>`
+    ).join('') +
+    // 4-pin I2C header at bottom: GND (14, 60), VCC (28, 60), SDA (42, 60), SCL (56, 60)
+    '<rect x="8" y="47" width="54" height="6" rx="1" fill="%230f172a"/>' +
+    [14, 28, 42, 56].map((x) =>
+      `<rect x="${x - 1.5}" y="51" width="3" height="9" rx="0.5" fill="url(%23lcd_pin_i2c)"/>` +
+      `<circle cx="${x}" cy="59" r="1.5" fill="%23475569"/>`
+    ).join('') +
+    '<text x="14" y="46" font-size="3" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">GND</text>' +
+    '<text x="28" y="46" font-size="3" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">VCC</text>' +
+    '<text x="42" y="46" font-size="3" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">SDA</text>' +
+    '<text x="56" y="46" font-size="3" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">SCL</text>' +
+    '<text x="94" y="52" font-size="3.5" fill="%23cbd5e1" font-family="Arial" font-weight="bold">I2C LCD1602</text>'
   ),
   LCD_16X2: svg('0 0 170 60',
-    '<rect width="170" height="60" rx="4" fill="%230369a1"/>' +
-    '<circle cx="8" cy="8" r="3" fill="%23111827"/><circle cx="162" cy="8" r="3" fill="%23111827"/>' +
-    '<rect x="12" y="10" width="146" height="34" rx="2" fill="%2384cc16"/>' +
-    '<text x="85" y="25" font-size="8" fill="%23365f07" text-anchor="middle" font-family="monospace">VoltForge</text>' +
-    '<text x="85" y="38" font-size="8" fill="%23365f07" text-anchor="middle" font-family="monospace">LCD 16x2</text>' +
-    '<rect x="8" y="52" width="154" height="4" fill="%23b8860b" opacity="0.6"/>'
+    '<defs>' +
+      '<linearGradient id="lcd_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%230369a1"/><stop offset="50%25" stop-color="%230284c7"/><stop offset="100%25" stop-color="%23075985"/></linearGradient>' +
+      '<linearGradient id="lcd_glass" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2384cc16"/><stop offset="100%25" stop-color="%2365a30d"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="166" height="56" rx="4" fill="url(%23lcd_pcb)" stroke="%23075985" stroke-width="0.8"/>' +
+    // 4 corner mounting holes
+    '<circle cx="7" cy="7" r="2" fill="%23082f49" stroke="%2338bdf8" stroke-width="0.4"/>' +
+    '<circle cx="163" cy="7" r="2" fill="%23082f49" stroke="%2338bdf8" stroke-width="0.4"/>' +
+    // Metal bezel
+    '<rect x="10" y="6" width="150" height="42" rx="2.5" fill="%231e293b" stroke="%23334155" stroke-width="0.8"/>' +
+    '<rect x="12" y="8" width="146" height="38" rx="2" fill="url(%23lcd_glass)"/>' +
+    // Dot matrix character blocks
+    Array.from({ length: 16 }, (_, c) =>
+      `<rect x="${16 + c * 8.8}" y="12" width="7" height="13" fill="%234d7c0f" opacity="0.3"/>` +
+      `<rect x="${16 + c * 8.8}" y="29" width="7" height="13" fill="%234d7c0f" opacity="0.3"/>`
+    ).join('') +
+    // 16-pin gold solder eyelets along bottom edge: 10 + i * 10 (10 to 160)
+    Array.from({ length: 16 }, (_, i) => {
+      const x = 10 + i * 10;
+      return `<circle cx="${x}" cy="56" r="2.2" fill="%23eab308" stroke="%23ca8a04" stroke-width="0.4"/>` +
+             `<circle cx="${x}" cy="56" r="1.1" fill="%230f172a"/>`;
+    }).join('') +
+    '<text x="10" y="52" font-size="3" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">1</text>' +
+    '<text x="160" y="52" font-size="3" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">16</text>'
   ),
   DISPLAY_OLED: svg('0 0 80 60',
-    '<rect width="80" height="60" rx="4" fill="%23111827"/>' +
-    '<rect x="6" y="6" width="68" height="38" rx="2" fill="%23000" stroke="%23333" stroke-width="1"/>' +
-    '<text x="40" y="28" font-size="8" fill="%230ea5e9" text-anchor="middle" font-family="Arial">OLED 128x64</text>' +
-    '<rect x="16" y="50" width="6" height="6" fill="%23b8860b"/>' +
-    '<rect x="30" y="50" width="6" height="6" fill="%23b8860b"/>' +
-    '<rect x="44" y="50" width="6" height="6" fill="%23b8860b"/>' +
-    '<rect x="58" y="50" width="6" height="6" fill="%23b8860b"/>'
+    '<defs>' +
+      '<linearGradient id="oled_glass" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%230f172a"/><stop offset="100%25" stop-color="%23020617"/></linearGradient>' +
+      '<linearGradient id="oled_pin" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="76" height="56" rx="3.5" fill="%231e293b" stroke="%23334155" stroke-width="0.8"/>' +
+    '<circle cx="6" cy="6" r="1.5" fill="%230f172a" stroke="%2364748b" stroke-width="0.3"/>' +
+    '<circle cx="74" cy="6" r="1.5" fill="%230f172a" stroke="%2364748b" stroke-width="0.3"/>' +
+    // OLED glass display panel
+    '<rect x="6" y="6" width="68" height="40" rx="1.5" fill="url(%23oled_glass)" stroke="%23090d16" stroke-width="0.8"/>' +
+    // Specular reflection line across glass
+    '<line x1="10" y1="8" x2="70" y2="8" stroke="%23ffffff" stroke-width="0.6" opacity="0.3"/>' +
+    // 4-pin header at bottom: GND (19, 60), VCC (33, 60), SCL (47, 60), SDA (61, 60)
+    '<rect x="13" y="49" width="54" height="5" rx="1" fill="%23090d16"/>' +
+    [19, 33, 47, 61].map((x) =>
+      `<rect x="${x - 1.5}" y="52" width="3" height="8" rx="0.5" fill="url(%23oled_pin)"/>` +
+      `<circle cx="${x}" cy="59" r="1.5" fill="%23475569"/>`
+    ).join('') +
+    '<text x="19" y="48" font-size="3" fill="%23cbd5e1" font-family="Arial" font-weight="bold" text-anchor="middle">GND</text>' +
+    '<text x="33" y="48" font-size="3" fill="%23cbd5e1" font-family="Arial" font-weight="bold" text-anchor="middle">VCC</text>' +
+    '<text x="47" y="48" font-size="3" fill="%23cbd5e1" font-family="Arial" font-weight="bold" text-anchor="middle">SCL</text>' +
+    '<text x="61" y="48" font-size="3" fill="%23cbd5e1" font-family="Arial" font-weight="bold" text-anchor="middle">SDA</text>'
   ),
   DISPLAY_7SEG: svg('0 0 50 70',
-    '<rect width="50" height="70" rx="2" fill="%23111"/>' +
-    '<path d="M12 8 h26 l-4 4 h-18 Z" fill="%23ef4444" opacity="0.8"/>' +
-    '<path d="M40 12 l4 4 v18 l-4 4 l-4-4 v-18 Z" fill="%23ef4444" opacity="0.8"/>' +
-    '<path d="M40 40 l4 4 v18 l-4 4 l-4-4 v-18 Z" fill="%23ef4444" opacity="0.2"/>' +
-    '<path d="M12 62 h26 l-4-4 h-18 Z" fill="%23ef4444" opacity="0.2"/>' +
-    '<path d="M10 40 l-4 4 v18 l4 4 l4-4 v-18 Z" fill="%23ef4444" opacity="0.2"/>' +
-    '<path d="M10 12 l-4 4 v18 l4 4 l4-4 v-18 Z" fill="%23ef4444" opacity="0.8"/>' +
-    '<path d="M12 35 h26 l-4 4 h-18 Z" fill="%23ef4444" opacity="0.8"/>' +
-    '<circle cx="44" cy="62" r="2" fill="%23ef4444" opacity="0.8"/>'
+    '<defs>' +
+      '<linearGradient id="seg_bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23181e29"/><stop offset="100%25" stop-color="%230f131a"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="4" width="46" height="62" rx="3" fill="url(%23seg_bg)" stroke="%23334155" stroke-width="1"/>' +
+    Array.from([5, 15, 25, 35, 45], (x) => `<rect x="${x - 1.2}" y="0" width="2.4" height="6" rx="0.5" fill="%2394a3b8"/><circle cx="${x}" cy="1" r="1.1" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>`).join('') +
+    Array.from([5, 15, 25, 35, 45], (x) => `<rect x="${x - 1.2}" y="64" width="2.4" height="6" rx="0.5" fill="%2394a3b8"/><circle cx="${x}" cy="69" r="1.1" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>`).join('') +
+    '<text x="5" y="10" font-size="3.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle">G</text>' +
+    '<text x="15" y="10" font-size="3.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle">F</text>' +
+    '<text x="25" y="10" font-size="3.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle">COM</text>' +
+    '<text x="35" y="10" font-size="3.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle">A</text>' +
+    '<text x="45" y="10" font-size="3.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle">B</text>' +
+    '<text x="5" y="62" font-size="3.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle">E</text>' +
+    '<text x="15" y="62" font-size="3.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle">D</text>' +
+    '<text x="25" y="62" font-size="3.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle">COM</text>' +
+    '<text x="35" y="62" font-size="3.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle">C</text>' +
+    '<text x="45" y="62" font-size="3.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle">DP</text>' +
+    '<rect x="8" y="11" width="34" height="48" rx="2" fill="%230a0d14" stroke="%231e2533" stroke-width="0.8"/>' +
+    '<path d="M 16 14 L 19 12 L 31 12 L 34 14 L 31 16 L 19 16 Z" fill="%231a2230" stroke="%23111827" stroke-width="0.5"/>' +
+    '<path d="M 35 15 L 37 18 L 37 30 L 35 32 L 33 30 L 33 18 Z" fill="%231a2230" stroke="%23111827" stroke-width="0.5"/>' +
+    '<path d="M 35 34 L 37 37 L 37 49 L 35 52 L 33 49 L 33 37 Z" fill="%231a2230" stroke="%23111827" stroke-width="0.5"/>' +
+    '<path d="M 16 53 L 19 51 L 31 51 L 34 53 L 31 55 L 19 55 Z" fill="%231a2230" stroke="%23111827" stroke-width="0.5"/>' +
+    '<path d="M 15 34 L 17 37 L 17 49 L 15 52 L 13 49 L 13 37 Z" fill="%231a2230" stroke="%23111827" stroke-width="0.5"/>' +
+    '<path d="M 15 15 L 17 18 L 17 30 L 15 32 L 13 30 L 13 18 Z" fill="%231a2230" stroke="%23111827" stroke-width="0.5"/>' +
+    '<path d="M 16 33 L 18 31.5 L 32 31.5 L 34 33 L 32 34.5 L 18 34.5 Z" fill="%231a2230" stroke="%23111827" stroke-width="0.5"/>' +
+    '<circle cx="39" cy="53" r="2" fill="%231a2230" stroke="%23111827" stroke-width="0.5"/>'
   ),
 
   // ── Relays ──
+  RELAY_SPDT: svg('0 0 70 50',
+    '<defs>' +
+      '<linearGradient id="rel_cube" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%233b82f6"/><stop offset="30%25" stop-color="%232563eb"/><stop offset="100%25" stop-color="%231d4ed8"/></linearGradient>' +
+      '<linearGradient id="rel_pin" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="0" y="13.5" width="8" height="3" rx="0.5" fill="url(%23rel_pin)"/>' +
+    '<circle cx="1" cy="15" r="1.5" fill="%23475569"/>' +
+    '<rect x="0" y="33.5" width="8" height="3" rx="0.5" fill="url(%23rel_pin)"/>' +
+    '<circle cx="1" cy="35" r="1.5" fill="%23475569"/>' +
+    '<rect x="62" y="8.5" width="8" height="3" rx="0.5" fill="url(%23rel_pin)"/>' +
+    '<circle cx="69" cy="10" r="1.5" fill="%23475569"/>' +
+    '<rect x="62" y="23.5" width="8" height="3" rx="0.5" fill="url(%23rel_pin)"/>' +
+    '<circle cx="69" cy="25" r="1.5" fill="%23475569"/>' +
+    '<rect x="62" y="38.5" width="8" height="3" rx="0.5" fill="url(%23rel_pin)"/>' +
+    '<circle cx="69" cy="40" r="1.5" fill="%23475569"/>' +
+    '<rect x="7" y="4" width="56" height="42" rx="3" fill="url(%23rel_cube)" stroke="%231e40af" stroke-width="0.8"/>' +
+    '<rect x="9" y="6" width="52" height="38" rx="2" fill="none" stroke="%2360a5fa" stroke-width="0.5" opacity="0.6"/>' +
+    '<text x="35" y="15" font-size="6.5" fill="%23ffffff" font-family="Arial" font-weight="900" text-anchor="middle" letter-spacing="1">SONGLE</text>' +
+    '<text x="35" y="23" font-size="5" fill="%23dbeafe" font-family="Arial" font-weight="bold" text-anchor="middle">SRD-05VDC-SL-C</text>' +
+    '<text x="35" y="31" font-size="4" fill="%23bfdbfe" font-family="Arial" text-anchor="middle">10A 250VAC  10A 125VAC</text>' +
+    '<text x="35" y="37" font-size="4" fill="%23bfdbfe" font-family="Arial" text-anchor="middle">10A 30VDC   10A 28VDC</text>' +
+    '<text x="35" y="43" font-size="3.5" fill="%2393c5fd" font-family="Arial" text-anchor="middle">5VDC COIL</text>'
+  ),
   RELAY_SINGLE: svg('0 0 70 50',
-    '<rect width="70" height="50" rx="4" fill="%232563eb"/>' +
-    '<rect x="4" y="4" width="62" height="28" rx="2" fill="%231e40af"/>' +
-    '<rect x="8" y="8" width="14" height="20" rx="1" fill="%23c0c0c0"/>' +
-    '<circle cx="45" cy="18" r="6" fill="%23fbbf24" opacity="0.6"/>' +
-    '<text x="35" y="44" font-size="7" fill="white" text-anchor="middle" font-family="Arial">RELAY</text>'
+    '<defs>' +
+      '<linearGradient id="rs_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%231d4ed8"/><stop offset="100%25" stop-color="%231e3a8a"/></linearGradient>' +
+      '<linearGradient id="rs_relay" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%233b82f6"/><stop offset="50%25" stop-color="%232563eb"/><stop offset="100%25" stop-color="%231d4ed8"/></linearGradient>' +
+      '<linearGradient id="rs_term" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%2316a34a"/><stop offset="50%25" stop-color="%2315803d"/><stop offset="100%25" stop-color="%2314532d"/></linearGradient>' +
+      '<linearGradient id="rs_hdr" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="66" height="46" rx="3.5" fill="url(%23rs_pcb)" stroke="%23172554" stroke-width="0.8"/>' +
+    '<circle cx="5" cy="5" r="1.5" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>' +
+    '<circle cx="5" cy="45" r="1.5" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>' +
+    '<rect x="0" y="6.5" width="5" height="3" rx="0.5" fill="url(%23rs_hdr)"/>' +
+    '<rect x="0" y="23.5" width="5" height="3" rx="0.5" fill="url(%23rs_hdr)"/>' +
+    '<rect x="0" y="40.5" width="5" height="3" rx="0.5" fill="url(%23rs_hdr)"/>' +
+    '<circle cx="0.5" cy="8" r="1.2" fill="%23475569"/><circle cx="0.5" cy="25" r="1.2" fill="%23475569"/><circle cx="0.5" cy="42" r="1.2" fill="%23475569"/>' +
+    '<rect x="4" y="5" width="3" height="40" rx="1" fill="%231e293b"/>' +
+    '<text x="9" y="9.5" font-size="3.5" fill="%23f8fafc" font-family="Arial" font-weight="bold">VCC</text>' +
+    '<text x="9" y="26.5" font-size="3.5" fill="%23f8fafc" font-family="Arial" font-weight="bold">GND</text>' +
+    '<text x="9" y="43.5" font-size="3.5" fill="%23f8fafc" font-family="Arial" font-weight="bold">IN</text>' +
+    '<rect x="18" y="7" width="33" height="36" rx="2.5" fill="url(%23rs_relay)" stroke="%231e40af" stroke-width="0.75"/>' +
+    '<text x="34.5" y="15" font-size="5" fill="%23ffffff" font-family="Arial" font-weight="900" text-anchor="middle">SONGLE</text>' +
+    '<text x="34.5" y="22" font-size="3.8" fill="%23dbeafe" font-family="Arial" font-weight="bold" text-anchor="middle">SRD-05VDC</text>' +
+    '<text x="34.5" y="28" font-size="3.2" fill="%23bfdbfe" font-family="Arial" text-anchor="middle">10A 250VAC</text>' +
+    '<text x="34.5" y="34" font-size="3.2" fill="%23bfdbfe" font-family="Arial" text-anchor="middle">10A 30VDC</text>' +
+    '<rect x="10" y="14" width="5" height="4" rx="0.5" fill="%230f172a" stroke="%23334155" stroke-width="0.4"/>' +
+    '<circle cx="14" cy="22" r="1.2" fill="%23ef4444"/>' +
+    '<circle cx="14" cy="30" r="1.2" fill="%2322c55e"/>' +
+    '<rect x="54" y="4" width="16" height="42" rx="2" fill="url(%23rs_term)" stroke="%2314532d" stroke-width="0.8"/>' +
+    '<circle cx="61" cy="8" r="3.2" fill="%23d1d5db" stroke="%234b5563" stroke-width="0.6"/>' +
+    '<line x1="59" y1="8" x2="63" y2="8" stroke="%231f2937" stroke-width="0.8"/>' +
+    '<circle cx="69" cy="8" r="1.5" fill="%2314532d"/>' +
+    '<circle cx="61" cy="25" r="3.2" fill="%23d1d5db" stroke="%234b5563" stroke-width="0.6"/>' +
+    '<line x1="59" y1="25" x2="63" y2="25" stroke="%231f2937" stroke-width="0.8"/>' +
+    '<circle cx="69" cy="25" r="1.5" fill="%2314532d"/>' +
+    '<circle cx="61" cy="42" r="3.2" fill="%23d1d5db" stroke="%234b5563" stroke-width="0.6"/>' +
+    '<line x1="59" y1="42" x2="63" y2="42" stroke="%231f2937" stroke-width="0.8"/>' +
+    '<circle cx="69" cy="42" r="1.5" fill="%2314532d"/>' +
+    '<text x="52" y="9.5" font-size="3.5" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="end">COM</text>' +
+    '<text x="52" y="26.5" font-size="3.5" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="end">NO</text>' +
+    '<text x="52" y="43.5" font-size="3.5" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="end">NC</text>'
   ),
   RELAY_2CH: svg('0 0 90 50',
-    '<rect width="90" height="50" rx="4" fill="%232563eb"/>' +
-    '<rect x="4" y="6" width="35" height="24" rx="2" fill="%231e40af"/>' +
-    '<rect x="51" y="6" width="35" height="24" rx="2" fill="%231e40af"/>' +
-    '<rect x="8" y="10" width="12" height="16" rx="1" fill="%23c0c0c0"/>' +
-    '<rect x="55" y="10" width="12" height="16" rx="1" fill="%23c0c0c0"/>' +
-    '<circle cx="28" cy="18" r="4" fill="%23fbbf24" opacity="0.5"/>' +
-    '<circle cx="75" cy="18" r="4" fill="%23fbbf24" opacity="0.5"/>' +
-    '<text x="45" y="44" font-size="7" fill="white" text-anchor="middle" font-family="Arial">2-CH RELAY</text>'
+    '<defs>' +
+      '<linearGradient id="r2_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%231d4ed8"/><stop offset="100%25" stop-color="%231e3a8a"/></linearGradient>' +
+      '<linearGradient id="r2_relay" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%233b82f6"/><stop offset="50%25" stop-color="%232563eb"/><stop offset="100%25" stop-color="%231d4ed8"/></linearGradient>' +
+      '<linearGradient id="r2_term" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%2316a34a"/><stop offset="50%25" stop-color="%2315803d"/><stop offset="100%25" stop-color="%2314532d"/></linearGradient>' +
+      '<linearGradient id="r2_hdr" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="86" height="46" rx="3.5" fill="url(%23r2_pcb)" stroke="%23172554" stroke-width="0.8"/>' +
+    '<rect x="0" y="8.5" width="5" height="3" rx="0.5" fill="url(%23r2_hdr)"/>' +
+    '<rect x="0" y="18.5" width="5" height="3" rx="0.5" fill="url(%23r2_hdr)"/>' +
+    '<rect x="0" y="23.5" width="5" height="3" rx="0.5" fill="url(%23r2_hdr)"/>' +
+    '<rect x="0" y="38.5" width="5" height="3" rx="0.5" fill="url(%23r2_hdr)"/>' +
+    '<circle cx="0.5" cy="10" r="1.2" fill="%23475569"/><circle cx="0.5" cy="20" r="1.2" fill="%23475569"/><circle cx="0.5" cy="25" r="1.2" fill="%23475569"/><circle cx="0.5" cy="40" r="1.2" fill="%23475569"/>' +
+    '<rect x="4" y="6" width="3" height="38" rx="1" fill="%231e293b"/>' +
+    '<text x="9" y="11.5" font-size="3" fill="%23f8fafc" font-family="Arial" font-weight="bold">IN1</text>' +
+    '<text x="9" y="21.5" font-size="3" fill="%23f8fafc" font-family="Arial" font-weight="bold">IN2</text>' +
+    '<text x="9" y="26.5" font-size="3" fill="%23f8fafc" font-family="Arial" font-weight="bold">GND</text>' +
+    '<text x="9" y="41.5" font-size="3" fill="%23f8fafc" font-family="Arial" font-weight="bold">VCC</text>' +
+    '<rect x="16" y="5" width="27" height="38" rx="2" fill="url(%23r2_relay)" stroke="%231e40af" stroke-width="0.6"/>' +
+    '<text x="29.5" y="14" font-size="4.2" fill="%23ffffff" font-family="Arial" font-weight="900" text-anchor="middle">SONGLE</text>' +
+    '<text x="29.5" y="21" font-size="3.2" fill="%23dbeafe" font-family="Arial" font-weight="bold" text-anchor="middle">SRD-05VDC</text>' +
+    '<text x="29.5" y="27" font-size="2.8" fill="%23bfdbfe" font-family="Arial" text-anchor="middle">10A 250VAC</text>' +
+    '<rect x="45" y="5" width="27" height="38" rx="2" fill="url(%23r2_relay)" stroke="%231e40af" stroke-width="0.6"/>' +
+    '<text x="58.5" y="14" font-size="4.2" fill="%23ffffff" font-family="Arial" font-weight="900" text-anchor="middle">SONGLE</text>' +
+    '<text x="58.5" y="21" font-size="3.2" fill="%23dbeafe" font-family="Arial" font-weight="bold" text-anchor="middle">SRD-05VDC</text>' +
+    '<text x="58.5" y="27" font-size="2.8" fill="%23bfdbfe" font-family="Arial" text-anchor="middle">10A 250VAC</text>' +
+    '<rect x="74" y="4" width="16" height="42" rx="2" fill="url(%23r2_term)" stroke="%2314532d" stroke-width="0.8"/>' +
+    [12, 25, 38, 48].map((y) =>
+      `<circle cx="81" cy="${y}" r="2.8" fill="%23d1d5db" stroke="%234b5563" stroke-width="0.5"/>` +
+      `<line x1="79.2" y1="${y}" x2="82.8" y2="${y}" stroke="%231f2937" stroke-width="0.7"/>` +
+      `<circle cx="89" cy="${y}" r="1.2" fill="%2314532d"/>`
+    ).join('') +
+    '<text x="73" y="13.5" font-size="3" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="end">C1</text>' +
+    '<text x="73" y="26.5" font-size="3" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="end">NO1</text>' +
+    '<text x="73" y="39.5" font-size="3" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="end">C2</text>' +
+    '<text x="73" y="49" font-size="3" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="end">NO2</text>'
   ),
   RELAY_4CH: svg('0 0 120 50',
-    '<rect width="120" height="50" rx="4" fill="%232563eb"/>' +
-    '<rect x="4" y="6" width="20" height="24" rx="2" fill="%231e40af"/>' +
-    '<rect x="30" y="6" width="20" height="24" rx="2" fill="%231e40af"/>' +
-    '<rect x="56" y="6" width="20" height="24" rx="2" fill="%231e40af"/>' +
-    '<rect x="82" y="6" width="20" height="24" rx="2" fill="%231e40af"/>' +
-    '<text x="60" y="44" font-size="7" fill="white" text-anchor="middle" font-family="Arial">4-CH RELAY</text>'
+    '<defs>' +
+      '<linearGradient id="r4_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%231d4ed8"/><stop offset="100%25" stop-color="%231e3a8a"/></linearGradient>' +
+      '<linearGradient id="r4_relay" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%233b82f6"/><stop offset="50%25" stop-color="%232563eb"/><stop offset="100%25" stop-color="%231d4ed8"/></linearGradient>' +
+      '<linearGradient id="r4_term" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%2316a34a"/><stop offset="50%25" stop-color="%2315803d"/><stop offset="100%25" stop-color="%2314532d"/></linearGradient>' +
+      '<linearGradient id="r4_hdr" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="116" height="46" rx="3.5" fill="url(%23r4_pcb)" stroke="%23172554" stroke-width="0.8"/>' +
+    [10, 18, 25, 32, 40, 47].map((y) =>
+      `<rect x="0" y="${y - 1.5}" width="5" height="3" rx="0.5" fill="url(%23r4_hdr)"/>` +
+      `<circle cx="0.5" cy="${y}" r="1.1" fill="%23475569"/>`
+    ).join('') +
+    '<rect x="4" y="5" width="2.5" height="40" rx="1" fill="%231e293b"/>' +
+    [0, 1, 2, 3].map((i) => {
+      const x = 12 + i * 22;
+      return `<rect x="${x}" y="5" width="20" height="38" rx="1.5" fill="url(%23r4_relay)" stroke="%231e40af" stroke-width="0.5"/>` +
+             `<text x="${x + 10}" y="13" font-size="3.2" fill="%23ffffff" font-family="Arial" font-weight="900" text-anchor="middle">SONGLE</text>` +
+             `<text x="${x + 10}" y="19" font-size="2.6" fill="%23dbeafe" font-family="Arial" font-weight="bold" text-anchor="middle">SRD-05VDC</text>` +
+             `<text x="${x + 10}" y="25" font-size="2.2" fill="%23bfdbfe" font-family="Arial" text-anchor="middle">10A 250V</text>`;
+    }).join('') +
+    '<rect x="103" y="3" width="17" height="44" rx="2" fill="url(%23r4_term)" stroke="%2314532d" stroke-width="0.8"/>' +
+    [6, 11, 18, 23, 30, 35, 42, 47].map((y) =>
+      `<circle cx="110" cy="${y}" r="2" fill="%23d1d5db" stroke="%234b5563" stroke-width="0.4"/>` +
+      `<line x1="108.8" y1="${y}" x2="111.2" y2="${y}" stroke="%231f2937" stroke-width="0.6"/>` +
+      `<circle cx="119" cy="${y}" r="1" fill="%2314532d"/>`
+    ).join('')
   ),
 
   // ── Motors ──
   MOTOR_DC: svg('0 0 70 50',
-    '<rect x="5" y="8" width="50" height="34" rx="17" fill="%234b5563"/>' +
-    '<rect x="55" y="20" width="12" height="10" rx="2" fill="%23c0c0c0"/>' +
-    '<circle cx="30" cy="25" r="12" fill="%231f2937"/>' +
-    '<circle cx="30" cy="25" r="4" fill="%23c0c0c0"/>' +
-    '<text x="30" y="48" font-size="6" fill="%239ca3af" text-anchor="middle" font-family="Arial">DC MOTOR</text>'
+    '<defs>' +
+      '<linearGradient id="dcm_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%239ca3af"/><stop offset="20%25" stop-color="%236b7280"/><stop offset="50%25" stop-color="%234b5563"/><stop offset="80%25" stop-color="%236b7280"/><stop offset="100%25" stop-color="%239ca3af"/></linearGradient>' +
+      '<linearGradient id="dcm_shaft" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="50%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+      '<linearGradient id="dcm_end" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23d97706"/><stop offset="50%25" stop-color="%23b45309"/><stop offset="100%25" stop-color="%2392400e"/></linearGradient>' +
+    '</defs>' +
+    // Main cylindrical body
+    '<rect x="10" y="8" width="42" height="34" rx="17" fill="url(%23dcm_body)" stroke="%23374151" stroke-width="0.8"/>' +
+    // Ventilation slots on body
+    '<line x1="20" y1="10" x2="20" y2="40" stroke="%23374151" stroke-width="0.5" opacity="0.4"/>' +
+    '<line x1="25" y1="9" x2="25" y2="41" stroke="%23374151" stroke-width="0.5" opacity="0.4"/>' +
+    '<line x1="30" y1="8.5" x2="30" y2="41.5" stroke="%23374151" stroke-width="0.5" opacity="0.4"/>' +
+    '<line x1="35" y1="9" x2="35" y2="41" stroke="%23374151" stroke-width="0.5" opacity="0.4"/>' +
+    '<line x1="40" y1="10" x2="40" y2="40" stroke="%23374151" stroke-width="0.5" opacity="0.4"/>' +
+    // Rear endcap (gold/brass)
+    '<ellipse cx="10" cy="25" rx="4" ry="14" fill="url(%23dcm_end)" stroke="%2378350f" stroke-width="0.6"/>' +
+    // Terminal tabs at rear
+    '<rect x="0" y="12" width="8" height="4" rx="0.5" fill="%23ef4444" stroke="%23b91c1c" stroke-width="0.4"/>' +
+    '<circle cx="4" cy="14" r="1.2" fill="%23f1f5f9"/><circle cx="4" cy="14" r="0.5" fill="%230f172a"/>' +
+    '<rect x="0" y="34" width="8" height="4" rx="0.5" fill="%231e293b" stroke="%230f172a" stroke-width="0.4"/>' +
+    '<circle cx="4" cy="36" r="1.2" fill="%23f1f5f9"/><circle cx="4" cy="36" r="0.5" fill="%230f172a"/>' +
+    // Front bearing plate
+    '<ellipse cx="52" cy="25" rx="3.5" ry="12" fill="%23374151" stroke="%23475569" stroke-width="0.5"/>' +
+    '<circle cx="52" cy="25" r="5" fill="%231f2937" stroke="%23475569" stroke-width="0.5"/>' +
+    '<circle cx="52" cy="25" r="2.5" fill="%23cbd5e1"/>' +
+    // Shaft
+    '<rect x="52" y="23" width="16" height="4" rx="0.5" fill="url(%23dcm_shaft)" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<rect x="64" y="22.5" width="3" height="5" rx="0.5" fill="%23e2e8f0" stroke="%2394a3b8" stroke-width="0.3"/>' +
+    // Glossy highlight
+    '<path d="M 16 10 Q 30 6 45 10" fill="none" stroke="%23ffffff" stroke-width="1" opacity="0.4" stroke-linecap="round"/>' +
+    // Label
+    '<text x="30" y="27" font-size="5" fill="%23111827" font-family="Arial" font-weight="bold" text-anchor="middle">FA-130</text>' +
+    '<text x="3.5" y="11" font-size="3.5" fill="%23ef4444" font-family="Arial" font-weight="bold" text-anchor="middle">+</text>' +
+    '<text x="3.5" y="42" font-size="3.5" fill="%2394a3b8" font-family="Arial" font-weight="bold" text-anchor="middle">\u2212</text>'
   ),
-  MOTOR_SERVO: svg('0 0 60 50',
-    '<rect x="0" y="10" width="50" height="30" rx="3" fill="%231e40af"/>' +
-    '<rect x="50" y="18" width="10" height="14" rx="2" fill="%23c0c0c0"/>' +
-    '<circle cx="54" cy="25" r="5" fill="%23333"/>' +
-    '<rect x="8" y="40" width="6" height="8" fill="%23ef4444"/>' +
-    '<rect x="18" y="40" width="6" height="8" fill="%23a16207"/>' +
-    '<rect x="28" y="40" width="6" height="8" fill="%23f97316"/>' +
-    '<text x="25" y="30" font-size="7" fill="white" text-anchor="middle" font-family="Arial">SG90</text>'
+  MOTOR_SERVO: svg('0 0 70 50',
+    '<defs>' +
+      '<linearGradient id="sg90_case" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%232563eb"/><stop offset="50%25" stop-color="%231d4ed8"/><stop offset="100%25" stop-color="%231e40af"/></linearGradient>' +
+      '<linearGradient id="sg90_glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0%25" stop-color="%2360a5fa" stop-opacity="0.6"/><stop offset="100%25" stop-color="%231d4ed8" stop-opacity="0.85"/></linearGradient>' +
+      '<linearGradient id="sg90_horn" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23ffffff"/><stop offset="100%25" stop-color="%23e2e8f0"/></linearGradient>' +
+      '<linearGradient id="sg90_wire_o" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23fb923c"/><stop offset="50%25" stop-color="%23f97316"/><stop offset="100%25" stop-color="%23ea580c"/></linearGradient>' +
+      '<linearGradient id="sg90_wire_r" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f87171"/><stop offset="50%25" stop-color="%23ef4444"/><stop offset="100%25" stop-color="%23dc2626"/></linearGradient>' +
+      '<linearGradient id="sg90_wire_b" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%2378350f"/><stop offset="50%25" stop-color="%23451a03"/><stop offset="100%25" stop-color="%23292524"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="16" width="66" height="8" rx="1.5" fill="url(%23sg90_case)" stroke="%231e3a8a" stroke-width="0.6"/>' +
+    '<circle cx="6" cy="20" r="2.2" fill="%23fef08a" stroke="%23ca8a04" stroke-width="0.5"/><circle cx="6" cy="20" r="1.2" fill="%230f172a"/>' +
+    '<circle cx="64" cy="20" r="2.2" fill="%23fef08a" stroke="%23ca8a04" stroke-width="0.5"/><circle cx="64" cy="20" r="1.2" fill="%230f172a"/>' +
+    '<rect x="10" y="8" width="50" height="32" rx="3" fill="url(%23sg90_case)" stroke="%23172554" stroke-width="0.8"/>' +
+    '<rect x="12" y="10" width="46" height="28" rx="2" fill="url(%23sg90_glass)"/>' +
+    '<circle cx="24" cy="24" r="8" fill="none" stroke="%2393c5fd" stroke-width="0.6" stroke-dasharray="2,2" opacity="0.4"/>' +
+    '<circle cx="46" cy="24" r="10" fill="none" stroke="%2393c5fd" stroke-width="0.6" stroke-dasharray="2,2" opacity="0.4"/>' +
+    '<rect x="40" y="3" width="16" height="8" rx="3" fill="%231e40af" stroke="%231e3a8a" stroke-width="0.5"/>' +
+    '<circle cx="48" cy="7" r="7" fill="url(%23sg90_horn)" stroke="%23cbd5e1" stroke-width="0.6"/>' +
+    '<path d="M 48 3 L 64 6 C 66 6.5 66 7.5 64 8 L 48 11 Z" fill="url(%23sg90_horn)" stroke="%2394a3b8" stroke-width="0.5"/>' +
+    '<circle cx="54" cy="7" r="0.8" fill="%23475569"/><circle cx="58" cy="7" r="0.8" fill="%23475569"/><circle cx="62" cy="7" r="0.8" fill="%23475569"/>' +
+    '<circle cx="48" cy="7" r="2.5" fill="%2394a3b8" stroke="%23475569" stroke-width="0.4"/>' +
+    '<line x1="46.5" y1="7" x2="49.5" y2="7" stroke="%231e293b" stroke-width="0.6"/>' +
+    '<rect x="12" y="24" width="30" height="12" rx="1" fill="%230f172a" stroke="%2338bdf8" stroke-width="0.5"/>' +
+    '<text x="27" y="30" font-size="4.2" fill="%2338bdf8" font-family="Arial" font-weight="900" text-anchor="middle">Tower Pro</text>' +
+    '<text x="27" y="34.5" font-size="3.5" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">SG90 9g</text>' +
+    '<path d="M 16 40 Q 13 44 11 50" fill="none" stroke="url(%23sg90_wire_o)" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path d="M 21 40 L 21 50" stroke="url(%23sg90_wire_r)" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path d="M 26 40 Q 29 44 31 50" fill="none" stroke="url(%23sg90_wire_b)" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<rect x="8" y="44" width="6" height="6" rx="0.8" fill="%230f172a"/>' +
+    '<circle cx="11" cy="50" r="1.6" fill="%23fbbf24" stroke="%23b45309" stroke-width="0.4"/><circle cx="11" cy="50" r="0.8" fill="%230f172a"/>' +
+    '<rect x="18" y="44" width="6" height="6" rx="0.8" fill="%230f172a"/>' +
+    '<circle cx="21" cy="50" r="1.6" fill="%23fbbf24" stroke="%23b45309" stroke-width="0.4"/><circle cx="21" cy="50" r="0.8" fill="%230f172a"/>' +
+    '<rect x="28" y="44" width="6" height="6" rx="0.8" fill="%230f172a"/>' +
+    '<circle cx="31" cy="50" r="1.6" fill="%23fbbf24" stroke="%23b45309" stroke-width="0.4"/><circle cx="31" cy="50" r="0.8" fill="%230f172a"/>' +
+    '<text x="11" y="43" font-size="2.6" fill="%23ea580c" font-family="Arial" font-weight="bold" text-anchor="middle">SIG</text>' +
+    '<text x="21" y="43" font-size="2.6" fill="%23ef4444" font-family="Arial" font-weight="bold" text-anchor="middle">VCC</text>' +
+    '<text x="31" y="43" font-size="2.6" fill="%2394a3b8" font-family="Arial" font-weight="bold" text-anchor="middle">GND</text>'
   ),
   SERVO_MOTOR: svg('0 0 70 50',
-    '<rect x="0" y="9" width="52" height="32" rx="4" fill="%231d4ed8"/>' +
-    '<rect x="52" y="17" width="14" height="16" rx="2" fill="%23cbd5e1"/>' +
-    '<circle cx="58" cy="25" r="7" fill="%23334155"/>' +
-    '<rect x="8" y="41" width="6" height="8" fill="%23ef4444"/>' +
-    '<rect x="20" y="41" width="6" height="8" fill="%23a16207"/>' +
-    '<rect x="32" y="41" width="6" height="8" fill="%23f97316"/>' +
-    '<text x="26" y="29" font-size="8" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">SG90</text>'
+    '<defs>' +
+      '<linearGradient id="sg90_case2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%232563eb"/><stop offset="50%25" stop-color="%231d4ed8"/><stop offset="100%25" stop-color="%231e40af"/></linearGradient>' +
+      '<linearGradient id="sg90_glass2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%25" stop-color="%2360a5fa" stop-opacity="0.6"/><stop offset="100%25" stop-color="%231d4ed8" stop-opacity="0.85"/></linearGradient>' +
+      '<linearGradient id="sg90_horn2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23ffffff"/><stop offset="100%25" stop-color="%23e2e8f0"/></linearGradient>' +
+      '<linearGradient id="sg90_wire_o2" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23fb923c"/><stop offset="50%25" stop-color="%23f97316"/><stop offset="100%25" stop-color="%23ea580c"/></linearGradient>' +
+      '<linearGradient id="sg90_wire_r2" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f87171"/><stop offset="50%25" stop-color="%23ef4444"/><stop offset="100%25" stop-color="%23dc2626"/></linearGradient>' +
+      '<linearGradient id="sg90_wire_b2" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%2378350f"/><stop offset="50%25" stop-color="%23451a03"/><stop offset="100%25" stop-color="%23292524"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="16" width="66" height="8" rx="1.5" fill="url(%23sg90_case2)" stroke="%231e3a8a" stroke-width="0.6"/>' +
+    '<circle cx="6" cy="20" r="2.2" fill="%23fef08a" stroke="%23ca8a04" stroke-width="0.5"/><circle cx="6" cy="20" r="1.2" fill="%230f172a"/>' +
+    '<circle cx="64" cy="20" r="2.2" fill="%23fef08a" stroke="%23ca8a04" stroke-width="0.5"/><circle cx="64" cy="20" r="1.2" fill="%230f172a"/>' +
+    '<rect x="10" y="8" width="50" height="32" rx="3" fill="url(%23sg90_case2)" stroke="%23172554" stroke-width="0.8"/>' +
+    '<rect x="12" y="10" width="46" height="28" rx="2" fill="url(%23sg90_glass2)"/>' +
+    '<circle cx="24" cy="24" r="8" fill="none" stroke="%2393c5fd" stroke-width="0.6" stroke-dasharray="2,2" opacity="0.4"/>' +
+    '<circle cx="46" cy="24" r="10" fill="none" stroke="%2393c5fd" stroke-width="0.6" stroke-dasharray="2,2" opacity="0.4"/>' +
+    '<rect x="40" y="3" width="16" height="8" rx="3" fill="%231e40af" stroke="%231e3a8a" stroke-width="0.5"/>' +
+    '<circle cx="48" cy="7" r="7" fill="url(%23sg90_horn2)" stroke="%23cbd5e1" stroke-width="0.6"/>' +
+    '<path d="M 48 3 L 64 6 C 66 6.5 66 7.5 64 8 L 48 11 Z" fill="url(%23sg90_horn2)" stroke="%2394a3b8" stroke-width="0.5"/>' +
+    '<circle cx="54" cy="7" r="0.8" fill="%23475569"/><circle cx="58" cy="7" r="0.8" fill="%23475569"/><circle cx="62" cy="7" r="0.8" fill="%23475569"/>' +
+    '<circle cx="48" cy="7" r="2.5" fill="%2394a3b8" stroke="%23475569" stroke-width="0.4"/>' +
+    '<line x1="46.5" y1="7" x2="49.5" y2="7" stroke="%231e293b" stroke-width="0.6"/>' +
+    '<rect x="12" y="24" width="30" height="12" rx="1" fill="%230f172a" stroke="%2338bdf8" stroke-width="0.5"/>' +
+    '<text x="27" y="30" font-size="4.2" fill="%2338bdf8" font-family="Arial" font-weight="900" text-anchor="middle">Tower Pro</text>' +
+    '<text x="27" y="34.5" font-size="3.5" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">SG90 9g</text>' +
+    '<path d="M 16 40 Q 13 44 11 50" fill="none" stroke="url(%23sg90_wire_o2)" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path d="M 21 40 L 21 50" stroke="url(%23sg90_wire_r2)" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path d="M 26 40 Q 29 44 31 50" fill="none" stroke="url(%23sg90_wire_b2)" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<rect x="8" y="44" width="6" height="6" rx="0.8" fill="%230f172a"/>' +
+    '<circle cx="11" cy="50" r="1.6" fill="%23fbbf24" stroke="%23b45309" stroke-width="0.4"/><circle cx="11" cy="50" r="0.8" fill="%230f172a"/>' +
+    '<rect x="18" y="44" width="6" height="6" rx="0.8" fill="%230f172a"/>' +
+    '<circle cx="21" cy="50" r="1.6" fill="%23fbbf24" stroke="%23b45309" stroke-width="0.4"/><circle cx="21" cy="50" r="0.8" fill="%230f172a"/>' +
+    '<rect x="28" y="44" width="6" height="6" rx="0.8" fill="%230f172a"/>' +
+    '<circle cx="31" cy="50" r="1.6" fill="%23fbbf24" stroke="%23b45309" stroke-width="0.4"/><circle cx="31" cy="50" r="0.8" fill="%230f172a"/>' +
+    '<text x="11" y="43" font-size="2.6" fill="%23ea580c" font-family="Arial" font-weight="bold" text-anchor="middle">SIG</text>' +
+    '<text x="21" y="43" font-size="2.6" fill="%23ef4444" font-family="Arial" font-weight="bold" text-anchor="middle">VCC</text>' +
+    '<text x="31" y="43" font-size="2.6" fill="%2394a3b8" font-family="Arial" font-weight="bold" text-anchor="middle">GND</text>'
+  ),
+  STEPPER_MOTOR: svg('0 0 70 70',
+    '<defs>' +
+      '<radialGradient id="stp_can" cx="40%25" cy="35%25" r="65%25"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="35%25" stop-color="%23cbd5e1"/><stop offset="85%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></radialGradient>' +
+      '<linearGradient id="stp_brass" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23fef08a"/><stop offset="50%25" stop-color="%23eab308"/><stop offset="100%25" stop-color="%23a16207"/></linearGradient>' +
+      '<linearGradient id="stp_ear" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23e2e8f0"/><stop offset="50%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+    '</defs>' +
+    '<path d="M 6 22 C 2 22 2 44 6 44 L 64 44 C 68 44 68 22 64 22 Z" fill="url(%23stp_ear)" stroke="%2364748b" stroke-width="0.8"/>' +
+    '<rect x="4" y="29" width="5" height="8" rx="2.5" fill="%231e293b" stroke="%23475569" stroke-width="0.4"/>' +
+    '<rect x="61" y="29" width="5" height="8" rx="2.5" fill="%231e293b" stroke="%23475569" stroke-width="0.4"/>' +
+    '<circle cx="35" cy="33" r="26" fill="url(%23stp_can)" stroke="%23475569" stroke-width="1"/>' +
+    '<circle cx="35" cy="33" r="24.5" fill="none" stroke="%23ffffff" stroke-width="0.8" opacity="0.6"/>' +
+    '<path d="M 23 20 C 23 12 47 12 47 20 Z" fill="url(%23stp_can)" stroke="%2364748b" stroke-width="0.6"/>' +
+    '<circle cx="35" cy="20" r="6" fill="%23334155" stroke="%23475569" stroke-width="0.6"/>' +
+    '<circle cx="35" cy="20" r="4.5" fill="url(%23stp_brass)" stroke="%23854d0e" stroke-width="0.5"/>' +
+    '<path d="M 33 17 L 37 17 L 37 23 L 33 23 Z" fill="%23ca8a04"/>' +
+    '<line x1="33" y1="17" x2="33" y2="23" stroke="%23451a03" stroke-width="0.8"/>' +
+    '<rect x="20" y="33" width="30" height="15" rx="1.5" fill="%230f172a" stroke="%2338bdf8" stroke-width="0.5"/>' +
+    '<text x="35" y="40" font-size="4" fill="%2338bdf8" font-family="Arial" font-weight="900" text-anchor="middle">28BYJ-48</text>' +
+    '<text x="35" y="45.5" font-size="3" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">5V DC STEPPER</text>' +
+    '<rect x="22" y="55" width="26" height="7" rx="1.5" fill="%230284c7" stroke="%230369a1" stroke-width="0.6"/>' +
+    '<path d="M 25 61 Q 18 64 15 70" fill="none" stroke="%233b82f6" stroke-width="2.2" stroke-linecap="round"/>' +
+    '<path d="M 29 61 Q 27 65 27 70" fill="none" stroke="%23ec4899" stroke-width="2.2" stroke-linecap="round"/>' +
+    '<path d="M 41 61 Q 43 65 43 70" fill="none" stroke="%23eab308" stroke-width="2.2" stroke-linecap="round"/>' +
+    '<path d="M 45 61 Q 52 64 55 70" fill="none" stroke="%23f97316" stroke-width="2.2" stroke-linecap="round"/>' +
+    '<circle cx="15" cy="70" r="1.8" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="15" cy="70" r="0.8" fill="%230f172a"/>' +
+    '<circle cx="27" cy="70" r="1.8" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="27" cy="70" r="0.8" fill="%230f172a"/>' +
+    '<circle cx="43" cy="70" r="1.8" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="43" cy="70" r="0.8" fill="%230f172a"/>' +
+    '<circle cx="55" cy="70" r="1.8" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="55" cy="70" r="0.8" fill="%230f172a"/>' +
+    '<text x="15" y="65" font-size="3" fill="%233b82f6" font-family="Arial" font-weight="bold" text-anchor="middle">A+</text>' +
+    '<text x="27" y="65" font-size="3" fill="%23ec4899" font-family="Arial" font-weight="bold" text-anchor="middle">A\u2212</text>' +
+    '<text x="43" y="65" font-size="3" fill="%23eab308" font-family="Arial" font-weight="bold" text-anchor="middle">B+</text>' +
+    '<text x="55" y="65" font-size="3" fill="%23f97316" font-family="Arial" font-weight="bold" text-anchor="middle">B\u2212</text>'
   ),
   MOTOR_STEPPER: svg('0 0 70 70',
-    '<circle cx="35" cy="35" r="30" fill="%234b5563"/>' +
-    '<circle cx="35" cy="35" r="20" fill="%231f2937"/>' +
-    '<circle cx="35" cy="35" r="6" fill="%23c0c0c0"/>' +
-    '<rect x="12" y="62" width="6" height="8" fill="%23b8860b"/>' +
-    '<rect x="24" y="62" width="6" height="8" fill="%23b8860b"/>' +
-    '<rect x="36" y="62" width="6" height="8" fill="%23b8860b"/>' +
-    '<rect x="48" y="62" width="6" height="8" fill="%23b8860b"/>'
+    '<defs>' +
+      '<linearGradient id="uln_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2315803d"/><stop offset="50%25" stop-color="%23166534"/><stop offset="100%25" stop-color="%2314532d"/></linearGradient>' +
+      '<linearGradient id="uln_ic" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2327272a"/><stop offset="100%25" stop-color="%2318181b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="66" height="66" rx="4" fill="url(%23uln_pcb)" stroke="%2314532d" stroke-width="1"/>' +
+    '<circle cx="6" cy="6" r="2.2" fill="%23052e16" stroke="%2386efac" stroke-width="0.4"/>' +
+    '<circle cx="64" cy="6" r="2.2" fill="%23052e16" stroke="%2386efac" stroke-width="0.4"/>' +
+    '<circle cx="6" cy="64" r="2.2" fill="%23052e16" stroke="%2386efac" stroke-width="0.4"/>' +
+    '<circle cx="64" cy="64" r="2.2" fill="%23052e16" stroke="%2386efac" stroke-width="0.4"/>' +
+    '<rect x="18" y="4" width="34" height="12" rx="1.5" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="0.8"/>' +
+    '<rect x="21" y="6" width="28" height="8" rx="1" fill="%23e2e8f0"/>' +
+    '<circle cx="24" cy="10" r="1.1" fill="%23f59e0b"/><circle cx="28.5" cy="10" r="1.1" fill="%23f59e0b"/><circle cx="33" cy="10" r="1.1" fill="%23f59e0b"/><circle cx="37.5" cy="10" r="1.1" fill="%23f59e0b"/><circle cx="42" cy="10" r="1.1" fill="%23f59e0b"/>' +
+    '<text x="35" y="19" font-size="2.8" fill="%23bbf7d0" font-family="Arial" font-weight="bold" text-anchor="middle">STEPPER MOTOR</text>' +
+    '<rect x="15" y="23" width="40" height="18" rx="2" fill="url(%23uln_ic)" stroke="%233f3f46" stroke-width="0.6"/>' +
+    '<path d="M 15 30 A 2 2 0 0 1 15 34 Z" fill="%2309090b"/>' +
+    '<circle cx="19" cy="38" r="0.8" fill="%2352525b"/>' +
+    '<text x="35" y="32" font-size="4.5" fill="%23f4f4f5" font-family="Arial" font-weight="bold" text-anchor="middle">ULN2003A</text>' +
+    '<text x="35" y="38" font-size="2.6" fill="%23a1a1aa" font-family="Arial" text-anchor="middle">DARLINGTON ARRAY</text>' +
+    '<rect x="58" y="20" width="3.5" height="5" rx="0.8" fill="%23ef4444" stroke="%23991b1b" stroke-width="0.3"/><text x="64" y="24" font-size="3" fill="%23fecaca" font-family="Arial" font-weight="bold">A</text>' +
+    '<rect x="58" y="27" width="3.5" height="5" rx="0.8" fill="%23ef4444" stroke="%23991b1b" stroke-width="0.3"/><text x="64" y="31" font-size="3" fill="%23fecaca" font-family="Arial" font-weight="bold">B</text>' +
+    '<rect x="58" y="34" width="3.5" height="5" rx="0.8" fill="%23ef4444" stroke="%23991b1b" stroke-width="0.3"/><text x="64" y="38" font-size="3" fill="%23fecaca" font-family="Arial" font-weight="bold">C</text>' +
+    '<rect x="58" y="41" width="3.5" height="5" rx="0.8" fill="%23ef4444" stroke="%23991b1b" stroke-width="0.3"/><text x="64" y="45" font-size="3" fill="%23fecaca" font-family="Arial" font-weight="bold">D</text>' +
+    '<rect x="5" y="34" width="6" height="10" rx="1" fill="%2318181b"/>' +
+    '<circle cx="8" cy="37" r="1.1" fill="%23f59e0b"/><circle cx="8" cy="41" r="1.1" fill="%23f59e0b"/>' +
+    '<rect x="6.5" y="35" width="3" height="8" rx="0.5" fill="%23eab308"/>' +
+    '<text x="8" y="31" font-size="2.4" fill="%23bbf7d0" font-family="Arial" text-anchor="middle">5-12V</text>' +
+    '<rect x="4" y="58" width="62" height="7" rx="1" fill="%2318181b" stroke="%2327272a" stroke-width="0.5"/>' +
+    [7, 18, 29, 40, 51, 62].map((x) =>
+      `<rect x="${x - 1.5}" y="60" width="3" height="10" rx="0.5" fill="%23f59e0b" stroke="%23b45309" stroke-width="0.3"/>` +
+      `<circle cx="${x}" cy="69" r="1" fill="%23451a03"/>`
+    ).join('') +
+    '<text x="7" y="56" font-size="2.6" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">IN1</text>' +
+    '<text x="18" y="56" font-size="2.6" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">IN2</text>' +
+    '<text x="29" y="56" font-size="2.6" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">IN3</text>' +
+    '<text x="40" y="56" font-size="2.6" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">IN4</text>' +
+    '<text x="51" y="56" font-size="2.6" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">VCC</text>' +
+    '<text x="62" y="56" font-size="2.6" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">GND</text>'
   ),
 
   // ── Passives ──
   RESISTOR: svg('0 0 90 24',
-    '<defs><linearGradient id="res_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f4d39d"/><stop offset="100%25" stop-color="%23c58a48"/></linearGradient></defs>' +
-    '<rect x="0" y="10.2" width="19" height="3.6" rx="1.8" fill="%2394a3b8"/>' +
-    '<rect x="71" y="10.2" width="19" height="3.6" rx="1.8" fill="%2394a3b8"/>' +
-    '<rect x="18" y="2" width="54" height="20" rx="6" fill="url(%23res_body)" stroke="%2392452e" stroke-width="1"/>' +
-    '<rect x="26" y="3" width="5" height="18" rx="1" fill="%237c2d12"/>' +
-    '<rect x="37" y="3" width="5" height="18" rx="1" fill="%23111827"/>' +
-    '<rect x="48" y="3" width="5" height="18" rx="1" fill="%23dc2626"/>' +
-    '<rect x="60" y="3" width="3" height="18" rx="1" fill="%23d97706"/>'
+    '<defs>' +
+      '<linearGradient id="res_lead" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="res_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23fef3c7"/><stop offset="25%25" stop-color="%23fde68a"/><stop offset="70%25" stop-color="%23d97706"/><stop offset="100%25" stop-color="%2392400e"/></linearGradient>' +
+      '<linearGradient id="res_gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23fef08a"/><stop offset="45%25" stop-color="%23eab308"/><stop offset="100%25" stop-color="%23854d0e"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="0" y="10.5" width="23" height="3" rx="0.5" fill="url(%23res_lead)"/>' +
+    '<rect x="67" y="10.5" width="23" height="3" rx="0.5" fill="url(%23res_lead)"/>' +
+    '<circle cx="0.5" cy="12" r="1.5" fill="%2364748b"/><circle cx="89.5" cy="12" r="1.5" fill="%2364748b"/>' +
+    '<path d="M 23 7 C 23 4.5 25 3.5 27 3.5 L 63 3.5 C 65 3.5 67 4.5 67 7 L 67 17 C 67 19.5 65 20.5 63 20.5 L 27 20.5 C 25 20.5 23 19.5 23 17 Z" fill="url(%23res_body)" stroke="%2378350f" stroke-width="0.75"/>' +
+    '<rect x="21" y="4" width="6" height="16" rx="2" fill="url(%23res_body)" stroke="%2378350f" stroke-width="0.6"/>' +
+    '<rect x="63" y="4" width="6" height="16" rx="2" fill="url(%23res_body)" stroke="%2378350f" stroke-width="0.6"/>' +
+    '<rect x="29" y="3.5" width="4.5" height="17" fill="%235c2406"/>' +
+    '<rect x="39" y="3.5" width="4.5" height="17" fill="%230f172a"/>' +
+    '<rect x="49" y="3.5" width="4.5" height="17" fill="%23dc2626"/>' +
+    '<rect x="59" y="3.5" width="3.5" height="17" fill="url(%23res_gold)"/>' +
+    '<path d="M 24 5.5 L 66 5.5" stroke="%23ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.45"/>'
   ),
   CERAMIC_CAPACITOR: svg('0 0 44 60',
-    '<defs><linearGradient id="cer_cap" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23fde68a"/><stop offset="100%25" stop-color="%23d97706"/></linearGradient></defs>' +
-    '<rect x="15" y="38" width="3" height="22" rx="1.5" fill="%2394a3b8"/>' +
-    '<rect x="27" y="38" width="3" height="22" rx="1.5" fill="%2394a3b8"/>' +
-    '<path d="M11 7 Q22 -1 33 7 Q39 16 37 31 Q34 43 22 44 Q10 43 7 31 Q5 16 11 7Z" fill="url(%23cer_cap)" stroke="%2392452e" stroke-width="1.2"/>' +
-    '<path d="M14 16h16M13 23h18M14 30h16" stroke="%23fef3c7" stroke-width="1.4" opacity="0.7"/>' +
-    '<text x="22" y="37" font-size="7" fill="%237c2d12" text-anchor="middle" font-family="Arial" font-weight="bold">104</text>'
+    '<defs>' +
+      '<radialGradient id="cer_body" cx="35%25" cy="35%25" r="65%25"><stop offset="0%25" stop-color="%23fde68a"/><stop offset="35%25" stop-color="%23f59e0b"/><stop offset="85%25" stop-color="%23b45309"/><stop offset="100%25" stop-color="%2378350f"/></radialGradient>' +
+      '<linearGradient id="cer_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="14.8" y="34" width="2.4" height="26" rx="0.5" fill="url(%23cer_lead)"/>' +
+    '<circle cx="16" cy="59" r="1.5" fill="%23475569"/>' +
+    '<rect x="26.8" y="34" width="2.4" height="26" rx="0.5" fill="url(%23cer_lead)"/>' +
+    '<circle cx="28" cy="59" r="1.5" fill="%23475569"/>' +
+    '<ellipse cx="16" cy="37" rx="2.5" ry="1.2" fill="%2394a3b8"/>' +
+    '<ellipse cx="28" cy="37" rx="2.5" ry="1.2" fill="%2394a3b8"/>' +
+    '<path d="M 9 8 Q 22 1 35 8 Q 41 18 39 31 Q 35 41 22 42 Q 9 41 5 31 Q 3 18 9 8 Z" fill="url(%23cer_body)" stroke="%2378350f" stroke-width="1"/>' +
+    '<text x="22" y="24" font-size="8" fill="%23451a03" font-family="Arial" font-weight="900" text-anchor="middle" letter-spacing="0.5">104</text>' +
+    '<line x1="15" y1="27" x2="29" y2="27" stroke="%23451a03" stroke-width="1" stroke-linecap="round"/>' +
+    '<text x="22" y="34" font-size="5" fill="%235c2406" font-family="Arial" text-anchor="middle">50V</text>' +
+    '<path d="M 12 12 Q 22 5 32 12" fill="none" stroke="%23ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>'
   ),
   CAPACITOR: svg('0 0 44 60',
-    '<defs><linearGradient id="cap_alias" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23fde68a"/><stop offset="100%25" stop-color="%23d97706"/></linearGradient></defs>' +
-    '<rect x="15" y="38" width="3" height="22" rx="1.5" fill="%2394a3b8"/>' +
-    '<rect x="27" y="38" width="3" height="22" rx="1.5" fill="%2394a3b8"/>' +
-    '<path d="M11 7 Q22 -1 33 7 Q39 16 37 31 Q34 43 22 44 Q10 43 7 31 Q5 16 11 7Z" fill="url(%23cap_alias)" stroke="%2392452e" stroke-width="1.2"/>' +
-    '<text x="22" y="37" font-size="7" fill="%237c2d12" text-anchor="middle" font-family="Arial" font-weight="bold">104</text>'
+    '<defs>' +
+      '<radialGradient id="cap_body" cx="35%25" cy="35%25" r="65%25"><stop offset="0%25" stop-color="%23fde68a"/><stop offset="35%25" stop-color="%23f59e0b"/><stop offset="85%25" stop-color="%23b45309"/><stop offset="100%25" stop-color="%2378350f"/></radialGradient>' +
+      '<linearGradient id="cap_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="14.8" y="34" width="2.4" height="26" rx="0.5" fill="url(%23cap_lead)"/>' +
+    '<circle cx="16" cy="59" r="1.5" fill="%23475569"/>' +
+    '<rect x="26.8" y="34" width="2.4" height="26" rx="0.5" fill="url(%23cap_lead)"/>' +
+    '<circle cx="28" cy="59" r="1.5" fill="%23475569"/>' +
+    '<ellipse cx="16" cy="37" rx="2.5" ry="1.2" fill="%2394a3b8"/>' +
+    '<ellipse cx="28" cy="37" rx="2.5" ry="1.2" fill="%2394a3b8"/>' +
+    '<path d="M 9 8 Q 22 1 35 8 Q 41 18 39 31 Q 35 41 22 42 Q 9 41 5 31 Q 3 18 9 8 Z" fill="url(%23cap_body)" stroke="%2378350f" stroke-width="1"/>' +
+    '<text x="22" y="24" font-size="8" fill="%23451a03" font-family="Arial" font-weight="900" text-anchor="middle" letter-spacing="0.5">104</text>' +
+    '<line x1="15" y1="27" x2="29" y2="27" stroke="%23451a03" stroke-width="1" stroke-linecap="round"/>' +
+    '<text x="22" y="34" font-size="5" fill="%235c2406" font-family="Arial" text-anchor="middle">50V</text>' +
+    '<path d="M 12 12 Q 22 5 32 12" fill="none" stroke="%23ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>'
   ),
   ELECTROLYTIC_CAPACITOR: svg('0 0 46 70',
-    '<defs><linearGradient id="elyt" x1="0" y1="0" x2="1" y2="1"><stop offset="0%25" stop-color="%23334155"/><stop offset="55%25" stop-color="%231e293b"/><stop offset="100%25" stop-color="%230f172a"/></linearGradient></defs>' +
-    '<rect x="14" y="49" width="3.5" height="21" rx="1.5" fill="%2394a3b8"/>' +
-    '<rect x="28.5" y="49" width="3.5" height="21" rx="1.5" fill="%2394a3b8"/>' +
-    '<rect x="8" y="5" width="30" height="48" rx="8" fill="url(%23elyt)" stroke="%23475569" stroke-width="1.4"/>' +
-    '<rect x="28" y="8" width="6" height="42" rx="2" fill="%23e5e7eb" opacity="0.86"/>' +
-    '<path d="M30 15h3M30 24h3M30 33h3M30 42h3" stroke="%230f172a" stroke-width="1"/>' +
-    '<text x="17" y="26" font-size="7" fill="%23cbd5e1" text-anchor="middle" font-family="Arial" font-weight="bold">10uF</text>' +
-    '<text x="16" y="40" font-size="8" fill="%23f8fafc" text-anchor="middle" font-family="Arial" font-weight="bold">+</text>'
+    '<defs>' +
+      '<linearGradient id="elyt_sleeve" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%231e293b"/><stop offset="35%25" stop-color="%23334155"/><stop offset="85%25" stop-color="%230f172a"/><stop offset="100%25" stop-color="%23020617"/></linearGradient>' +
+      '<linearGradient id="elyt_alu" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="50%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+      '<linearGradient id="elyt_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="14.8" y="48" width="2.4" height="22" rx="0.5" fill="url(%23elyt_lead)"/>' +
+    '<circle cx="16" cy="69" r="1.5" fill="%23475569"/>' +
+    '<rect x="28.8" y="48" width="2.4" height="22" rx="0.5" fill="url(%23elyt_lead)"/>' +
+    '<circle cx="30" cy="69" r="1.5" fill="%23475569"/>' +
+    '<rect x="7" y="4" width="32" height="7" rx="3.5" fill="url(%23elyt_alu)" stroke="%2364748b" stroke-width="0.75"/>' +
+    '<line x1="20" y1="5.5" x2="26" y2="9.5" stroke="%23475569" stroke-width="0.8"/>' +
+    '<line x1="26" y1="5.5" x2="20" y2="9.5" stroke="%23475569" stroke-width="0.8"/>' +
+    '<rect x="7" y="8" width="32" height="42" rx="2" fill="url(%23elyt_sleeve)" stroke="%231e293b" stroke-width="0.75"/>' +
+    '<rect x="27.5" y="8" width="6.5" height="42" fill="%23e2e8f0"/>' +
+    '<text x="30.75" y="17" font-size="7" fill="%230f172a" font-family="Arial" font-weight="900" text-anchor="middle">−</text>' +
+    '<text x="30.75" y="27" font-size="7" fill="%230f172a" font-family="Arial" font-weight="900" text-anchor="middle">−</text>' +
+    '<text x="30.75" y="37" font-size="7" fill="%230f172a" font-family="Arial" font-weight="900" text-anchor="middle">−</text>' +
+    '<text x="30.75" y="47" font-size="7" fill="%230f172a" font-family="Arial" font-weight="900" text-anchor="middle">−</text>' +
+    '<text x="17" y="24" font-size="7" fill="%23fde047" font-family="Arial" font-weight="bold" text-anchor="middle">10µF</text>' +
+    '<text x="17" y="34" font-size="6" fill="%23fde047" font-family="Arial" font-weight="bold" text-anchor="middle">50V</text>' +
+    '<text x="17" y="44" font-size="4.5" fill="%23cbd5e1" font-family="Arial" text-anchor="middle">105°C</text>' +
+    '<line x1="10" y1="9" x2="10" y2="48" stroke="%23ffffff" stroke-width="1" opacity="0.3"/>'
   ),
   DIODE: svg('0 0 72 28',
-    '<rect x="0" y="12" width="20" height="4" rx="2" fill="%2394a3b8"/>' +
-    '<rect x="52" y="12" width="20" height="4" rx="2" fill="%2394a3b8"/>' +
-    '<rect x="20" y="6" width="32" height="16" rx="4" fill="%23111827" stroke="%23475569" stroke-width="1.2"/>' +
-    '<path d="M30 8v12" stroke="%23e5e7eb" stroke-width="2"/>' +
-    '<rect x="43" y="6" width="3" height="16" fill="%23e5e7eb"/>' +
-    '<text x="36" y="18" font-size="6" fill="%2394a3b8" text-anchor="middle" font-family="Arial">1N4148</text>'
+    '<defs>' +
+      '<linearGradient id="dio_lead" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="dio_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2327272a"/><stop offset="50%25" stop-color="%2318181b"/><stop offset="100%25" stop-color="%2309090b"/></linearGradient>' +
+      '<linearGradient id="dio_silver" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="50%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="0" y="12.5" width="20" height="3" rx="0.5" fill="url(%23dio_lead)"/>' +
+    '<circle cx="0.5" cy="14" r="1.5" fill="%2364748b"/>' +
+    '<rect x="52" y="12.5" width="20" height="3" rx="0.5" fill="url(%23dio_lead)"/>' +
+    '<circle cx="71.5" cy="14" r="1.5" fill="%2364748b"/>' +
+    '<rect x="18" y="6" width="36" height="16" rx="2.5" fill="url(%23dio_body)" stroke="%233f3f46" stroke-width="0.75"/>' +
+    '<rect x="44" y="6" width="5.5" height="16" fill="url(%23dio_silver)"/>' +
+    '<text x="32" y="16.5" font-size="6" fill="%23a1a1aa" font-family="Arial" font-weight="bold" text-anchor="middle" letter-spacing="0.5">1N4007</text>' +
+    '<line x1="20" y1="7.5" x2="52" y2="7.5" stroke="%23ffffff" stroke-width="0.8" opacity="0.4"/>'
   ),
   NPN_TRANSISTOR: svg('0 0 56 70',
-    '<rect x="12" y="6" width="32" height="42" rx="15" fill="%23111827" stroke="%23475569" stroke-width="1.3"/>' +
-    '<path d="M18 48v22M28 48v22M38 48v22" stroke="%2394a3b8" stroke-width="3" stroke-linecap="round"/>' +
-    '<path d="M20 28h16M28 18v22M29 38l8 7" stroke="%23cbd5e1" stroke-width="1.6" stroke-linecap="round"/>' +
-    '<path d="M37 45l-1-6l-5 3Z" fill="%23cbd5e1"/>' +
-    '<text x="28" y="15" font-size="7" fill="%23e5e7eb" text-anchor="middle" font-family="Arial" font-weight="bold">NPN</text>'
+    '<defs>' +
+      '<linearGradient id="to92_body" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23334155"/><stop offset="30%25" stop-color="%231e293b"/><stop offset="85%25" stop-color="%230f172a"/><stop offset="100%25" stop-color="%23020617"/></linearGradient>' +
+      '<linearGradient id="to92_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="12.8" y="42" width="2.4" height="28" rx="0.5" fill="url(%23to92_lead)"/>' +
+    '<circle cx="14" cy="69" r="1.5" fill="%23475569"/>' +
+    '<rect x="26.8" y="42" width="2.4" height="28" rx="0.5" fill="url(%23to92_lead)"/>' +
+    '<circle cx="28" cy="69" r="1.5" fill="%23475569"/>' +
+    '<rect x="40.8" y="42" width="2.4" height="28" rx="0.5" fill="url(%23to92_lead)"/>' +
+    '<circle cx="42" cy="69" r="1.5" fill="%23475569"/>' +
+    '<path d="M 12 12 Q 28 4 44 12 L 44 42 C 44 45 42 46 39 46 L 17 46 C 14 46 12 45 12 42 Z" fill="url(%23to92_body)" stroke="%23334155" stroke-width="0.8"/>' +
+    '<line x1="14" y1="44" x2="42" y2="44" stroke="%23475569" stroke-width="0.6"/>' +
+    '<text x="28" y="24" font-size="7.5" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">2N3904</text>' +
+    '<text x="28" y="34" font-size="5" fill="%2394a3b8" font-family="Arial" text-anchor="middle">C  B  E</text>' +
+    '<path d="M 16 12 Q 28 6 40 12" fill="none" stroke="%23ffffff" stroke-width="1" opacity="0.35"/>'
   ),
   PNP_TRANSISTOR: svg('0 0 56 70',
-    '<rect x="12" y="6" width="32" height="42" rx="15" fill="%23111827" stroke="%23475569" stroke-width="1.3"/>' +
-    '<path d="M18 48v22M28 48v22M38 48v22" stroke="%2394a3b8" stroke-width="3" stroke-linecap="round"/>' +
-    '<path d="M20 28h16M28 18v22M36 39l-8-7" stroke="%23cbd5e1" stroke-width="1.6" stroke-linecap="round"/>' +
-    '<path d="M28 32l6 1l-3 5Z" fill="%23cbd5e1"/>' +
-    '<text x="28" y="15" font-size="7" fill="%23e5e7eb" text-anchor="middle" font-family="Arial" font-weight="bold">PNP</text>'
+    '<defs>' +
+      '<linearGradient id="to92_body2" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23334155"/><stop offset="30%25" stop-color="%231e293b"/><stop offset="85%25" stop-color="%230f172a"/><stop offset="100%25" stop-color="%23020617"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="12.8" y="42" width="2.4" height="28" rx="0.5" fill="url(%23to92_lead)"/>' +
+    '<circle cx="14" cy="69" r="1.5" fill="%23475569"/>' +
+    '<rect x="26.8" y="42" width="2.4" height="28" rx="0.5" fill="url(%23to92_lead)"/>' +
+    '<circle cx="28" cy="69" r="1.5" fill="%23475569"/>' +
+    '<rect x="40.8" y="42" width="2.4" height="28" rx="0.5" fill="url(%23to92_lead)"/>' +
+    '<circle cx="42" cy="69" r="1.5" fill="%23475569"/>' +
+    '<path d="M 12 12 Q 28 4 44 12 L 44 42 C 44 45 42 46 39 46 L 17 46 C 14 46 12 45 12 42 Z" fill="url(%23to92_body2)" stroke="%23334155" stroke-width="0.8"/>' +
+    '<line x1="14" y1="44" x2="42" y2="44" stroke="%23475569" stroke-width="0.6"/>' +
+    '<text x="28" y="24" font-size="7.5" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">2N3906</text>' +
+    '<text x="28" y="34" font-size="5" fill="%2394a3b8" font-family="Arial" text-anchor="middle">E  B  C</text>' +
+    '<path d="M 16 12 Q 28 6 40 12" fill="none" stroke="%23ffffff" stroke-width="1" opacity="0.35"/>'
   ),
   VOLTAGE_REGULATOR_7805: svg('0 0 64 72',
-    '<defs><linearGradient id="reg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23475569"/><stop offset="100%25" stop-color="%23111827"/></linearGradient></defs>' +
-    '<rect x="18" y="3" width="28" height="14" rx="3" fill="%2394a3b8" stroke="%2364748b" stroke-width="1"/>' +
-    '<circle cx="32" cy="10" r="3" fill="%23e5e7eb"/>' +
-    '<rect x="10" y="14" width="44" height="38" rx="5" fill="url(%23reg)" stroke="%23475569" stroke-width="1.4"/>' +
-    '<text x="32" y="31" font-size="9" fill="%23f8fafc" text-anchor="middle" font-family="Arial" font-weight="bold">7805</text>' +
-    '<text x="32" y="43" font-size="6" fill="%23cbd5e1" text-anchor="middle" font-family="Arial">5V REG</text>' +
-    '<path d="M16 52v20M32 52v20M48 52v20" stroke="%2394a3b8" stroke-width="4" stroke-linecap="round"/>'
+    '<defs>' +
+      '<linearGradient id="reg_tab" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+      '<linearGradient id="reg_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23334155"/><stop offset="50%25" stop-color="%231e293b"/><stop offset="100%25" stop-color="%230f172a"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="14.5" y="44" width="3" height="28" rx="0.5" fill="%2394a3b8"/><circle cx="16" cy="71.5" r="1.5" fill="%23475569"/>' +
+    '<rect x="30.5" y="44" width="3" height="28" rx="0.5" fill="%2394a3b8"/><circle cx="32" cy="71.5" r="1.5" fill="%23475569"/>' +
+    '<rect x="46.5" y="44" width="3" height="28" rx="0.5" fill="%2394a3b8"/><circle cx="48" cy="71.5" r="1.5" fill="%23475569"/>' +
+    '<rect x="14" y="6" width="36" height="20" rx="2" fill="url(%23reg_tab)" stroke="%2364748b" stroke-width="0.75"/>' +
+    '<circle cx="32" cy="16" r="4.5" fill="%23475569"/><circle cx="32" cy="16" r="3" fill="%230f172a"/>' +
+    '<rect x="10" y="22" width="44" height="28" rx="3" fill="url(%23reg_body)" stroke="%23475569" stroke-width="0.8"/>' +
+    '<rect x="12" y="24" width="40" height="3" rx="1" fill="%230f172a" opacity="0.4"/>' +
+    '<text x="32" y="38" font-size="8" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">L7805CV</text>' +
+    '<text x="32" y="46" font-size="4.5" fill="%23cbd5e1" font-family="Arial" text-anchor="middle">VIN  GND  VOUT</text>'
   ),
   POTENTIOMETER: svg('0 0 50 50',
-    '<defs><radialGradient id="pot"><stop offset="0%25" stop-color="%23e0f2fe"/><stop offset="70%25" stop-color="%230ea5e9"/><stop offset="100%25" stop-color="%230c4a6e"/></radialGradient></defs>' +
-    '<circle cx="25" cy="25" r="20" fill="url(%23pot)" stroke="%230f172a" stroke-width="1"/>' +
-    '<circle cx="25" cy="25" r="13" fill="%231e293b" opacity="0.82"/>' +
-    '<line x1="25" y1="25" x2="25" y2="8" stroke="%23f8fafc" stroke-width="2.2" stroke-linecap="round"/>' +
-    '<circle cx="25" cy="25" r="4" fill="%23cbd5e1"/>' +
-    '<rect x="6" y="44" width="4" height="6" fill="%2394a3b8"/>' +
-    '<rect x="22" y="44" width="4" height="6" fill="%2394a3b8"/>' +
-    '<rect x="40" y="44" width="4" height="6" fill="%2394a3b8"/>'
+    '<defs>' +
+      '<radialGradient id="pot_casing" cx="40%25" cy="40%25" r="60%25"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="45%25" stop-color="%23cbd5e1"/><stop offset="85%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></radialGradient>' +
+      '<radialGradient id="pot_knob" cx="35%25" cy="35%25" r="65%25"><stop offset="0%25" stop-color="%2338bdf8"/><stop offset="45%25" stop-color="%230284c7"/><stop offset="100%25" stop-color="%230c4a6e"/></radialGradient>' +
+    '</defs>' +
+    '<rect x="8" y="42" width="4" height="8" rx="0.5" fill="%2394a3b8"/>' +
+    '<circle cx="10" cy="49" r="1.8" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.4"/><circle cx="10" cy="49" r="0.9" fill="%230f172a"/>' +
+    '<rect x="38" y="42" width="4" height="8" rx="0.5" fill="%2394a3b8"/>' +
+    '<circle cx="40" cy="49" r="1.8" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.4"/><circle cx="40" cy="49" r="0.9" fill="%230f172a"/>' +
+    '<rect x="23" y="0" width="4" height="8" rx="0.5" fill="%2394a3b8"/>' +
+    '<circle cx="25" cy="1" r="1.8" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.4"/><circle cx="25" cy="1" r="0.9" fill="%230f172a"/>' +
+    '<circle cx="25" cy="25" r="20" fill="url(%23pot_casing)" stroke="%2364748b" stroke-width="1"/>' +
+    '<circle cx="25" cy="25" r="18.5" fill="none" stroke="%23f8fafc" stroke-width="0.6" opacity="0.6"/>' +
+    '<circle cx="25" cy="25" r="12" fill="url(%23pot_knob)" stroke="%23075985" stroke-width="0.8"/>' +
+    '<line x1="25" y1="25" x2="25" y2="15" stroke="%23ffffff" stroke-width="2.2" stroke-linecap="round"/>' +
+    '<circle cx="25" cy="25" r="3.5" fill="%23f8fafc"/>'
   ),
   PUSH_BUTTON: svg('0 0 40 40',
-    '<rect x="4" y="8" width="32" height="24" rx="5" fill="%23e5e7eb" stroke="%2394a3b8" stroke-width="1.2"/>' +
-    '<circle cx="20" cy="20" r="9" fill="%23ef4444" stroke="%23991b1b" stroke-width="1.2"/>' +
-    '<circle cx="20" cy="18" r="4" fill="%23fecaca" opacity="0.6"/>' +
-    '<rect x="0" y="9" width="5" height="5" fill="%2394a3b8"/>' +
-    '<rect x="35" y="9" width="5" height="5" fill="%2394a3b8"/>' +
-    '<rect x="0" y="26" width="5" height="5" fill="%2394a3b8"/>' +
-    '<rect x="35" y="26" width="5" height="5" fill="%2394a3b8"/>'
+    '<defs>' +
+      '<linearGradient id="btn_metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="35%25" stop-color="%23e2e8f0"/><stop offset="70%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%23cbd5e1"/></linearGradient>' +
+      '<linearGradient id="btn_lead" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<radialGradient id="btn_cap" cx="35%25" cy="35%25" r="65%25"><stop offset="0%25" stop-color="%23fca5a5"/><stop offset="40%25" stop-color="%23ef4444"/><stop offset="100%25" stop-color="%23991b1b"/></radialGradient>' +
+    '</defs>' +
+    '<rect x="0" y="8.5" width="6" height="3" rx="0.5" fill="url(%23btn_lead)"/>' +
+    '<rect x="0" y="28.5" width="6" height="3" rx="0.5" fill="url(%23btn_lead)"/>' +
+    '<rect x="34" y="8.5" width="6" height="3" rx="0.5" fill="url(%23btn_lead)"/>' +
+    '<rect x="34" y="28.5" width="6" height="3" rx="0.5" fill="url(%23btn_lead)"/>' +
+    '<line x1="3" y1="8.5" x2="3" y2="11.5" stroke="%23475569" stroke-width="0.5"/>' +
+    '<line x1="3" y1="28.5" x2="3" y2="31.5" stroke="%23475569" stroke-width="0.5"/>' +
+    '<line x1="37" y1="8.5" x2="37" y2="11.5" stroke="%23475569" stroke-width="0.5"/>' +
+    '<line x1="37" y1="28.5" x2="37" y2="31.5" stroke="%23475569" stroke-width="0.5"/>' +
+    '<rect x="5" y="5" width="30" height="30" rx="3.5" fill="%230f172a" stroke="%231e293b" stroke-width="0.8"/>' +
+    '<rect x="5.5" y="5.5" width="29" height="29" rx="2.5" fill="url(%23btn_metal)" stroke="%2364748b" stroke-width="0.75"/>' +
+    '<circle cx="8" cy="8" r="1.3" fill="%2364748b" stroke="%23cbd5e1" stroke-width="0.4"/>' +
+    '<circle cx="32" cy="8" r="1.3" fill="%2364748b" stroke="%23cbd5e1" stroke-width="0.4"/>' +
+    '<circle cx="8" cy="32" r="1.3" fill="%2364748b" stroke="%23cbd5e1" stroke-width="0.4"/>' +
+    '<circle cx="32" cy="32" r="1.3" fill="%2364748b" stroke="%23cbd5e1" stroke-width="0.4"/>' +
+    '<circle cx="20" cy="20" r="11" fill="%23334155" stroke="%23475569" stroke-width="0.8"/>' +
+    '<circle cx="20" cy="20" r="9.5" fill="%23020617"/>' +
+    '<circle cx="20" cy="20" r="8.5" fill="url(%23btn_cap)" stroke="%23991b1b" stroke-width="0.8"/>' +
+    '<path d="M 14.5 17 A 6.5 6.5 0 0 1 25.5 17" fill="none" stroke="%23ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.65"/>' +
+    '<circle cx="17.5" cy="17" r="1.3" fill="%23ffffff" opacity="0.6"/>'
   ),
   BUTTON: svg('0 0 40 40',
-    '<rect x="4" y="8" width="32" height="24" rx="5" fill="%23e5e7eb" stroke="%2394a3b8" stroke-width="1.2"/>' +
-    '<circle cx="20" cy="20" r="9" fill="%23ef4444" stroke="%23991b1b" stroke-width="1.2"/>' +
-    '<circle cx="20" cy="18" r="4" fill="%23fecaca" opacity="0.6"/>' +
-    '<rect x="0" y="9" width="5" height="5" fill="%2394a3b8"/>' +
-    '<rect x="35" y="9" width="5" height="5" fill="%2394a3b8"/>' +
-    '<rect x="0" y="26" width="5" height="5" fill="%2394a3b8"/>' +
-    '<rect x="35" y="26" width="5" height="5" fill="%2394a3b8"/>'
+    '<defs>' +
+      '<linearGradient id="btn_metal2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="35%25" stop-color="%23e2e8f0"/><stop offset="70%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%23cbd5e1"/></linearGradient>' +
+      '<linearGradient id="btn_lead2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<radialGradient id="btn_cap2" cx="35%25" cy="35%25" r="65%25"><stop offset="0%25" stop-color="%23fca5a5"/><stop offset="40%25" stop-color="%23ef4444"/><stop offset="100%25" stop-color="%23991b1b"/></radialGradient>' +
+    '</defs>' +
+    '<rect x="0" y="8.5" width="6" height="3" rx="0.5" fill="url(%23btn_lead2)"/>' +
+    '<rect x="0" y="28.5" width="6" height="3" rx="0.5" fill="url(%23btn_lead2)"/>' +
+    '<rect x="34" y="8.5" width="6" height="3" rx="0.5" fill="url(%23btn_lead2)"/>' +
+    '<rect x="34" y="28.5" width="6" height="3" rx="0.5" fill="url(%23btn_lead2)"/>' +
+    '<line x1="3" y1="8.5" x2="3" y2="11.5" stroke="%23475569" stroke-width="0.5"/>' +
+    '<line x1="3" y1="28.5" x2="3" y2="31.5" stroke="%23475569" stroke-width="0.5"/>' +
+    '<line x1="37" y1="8.5" x2="37" y2="11.5" stroke="%23475569" stroke-width="0.5"/>' +
+    '<line x1="37" y1="28.5" x2="37" y2="31.5" stroke="%23475569" stroke-width="0.5"/>' +
+    '<rect x="5" y="5" width="30" height="30" rx="3.5" fill="%230f172a" stroke="%231e293b" stroke-width="0.8"/>' +
+    '<rect x="5.5" y="5.5" width="29" height="29" rx="2.5" fill="url(%23btn_metal2)" stroke="%2364748b" stroke-width="0.75"/>' +
+    '<circle cx="8" cy="8" r="1.3" fill="%2364748b" stroke="%23cbd5e1" stroke-width="0.4"/>' +
+    '<circle cx="32" cy="8" r="1.3" fill="%2364748b" stroke="%23cbd5e1" stroke-width="0.4"/>' +
+    '<circle cx="8" cy="32" r="1.3" fill="%2364748b" stroke="%23cbd5e1" stroke-width="0.4"/>' +
+    '<circle cx="32" cy="32" r="1.3" fill="%2364748b" stroke="%23cbd5e1" stroke-width="0.4"/>' +
+    '<circle cx="20" cy="20" r="11" fill="%23334155" stroke="%23475569" stroke-width="0.8"/>' +
+    '<circle cx="20" cy="20" r="9.5" fill="%23020617"/>' +
+    '<circle cx="20" cy="20" r="8.5" fill="url(%23btn_cap2)" stroke="%23991b1b" stroke-width="0.8"/>' +
+    '<path d="M 14.5 17 A 6.5 6.5 0 0 1 25.5 17" fill="none" stroke="%23ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.65"/>' +
+    '<circle cx="17.5" cy="17" r="1.3" fill="%23ffffff" opacity="0.6"/>'
+  ),
+  SWITCH_SPST: svg('0 0 60 30',
+    '<defs>' +
+      '<linearGradient id="sw_plate" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="30%25" stop-color="%23e2e8f0"/><stop offset="70%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+      '<linearGradient id="sw_knob" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%233f3f46"/><stop offset="50%25" stop-color="%2327272a"/><stop offset="100%25" stop-color="%2318181b"/></linearGradient>' +
+      '<linearGradient id="sw_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="31" y="13" width="7" height="4" rx="0.5" fill="url(%23sw_lead)"/>' +
+    '<circle cx="34" cy="15" r="1.8" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.5"/><circle cx="34" cy="15" r="0.9" fill="%230f172a"/>' +
+    '<rect x="51" y="13" width="7" height="4" rx="0.5" fill="url(%23sw_lead)"/>' +
+    '<circle cx="54" cy="15" r="1.8" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.5"/><circle cx="54" cy="15" r="0.9" fill="%230f172a"/>' +
+    '<rect x="2" y="4" width="28" height="22" rx="2" fill="%2309090b" stroke="%2318181b" stroke-width="0.75"/>' +
+    '<rect x="4" y="6" width="24" height="18" rx="1.5" fill="url(%23sw_plate)" stroke="%2364748b" stroke-width="0.6"/>' +
+    '<circle cx="7.5" cy="15" r="1.5" fill="%23475569" stroke="%23cbd5e1" stroke-width="0.4"/>' +
+    '<rect x="12" y="10" width="13" height="10" rx="1.5" fill="%2318181b" stroke="%2309090b" stroke-width="0.5"/>' +
+    '<rect x="13" y="11" width="6" height="8" rx="1" fill="url(%23sw_knob)" stroke="%2309090b" stroke-width="0.5"/>' +
+    '<line x1="15" y1="12" x2="15" y2="18" stroke="%2352525b" stroke-width="0.6"/>' +
+    '<line x1="17" y1="12" x2="17" y2="18" stroke="%2352525b" stroke-width="0.6"/>' +
+    '<text x="21" y="9" font-size="4" fill="%23475569" font-family="Arial" font-weight="bold">ON</text>'
   ),
   BREADBOARD: svg('0 0 220 120',
-    '<rect x="2" y="2" width="216" height="116" rx="6" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="2"/>' +
-    '<rect x="8" y="7" width="204" height="8" rx="2" fill="%23fee2e2"/>' +
-    '<rect x="8" y="19" width="204" height="8" rx="2" fill="%23dbeafe"/>' +
-    '<rect x="8" y="93" width="204" height="8" rx="2" fill="%23fee2e2"/>' +
-    '<rect x="8" y="105" width="204" height="8" rx="2" fill="%23dbeafe"/>' +
-    '<rect x="8" y="34" width="204" height="30" rx="3" fill="%23eef2f7"/>' +
-    '<rect x="8" y="72" width="204" height="30" rx="3" fill="%23eef2f7"/>' +
-    '<rect x="8" y="65" width="204" height="5" rx="2" fill="%23cbd5e1" opacity="0.8"/>' +
-    '<path d="M14 11h192M14 23h192M14 97h192M14 109h192" stroke="%23ffffff" stroke-width="1" opacity="0.7"/>' +
-    '<g fill="%2394a3b8" opacity="0.78">' +
+    '<defs>' +
+      '<linearGradient id="bb_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23ffffff"/><stop offset="3%25" stop-color="%23f8fafc"/><stop offset="97%25" stop-color="%23f1f5f9"/><stop offset="100%25" stop-color="%23e2e8f0"/></linearGradient>' +
+      '<linearGradient id="bb_trough" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23cbd5e1"/><stop offset="25%25" stop-color="%23e2e8f0"/><stop offset="75%25" stop-color="%23e2e8f0"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="216" height="116" rx="4" fill="url(%23bb_body)" stroke="%2394a3b8" stroke-width="1.2"/>' +
+    '<rect x="0" y="45" width="2.5" height="10" rx="1" fill="%23cbd5e1"/>' +
+    '<rect x="0" y="65" width="2.5" height="10" rx="1" fill="%23cbd5e1"/>' +
+    '<rect x="217.5" y="45" width="2.5" height="10" rx="1" fill="%23cbd5e1"/>' +
+    '<rect x="217.5" y="65" width="2.5" height="10" rx="1" fill="%23cbd5e1"/>' +
+    '<line x1="12" y1="6" x2="208" y2="6" stroke="%23ef4444" stroke-width="1" stroke-linecap="round"/>' +
+    '<line x1="12" y1="26" x2="208" y2="26" stroke="%233b82f6" stroke-width="1" stroke-linecap="round"/>' +
+    '<line x1="12" y1="94" x2="208" y2="94" stroke="%23ef4444" stroke-width="1" stroke-linecap="round"/>' +
+    '<line x1="12" y1="114" x2="208" y2="114" stroke="%233b82f6" stroke-width="1" stroke-linecap="round"/>' +
+    '<text x="8" y="7.5" font-size="5.5" fill="%23ef4444" font-family="Arial" font-weight="900" text-anchor="middle">+</text>' +
+    '<text x="212" y="7.5" font-size="5.5" fill="%23ef4444" font-family="Arial" font-weight="900" text-anchor="middle">+</text>' +
+    '<text x="8" y="27" font-size="6" fill="%233b82f6" font-family="Arial" font-weight="900" text-anchor="middle">−</text>' +
+    '<text x="212" y="27" font-size="6" fill="%233b82f6" font-family="Arial" font-weight="900" text-anchor="middle">−</text>' +
+    '<text x="8" y="95.5" font-size="5.5" fill="%23ef4444" font-family="Arial" font-weight="900" text-anchor="middle">+</text>' +
+    '<text x="212" y="95.5" font-size="5.5" fill="%23ef4444" font-family="Arial" font-weight="900" text-anchor="middle">+</text>' +
+    '<text x="8" y="115" font-size="6" fill="%233b82f6" font-family="Arial" font-weight="900" text-anchor="middle">−</text>' +
+    '<text x="212" y="115" font-size="6" fill="%233b82f6" font-family="Arial" font-weight="900" text-anchor="middle">−</text>' +
+    '<rect x="10" y="69" width="200" height="4" rx="1" fill="url(%23bb_trough)"/>' +
+    ['a', 'b', 'c', 'd', 'e'].map((r, i) =>
+      `<text x="10" y="${41.5 + i * 6}" font-size="4" fill="%2394a3b8" font-family="Arial" font-weight="bold" text-anchor="end">${r}</text>` +
+      `<text x="210" y="${41.5 + i * 6}" font-size="4" fill="%2394a3b8" font-family="Arial" font-weight="bold" text-anchor="start">${r}</text>`
+    ).join('') +
+    ['f', 'g', 'h', 'i', 'j'].map((r, i) =>
+      `<text x="10" y="${79.5 + i * 6}" font-size="4" fill="%2394a3b8" font-family="Arial" font-weight="bold" text-anchor="end">${r}</text>` +
+      `<text x="210" y="${79.5 + i * 6}" font-size="4" fill="%2394a3b8" font-family="Arial" font-weight="bold" text-anchor="start">${r}</text>`
+    ).join('') +
+    [1, 5, 10, 15, 20, 25, 30].map(c => {
+      const x = 15 + (c - 1) * 6.55;
+      return `<text x="${x.toFixed(2)}" y="35" font-size="4" fill="%2364748b" font-family="Arial" font-weight="bold" text-anchor="middle">${c}</text>` +
+             `<text x="${x.toFixed(2)}" y="108" font-size="4" fill="%2364748b" font-family="Arial" font-weight="bold" text-anchor="middle">${c}</text>`;
+    }).join('') +
+    '<g>' +
     Array.from({ length: 30 }, (_, i) => {
-      const x = 15 + i * 6.55;
-      return `<circle cx="${x.toFixed(2)}" cy="10" r="1.3"/><circle cx="${x.toFixed(2)}" cy="22" r="1.3"/><circle cx="${x.toFixed(2)}" cy="40" r="1.3"/><circle cx="${x.toFixed(2)}" cy="46" r="1.3"/><circle cx="${x.toFixed(2)}" cy="52" r="1.3"/><circle cx="${x.toFixed(2)}" cy="58" r="1.3"/><circle cx="${x.toFixed(2)}" cy="64" r="1.3"/><circle cx="${x.toFixed(2)}" cy="78" r="1.3"/><circle cx="${x.toFixed(2)}" cy="84" r="1.3"/><circle cx="${x.toFixed(2)}" cy="90" r="1.3"/><circle cx="${x.toFixed(2)}" cy="96" r="1.3"/><circle cx="${x.toFixed(2)}" cy="102" r="1.3"/><circle cx="${x.toFixed(2)}" cy="98" r="1.3"/><circle cx="${x.toFixed(2)}" cy="110" r="1.3"/>`;
+      const x = (15 + i * 6.55).toFixed(2);
+      const tie = (cy: number) =>
+        `<rect x="${(Number(x) - 1.6).toFixed(2)}" y="${(cy - 1.6).toFixed(2)}" width="3.2" height="3.2" rx="0.5" fill="%23e2e8f0" stroke="%23cbd5e1" stroke-width="0.3"/>` +
+        `<rect x="${(Number(x) - 1.1).toFixed(2)}" y="${(cy - 1.1).toFixed(2)}" width="2.2" height="2.2" rx="0.3" fill="%23334155"/>` +
+        `<circle cx="${x}" cy="${cy}" r="0.75" fill="%230f172a"/>`;
+      return tie(10) + tie(22) +
+             tie(40) + tie(46) + tie(52) + tie(58) + tie(64) +
+             tie(78) + tie(84) + tie(90) + tie(96) + tie(102) +
+             tie(98) + tie(110);
     }).join('') +
     '</g>' +
-    '<text x="110" y="69" font-size="7" fill="%2364748b" text-anchor="middle" font-family="Arial" font-weight="bold">HALF-SIZE BREADBOARD</text>'
+    '<text x="110" y="72" font-size="3" fill="%2364748b" text-anchor="middle" font-family="Arial" font-weight="bold" letter-spacing="0.5">VOLTFORGE BREADBOARD</text>'
   ),
   BUZZER: svg('0 0 50 50',
-    '<defs><radialGradient id="buzz"><stop offset="0%25" stop-color="%23475569"/><stop offset="78%25" stop-color="%231e293b"/><stop offset="100%25" stop-color="%230f172a"/></radialGradient></defs>' +
-    '<circle cx="25" cy="25" r="22" fill="url(%23buzz)" stroke="%23475569" stroke-width="1.4"/>' +
-    '<circle cx="25" cy="25" r="15" fill="%230f172a" stroke="%23334155" stroke-width="1"/>' +
-    '<circle cx="25" cy="25" r="5" fill="%23334155"/>' +
-    '<text x="25" y="10" font-size="8" fill="%23e5e7eb" text-anchor="middle" font-family="Arial" font-weight="bold">+</text>' +
-    '<path d="M34 16q8 9 0 18M39 12q12 13 0 26" stroke="%2394a3b8" stroke-width="1.3" fill="none" opacity="0.65"/>' +
-    '<rect x="18" y="46" width="4" height="4" fill="%2394a3b8"/>' +
-    '<rect x="28" y="46" width="4" height="4" fill="%2394a3b8"/>'
+    '<defs>' +
+      '<radialGradient id="buzz_body" cx="40%25" cy="40%25" r="60%25"><stop offset="0%25" stop-color="%23334155"/><stop offset="65%25" stop-color="%231e293b"/><stop offset="100%25" stop-color="%23090d16"/></radialGradient>' +
+      '<radialGradient id="buzz_piezo" cx="45%25" cy="40%25" r="55%25"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="45%25" stop-color="%23cbd5e1"/><stop offset="85%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></radialGradient>' +
+      '<linearGradient id="buzz_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="13.5" y="42" width="3" height="8" rx="0.5" fill="url(%23buzz_lead)"/>' +
+    '<circle cx="15" cy="49" r="2.2" fill="%2364748b" stroke="%23cbd5e1" stroke-width="0.5"/>' +
+    '<circle cx="15" cy="49" r="1.1" fill="%230f172a"/>' +
+    '<rect x="33.5" y="42" width="3" height="8" rx="0.5" fill="url(%23buzz_lead)"/>' +
+    '<circle cx="35" cy="49" r="2.2" fill="%2364748b" stroke="%23cbd5e1" stroke-width="0.5"/>' +
+    '<circle cx="35" cy="49" r="1.1" fill="%230f172a"/>' +
+    '<circle cx="25" cy="23" r="21" fill="url(%23buzz_body)" stroke="%23475569" stroke-width="1.2"/>' +
+    '<circle cx="25" cy="23" r="19.5" fill="none" stroke="%23475569" stroke-width="0.75" opacity="0.6"/>' +
+    '<circle cx="25" cy="23" r="16.5" fill="none" stroke="%230f172a" stroke-width="1.5"/>' +
+    '<circle cx="25" cy="23" r="13.5" fill="%23090d16" stroke="%231e293b" stroke-width="0.8"/>' +
+    '<circle cx="25" cy="23" r="10.5" fill="url(%23buzz_piezo)" stroke="%23475569" stroke-width="0.75"/>' +
+    '<circle cx="25" cy="23" r="3.5" fill="%23020617" stroke="%231e293b" stroke-width="0.8"/>' +
+    '<text x="13" y="14" font-size="7" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">+</text>' +
+    '<text x="37" y="14" font-size="7" fill="%2394a3b8" font-family="Arial" font-weight="bold" text-anchor="middle">−</text>' +
+    '<path d="M 33 20 A 10 10 0 0 1 33 26" fill="none" stroke="%2364748b" stroke-width="1" stroke-linecap="round" opacity="0.6"/>' +
+    '<path d="M 36 17 A 15 15 0 0 1 36 29" fill="none" stroke="%2364748b" stroke-width="1" stroke-linecap="round" opacity="0.4"/>'
   ),
   MULTIMETER: svg('0 0 90 70',
-    '<rect x="4" y="2" width="82" height="66" rx="8" fill="%23f59e0b" stroke="%23b45309" stroke-width="2"/>' +
-    '<rect x="14" y="14" width="62" height="28" rx="3" fill="%23111827" stroke="%23222" stroke-width="1"/>' +
-    '<circle cx="45" cy="55" r="8" fill="%23374151" stroke="%23111827" stroke-width="2"/>' +
-    '<path d="M45 49v12M39 55h12" stroke="%239ca3af" stroke-width="1.5"/>' +
-    '<circle cx="24" cy="64" r="3" fill="%23ef4444"/>' +
-    '<circle cx="66" cy="64" r="3" fill="%23111827"/>'
+    '<defs>' +
+      '<linearGradient id="dmm_case" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f59e0b"/><stop offset="50%25" stop-color="%23d97706"/><stop offset="100%25" stop-color="%23b45309"/></linearGradient>' +
+      '<linearGradient id="dmm_face" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23334155"/><stop offset="100%25" stop-color="%231e293b"/></linearGradient>' +
+      '<linearGradient id="dmm_lcd" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2399f6e4"/><stop offset="50%25" stop-color="%235eead4"/><stop offset="100%25" stop-color="%232dd4bf"/></linearGradient>' +
+      '<radialGradient id="dmm_knob" cx="35%25" cy="35%25" r="65%25"><stop offset="0%25" stop-color="%23334155"/><stop offset="50%25" stop-color="%231e293b"/><stop offset="100%25" stop-color="%230f172a"/></radialGradient>' +
+    '</defs>' +
+    // Yellow protective rubber holster
+    '<rect x="2" y="2" width="86" height="66" rx="7" fill="url(%23dmm_case)" stroke="%2392400e" stroke-width="1.2"/>' +
+    // Dark inner body faceplate
+    '<rect x="6" y="5" width="78" height="60" rx="5" fill="url(%23dmm_face)" stroke="%230f172a" stroke-width="0.8"/>' +
+    // Brand & model header
+    '<text x="12" y="11" font-size="4" fill="%23fef08a" font-family="Arial" font-weight="900">VOLTFORGE</text>' +
+    '<text x="78" y="11" font-size="3.2" fill="%2394a3b8" font-family="Arial" font-weight="bold" text-anchor="end">TRUE RMS DMM</text>' +
+    // LCD bezel and screen (x=10, y=14, w=70, h=18)
+    '<rect x="10" y="13" width="70" height="19" rx="2" fill="%230f172a" stroke="%231e293b" stroke-width="0.75"/>' +
+    '<rect x="12" y="15" width="66" height="15" rx="1.5" fill="url(%23dmm_lcd)"/>' +
+    // LCD content: 7-segment digital readout
+    '<text x="15" y="20" font-size="2.8" fill="%23042f2e" font-family="Arial" font-weight="bold">AUTO</text>' +
+    '<text x="15" y="25" font-size="2.8" fill="%23042f2e" font-family="Arial" font-weight="bold">DC</text>' +
+    '<text x="54" y="27" font-size="11" fill="%23042f2e" font-family="Courier New, monospace" font-weight="900" text-anchor="end" letter-spacing="1"> 0.00</text>' +
+    '<text x="64" y="27" font-size="8" fill="%23042f2e" font-family="Arial" font-weight="900">V</text>' +
+    '<line x1="15" y1="28.5" x2="68" y2="28.5" stroke="%230f766e" stroke-width="0.5"/>' +
+    // Rotary range selector dial (center cx=45, cy=44, r=9.5)
+    '<circle cx="45" cy="44" r="9.5" fill="url(%23dmm_knob)" stroke="%23475569" stroke-width="0.8"/>' +
+    '<circle cx="45" cy="44" r="8" fill="none" stroke="%230f172a" stroke-width="0.8"/>' +
+    '<line x1="45" y1="44" x2="38" y2="39" stroke="%23f8fafc" stroke-width="1.8" stroke-linecap="round"/>' +
+    '<circle cx="45" cy="44" r="2.2" fill="%230f172a"/>' +
+    // Printed dial range markings
+    '<text x="34" y="40" font-size="3" fill="%23fef08a" font-family="Arial" font-weight="bold" text-anchor="middle">V\u2393</text>' +
+    '<text x="35" y="52" font-size="3" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">V~</text>' +
+    '<text x="45" y="57" font-size="3" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">\u03A9</text>' +
+    '<text x="55" y="52" font-size="3" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">mA</text>' +
+    '<text x="56" y="40" font-size="3" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">A</text>' +
+    '<text x="45" y="34" font-size="3" fill="%23ef4444" font-family="Arial" font-weight="bold" text-anchor="middle">OFF</text>' +
+    // Side function buttons
+    '<circle cx="15" cy="40" r="3" fill="%23eab308" stroke="%23ca8a04" stroke-width="0.5"/><text x="15" y="46" font-size="2.2" fill="%23cbd5e1" font-family="Arial" text-anchor="middle">HOLD</text>' +
+    '<circle cx="75" cy="40" r="3" fill="%233b82f6" stroke="%232563eb" stroke-width="0.5"/><text x="75" y="46" font-size="2.2" fill="%23cbd5e1" font-family="Arial" text-anchor="middle">REL</text>' +
+    // Banana probe jacks: Red V/Ω/mA at (24, 70), Black COM at (66, 70)
+    '<rect x="18" y="53" width="12" height="16" rx="1.5" fill="%23ef4444" stroke="%23b91c1c" stroke-width="0.6"/>' +
+    '<circle cx="24" cy="61" r="4" fill="%23f87171" stroke="%23b91c1c" stroke-width="0.5"/>' +
+    '<circle cx="24" cy="70" r="2.8" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="24" cy="70" r="1.3" fill="%230f172a"/>' +
+    '<text x="24" y="51" font-size="3.2" fill="%23fca5a5" font-family="Arial" font-weight="900" text-anchor="middle">V\u03A9mA</text>' +
+    '<rect x="60" y="53" width="12" height="16" rx="1.5" fill="%230f172a" stroke="%231e293b" stroke-width="0.6"/>' +
+    '<circle cx="66" cy="61" r="4" fill="%23334155" stroke="%231e293b" stroke-width="0.5"/>' +
+    '<circle cx="66" cy="70" r="2.8" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="66" cy="70" r="1.3" fill="%230f172a"/>' +
+    '<text x="66" y="51" font-size="3.2" fill="%23cbd5e1" font-family="Arial" font-weight="900" text-anchor="middle">COM</text>'
   ),
   IC_555_TIMER: svg('0 0 90 50',
-    '<rect x="12" y="6" width="66" height="38" rx="4" fill="%23111827" stroke="%23374151" stroke-width="2"/>' +
-    '<circle cx="45" cy="6" r="3" fill="%23374151"/>' +
-    '<text x="45" y="29" font-size="13" fill="%23e5e7eb" text-anchor="middle" font-family="Arial" font-weight="bold">NE555</text>' +
-    '<path d="M8 12h8M8 20h8M8 28h8M8 36h8M74 12h8M74 20h8M74 28h8M74 36h8" stroke="%23cbd5e1" stroke-width="3"/>'
+    '<defs>' +
+      '<linearGradient id="dip555_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="dip555_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23272f3d"/><stop offset="50%25" stop-color="%23171f2c"/><stop offset="100%25" stop-color="%230b1019"/></linearGradient>' +
+    '</defs>' +
+    [23, 35, 47, 59].map((x) =>
+      `<rect x="${x - 1.8}" y="0" width="3.6" height="12" rx="0.5" fill="url(%23dip555_lead)"/>` +
+      `<polygon points="${x - 2.5},10 ${x + 2.5},10 ${x + 1.8},6 ${x - 1.8},6" fill="%2394a3b8"/>` +
+      `<circle cx="${x}" cy="1.5" r="1.1" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>`
+    ).join('') +
+    [23, 35, 47, 59].map((x) =>
+      `<rect x="${x - 1.8}" y="38" width="3.6" height="12" rx="0.5" fill="url(%23dip555_lead)"/>` +
+      `<polygon points="${x - 1.8},44 ${x + 1.8},44 ${x + 2.5},40 ${x - 2.5},40" fill="%2394a3b8"/>` +
+      `<circle cx="${x}" cy="48.5" r="1.1" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>`
+    ).join('') +
+    '<rect x="14" y="11" width="62" height="30" rx="2.5" fill="%23000000" opacity="0.35"/>' +
+    '<rect x="14" y="10" width="62" height="30" rx="2.5" fill="url(%23dip555_body)" stroke="%23334155" stroke-width="0.75"/>' +
+    '<line x1="16" y1="11" x2="74" y2="11" stroke="%23475569" stroke-width="0.75" opacity="0.6"/>' +
+    '<line x1="16" y1="39" x2="74" y2="39" stroke="%23020617" stroke-width="0.75" opacity="0.8"/>' +
+    '<path d="M 14 20 A 5 5 0 0 1 14 30 Z" fill="%230b1019" stroke="%231e293b" stroke-width="0.6"/>' +
+    '<circle cx="21" cy="33" r="1.8" fill="%23090d16" stroke="%23334155" stroke-width="0.5"/>' +
+    '<circle cx="21" cy="33" r="0.9" fill="%231e293b"/>' +
+    '<text x="26" y="20" font-size="5" fill="%2394a3b8" font-family="Arial" font-weight="bold">TI</text>' +
+    '<text x="47" y="26" font-size="9" fill="%23f1f5f9" font-family="Arial" font-weight="bold" text-anchor="middle" letter-spacing="1">NE555P</text>' +
+    '<text x="47" y="34" font-size="4.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle" letter-spacing="0.5">2432 MALAYSIA</text>'
   ),
   IC_74HC595: svg('0 0 120 50',
-    '<rect x="12" y="6" width="96" height="38" rx="4" fill="%23111827" stroke="%23374151" stroke-width="2"/>' +
-    '<circle cx="60" cy="6" r="3" fill="%23374151"/>' +
-    '<text x="60" y="29" font-size="12" fill="%23e5e7eb" text-anchor="middle" font-family="Arial" font-weight="bold">74HC595</text>' +
-    '<path d="M7 8h8M7 14h8M7 20h8M7 26h8M7 32h8M7 38h8M7 44h8M7 50h8M105 8h8M105 14h8M105 20h8M105 26h8M105 32h8M105 38h8M105 44h8M105 50h8" stroke="%23cbd5e1" stroke-width="2.5"/>'
+    '<defs>' +
+      '<linearGradient id="dip595_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="dip595_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23272f3d"/><stop offset="50%25" stop-color="%23171f2c"/><stop offset="100%25" stop-color="%230b1019"/></linearGradient>' +
+    '</defs>' +
+    [16, 28.5, 41, 53.5, 66, 78.5, 91, 103.5].map((x) =>
+      `<rect x="${x - 1.8}" y="0" width="3.6" height="12" rx="0.5" fill="url(%23dip595_lead)"/>` +
+      `<polygon points="${x - 2.5},10 ${x + 2.5},10 ${x + 1.8},6 ${x - 1.8},6" fill="%2394a3b8"/>` +
+      `<circle cx="${x}" cy="1.5" r="1.1" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>`
+    ).join('') +
+    [16, 28.5, 41, 53.5, 66, 78.5, 91, 103.5].map((x) =>
+      `<rect x="${x - 1.8}" y="38" width="3.6" height="12" rx="0.5" fill="url(%23dip595_lead)"/>` +
+      `<polygon points="${x - 1.8},44 ${x + 1.8},44 ${x + 2.5},40 ${x - 2.5},40" fill="%2394a3b8"/>` +
+      `<circle cx="${x}" cy="48.5" r="1.1" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>`
+    ).join('') +
+    '<rect x="8" y="11" width="104" height="30" rx="2.5" fill="%23000000" opacity="0.35"/>' +
+    '<rect x="8" y="10" width="104" height="30" rx="2.5" fill="url(%23dip595_body)" stroke="%23334155" stroke-width="0.75"/>' +
+    '<line x1="10" y1="11" x2="110" y2="11" stroke="%23475569" stroke-width="0.75" opacity="0.6"/>' +
+    '<line x1="10" y1="39" x2="110" y2="39" stroke="%23020617" stroke-width="0.75" opacity="0.8"/>' +
+    '<path d="M 8 20 A 5 5 0 0 1 8 30 Z" fill="%230b1019" stroke="%231e293b" stroke-width="0.6"/>' +
+    '<circle cx="15" cy="33" r="1.8" fill="%23090d16" stroke="%23334155" stroke-width="0.5"/>' +
+    '<circle cx="15" cy="33" r="0.9" fill="%231e293b"/>' +
+    '<text x="20" y="20" font-size="5" fill="%2394a3b8" font-family="Arial" font-weight="bold">TI</text>' +
+    '<text x="60" y="26" font-size="9" fill="%23f1f5f9" font-family="Arial" font-weight="bold" text-anchor="middle" letter-spacing="1">SN74HC595N</text>' +
+    '<text x="60" y="34" font-size="4.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle" letter-spacing="0.5">2418 MALAYSIA  8-BIT SHIFT REG</text>'
   ),
-  IC_74HC165: svg('0 0 120 55',
-    '<rect x="12" y="4" width="96" height="47" rx="4" fill="%23111827" stroke="%23374151" stroke-width="2"/>' +
-    '<circle cx="60" cy="4" r="3" fill="%23374151"/>' +
-    '<text x="60" y="30" font-size="11" fill="%2338bdf8" text-anchor="middle" font-family="Arial" font-weight="bold">74HC165 PISO</text>' +
-    '<path d="M7 8h8M7 14h8M7 20h8M7 26h8M7 32h8M7 38h8M7 44h8M7 50h8M105 8h8M105 14h8M105 20h8M105 26h8M105 32h8M105 38h8M105 44h8M105 50h8" stroke="%23cbd5e1" stroke-width="2.5"/>'
+  IC_74HC165: svg('0 0 120 50',
+    '<defs>' +
+      '<linearGradient id="dip165_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="dip165_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23272f3d"/><stop offset="50%25" stop-color="%23171f2c"/><stop offset="100%25" stop-color="%230b1019"/></linearGradient>' +
+    '</defs>' +
+    [16, 28.5, 41, 53.5, 66, 78.5, 91, 103.5].map((x) =>
+      `<rect x="${x - 1.8}" y="0" width="3.6" height="12" rx="0.5" fill="url(%23dip165_lead)"/>` +
+      `<polygon points="${x - 2.5},10 ${x + 2.5},10 ${x + 1.8},6 ${x - 1.8},6" fill="%2394a3b8"/>` +
+      `<circle cx="${x}" cy="1.5" r="1.1" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>`
+    ).join('') +
+    [16, 28.5, 41, 53.5, 66, 78.5, 91, 103.5].map((x) =>
+      `<rect x="${x - 1.8}" y="38" width="3.6" height="12" rx="0.5" fill="url(%23dip165_lead)"/>` +
+      `<polygon points="${x - 1.8},44 ${x + 1.8},44 ${x + 2.5},40 ${x - 2.5},40" fill="%2394a3b8"/>` +
+      `<circle cx="${x}" cy="48.5" r="1.1" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>`
+    ).join('') +
+    '<rect x="8" y="11" width="104" height="30" rx="2.5" fill="%23000000" opacity="0.35"/>' +
+    '<rect x="8" y="10" width="104" height="30" rx="2.5" fill="url(%23dip165_body)" stroke="%23334155" stroke-width="0.75"/>' +
+    '<line x1="10" y1="11" x2="110" y2="11" stroke="%23475569" stroke-width="0.75" opacity="0.6"/>' +
+    '<line x1="10" y1="39" x2="110" y2="39" stroke="%23020617" stroke-width="0.75" opacity="0.8"/>' +
+    '<path d="M 8 20 A 5 5 0 0 1 8 30 Z" fill="%230b1019" stroke="%231e293b" stroke-width="0.6"/>' +
+    '<circle cx="15" cy="33" r="1.8" fill="%23090d16" stroke="%23334155" stroke-width="0.5"/>' +
+    '<circle cx="15" cy="33" r="0.9" fill="%231e293b"/>' +
+    '<text x="20" y="20" font-size="5" fill="%2394a3b8" font-family="Arial" font-weight="bold">TI</text>' +
+    '<text x="60" y="26" font-size="9" fill="%23f1f5f9" font-family="Arial" font-weight="bold" text-anchor="middle" letter-spacing="1">SN74HC165N</text>' +
+    '<text x="60" y="34" font-size="4.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle" letter-spacing="0.5">2346 MALAYSIA  8-BIT PISO SHIFT</text>'
   ),
-  IC_74HC138: svg('0 0 120 55',
-    '<rect x="12" y="4" width="96" height="47" rx="4" fill="%23111827" stroke="%23374151" stroke-width="2"/>' +
-    '<circle cx="60" cy="4" r="3" fill="%23374151"/>' +
-    '<text x="60" y="30" font-size="11" fill="%234ade80" text-anchor="middle" font-family="Arial" font-weight="bold">74HC138 3-to-8</text>' +
-    '<path d="M7 8h8M7 14h8M7 20h8M7 26h8M7 32h8M7 38h8M7 44h8M7 50h8M105 8h8M105 14h8M105 20h8M105 26h8M105 32h8M105 38h8M105 44h8M105 50h8" stroke="%23cbd5e1" stroke-width="2.5"/>'
+  IC_74HC138: svg('0 0 120 50',
+    '<defs>' +
+      '<linearGradient id="dip138_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="dip138_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23272f3d"/><stop offset="50%25" stop-color="%23171f2c"/><stop offset="100%25" stop-color="%230b1019"/></linearGradient>' +
+    '</defs>' +
+    [16, 28.5, 41, 53.5, 66, 78.5, 91, 103.5].map((x) =>
+      `<rect x="${x - 1.8}" y="0" width="3.6" height="12" rx="0.5" fill="url(%23dip138_lead)"/>` +
+      `<polygon points="${x - 2.5},10 ${x + 2.5},10 ${x + 1.8},6 ${x - 1.8},6" fill="%2394a3b8"/>` +
+      `<circle cx="${x}" cy="1.5" r="1.1" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>`
+    ).join('') +
+    [16, 28.5, 41, 53.5, 66, 78.5, 91, 103.5].map((x) =>
+      `<rect x="${x - 1.8}" y="38" width="3.6" height="12" rx="0.5" fill="url(%23dip138_lead)"/>` +
+      `<polygon points="${x - 1.8},44 ${x + 1.8},44 ${x + 2.5},40 ${x - 2.5},40" fill="%2394a3b8"/>` +
+      `<circle cx="${x}" cy="48.5" r="1.1" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>`
+    ).join('') +
+    '<rect x="8" y="11" width="104" height="30" rx="2.5" fill="%23000000" opacity="0.35"/>' +
+    '<rect x="8" y="10" width="104" height="30" rx="2.5" fill="url(%23dip138_body)" stroke="%23334155" stroke-width="0.75"/>' +
+    '<line x1="10" y1="11" x2="110" y2="11" stroke="%23475569" stroke-width="0.75" opacity="0.6"/>' +
+    '<line x1="10" y1="39" x2="110" y2="39" stroke="%23020617" stroke-width="0.75" opacity="0.8"/>' +
+    '<path d="M 8 20 A 5 5 0 0 1 8 30 Z" fill="%230b1019" stroke="%231e293b" stroke-width="0.6"/>' +
+    '<circle cx="15" cy="33" r="1.8" fill="%23090d16" stroke="%23334155" stroke-width="0.5"/>' +
+    '<circle cx="15" cy="33" r="0.9" fill="%231e293b"/>' +
+    '<text x="20" y="20" font-size="5" fill="%2394a3b8" font-family="Arial" font-weight="bold">TI</text>' +
+    '<text x="60" y="26" font-size="9" fill="%23f1f5f9" font-family="Arial" font-weight="bold" text-anchor="middle" letter-spacing="1">SN74HC138N</text>' +
+    '<text x="60" y="34" font-size="4.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle" letter-spacing="0.5">2402 MALAYSIA  3-TO-8 DECODER</text>'
   ),
-  IC_74HC151: svg('0 0 120 55',
-    '<rect x="12" y="4" width="96" height="47" rx="4" fill="%23111827" stroke="%23374151" stroke-width="2"/>' +
-    '<circle cx="60" cy="4" r="3" fill="%23374151"/>' +
-    '<text x="60" y="30" font-size="11" fill="%23facc15" text-anchor="middle" font-family="Arial" font-weight="bold">74HC151 MUX</text>' +
-    '<path d="M7 8h8M7 14h8M7 20h8M7 26h8M7 32h8M7 38h8M7 44h8M7 50h8M105 8h8M105 14h8M105 20h8M105 26h8M105 32h8M105 38h8M105 44h8M105 50h8" stroke="%23cbd5e1" stroke-width="2.5"/>'
+  IC_74HC151: svg('0 0 120 50',
+    '<defs>' +
+      '<linearGradient id="dip151_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="dip151_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23272f3d"/><stop offset="50%25" stop-color="%23171f2c"/><stop offset="100%25" stop-color="%230b1019"/></linearGradient>' +
+    '</defs>' +
+    [16, 28.5, 41, 53.5, 66, 78.5, 91, 103.5].map((x) =>
+      `<rect x="${x - 1.8}" y="0" width="3.6" height="12" rx="0.5" fill="url(%23dip151_lead)"/>` +
+      `<polygon points="${x - 2.5},10 ${x + 2.5},10 ${x + 1.8},6 ${x - 1.8},6" fill="%2394a3b8"/>` +
+      `<circle cx="${x}" cy="1.5" r="1.1" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>`
+    ).join('') +
+    [16, 28.5, 41, 53.5, 66, 78.5, 91, 103.5].map((x) =>
+      `<rect x="${x - 1.8}" y="38" width="3.6" height="12" rx="0.5" fill="url(%23dip151_lead)"/>` +
+      `<polygon points="${x - 1.8},44 ${x + 1.8},44 ${x + 2.5},40 ${x - 2.5},40" fill="%2394a3b8"/>` +
+      `<circle cx="${x}" cy="48.5" r="1.1" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>`
+    ).join('') +
+    '<rect x="8" y="11" width="104" height="30" rx="2.5" fill="%23000000" opacity="0.35"/>' +
+    '<rect x="8" y="10" width="104" height="30" rx="2.5" fill="url(%23dip151_body)" stroke="%23334155" stroke-width="0.75"/>' +
+    '<line x1="10" y1="11" x2="110" y2="11" stroke="%23475569" stroke-width="0.75" opacity="0.6"/>' +
+    '<line x1="10" y1="39" x2="110" y2="39" stroke="%23020617" stroke-width="0.75" opacity="0.8"/>' +
+    '<path d="M 8 20 A 5 5 0 0 1 8 30 Z" fill="%230b1019" stroke="%231e293b" stroke-width="0.6"/>' +
+    '<circle cx="15" cy="33" r="1.8" fill="%23090d16" stroke="%23334155" stroke-width="0.5"/>' +
+    '<circle cx="15" cy="33" r="0.9" fill="%231e293b"/>' +
+    '<text x="20" y="20" font-size="5" fill="%2394a3b8" font-family="Arial" font-weight="bold">TI</text>' +
+    '<text x="60" y="26" font-size="9" fill="%23f1f5f9" font-family="Arial" font-weight="bold" text-anchor="middle" letter-spacing="1">SN74HC151N</text>' +
+    '<text x="60" y="34" font-size="4.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle" letter-spacing="0.5">2351 MALAYSIA  8:1 MULTIPLEXER</text>'
   ),
-  IC_CD4017: svg('0 0 120 55',
-    '<rect x="12" y="4" width="96" height="47" rx="4" fill="%23111827" stroke="%23374151" stroke-width="2"/>' +
-    '<circle cx="60" cy="4" r="3" fill="%23374151"/>' +
-    '<text x="60" y="30" font-size="11" fill="%23f472b6" text-anchor="middle" font-family="Arial" font-weight="bold">CD4017 Decade</text>' +
-    '<path d="M7 8h8M7 14h8M7 20h8M7 26h8M7 32h8M7 38h8M7 44h8M7 50h8M105 8h8M105 14h8M105 20h8M105 26h8M105 32h8M105 38h8M105 44h8M105 50h8" stroke="%23cbd5e1" stroke-width="2.5"/>'
+  IC_CD4017: svg('0 0 120 50',
+    '<defs>' +
+      '<linearGradient id="dip4017_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="dip4017_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23272f3d"/><stop offset="50%25" stop-color="%23171f2c"/><stop offset="100%25" stop-color="%230b1019"/></linearGradient>' +
+    '</defs>' +
+    [16, 28.5, 41, 53.5, 66, 78.5, 91, 103.5].map((x) =>
+      `<rect x="${x - 1.8}" y="0" width="3.6" height="12" rx="0.5" fill="url(%23dip4017_lead)"/>` +
+      `<polygon points="${x - 2.5},10 ${x + 2.5},10 ${x + 1.8},6 ${x - 1.8},6" fill="%2394a3b8"/>` +
+      `<circle cx="${x}" cy="1.5" r="1.1" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>`
+    ).join('') +
+    [16, 28.5, 41, 53.5, 66, 78.5, 91, 103.5].map((x) =>
+      `<rect x="${x - 1.8}" y="38" width="3.6" height="12" rx="0.5" fill="url(%23dip4017_lead)"/>` +
+      `<polygon points="${x - 1.8},44 ${x + 1.8},44 ${x + 2.5},40 ${x - 2.5},40" fill="%2394a3b8"/>` +
+      `<circle cx="${x}" cy="48.5" r="1.1" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>`
+    ).join('') +
+    '<rect x="8" y="11" width="104" height="30" rx="2.5" fill="%23000000" opacity="0.35"/>' +
+    '<rect x="8" y="10" width="104" height="30" rx="2.5" fill="url(%23dip4017_body)" stroke="%23334155" stroke-width="0.75"/>' +
+    '<line x1="10" y1="11" x2="110" y2="11" stroke="%23475569" stroke-width="0.75" opacity="0.6"/>' +
+    '<line x1="10" y1="39" x2="110" y2="39" stroke="%23020617" stroke-width="0.75" opacity="0.8"/>' +
+    '<path d="M 8 20 A 5 5 0 0 1 8 30 Z" fill="%230b1019" stroke="%231e293b" stroke-width="0.6"/>' +
+    '<circle cx="15" cy="33" r="1.8" fill="%23090d16" stroke="%23334155" stroke-width="0.5"/>' +
+    '<circle cx="15" cy="33" r="0.9" fill="%231e293b"/>' +
+    '<text x="20" y="20" font-size="5" fill="%2394a3b8" font-family="Arial" font-weight="bold">HARRIS</text>' +
+    '<text x="60" y="26" font-size="9" fill="%23f1f5f9" font-family="Arial" font-weight="bold" text-anchor="middle" letter-spacing="1">CD4017BE</text>' +
+    '<text x="60" y="34" font-size="4.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle" letter-spacing="0.5">2339 MEXICO  DECADE COUNTER</text>'
   ),
 
   // ── Drone / ESC ──
+  // ── Drone / ESC ──
   ESC_MODULE: svg('0 0 120 60',
-    // Heat-shrink wrapped ESC body
-    '<defs><linearGradient id="esc_g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23334155"/><stop offset="100%25" stop-color="%231e293b"/></linearGradient></defs>' +
-    '<rect width="120" height="60" rx="6" fill="url(%23esc_g)" stroke="%23475569" stroke-width="1.5"/>' +
-    // Inner PCB glow line
-    '<rect x="6" y="6" width="108" height="48" rx="3" fill="none" stroke="%2322c55e" stroke-width="0.5" opacity="0.3"/>' +
-    // MOSFET heat-pads
-    '<rect x="30" y="10" width="12" height="10" rx="1" fill="%234b5563"/>' +
-    '<rect x="48" y="10" width="12" height="10" rx="1" fill="%234b5563"/>' +
-    '<rect x="66" y="10" width="12" height="10" rx="1" fill="%234b5563"/>' +
-    // Capacitor cluster
-    '<circle cx="40" cy="38" r="5" fill="%231e293b" stroke="%23475569" stroke-width="1"/>' +
-    '<circle cx="56" cy="38" r="5" fill="%231e293b" stroke="%23475569" stroke-width="1"/>' +
-    '<circle cx="72" cy="38" r="5" fill="%231e293b" stroke="%23475569" stroke-width="1"/>' +
-    // Input wires (left)
-    '<rect x="0" y="12" width="10" height="4" rx="1" fill="%23f97316"/>' +  // Signal
-    '<rect x="0" y="27" width="10" height="4" rx="1" fill="%23ef4444"/>' +  // VCC
-    '<rect x="0" y="42" width="10" height="4" rx="1" fill="%23555"/>' +    // GND
-    // Phase output wires (right)
-    '<rect x="110" y="12" width="10" height="4" rx="1" fill="%23facc15"/>' +  // Phase A
-    '<rect x="110" y="27" width="10" height="4" rx="1" fill="%2322c55e"/>' +  // Phase B
-    '<rect x="110" y="42" width="10" height="4" rx="1" fill="%233b82f6"/>' +  // Phase C
-    // Label
-    '<text x="60" y="56" font-size="7" fill="%2394a3b8" text-anchor="middle" font-family="Arial" font-weight="bold">ESC 20A</text>'
+    '<defs>' +
+      '<linearGradient id="esc_wrap" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%231e293b" stop-opacity="0.95"/><stop offset="50%25" stop-color="%230f172a" stop-opacity="0.9"/><stop offset="100%25" stop-color="%23020617" stop-opacity="0.95"/></linearGradient>' +
+      '<linearGradient id="esc_sink" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2364748b"/><stop offset="50%25" stop-color="%23475569"/><stop offset="100%25" stop-color="%23334155"/></linearGradient>' +
+      '<linearGradient id="esc_gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23fef08a"/><stop offset="50%25" stop-color="%23eab308"/><stop offset="100%25" stop-color="%23a16207"/></linearGradient>' +
+    '</defs>' +
+    // Translucent heat-shrink wrap over PCB
+    '<rect x="8" y="4" width="104" height="52" rx="4" fill="url(%23esc_wrap)" stroke="%23334155" stroke-width="1"/>' +
+    // Aluminum heatsink plate with cooling ridges
+    '<rect x="22" y="8" width="76" height="20" rx="1.5" fill="url(%23esc_sink)" stroke="%2364748b" stroke-width="0.5"/>' +
+    [26, 33, 40, 47, 54, 61, 68, 75, 82, 89].map((x) =>
+      `<line x1="${x}" y1="9" x2="${x}" y2="27" stroke="%231e293b" stroke-width="0.8"/><line x1="${x + 1}" y1="9" x2="${x + 1}" y2="27" stroke="%2394a3b8" stroke-width="0.4"/>`
+    ).join('') +
+    // Microcontroller IC & label
+    '<rect x="30" y="32" width="22" height="18" rx="1" fill="%2309090b" stroke="%2327272a" stroke-width="0.5"/>' +
+    '<circle cx="33" cy="35" r="0.6" fill="%2371717a"/>' +
+    '<text x="41" y="41" font-size="3" fill="%2322c55e" font-family="Arial" font-weight="bold" text-anchor="middle">BLHeli_32</text>' +
+    '<text x="41" y="46" font-size="2.4" fill="%2394a3b8" font-family="Arial" text-anchor="middle">30A DSHOT</text>' +
+    // Low-ESR electrolytic capacitor
+    '<rect x="58" y="32" width="36" height="18" rx="3" fill="%2318181b" stroke="%23334155" stroke-width="0.6"/>' +
+    '<rect x="58" y="32" width="6" height="18" fill="%23e2e8f0"/>' +
+    '<text x="61" y="42" font-size="5" fill="%230f172a" font-family="Arial" font-weight="900" text-anchor="middle">\u2212</text>' +
+    '<text x="78" y="42" font-size="3.5" fill="%23facc15" font-family="Arial" font-weight="bold" text-anchor="middle">330\u00B5F 25V</text>' +
+    // Left input wires: Signal (0, 15), VCC (0, 30), GND (0, 45)
+    '<rect x="0" y="13" width="10" height="4" rx="1" fill="%23ea580c"/>' +
+    '<circle cx="1" cy="15" r="1.5" fill="%23f97316" stroke="%23c2410c" stroke-width="0.4"/>' +
+    '<text x="12" y="16.5" font-size="3" fill="%23fb923c" font-family="Arial" font-weight="bold">SIG</text>' +
+    '<rect x="0" y="27.5" width="10" height="5" rx="1" fill="%23dc2626"/>' +
+    '<circle cx="1" cy="30" r="1.8" fill="%23ef4444" stroke="%23b91c1c" stroke-width="0.4"/>' +
+    '<text x="12" y="31.5" font-size="3" fill="%23f87171" font-family="Arial" font-weight="bold">VCC</text>' +
+    '<rect x="0" y="42.5" width="10" height="5" rx="1" fill="%230f172a"/>' +
+    '<circle cx="1" cy="45" r="1.8" fill="%23334155" stroke="%23020617" stroke-width="0.4"/>' +
+    '<text x="12" y="46.5" font-size="3" fill="%2394a3b8" font-family="Arial" font-weight="bold">GND</text>' +
+    // Right phase output wires with gold bullet connectors: Phase A (120, 15), Phase B (120, 30), Phase C (120, 45)
+    '<rect x="110" y="13" width="10" height="4" rx="1" fill="%232563eb"/>' +
+    '<circle cx="119" cy="15" r="1.6" fill="url(%23esc_gold)" stroke="%23854d0e" stroke-width="0.4"/>' +
+    '<text x="108" y="16.5" font-size="3" fill="%2360a5fa" font-family="Arial" font-weight="bold" text-anchor="end">PH-A</text>' +
+    '<rect x="110" y="28" width="10" height="4" rx="1" fill="%23eab308"/>' +
+    '<circle cx="119" cy="30" r="1.6" fill="url(%23esc_gold)" stroke="%23854d0e" stroke-width="0.4"/>' +
+    '<text x="108" y="31.5" font-size="3" fill="%23fde047" font-family="Arial" font-weight="bold" text-anchor="end">PH-B</text>' +
+    '<rect x="110" y="43" width="10" height="4" rx="1" fill="%231e293b"/>' +
+    '<circle cx="119" cy="45" r="1.6" fill="url(%23esc_gold)" stroke="%23854d0e" stroke-width="0.4"/>' +
+    '<text x="108" y="46.5" font-size="3" fill="%23cbd5e1" font-family="Arial" font-weight="bold" text-anchor="end">PH-C</text>'
   ),
 
   MOTOR_BLDC: svg('0 0 80 80',
     '<defs>' +
-      '<radialGradient id="bldc_bell"><stop offset="0%25" stop-color="%234b5563"/><stop offset="80%25" stop-color="%231f2937"/><stop offset="100%25" stop-color="%23111827"/></radialGradient>' +
+      '<radialGradient id="bldc_bell" cx="40%25" cy="35%25" r="65%25"><stop offset="0%25" stop-color="%23ef4444"/><stop offset="60%25" stop-color="%23b91c1c"/><stop offset="100%25" stop-color="%237f1d1d"/></radialGradient>' +
+      '<radialGradient id="bldc_hub" cx="40%25" cy="40%25" r="60%25"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="45%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2364748b"/></radialGradient>' +
+      '<linearGradient id="bldc_coil" x1="0" y1="0" x2="1" y2="1"><stop offset="0%25" stop-color="%23fbbf24"/><stop offset="40%25" stop-color="%23d97706"/><stop offset="100%25" stop-color="%2378350f"/></linearGradient>' +
     '</defs>' +
-    // Stator body — outer ring
-    '<circle cx="40" cy="36" r="32" fill="%231f2937" stroke="%23374151" stroke-width="2"/>' +
-    // Stator coil teeth (12-slot pattern)
-    '<path d="M40 8 L44 18 L36 18 Z" fill="%23b45309" opacity="0.7"/>' +  // top
-    '<path d="M64 14 L60 24 L54 19 Z" fill="%23b45309" opacity="0.7"/>' +
-    '<path d="M72 36 L62 40 L62 32 Z" fill="%23b45309" opacity="0.7"/>' +
-    '<path d="M64 58 L54 53 L60 48 Z" fill="%23b45309" opacity="0.7"/>' +
-    '<path d="M40 64 L36 54 L44 54 Z" fill="%23b45309" opacity="0.7"/>' +
-    '<path d="M16 58 L20 48 L26 53 Z" fill="%23b45309" opacity="0.7"/>' +
-    '<path d="M8 36 L18 32 L18 40 Z" fill="%23b45309" opacity="0.7"/>' +
-    '<path d="M16 14 L26 19 L20 24 Z" fill="%23b45309" opacity="0.7"/>' +
-    // Bell housing — spinning element (will be animated with CSS/Konva rotation)
-    '<circle cx="40" cy="36" r="20" fill="url(%23bldc_bell)" class="bldc-bell"/>' +
-    // Rotor magnets (shown as alternating arcs on the bell)
-    '<path d="M40 18 a18 18 0 0 1 15.6 9" stroke="%23ef4444" stroke-width="3" fill="none" opacity="0.6"/>' +
-    '<path d="M55.6 27 a18 18 0 0 1 0 18" stroke="%233b82f6" stroke-width="3" fill="none" opacity="0.6"/>' +
-    '<path d="M55.6 45 a18 18 0 0 1 -15.6 9" stroke="%23ef4444" stroke-width="3" fill="none" opacity="0.6"/>' +
-    '<path d="M40 54 a18 18 0 0 1 -15.6 -9" stroke="%233b82f6" stroke-width="3" fill="none" opacity="0.6"/>' +
-    '<path d="M24.4 45 a18 18 0 0 1 0 -18" stroke="%23ef4444" stroke-width="3" fill="none" opacity="0.6"/>' +
-    '<path d="M24.4 27 a18 18 0 0 1 15.6 -9" stroke="%233b82f6" stroke-width="3" fill="none" opacity="0.6"/>' +
-    // Center bearing
-    '<circle cx="40" cy="36" r="5" fill="%23c0c0c0"/>' +
-    '<circle cx="40" cy="36" r="2" fill="%234b5563"/>' +
-    // Phase wire leads (bottom)
-    '<rect x="12" y="70" width="4" height="10" rx="1" fill="%23facc15"/>' +
-    '<rect x="38" y="70" width="4" height="10" rx="1" fill="%2322c55e"/>' +
-    '<rect x="62" y="70" width="4" height="10" rx="1" fill="%233b82f6"/>' +
-    // Model label
-    '<text x="40" y="75" font-size="5" fill="%236b7280" text-anchor="middle" font-family="Arial">2204</text>'
+    // Mounting base plate (X-mount cross ears)
+    '<rect x="6" y="28" width="68" height="16" rx="2" fill="%23334155" stroke="%231e293b" stroke-width="0.8"/>' +
+    '<circle cx="10" cy="36" r="2.2" fill="%230f172a" stroke="%2364748b" stroke-width="0.5"/>' +
+    '<circle cx="70" cy="36" r="2.2" fill="%230f172a" stroke="%2364748b" stroke-width="0.5"/>' +
+    // Outer stator body ring
+    '<circle cx="40" cy="36" r="30" fill="%231e293b" stroke="%23475569" stroke-width="1.2"/>' +
+    // 12 Stator copper coils (visible around stator teeth)
+    Array.from({ length: 12 }, (_, i) => {
+      const angle = (i * 30 * Math.PI) / 180;
+      const cx = (40 + 22 * Math.cos(angle)).toFixed(1);
+      const cy = (36 + 22 * Math.sin(angle)).toFixed(1);
+      return `<circle cx="${cx}" cy="${cy}" r="3.8" fill="url(%23bldc_coil)" stroke="%2378350f" stroke-width="0.4"/>`;
+    }).join('') +
+    // Red anodized CNC rotor bell
+    '<circle cx="40" cy="36" r="19" fill="url(%23bldc_bell)" stroke="%23991b1b" stroke-width="0.8"/>' +
+    // Rotor airflow cutouts (4 radial teardrop vents)
+    Array.from({ length: 4 }, (_, i) => {
+      const angle = (i * 90 * Math.PI) / 180;
+      const x1 = (40 + 8 * Math.cos(angle - 0.3)).toFixed(1);
+      const y1 = (36 + 8 * Math.sin(angle - 0.3)).toFixed(1);
+      const x2 = (40 + 15 * Math.cos(angle)).toFixed(1);
+      const y2 = (36 + 15 * Math.sin(angle)).toFixed(1);
+      const x3 = (40 + 8 * Math.cos(angle + 0.3)).toFixed(1);
+      const y3 = (36 + 8 * Math.sin(angle + 0.3)).toFixed(1);
+      return `<polygon points="${x1},${y1} ${x2},${y2} ${x3},${y3}" fill="%230f172a" opacity="0.65"/>`;
+    }).join('') +
+    // Stainless steel central shaft & circlip
+    '<circle cx="40" cy="36" r="5" fill="url(%23bldc_hub)" stroke="%23475569" stroke-width="0.5"/>' +
+    '<circle cx="40" cy="36" r="2.2" fill="%230f172a"/>' +
+    '<text x="40" y="60" font-size="3.5" fill="%23f8fafc" font-family="Arial" font-weight="900" text-anchor="middle" letter-spacing="0.5">2204 2300KV</text>' +
+    // 3 silicone phase lead wires exiting at bottom: Phase A (15, 80), Phase B (40, 80), Phase C (65, 80)
+    '<path d="M 32 64 Q 22 70 15 80" fill="none" stroke="%232563eb" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<circle cx="15" cy="80" r="2" fill="%23facc15" stroke="%23a16207" stroke-width="0.4"/>' +
+    '<text x="15" y="74" font-size="2.8" fill="%2360a5fa" font-family="Arial" font-weight="bold" text-anchor="middle">A</text>' +
+    '<path d="M 40 66 L 40 80" stroke="%23eab308" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<circle cx="40" cy="80" r="2" fill="%23facc15" stroke="%23a16207" stroke-width="0.4"/>' +
+    '<text x="40" y="74" font-size="2.8" fill="%23fde047" font-family="Arial" font-weight="bold" text-anchor="middle">B</text>' +
+    '<path d="M 48 64 Q 58 70 65 80" fill="none" stroke="%231e293b" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<circle cx="65" cy="80" r="2" fill="%23facc15" stroke="%23a16207" stroke-width="0.4"/>' +
+    '<text x="65" y="74" font-size="2.8" fill="%23cbd5e1" font-family="Arial" font-weight="bold" text-anchor="middle">C</text>'
   ),
 
   // ── Instruments / Meters ──
   AMMETER: svg('0 0 90 70',
-    '<rect x="4" y="2" width="82" height="66" rx="8" fill="%2338bdf8" stroke="%230284c7" stroke-width="2"/>' +
-    '<rect x="14" y="14" width="62" height="28" rx="3" fill="%23111827" stroke="%23222" stroke-width="1"/>' +
-    '<circle cx="45" cy="55" r="8" fill="%23374151" stroke="%23111827" stroke-width="2"/>' +
-    '<text x="45" y="58" font-size="10" fill="%2338bdf8" text-anchor="middle" font-family="Arial" font-weight="bold">A</text>' +
-    '<circle cx="24" cy="64" r="3" fill="%23ef4444"/>' +
-    '<circle cx="66" cy="64" r="3" fill="%23111827"/>'
+    '<defs>' +
+      '<linearGradient id="amm_case" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%230284c7"/><stop offset="50%25" stop-color="%230369a1"/><stop offset="100%25" stop-color="%23075985"/></linearGradient>' +
+      '<linearGradient id="amm_lcd" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%230f172a"/><stop offset="100%25" stop-color="%23020617"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="86" height="66" rx="7" fill="url(%23amm_case)" stroke="%230c4a6e" stroke-width="1.2"/>' +
+    '<rect x="6" y="5" width="78" height="60" rx="5" fill="%231e293b" stroke="%230f172a" stroke-width="0.8"/>' +
+    '<text x="12" y="11" font-size="4" fill="%2338bdf8" font-family="Arial" font-weight="900">VOLTFORGE</text>' +
+    '<text x="78" y="11" font-size="3.2" fill="%2394a3b8" font-family="Arial" font-weight="bold" text-anchor="end">DIGITAL AMMETER</text>' +
+    '<rect x="10" y="13" width="70" height="23" rx="2" fill="url(%23amm_lcd)" stroke="%230369a1" stroke-width="0.8"/>' +
+    '<text x="14" y="20" font-size="2.8" fill="%2338bdf8" font-family="Arial" font-weight="bold">DC CURRENT</text>' +
+    '<text x="56" y="31" font-size="12" fill="%23facc15" font-family="Courier New, monospace" font-weight="900" text-anchor="end"> 0.000</text>' +
+    '<text x="68" y="31" font-size="9" fill="%23facc15" font-family="Arial" font-weight="900">A</text>' +
+    '<circle cx="20" cy="44" r="2" fill="%2322c55e"/><text x="25" y="45.5" font-size="2.8" fill="%23cbd5e1" font-family="Arial">10A MAX</text>' +
+    '<circle cx="54" cy="44" r="2" fill="%2338bdf8"/><text x="59" y="45.5" font-size="2.8" fill="%23cbd5e1" font-family="Arial">FUSED</text>' +
+    '<rect x="18" y="53" width="12" height="16" rx="1.5" fill="%23ef4444" stroke="%23b91c1c" stroke-width="0.6"/>' +
+    '<circle cx="24" cy="61" r="4" fill="%23f87171" stroke="%23b91c1c" stroke-width="0.5"/>' +
+    '<circle cx="24" cy="70" r="2.8" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="24" cy="70" r="1.3" fill="%230f172a"/>' +
+    '<text x="24" y="51" font-size="3.5" fill="%23fca5a5" font-family="Arial" font-weight="900" text-anchor="middle">IN (+)</text>' +
+    '<rect x="60" y="53" width="12" height="16" rx="1.5" fill="%230f172a" stroke="%231e293b" stroke-width="0.6"/>' +
+    '<circle cx="66" cy="61" r="4" fill="%23334155" stroke="%231e293b" stroke-width="0.5"/>' +
+    '<circle cx="66" cy="70" r="2.8" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="66" cy="70" r="1.3" fill="%230f172a"/>' +
+    '<text x="66" y="51" font-size="3.5" fill="%23cbd5e1" font-family="Arial" font-weight="900" text-anchor="middle">OUT (\u2212)</text>'
   ),
   BATTERY_9V: svg('0 0 70 80',
-    '<rect x="18" y="6" width="34" height="58" rx="6" fill="%23334155" stroke="%2394a3b8" stroke-width="2"/>' +
-    '<rect x="27" y="0" width="7" height="8" rx="2" fill="%23ef4444"/><rect x="36" y="0" width="7" height="8" rx="2" fill="%23111827"/>' +
-    '<text x="35" y="36" font-size="12" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">9V</text>' +
-    '<text x="35" y="52" font-size="7" fill="%23cbd5e1" text-anchor="middle" font-family="Arial">BATTERY</text>'
+    '<defs>' +
+      '<linearGradient id="b9_gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23d97706"/><stop offset="35%25" stop-color="%23fde68a"/><stop offset="70%25" stop-color="%23f59e0b"/><stop offset="100%25" stop-color="%23b45309"/></linearGradient>' +
+      '<linearGradient id="b9_body" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%231e293b"/><stop offset="40%25" stop-color="%23334155"/><stop offset="85%25" stop-color="%230f172a"/><stop offset="100%25" stop-color="%23020617"/></linearGradient>' +
+      '<linearGradient id="b9_metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="50%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+    '</defs>' +
+    // Battery metal body
+    '<rect x="14" y="4" width="42" height="54" rx="4" fill="url(%23b9_body)" stroke="%23334155" stroke-width="0.8"/>' +
+    '<rect x="14" y="4" width="42" height="15" rx="3" fill="url(%23b9_gold)"/>' +
+    '<line x1="14" y1="19" x2="56" y2="19" stroke="%2378350f" stroke-width="0.75"/>' +
+    '<text x="35" y="14" font-size="7.5" fill="%23451a03" font-family="Arial" font-weight="900" text-anchor="middle" letter-spacing="1">9V</text>' +
+    '<text x="35" y="30" font-size="4.5" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle" letter-spacing="0.5">VOLTFORGE</text>' +
+    '<text x="35" y="38" font-size="3.5" fill="%2394a3b8" font-family="Arial" text-anchor="middle">ALKALINE 6LR61</text>' +
+    '<text x="24" y="52" font-size="6" fill="%23ef4444" font-family="Arial" font-weight="900" text-anchor="middle">+</text>' +
+    '<text x="46" y="52" font-size="6" fill="%2338bdf8" font-family="Arial" font-weight="900" text-anchor="middle">−</text>' +
+    // Top terminal snaps: female octagonal at (24, 3), male circular at (46, 3)
+    '<polygon points="21,1 27,1 29,3 29,5 27,7 21,7 19,5 19,3" fill="url(%23b9_metal)" stroke="%23475569" stroke-width="0.5"/>' +
+    '<circle cx="24" cy="4" r="1.8" fill="%230f172a"/>' +
+    '<circle cx="46" cy="4" r="3.2" fill="url(%23b9_metal)" stroke="%23475569" stroke-width="0.5"/>' +
+    '<circle cx="46" cy="4" r="1.5" fill="%2364748b"/>' +
+    // Snap clip with red & black insulated wires down to (15, 60) and (45, 60)
+    '<path d="M 24 4 Q 8 26 15 58" fill="none" stroke="%23dc2626" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path d="M 24 4 Q 8 26 15 58" fill="none" stroke="%23f87171" stroke-width="0.75" stroke-linecap="round" opacity="0.6"/>' +
+    '<path d="M 46 4 Q 62 26 45 58" fill="none" stroke="%230f172a" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path d="M 46 4 Q 62 26 45 58" fill="none" stroke="%23475569" stroke-width="0.75" stroke-linecap="round" opacity="0.6"/>' +
+    // Terminal pins at (15, 60) and (45, 60)
+    '<circle cx="15" cy="60" r="2.8" fill="%23dc2626" stroke="%23b91c1c" stroke-width="0.5"/>' +
+    '<circle cx="15" cy="60" r="1.5" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<circle cx="15" cy="60" r="0.7" fill="%230f172a"/>' +
+    '<circle cx="45" cy="60" r="2.8" fill="%231e293b" stroke="%230f172a" stroke-width="0.5"/>' +
+    '<circle cx="45" cy="60" r="1.5" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<circle cx="45" cy="60" r="0.7" fill="%230f172a"/>'
   ),
   BATTERY_AA: svg('0 0 50 80',
-    '<rect x="12" y="8" width="26" height="60" rx="10" fill="%23eab308" stroke="%23a16207" stroke-width="2"/>' +
-    '<rect x="20" y="2" width="10" height="8" rx="2" fill="%23ef4444"/>' +
-    '<text x="25" y="38" font-size="12" fill="%23111827" text-anchor="middle" font-family="Arial" font-weight="bold">AA</text>' +
-    '<text x="25" y="52" font-size="7" fill="%237c2d12" text-anchor="middle" font-family="Arial">1.5V</text>'
+    '<defs>' +
+      '<linearGradient id="aa_gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23d97706"/><stop offset="35%25" stop-color="%23fde68a"/><stop offset="70%25" stop-color="%23f59e0b"/><stop offset="100%25" stop-color="%23b45309"/></linearGradient>' +
+      '<linearGradient id="aa_body" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%230f172a"/><stop offset="40%25" stop-color="%231e293b"/><stop offset="85%25" stop-color="%23090d16"/><stop offset="100%25" stop-color="%23020617"/></linearGradient>' +
+    '</defs>' +
+    // Plastic battery holder bracket
+    '<rect x="7" y="3" width="36" height="56" rx="4" fill="%2318181b" stroke="%2327272a" stroke-width="0.8"/>' +
+    // Cylindrical cell
+    '<rect x="10" y="7" width="30" height="48" rx="3" fill="url(%23aa_body)" stroke="%23334155" stroke-width="0.6"/>' +
+    '<rect x="10" y="7" width="30" height="14" rx="2" fill="url(%23aa_gold)"/>' +
+    '<rect x="21" y="4" width="8" height="3.5" rx="1" fill="%23e2e8f0" stroke="%2364748b" stroke-width="0.5"/>' +
+    '<text x="25" y="16" font-size="5" fill="%23451a03" font-family="Arial" font-weight="900" text-anchor="middle">AA</text>' +
+    '<text x="25" y="30" font-size="4" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">1.5V</text>' +
+    '<text x="25" y="38" font-size="3" fill="%2394a3b8" font-family="Arial" text-anchor="middle">ALKALINE</text>' +
+    '<text x="25" y="47" font-size="4" fill="%23ef4444" font-family="Arial" font-weight="bold" text-anchor="middle">+</text>' +
+    // Wires from holder down to terminals at (15, 60) and (45, 60)
+    '<path d="M 12 56 Q 10 58 15 60" fill="none" stroke="%23dc2626" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<path d="M 38 56 Q 42 58 45 60" fill="none" stroke="%230f172a" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<circle cx="15" cy="60" r="2.8" fill="%23dc2626" stroke="%23b91c1c" stroke-width="0.5"/>' +
+    '<circle cx="15" cy="60" r="1.5" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<circle cx="15" cy="60" r="0.7" fill="%230f172a"/>' +
+    '<circle cx="45" cy="60" r="2.8" fill="%231e293b" stroke="%230f172a" stroke-width="0.5"/>' +
+    '<circle cx="45" cy="60" r="1.5" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<circle cx="45" cy="60" r="0.7" fill="%230f172a"/>'
   ),
   DC_SOURCE_3V3: svg('0 0 80 60',
-    '<rect x="4" y="6" width="72" height="44" rx="5" fill="%230f766e" stroke="%232dd4bf" stroke-width="1.5"/>' +
-    '<text x="40" y="28" font-size="12" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">DC</text>' +
-    '<text x="40" y="42" font-size="9" fill="%23ccfbf1" text-anchor="middle" font-family="Arial">3.3V</text>'
+    '<defs>' +
+      '<linearGradient id="dc33_case" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23134e4a"/><stop offset="50%25" stop-color="%230f766e"/><stop offset="100%25" stop-color="%23115e59"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="76" height="56" rx="4" fill="url(%23dc33_case)" stroke="%232dd4bf" stroke-width="1"/>' +
+    '<rect x="4" y="4" width="72" height="52" rx="3" fill="none" stroke="%23042f2e" stroke-width="0.75" opacity="0.6"/>' +
+    // LED display bezel
+    '<rect x="12" y="8" width="56" height="24" rx="2" fill="%23042f2e" stroke="%23115e59" stroke-width="0.8"/>' +
+    '<rect x="14" y="10" width="52" height="20" rx="1.5" fill="%23021917"/>' +
+    '<text x="40" y="24" font-size="12" fill="%232dd4bf" font-family="Courier New, monospace" font-weight="900" text-anchor="middle" letter-spacing="1">3.30V</text>' +
+    '<text x="40" y="38" font-size="4" fill="%23ccfbf1" font-family="Arial" font-weight="bold" text-anchor="middle" letter-spacing="0.5">REGULATED DC SUPPLY</text>' +
+    // Binding posts: Red (+) at (15, 60), Black (-) at (45, 60)
+    '<rect x="11" y="44" width="8" height="15" rx="1" fill="%23ef4444" stroke="%23b91c1c" stroke-width="0.6"/>' +
+    '<circle cx="15" cy="52" r="3.5" fill="%23f87171" stroke="%23b91c1c" stroke-width="0.5"/>' +
+    '<circle cx="15" cy="60" r="2.5" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="15" cy="60" r="1.1" fill="%230f172a"/>' +
+    '<text x="15" y="42" font-size="5" fill="%23fca5a5" font-family="Arial" font-weight="900" text-anchor="middle">+</text>' +
+    '<rect x="41" y="44" width="8" height="15" rx="1" fill="%231e293b" stroke="%230f172a" stroke-width="0.6"/>' +
+    '<circle cx="45" cy="52" r="3.5" fill="%23334155" stroke="%230f172a" stroke-width="0.5"/>' +
+    '<circle cx="45" cy="60" r="2.5" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="45" cy="60" r="1.1" fill="%230f172a"/>' +
+    '<text x="45" y="42" font-size="6" fill="%2394a3b8" font-family="Arial" font-weight="900" text-anchor="middle">−</text>' +
+    // Power LED
+    '<circle cx="68" cy="48" r="2" fill="%2322c55e" stroke="%2315803d" stroke-width="0.5"/>' +
+    '<circle cx="68" cy="48" r="0.8" fill="%23bbf7d0"/>' +
+    '<text x="68" y="43" font-size="3" fill="%2386efac" font-family="Arial" text-anchor="middle">ON</text>'
   ),
   DC_SOURCE_5V: svg('0 0 80 60',
-    '<rect x="4" y="6" width="72" height="44" rx="5" fill="%230369a1" stroke="%2338bdf8" stroke-width="1.5"/>' +
-    '<text x="40" y="28" font-size="12" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">DC</text>' +
-    '<text x="40" y="42" font-size="9" fill="%23e0f2fe" text-anchor="middle" font-family="Arial">5V</text>'
+    '<defs>' +
+      '<linearGradient id="dc5_case" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23075985"/><stop offset="50%25" stop-color="%230284c7"/><stop offset="100%25" stop-color="%230369a1"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="76" height="56" rx="4" fill="url(%23dc5_case)" stroke="%2338bdf8" stroke-width="1"/>' +
+    '<rect x="4" y="4" width="72" height="52" rx="3" fill="none" stroke="%23082f49" stroke-width="0.75" opacity="0.6"/>' +
+    '<rect x="12" y="8" width="56" height="24" rx="2" fill="%23082f49" stroke="%230369a1" stroke-width="0.8"/>' +
+    '<rect x="14" y="10" width="52" height="20" rx="1.5" fill="%23031a29"/>' +
+    '<text x="40" y="24" font-size="12" fill="%2338bdf8" font-family="Courier New, monospace" font-weight="900" text-anchor="middle" letter-spacing="1">5.00V</text>' +
+    '<text x="40" y="38" font-size="4" fill="%23e0f2fe" font-family="Arial" font-weight="bold" text-anchor="middle" letter-spacing="0.5">REGULATED DC SUPPLY</text>' +
+    '<rect x="11" y="44" width="8" height="15" rx="1" fill="%23ef4444" stroke="%23b91c1c" stroke-width="0.6"/>' +
+    '<circle cx="15" cy="52" r="3.5" fill="%23f87171" stroke="%23b91c1c" stroke-width="0.5"/>' +
+    '<circle cx="15" cy="60" r="2.5" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="15" cy="60" r="1.1" fill="%230f172a"/>' +
+    '<text x="15" y="42" font-size="5" fill="%23fca5a5" font-family="Arial" font-weight="900" text-anchor="middle">+</text>' +
+    '<rect x="41" y="44" width="8" height="15" rx="1" fill="%231e293b" stroke="%230f172a" stroke-width="0.6"/>' +
+    '<circle cx="45" cy="52" r="3.5" fill="%23334155" stroke="%230f172a" stroke-width="0.5"/>' +
+    '<circle cx="45" cy="60" r="2.5" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="45" cy="60" r="1.1" fill="%230f172a"/>' +
+    '<text x="45" y="42" font-size="6" fill="%2394a3b8" font-family="Arial" font-weight="900" text-anchor="middle">−</text>' +
+    '<circle cx="68" cy="48" r="2" fill="%2338bdf8" stroke="%230284c7" stroke-width="0.5"/>' +
+    '<circle cx="68" cy="48" r="0.8" fill="%23e0f2fe"/>' +
+    '<text x="68" y="43" font-size="3" fill="%237dd3fc" font-family="Arial" text-anchor="middle">ON</text>'
   ),
   DC_SOURCE_12V: svg('0 0 80 60',
-    '<rect x="4" y="6" width="72" height="44" rx="5" fill="%237c2d12" stroke="%23fb923c" stroke-width="1.5"/>' +
-    '<text x="40" y="28" font-size="12" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">DC</text>' +
-    '<text x="40" y="42" font-size="9" fill="%23fed7aa" text-anchor="middle" font-family="Arial">12V</text>'
+    '<defs>' +
+      '<linearGradient id="dc12_case" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%239a3412"/><stop offset="50%25" stop-color="%23ea580c"/><stop offset="100%25" stop-color="%23c2410c"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="76" height="56" rx="4" fill="url(%23dc12_case)" stroke="%23fb923c" stroke-width="1"/>' +
+    '<rect x="4" y="4" width="72" height="52" rx="3" fill="none" stroke="%23431407" stroke-width="0.75" opacity="0.6"/>' +
+    '<rect x="12" y="8" width="56" height="24" rx="2" fill="%23431407" stroke="%239a3412" stroke-width="0.8"/>' +
+    '<rect x="14" y="10" width="52" height="20" rx="1.5" fill="%231a0803"/>' +
+    '<text x="40" y="24" font-size="12" fill="%23fb923c" font-family="Courier New, monospace" font-weight="900" text-anchor="middle" letter-spacing="1">12.0V</text>' +
+    '<text x="40" y="38" font-size="4" fill="%23ffedd5" font-family="Arial" font-weight="bold" text-anchor="middle" letter-spacing="0.5">REGULATED DC SUPPLY</text>' +
+    '<rect x="11" y="44" width="8" height="15" rx="1" fill="%23ef4444" stroke="%23b91c1c" stroke-width="0.6"/>' +
+    '<circle cx="15" cy="52" r="3.5" fill="%23f87171" stroke="%23b91c1c" stroke-width="0.5"/>' +
+    '<circle cx="15" cy="60" r="2.5" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="15" cy="60" r="1.1" fill="%230f172a"/>' +
+    '<text x="15" y="42" font-size="5" fill="%23fca5a5" font-family="Arial" font-weight="900" text-anchor="middle">+</text>' +
+    '<rect x="41" y="44" width="8" height="15" rx="1" fill="%231e293b" stroke="%230f172a" stroke-width="0.6"/>' +
+    '<circle cx="45" cy="52" r="3.5" fill="%23334155" stroke="%230f172a" stroke-width="0.5"/>' +
+    '<circle cx="45" cy="60" r="2.5" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="45" cy="60" r="1.1" fill="%230f172a"/>' +
+    '<text x="45" y="42" font-size="6" fill="%2394a3b8" font-family="Arial" font-weight="900" text-anchor="middle">−</text>' +
+    '<circle cx="68" cy="48" r="2" fill="%23ea580c" stroke="%23c2410c" stroke-width="0.5"/>' +
+    '<circle cx="68" cy="48" r="0.8" fill="%23fed7aa"/>' +
+    '<text x="68" y="43" font-size="3" fill="%23fdba74" font-family="Arial" text-anchor="middle">ON</text>'
   ),
   POWER_SUPPLY: svg('0 0 90 60',
-    '<rect x="4" y="6" width="82" height="44" rx="5" fill="%23374151" stroke="%2394a3b8" stroke-width="1.5"/>' +
-    '<circle cx="24" cy="28" r="8" fill="%23111827" stroke="%2322c55e"/><text x="24" y="32" font-size="10" fill="%2322c55e" text-anchor="middle" font-family="Arial">+</text>' +
-    '<text x="57" y="28" font-size="10" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">DC SUPPLY</text>' +
-    '<text x="57" y="41" font-size="8" fill="%23cbd5e1" text-anchor="middle" font-family="Arial">CONFIGURABLE</text>'
+    '<defs>' +
+      '<linearGradient id="ps_case" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23334155"/><stop offset="50%25" stop-color="%231e293b"/><stop offset="100%25" stop-color="%230f172a"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="86" height="56" rx="4" fill="url(%23ps_case)" stroke="%23475569" stroke-width="1"/>' +
+    // Top display bezel
+    '<rect x="8" y="6" width="46" height="28" rx="2" fill="%23020617" stroke="%231e293b" stroke-width="0.75"/>' +
+    '<text x="12" y="18" font-size="8" fill="%2322c55e" font-family="Courier New, monospace" font-weight="900">05.00V</text>' +
+    '<text x="12" y="30" font-size="8" fill="%2338bdf8" font-family="Courier New, monospace" font-weight="900">0.500A</text>' +
+    '<circle cx="48" cy="14" r="1.2" fill="%2322c55e"/><text x="45" y="14.5" font-size="2.5" fill="%2386efac" font-family="Arial" text-anchor="end">CV</text>' +
+    '<circle cx="48" cy="24" r="1.2" fill="%23ef4444"/><text x="45" y="24.5" font-size="2.5" fill="%23fca5a5" font-family="Arial" text-anchor="end">CC</text>' +
+    // Rotary voltage/current knobs on right
+    '<circle cx="70" cy="14" r="7" fill="%23475569" stroke="%2364748b" stroke-width="0.8"/>' +
+    '<circle cx="70" cy="14" r="5" fill="%231e293b"/>' +
+    '<line x1="70" y1="14" x2="70" y2="10" stroke="%2338bdf8" stroke-width="1.5" stroke-linecap="round"/>' +
+    '<circle cx="70" cy="30" r="7" fill="%23475569" stroke="%2364748b" stroke-width="0.8"/>' +
+    '<circle cx="70" cy="30" r="5" fill="%231e293b"/>' +
+    '<line x1="70" y1="30" x2="70" y2="26" stroke="%2322c55e" stroke-width="1.5" stroke-linecap="round"/>' +
+    '<text x="70" y="5" font-size="3" fill="%2394a3b8" font-family="Arial" text-anchor="middle">VOLT / CURR</text>' +
+    // Binding posts at (15, 60) and (45, 60)
+    '<rect x="11" y="42" width="8" height="17" rx="1" fill="%23ef4444" stroke="%23b91c1c" stroke-width="0.6"/>' +
+    '<circle cx="15" cy="50" r="3.5" fill="%23f87171" stroke="%23b91c1c" stroke-width="0.5"/>' +
+    '<circle cx="15" cy="60" r="2.5" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="15" cy="60" r="1.1" fill="%230f172a"/>' +
+    '<text x="15" y="40" font-size="5" fill="%23fca5a5" font-family="Arial" font-weight="900" text-anchor="middle">+</text>' +
+    '<rect x="41" y="42" width="8" height="17" rx="1" fill="%231e293b" stroke="%230f172a" stroke-width="0.6"/>' +
+    '<circle cx="45" cy="50" r="3.5" fill="%23334155" stroke="%230f172a" stroke-width="0.5"/>' +
+    '<circle cx="45" cy="60" r="2.5" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="45" cy="60" r="1.1" fill="%230f172a"/>' +
+    '<text x="45" y="40" font-size="6" fill="%2394a3b8" font-family="Arial" font-weight="900" text-anchor="middle">−</text>' +
+    // Ground post
+    '<rect x="26" y="42" width="8" height="15" rx="1" fill="%2315803d" stroke="%2314532d" stroke-width="0.6"/>' +
+    '<circle cx="30" cy="50" r="3.5" fill="%2322c55e" stroke="%2314532d" stroke-width="0.5"/>' +
+    '<circle cx="30" cy="54" r="1.5" fill="%23f1f5f9"/>' +
+    '<text x="30" y="40" font-size="3" fill="%2386efac" font-family="Arial" text-anchor="middle">GND</text>'
   ),
   AC_FUNCTION_GENERATOR: svg('0 0 100 60',
-    '<rect x="4" y="6" width="92" height="44" rx="5" fill="%234c1d95" stroke="%23a78bfa" stroke-width="1.5"/>' +
-    '<path d="M12 29 Q18 16 24 29 T36 29 T48 29" stroke="%23fef08a" stroke-width="2" fill="none"/>' +
-    '<text x="72" y="28" font-size="10" fill="white" text-anchor="middle" font-family="Arial" font-weight="bold">AC GEN</text>' +
-    '<text x="72" y="41" font-size="7" fill="%23ddd6fe" text-anchor="middle" font-family="Arial">WAVEFORM</text>'
+    '<defs>' +
+      '<linearGradient id="gen_case" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23312e81"/><stop offset="50%25" stop-color="%231e1b4b"/><stop offset="100%25" stop-color="%230f172a"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="96" height="56" rx="4" fill="url(%23gen_case)" stroke="%236366f1" stroke-width="1"/>' +
+    // TFT Display
+    '<rect x="8" y="6" width="56" height="30" rx="2" fill="%23090d16" stroke="%23312e81" stroke-width="0.8"/>' +
+    '<path d="M 12 21 Q 19 12 26 21 T 40 21 T 54 21 T 60 21" fill="none" stroke="%23eab308" stroke-width="1.8"/>' +
+    '<text x="12" y="32" font-size="4.5" fill="%2338bdf8" font-family="Courier New, monospace" font-weight="bold">1.000kHz 5.0Vpp</text>' +
+    // Buttons on right
+    ['SIN', 'SQR', 'TRI'].map((w, i) =>
+      `<rect x="68" y="${8 + i * 9}" width="24" height="7" rx="1.5" fill="%231e293b" stroke="%23475569" stroke-width="0.5"/>` +
+      `<text x="80" y="${13 + i * 9}" font-size="3.5" fill="%23cbd5e1" font-family="Arial" font-weight="bold" text-anchor="middle">${w}</text>`
+    ).join('') +
+    // Output terminals at (15, 60) and (45, 60)
+    '<rect x="11" y="44" width="8" height="15" rx="1" fill="%23ef4444" stroke="%23b91c1c" stroke-width="0.6"/>' +
+    '<circle cx="15" cy="52" r="3.5" fill="%23f87171" stroke="%23b91c1c" stroke-width="0.5"/>' +
+    '<circle cx="15" cy="60" r="2.5" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="15" cy="60" r="1.1" fill="%230f172a"/>' +
+    '<text x="15" y="42" font-size="4" fill="%23fca5a5" font-family="Arial" font-weight="bold" text-anchor="middle">OUT+</text>' +
+    '<rect x="41" y="44" width="8" height="15" rx="1" fill="%231e293b" stroke="%230f172a" stroke-width="0.6"/>' +
+    '<circle cx="45" cy="52" r="3.5" fill="%23334155" stroke="%230f172a" stroke-width="0.5"/>' +
+    '<circle cx="45" cy="60" r="2.5" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="45" cy="60" r="1.1" fill="%230f172a"/>' +
+    '<text x="45" y="42" font-size="4" fill="%2394a3b8" font-family="Arial" font-weight="bold" text-anchor="middle">GND</text>' +
+    // BNC connector visual
+    '<circle cx="78" cy="48" r="6" fill="%2394a3b8" stroke="%23475569" stroke-width="0.8"/>' +
+    '<circle cx="78" cy="48" r="3.5" fill="%23cbd5e1"/><circle cx="78" cy="48" r="1.2" fill="%230f172a"/>'
   ),
   GROUND: svg('0 0 40 30',
-    '<path d="M20 2v12M8 16h24M12 21h16M16 26h8" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round"/>'
+    '<defs>' +
+      '<linearGradient id="gnd_rod" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="50%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    // Stem
+    '<line x1="20" y1="2" x2="20" y2="12" stroke="url(%23gnd_rod)" stroke-width="2.5" stroke-linecap="round"/>' +
+    // 3 graduated horizontal earth plates
+    '<line x1="8" y1="12" x2="32" y2="12" stroke="%2394a3b8" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<line x1="12" y1="16.5" x2="28" y2="16.5" stroke="%2394a3b8" stroke-width="2.2" stroke-linecap="round"/>' +
+    '<line x1="16" y1="21" x2="24" y2="21" stroke="%2394a3b8" stroke-width="1.8" stroke-linecap="round"/>' +
+    // Terminal eyelet at (20, 24)
+    '<line x1="20" y1="21" x2="20" y2="24" stroke="%2394a3b8" stroke-width="1.5"/>' +
+    '<circle cx="20" cy="24" r="2.2" fill="%23e2e8f0" stroke="%2364748b" stroke-width="0.6"/>' +
+    '<circle cx="20" cy="24" r="1" fill="%230f172a"/>' +
+    '<text x="34" y="20" font-size="5" fill="%2364748b" font-family="Arial" font-weight="bold">GND</text>'
   ),
   OSCILLOSCOPE: svg('0 0 100 80',
-    '<rect width="100" height="80" rx="6" fill="%23111827" stroke="%23334155" stroke-width="2"/>' +
-    '<rect x="8" y="8" width="84" height="50" rx="3" fill="%230a0f1e" stroke="%23334155" stroke-width="1"/>' +
-    // Grid lines
-    '<path d="M8 33h84M50 8v50" stroke="%2322c55e" stroke-width="0.5" opacity="0.3"/>' +
-    '<path d="M29 8v50M71 8v50M8 20h84M8 45h84" stroke="%2322c55e" stroke-width="0.3" opacity="0.2"/>' +
-    // Sample waveform
-    '<path d="M12 33 L22 18 L24 18 L24 48 L26 48 L26 18 L36 18 L38 48 L40 48 L40 18 L50 18 L52 48 L54 48 L54 18 L64 18 L66 48 L68 48 L68 18 L78 18 L80 48 L82 48 L84 33" stroke="%2322c55e" stroke-width="1.5" fill="none"/>' +
-    // Controls
-    '<circle cx="20" cy="68" r="5" fill="%23374151" stroke="%23475569" stroke-width="1"/>' +
-    '<circle cx="40" cy="68" r="5" fill="%23374151" stroke="%23475569" stroke-width="1"/>' +
-    '<circle cx="60" cy="68" r="5" fill="%23374151" stroke="%23475569" stroke-width="1"/>' +
-    '<text x="20" y="72" font-size="5" fill="%2394a3b8" text-anchor="middle" font-family="Arial">T/D</text>' +
-    '<text x="40" y="72" font-size="5" fill="%2394a3b8" text-anchor="middle" font-family="Arial">V/D</text>' +
-    '<text x="80" y="68" font-size="6" fill="%2322c55e" text-anchor="middle" font-family="Arial" font-weight="bold">SCOPE</text>'
+    '<defs>' +
+      '<linearGradient id="scope_chassis" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23334155"/><stop offset="50%25" stop-color="%231e293b"/><stop offset="100%25" stop-color="%230f172a"/></linearGradient>' +
+      '<linearGradient id="scope_screen" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23090d16"/><stop offset="100%25" stop-color="%23020617"/></linearGradient>' +
+      '<linearGradient id="scope_bnc" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+    '</defs>' +
+    // Scope chassis
+    '<rect width="100" height="80" rx="5" fill="url(%23scope_chassis)" stroke="%23475569" stroke-width="1.2"/>' +
+    // Top digital logic analyzer probe header connector at y=10 (ch3 to ch8)
+    '<rect x="12" y="6" width="86" height="8" rx="1.5" fill="%230f172a" stroke="%23334155" stroke-width="0.6"/>' +
+    [20, 35, 50, 65, 80, 95].map((x, i) =>
+      `<circle cx="${x}" cy="10" r="1.6" fill="%23f59e0b" stroke="%23b45309" stroke-width="0.4"/>` +
+      `<circle cx="${x}" cy="10" r="0.8" fill="%230f172a"/>` +
+      `<text x="${x}" y="5" font-size="2" fill="%2394a3b8" font-family="Arial" text-anchor="middle">D${i}</text>`
+    ).join('') +
+    // Color TFT Display (x=6, y=16, w=58, h=44)
+    '<rect x="6" y="16" width="58" height="44" rx="2" fill="url(%23scope_screen)" stroke="%230f172a" stroke-width="0.8"/>' +
+    // Graticule grid
+    '<line x1="6" y1="27" x2="64" y2="27" stroke="%231e293b" stroke-width="0.4"/>' +
+    '<line x1="6" y1="38" x2="64" y2="38" stroke="%23334155" stroke-width="0.6"/>' +
+    '<line x1="6" y1="49" x2="64" y2="49" stroke="%231e293b" stroke-width="0.4"/>' +
+    '<line x1="20" y1="16" x2="20" y2="60" stroke="%231e293b" stroke-width="0.4"/>' +
+    '<line x1="35" y1="16" x2="35" y2="60" stroke="%23334155" stroke-width="0.6"/>' +
+    '<line x1="50" y1="16" x2="50" y2="60" stroke="%231e293b" stroke-width="0.4"/>' +
+    // Status bar at top of screen
+    '<rect x="6" y="16" width="58" height="5.5" fill="%230f172a"/>' +
+    '<text x="8" y="20" font-size="2.6" fill="%2322c55e" font-family="Arial" font-weight="bold">TD: 1.0ms</text>' +
+    '<text x="35" y="20" font-size="2.6" fill="%2338bdf8" font-family="Arial" font-weight="bold" text-anchor="middle">500MSa/s</text>' +
+    '<text x="62" y="20" font-size="2.6" fill="%2322c55e" font-family="Arial" font-weight="bold" text-anchor="end">RUN</text>' +
+    // CH1 Waveform (yellow sine wave)
+    '<path d="M 8 38 Q 15 24 22 38 T 36 38 T 50 38 T 62 38" fill="none" stroke="%23facc15" stroke-width="1.3"/>' +
+    // CH2 Waveform (cyan pulse train)
+    '<path d="M 8 46 L 14 46 L 14 52 L 24 52 L 24 46 L 34 46 L 34 52 L 44 52 L 44 46 L 54 46 L 54 52 L 62 52" fill="none" stroke="%2338bdf8" stroke-width="1.1"/>' +
+    // Right control panel: Buttons & Knobs
+    '<rect x="68" y="18" width="12" height="5.5" rx="1.5" fill="%2315803d" stroke="%2322c55e" stroke-width="0.5"/>' +
+    '<text x="74" y="22" font-size="2.6" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">RUN</text>' +
+    '<rect x="83" y="18" width="13" height="5.5" rx="1.5" fill="%231e293b" stroke="%23475569" stroke-width="0.5"/>' +
+    '<text x="89.5" y="22" font-size="2.6" fill="%2338bdf8" font-family="Arial" font-weight="bold" text-anchor="middle">AUTO</text>' +
+    // CH1 knob
+    '<circle cx="74" cy="32" r="5" fill="%23475569" stroke="%2364748b" stroke-width="0.6"/>' +
+    '<circle cx="74" cy="32" r="3.5" fill="%231e293b"/>' +
+    '<line x1="74" y1="32" x2="74" y2="28" stroke="%23facc15" stroke-width="1.2" stroke-linecap="round"/>' +
+    '<text x="74" y="40.5" font-size="2.4" fill="%23facc15" font-family="Arial" font-weight="bold" text-anchor="middle">CH1 V/D</text>' +
+    // CH2 knob
+    '<circle cx="89" cy="32" r="5" fill="%23475569" stroke="%2364748b" stroke-width="0.6"/>' +
+    '<circle cx="89" cy="32" r="3.5" fill="%231e293b"/>' +
+    '<line x1="89" y1="32" x2="89" y2="28" stroke="%2338bdf8" stroke-width="1.2" stroke-linecap="round"/>' +
+    '<text x="89" y="40.5" font-size="2.4" fill="%2338bdf8" font-family="Arial" font-weight="bold" text-anchor="middle">CH2 V/D</text>' +
+    // TIME/DIV knob
+    '<circle cx="81.5" cy="50" r="5" fill="%23475569" stroke="%2364748b" stroke-width="0.6"/>' +
+    '<circle cx="81.5" cy="50" r="3.5" fill="%231e293b"/>' +
+    '<line x1="81.5" y1="50" x2="81.5" y2="46" stroke="%23ffffff" stroke-width="1.2" stroke-linecap="round"/>' +
+    '<text x="81.5" y="58.5" font-size="2.4" fill="%23cbd5e1" font-family="Arial" font-weight="bold" text-anchor="middle">TIME/DIV</text>' +
+    // Bottom BNC input jacks: CH1 at (20, 80), CH2 at (50, 80), GND at (95, 80)
+    '<circle cx="20" cy="71" r="5.5" fill="%23facc15" stroke="%23ca8a04" stroke-width="0.6"/>' +
+    '<circle cx="20" cy="71" r="4" fill="url(%23scope_bnc)" stroke="%23475569" stroke-width="0.5"/>' +
+    '<circle cx="20" cy="80" r="2.8" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="20" cy="80" r="1.2" fill="%230f172a"/>' +
+    '<text x="20" y="63" font-size="3.2" fill="%23facc15" font-family="Arial" font-weight="bold" text-anchor="middle">CH1</text>' +
+    '<circle cx="50" cy="71" r="5.5" fill="%2338bdf8" stroke="%230284c7" stroke-width="0.6"/>' +
+    '<circle cx="50" cy="71" r="4" fill="url(%23scope_bnc)" stroke="%23475569" stroke-width="0.5"/>' +
+    '<circle cx="50" cy="80" r="2.8" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="50" cy="80" r="1.2" fill="%230f172a"/>' +
+    '<text x="50" y="63" font-size="3.2" fill="%2338bdf8" font-family="Arial" font-weight="bold" text-anchor="middle">CH2</text>' +
+    '<circle cx="95" cy="71" r="4.5" fill="%231e293b" stroke="%23475569" stroke-width="0.6"/>' +
+    '<circle cx="95" cy="80" r="2.8" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.5"/><circle cx="95" cy="80" r="1.2" fill="%230f172a"/>' +
+    '<text x="95" y="63" font-size="3.2" fill="%2394a3b8" font-family="Arial" font-weight="bold" text-anchor="middle">GND</text>'
   ),
 };
 
@@ -633,11 +2178,42 @@ export const componentSvgs: Record<string, string> = {
 // package is equivalent.
 Object.assign(componentSvgs, {
   LDR: componentSvgs.SENSOR_LDR,
+  OLED_DISPLAY: componentSvgs.DISPLAY_OLED,
   SOIL_MOISTURE: svg('0 0 40 50',
-    '<rect x="5" y="5" width="30" height="34" rx="3" fill="%23334155" stroke="%2394a3b8" stroke-width="2"/>' +
-    '<path d="M12 15h16M12 22h16M12 29h10" stroke="%2322c55e" stroke-width="2" stroke-linecap="round"/>' +
-    '<path d="M14 39v8M26 39v8" stroke="%23a0a0a0" stroke-width="2"/>'
+    '<defs>' +
+      '<linearGradient id="sm_gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23fde047"/><stop offset="50%25" stop-color="%23eab308"/><stop offset="100%25" stop-color="%23ca8a04"/></linearGradient>' +
+      '<linearGradient id="sm_pin" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    // Top electronic module head
+    '<rect x="4" y="2" width="32" height="24" rx="2.5" fill="%2309090b" stroke="%2327272a" stroke-width="0.8"/>' +
+    '<circle cx="8" cy="6" r="1.5" fill="%23000000" stroke="%2352525b" stroke-width="0.3"/>' +
+    // LM393 IC and LEDs
+    '<rect x="14" y="5" width="12" height="7" rx="0.5" fill="%2318181b" stroke="%233f3f46" stroke-width="0.4"/>' +
+    '<text x="20" y="10" font-size="3" fill="%23a1a1aa" font-family="Arial" text-anchor="middle">LM393</text>' +
+    '<circle cx="29" cy="7" r="1" fill="%23ef4444"/>' +
+    '<circle cx="29" cy="11" r="1" fill="%2322c55e"/>' +
+    // Blue trimmer
+    '<rect x="8" y="14" width="8" height="8" rx="0.5" fill="%230284c7" stroke="%230369a1" stroke-width="0.4"/>' +
+    '<circle cx="12" cy="18" r="2.2" fill="%23e2e8f0"/><line x1="10.5" y1="18" x2="13.5" y2="18" stroke="%230f172a" stroke-width="0.6"/>' +
+    // Dual sensor probe prongs
+    '<rect x="6" y="26" width="9" height="15" rx="1.5" fill="%2309090b" stroke="%2327272a" stroke-width="0.6"/>' +
+    '<path d="M 8 28 L 8 38 L 13 38 L 13 28" fill="none" stroke="url(%23sm_gold)" stroke-width="1.2" stroke-linecap="round"/>' +
+    '<rect x="25" y="26" width="9" height="15" rx="1.5" fill="%2309090b" stroke="%2327272a" stroke-width="0.6"/>' +
+    '<path d="M 27 28 L 27 38 L 32 38 L 32 28" fill="none" stroke="url(%23sm_gold)" stroke-width="1.2" stroke-linecap="round"/>' +
+    // Bottom 3-pin connector header: VCC (10, 50), GND (20, 50), SIG (30, 50)
+    [10, 20, 30].map((x) =>
+      `<rect x="${x - 1.5}" y="42" width="3" height="8" rx="0.5" fill="url(%23sm_pin)"/>` +
+      `<circle cx="${x}" cy="49" r="1.5" fill="%23475569"/>`
+    ).join('') +
+    '<text x="10" y="25" font-size="2.6" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">VCC</text>' +
+    '<text x="20" y="25" font-size="2.6" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">GND</text>' +
+    '<text x="30" y="25" font-size="2.6" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">SIG</text>'
   ),
+  '74HC595': componentSvgs.IC_74HC595,
+  '74HC165': componentSvgs.IC_74HC165,
+  '74HC138': componentSvgs.IC_74HC138,
+  '74HC151': componentSvgs.IC_74HC151,
+  'CD4017': componentSvgs.IC_CD4017,
 });
 
 // Default dimensions for each component type (width x height)
@@ -651,7 +2227,9 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
   ARDUINO_NANO: { w: 100, h: 160 },
   ESP32: { w: 100, h: 160 },
   ESP32_S3: { w: 100, h: 160 },
-  ESP8266: { w: 100, h: 160 },
+  ESP8266: { w: 95, h: 150 },
+  RASPBERRY_PI_PICO: { w: 100, h: 180 },
+  STM32_BLUE_PILL: { w: 110, h: 170 },
 
   // Passives (match SVG viewBox)
   RESISTOR: { w: 90, h: 24 },
@@ -677,6 +2255,15 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
   MULTIMETER: { w: 90, h: 70 },
   IC_555_TIMER: { w: 90, h: 50 },
   IC_74HC595: { w: 120, h: 50 },
+  IC_74HC165: { w: 120, h: 50 },
+  IC_74HC138: { w: 120, h: 50 },
+  IC_74HC151: { w: 120, h: 50 },
+  IC_CD4017: { w: 120, h: 50 },
+  '74HC595': { w: 120, h: 50 },
+  '74HC165': { w: 120, h: 50 },
+  '74HC138': { w: 120, h: 50 },
+  '74HC151': { w: 120, h: 50 },
+  'CD4017': { w: 120, h: 50 },
 
   // LEDs (match SVG viewBox)
   LED_STANDARD: { w: 40, h: 80 },
@@ -697,7 +2284,7 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
   // Output
   BUZZER: { w: 50, h: 50 },
   SERVO_MOTOR: { w: 70, h: 50 },
-  MOTOR_SERVO: { w: 60, h: 50 },
+  MOTOR_SERVO: { w: 70, h: 50 },
   MOTOR_DC: { w: 70, h: 50 },
   STEPPER_MOTOR: { w: 70, h: 70 },
   MOTOR_STEPPER: { w: 70, h: 70 },

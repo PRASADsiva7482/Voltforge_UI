@@ -10,9 +10,9 @@
   --vf-text-strong: #111816;
   --vf-border: #dce5de;
   --vf-border-strong: #bdcbc3;
-  --vf-teal: #087f83;
-  --vf-teal-dark: #06666a;
-  --vf-teal-soft: #d9f2ef;
+  --vf-teal: #2196f3;
+  --vf-teal-dark: #1e88e5;
+  --vf-teal-soft: rgba(33, 150, 243, 0.12);
   --vf-amber: #c98218;
   --vf-amber-soft: #fff0d8;
   --vf-red: #be3b3b;
@@ -36,30 +36,30 @@
 }
 
 html.dark {
-  --vf-bg: #000000;
-  --vf-sidebar: #0b0b0c;
-  --vf-surface: #121214;
-  --vf-surface-raised: #1e1e21;
-  --vf-surface-inset: #070708;
-  --vf-text: #e2e8f0;
-  --vf-text-muted: #94a3b8;
-  --vf-text-soft: #64748b;
+  --vf-bg: #121212;
+  --vf-sidebar: #1a1a1a;
+  --vf-surface: #242424;
+  --vf-surface-raised: #2c2c2c;
+  --vf-surface-inset: #181818;
+  --vf-text: #e0e0e0;
+  --vf-text-muted: #9e9e9e;
+  --vf-text-soft: #757575;
   --vf-text-strong: #ffffff;
-  --vf-border: rgba(255, 255, 255, 0.08);
-  --vf-border-strong: rgba(255, 255, 255, 0.15);
-  --vf-teal: #087f83;
-  --vf-teal-dark: #06666a;
-  --vf-teal-soft: rgba(8, 127, 131, 0.18);
-  --vf-amber: #eab308;
-  --vf-amber-soft: rgba(234, 179, 8, 0.15);
-  --vf-red: #ef4444;
-  --vf-red-soft: rgba(239, 68, 68, 0.15);
-  --vf-green: #22c55e;
-  --vf-green-soft: rgba(34, 197, 94, 0.15);
-  --vf-blue: #3b82f6;
-  --vf-blue-soft: rgba(59, 130, 246, 0.15);
-  --vf-violet: #a855f7;
-  --vf-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+  --vf-border: rgba(255, 255, 255, 0.12);
+  --vf-border-strong: rgba(255, 255, 255, 0.2);
+  --vf-teal: #2196f3;
+  --vf-teal-dark: #1e88e5;
+  --vf-teal-soft: rgba(33, 150, 243, 0.15);
+  --vf-amber: #fb8c00;
+  --vf-amber-soft: rgba(251, 140, 0, 0.15);
+  --vf-red: #e53935;
+  --vf-red-soft: rgba(229, 57, 53, 0.15);
+  --vf-green: #43a047;
+  --vf-green-soft: rgba(67, 160, 71, 0.15);
+  --vf-blue: #2196f3;
+  --vf-blue-soft: rgba(33, 150, 243, 0.15);
+  --vf-violet: #8e24aa;
+  --vf-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
 * {
@@ -68,8 +68,8 @@ html.dark {
 
 body {
   background:
-    linear-gradient(rgba(8, 127, 131, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(8, 127, 131, 0.035) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
     var(--vf-bg);
   background-size: 28px 28px;
   margin: 0;

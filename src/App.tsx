@@ -22,6 +22,7 @@ const LandingPage = lazy(() => import('./features/landing/LandingPage').then((mo
 const NewProjectPage = lazy(() => import('./features/projects/NewProjectPage').then((module) => ({ default: module.NewProjectPage })))
 const ProjectsPage = lazy(() => import('./features/projects/ProjectsPage').then((module) => ({ default: module.ProjectsPage })))
 const SettingsPage = lazy(() => import('./features/settings/SettingsPage').then((module) => ({ default: module.SettingsPage })))
+const ProfilePage = lazy(() => import('./features/profile/ProfilePage').then((module) => ({ default: module.ProfilePage })))
 const LabExplorerPage = lazy(() => import('./features/labs/LabExplorerPage').then((module) => ({ default: module.LabExplorerPage })))
 const LabChallengeRunner = lazy(() => import('./features/labs/LabChallengeRunner').then((module) => ({ default: module.LabChallengeRunner })))
 
@@ -68,6 +69,8 @@ function App() {
                 <Route element={lazyRoute('new project', <NewProjectPage />)} path="/projects/new" />
                 <Route element={lazyRoute('explore', <ExplorePage />)} path="/explore" />
                 <Route element={lazyRoute('labs', <LabExplorerPage />)} path="/labs" />
+                <Route element={lazyRoute('profile', <ProfilePage />)} path="/profile" />
+                <Route element={lazyRoute('user profile', <ProfilePage />)} path="/profile/:userId" />
                 <Route element={lazyRoute('settings', <SettingsPage />)} path="/settings" />
                 <Route element={lazyRoute('admin', <AdminPage />)} path="/admin" />
               </Route>

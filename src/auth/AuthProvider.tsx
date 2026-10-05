@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import keycloak from './keycloak'
+import keycloak, { getKeycloakConfig } from './keycloak'
 import { syncUser } from './user'
 import type { AppUser } from '../types/auth'
 import { AuthContext, type AuthContextValue } from './AuthContext'
@@ -100,9 +100,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     keycloak.clearToken()
     window.location.assign(url)
   }, [])
+
+  const changePassword = useCallback(() => {
+    const config = getKeycloakConfig()
+    const base = (keycloak.authServerUrl || config.url)?.replace(/\/$/, '')
+    const realm = keycloak.realm || config.realm
+    const clientId = keycloak.clientId || config.clientId
+    const redirectUri = `${window.location.origin}/settings?password_updated=true`
+    const url = `${base}/realms/${realm}/protocol/openid-connect/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid&kc_action=UPDATE_PASSWORD`
+    window.location.assign(url)
+  }, [])
+
+  const configureTotp = useCallback(() => {
+    const config = getKeycloakConfig()
+    const base = (keycloak.authServerUrl || config.url)?.replace(/\/$/, '')
+    const realm = keycloak.realm || config.realm
+    const clientId = keycloak.clientId || config.clientId
+    const redirectUri = `${window.location.origin}/settings?totp_updated=true`
+    const url = `${base}/realms/${realm}/protocol/openid-connect/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid&kc_action=CONFIGURE_TOTP`
+    window.location.assign(url)
+  }, [])
+
+  const manageAccount = useCallback(() => {
+    const config = getKeycloakConfig()
+    const base = (keycloak.authServerUrl || config.url)?.replace(/\/$/, '')
+    const realm = keycloak.realm || config.realm
+    const url = `${base}/realms/${realm}/account`
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }, [])
+
   const value = useMemo<AuthContextValue>(() => ({
-    isAuthenticated, isLoading, isRedirecting, error, login, logout, signup, user,
-  }), [isAuthenticated, isLoading, isRedirecting, error, login, logout, signup, user])
+    isAuthenticated, isLoading, isRedirecting, error, login, logout, signup, changePassword, configureTotp, manageAccount, user,
+  }), [isAuthenticated, isLoading, isRedirecting, error, login, logout, signup, changePassword, configureTotp, manageAccount, user])
 
   // Public routes always render. ProtectedRoute alone gates private content.
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -352,6 +352,7 @@ export class SimulationEngine {
   private digitalIcPrimeRequests = new Set<string>();
   private virtualMeterSignature = '';
   private stepperNodes: CanvasNode[] = [];  // Stepper motors on canvas
+  private relayContactStates = new Map<string, boolean>();
 
   // ── MNA Solver Integration ──
   private solverWorker: Worker | null = null;
@@ -652,6 +653,7 @@ private scopeCaptureRevision = 0;
         // 6. Relay active state change
         if ((node.type === 'RELAY_SINGLE' || node.type === 'RELAY_SPDT') && props.isActive !== prevProps.isActive) {
           const isActive = Boolean(props.isActive);
+          this.relayContactStates.set(node.type === 'RELAY_SPDT' ? `${node.id}:spdt` : `${node.id}:1`, isActive);
           this.solverWorker?.postMessage({
             type: 'UPDATE_PIN',
             elementId: `r_contact_no_${node.id}`,
@@ -668,6 +670,7 @@ private scopeCaptureRevision = 0;
             const key = `isSwitched_${ch}`;
             if (props[key] !== prevProps[key]) {
               const active = Boolean(props[key]);
+              this.relayContactStates.set(`${node.id}:${ch}`, active);
               this.solverWorker?.postMessage({
                 type: 'UPDATE_PIN',
                 elementId: `r_contact_no${ch}_${node.id}`,
@@ -681,6 +684,7 @@ private scopeCaptureRevision = 0;
             const key = `isSwitched_${ch}`;
             if (props[key] !== prevProps[key]) {
               const active = Boolean(props[key]);
+              this.relayContactStates.set(`${node.id}:${ch}`, active);
               this.solverWorker?.postMessage({
                 type: 'UPDATE_PIN',
                 elementId: `r_contact_no${ch}_${node.id}`,
@@ -2880,6 +2884,23 @@ private scopeCaptureRevision = 0;
     });
   }
 
+  private syncRelayContactStatesFromNodes(nodes: CanvasNode[]) {
+    this.relayContactStates.clear();
+    nodes.forEach(node => {
+      if (node.type === 'RELAY_SINGLE' || node.type === 'RELAY_2CH' || node.type === 'RELAY_4CH') {
+        const channels = node.type === 'RELAY_SINGLE' ? 1 : node.type === 'RELAY_2CH' ? 2 : 4;
+        for (let ch = 1; ch <= channels; ch++) {
+          const active = ch === 1
+            ? Boolean(node.properties?.isActive || node.properties?.isSwitched || node.properties?.isSwitched_1)
+            : Boolean(node.properties?.[`isSwitched_${ch}`]);
+          this.relayContactStates.set(`${node.id}:${ch}`, active);
+        }
+      } else if (node.type === 'RELAY_SPDT') {
+        this.relayContactStates.set(`${node.id}:spdt`, Boolean(node.properties?.isActive));
+      }
+    });
+  }
+
   private startMNASolver(nodes: CanvasNode[], wires: Wire[]) {
     try {
       const pinModes: Record<string, string> = {};
@@ -2898,6 +2919,7 @@ private scopeCaptureRevision = 0;
       const virtualMeter = this.getVirtualMeterConfiguration();
       this.mnaCircuit = buildMNACircuit(nodes, wires, this.mcuPinVoltages, pinModes, boardPoweredMap, virtualMeter);
       this.virtualMeterSignature = this.currentVirtualMeterSignature();
+      this.syncRelayContactStatesFromNodes(nodes);
 
       const elementIds = new Set<string>();
       for (const element of this.mnaCircuit.elements) {
@@ -3049,6 +3071,7 @@ private scopeCaptureRevision = 0;
     this.digitalIcOutputVoltages.clear();
     this.digitalIcPrimeRequests.clear();
     this.virtualMeterSignature = '';
+    this.relayContactStates.clear();
     this.scopeCaptureRevision = nextScopeCaptureRevision(this.scopeCaptureRevision);
     this.clearSolverResultSchedule();
     this.resultRequestOutstanding = false;
@@ -3118,6 +3141,7 @@ private scopeCaptureRevision = 0;
       };
       this.rebuildSimulationNodeIndex(nodes, this.mnaCircuit);
       this.virtualMeterSignature = this.currentVirtualMeterSignature();
+      this.syncRelayContactStatesFromNodes(nodes);
 
       if (refreshPlan.elementUpdates.length > 0) {
         this.solverWorker.postMessage({
@@ -4152,9 +4176,16 @@ private scopeCaptureRevision = 0;
       if (node.type === 'RELAY_SPDT' || isLegacySingleRelay) {
         const current = result.branchCurrents[`r_coil_${node.id}`] ?? 0;
         const isActive = Math.abs(current) > 0.02;
-        if (node.properties?.isActive !== isActive) {
+        const spdtKey = `${node.id}:spdt`;
+        const prevContactActive = this.relayContactStates.get(spdtKey);
+        if (prevContactActive === undefined || prevContactActive !== isActive) {
+          this.relayContactStates.set(spdtKey, isActive);
           this.solverWorker?.postMessage({ type: 'UPDATE_PIN', elementId: `r_contact_no_${node.id}`, voltage: isActive ? 0.05 : 1e8 });
           this.solverWorker?.postMessage({ type: 'UPDATE_PIN', elementId: `r_contact_nc_${node.id}`, voltage: isActive ? 1e8 : 0.05 });
+        }
+        if (node.properties?.isActive !== isActive) {
+
+
           useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: { ...node.properties, isActive },
           });
@@ -4181,9 +4212,14 @@ private scopeCaptureRevision = 0;
           const active = powered && (activeLow ? inputVoltage < supplyVoltage * 0.4 : inputVoltage > supplyVoltage * 0.6);
           const propertyName = channels === 1 ? 'isSwitched' : `isSwitched_${ch}`;
           updates[propertyName] = active;
+          if (channels === 1) updates.isSwitched_1 = active;
           if (active) anySwitched = true;
 
-          if (node.properties?.[propertyName] !== active) {
+          const contactKey = `${node.id}:${ch}`;
+          const prevContactActive = this.relayContactStates.get(contactKey);
+
+          if (prevContactActive === undefined || prevContactActive !== active) {
+            this.relayContactStates.set(contactKey, active);
             changed = true;
             const suffix = channels === 1 ? '' : String(ch);
             this.solverWorker?.postMessage({ type: 'UPDATE_PIN', elementId: `r_relay_coil_${ch}_${node.id}`, voltage: active ? 70 : 1e8 });
@@ -4192,7 +4228,7 @@ private scopeCaptureRevision = 0;
           }
         }
 
-        if (changed || node.properties?.isActive !== anySwitched || node.properties?.powered !== powered) {
+        if (changed || node.properties?.isActive !== anySwitched || node.properties?.powered !== powered || (channels === 1 ? node.properties?.isSwitched !== anySwitched : false)) {
           useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: {
               ...node.properties,

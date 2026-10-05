@@ -420,6 +420,13 @@
   display: flex;
   gap: 4px;
   overflow-x: auto;
+  overflow-y: hidden !important;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.vf-tabs__list::-webkit-scrollbar {
+  display: none;
 }
 
 .vf-tabs__tab {

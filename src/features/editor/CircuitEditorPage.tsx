@@ -34,6 +34,8 @@ import {
   Bug,
   FileArchive,
   CircuitBoard,
+  RotateCw,
+  Loader2,
 } from 'lucide-react'
 
 import { pcbManufacturingApi, projectApi, simulationApi, projectExportApi, type PcbManufacturingPayload } from '../../api/services'
@@ -227,6 +229,7 @@ export default function CircuitEditorPage() {
   const [leftPanelOpen, setLeftPanelOpen] = useState(true)
   const [isSimulating, setIsSimulating] = useState(false)
   const [isSimulationPaused, setIsSimulationPaused] = useState(false)
+  const [isCompilingFirmware, setIsCompilingFirmware] = useState(false)
   const canvasContainerRef = useRef<HTMLDivElement>(null)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
   const hydratedVersionRef = useRef<{ id: string; revision: string } | null>(null)
@@ -712,7 +715,30 @@ export default function CircuitEditorPage() {
           const mcuPin = targetNode.pins?.find((p) => p.id === targetPinId)
           if (mcuPin) {
             const pinNum = mcuPin.name.replace(/[^0-9]/g, '')
-            engineRef.current?.setExternalPinState(pinNum, isPressed ? 'HIGH' : 'LOW')
+            // Check if button's other pin connects to GND or VCC
+            const otherPin = node.pins?.find((p) => p.id !== (isFromNode ? wire.fromPinId : wire.toPinId))
+            let connectedToVcc = false
+            if (otherPin) {
+              const otherWires = wires.filter(
+                (w) =>
+                  (w.fromNodeId === nodeId && w.fromPinId === otherPin.id) ||
+                  (w.toNodeId === nodeId && w.toPinId === otherPin.id)
+              )
+              for (const ow of otherWires) {
+                const owTargetNode = nodes.find((n) => n.id === (ow.fromNodeId === nodeId ? ow.toNodeId : ow.fromNodeId))
+                const owTargetPinId = ow.fromNodeId === nodeId ? ow.toPinId : ow.fromPinId
+                const owTargetPin = owTargetNode?.pins?.find((p) => p.id === owTargetPinId)
+                if (owTargetPin && /5V|VCC|3V3/i.test(owTargetPin.name)) {
+                  connectedToVcc = true
+                }
+              }
+            }
+
+            // Standard Arduino pullup button connects to GND -> pressed pulls LOW, released HIGH
+            // Active-high button connects to VCC -> pressed pulls HIGH, released LOW
+            const activeLevel = connectedToVcc ? 'HIGH' : 'LOW'
+            const inactiveLevel = connectedToVcc ? 'LOW' : 'HIGH'
+            engineRef.current?.setExternalPinState(pinNum, isPressed ? activeLevel : inactiveLevel)
           }
         }
       })
@@ -720,12 +746,25 @@ export default function CircuitEditorPage() {
     [engineRef, isSimulating, updateNode]
   )
 
+  // ── Restart Simulation ──
+  const handleRestartSimulation = useCallback(() => {
+    simulationRequestRef.current += 1
+    engineRef.current?.stop()
+    setIsSimulating(false)
+    setIsSimulationPaused(false)
+    setSimulating(false)
+    setTimeout(() => {
+      toggleSimulation()
+    }, 80)
+  }, [isSimulating])
+
   // ── Simulation toggle ──
   const toggleSimulation = async () => {
     const { nodes, wires } = useCanvasStore.getState()
     const { currentProject, activeCodeFile } = useProjectStore.getState()
     if (!isSimulating) {
       const requestId = ++simulationRequestRef.current
+      setIsCompilingFirmware(true)
       setIsSimulating(true)
       setIsSimulationPaused(false)
       setSimulating(true)
@@ -791,6 +830,8 @@ export default function CircuitEditorPage() {
         }
       }
 
+      setIsCompilingFirmware(false)
+
       // Stop can be clicked while a remote compiler request is pending. Do not
       // start a worker after that stop has already invalidated this request.
       if (requestId !== simulationRequestRef.current) return
@@ -799,6 +840,7 @@ export default function CircuitEditorPage() {
         if (requestId !== simulationRequestRef.current) return
         await engine.start(bundledCode, nodes, wires, compiledHex, selectedBoardType)
       } catch (error) {
+        setIsCompilingFirmware(false)
         if (error instanceof SimulationEngineLoadCancelledError || requestId !== simulationRequestRef.current) return
         setIsSimulating(false)
         setIsSimulationPaused(false)
@@ -808,6 +850,7 @@ export default function CircuitEditorPage() {
     } else {
       simulationRequestRef.current += 1
       if (regressionMode !== null) regressionTokenRef.current += 1
+      setIsCompilingFirmware(false)
       setIsSimulating(false)
       setIsSimulationPaused(false)
       setSimulating(false)
@@ -830,6 +873,53 @@ export default function CircuitEditorPage() {
       if ((globalThis as any).__voltforgeBldcState) delete (globalThis as any).__voltforgeBldcState
     }
   }
+
+  // ── Global Simulation Hotkeys (Wokwi Standard: Ctrl+Enter, '.', ',') ──
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable ||
+          target.closest('.monaco-editor'))
+      ) {
+        return
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault()
+        if (isSimulating) {
+          handleRestartSimulation()
+        } else if (!isCompilingFirmware) {
+          toggleSimulation()
+        }
+        return
+      }
+
+      if (e.key === '.' && isSimulating) {
+        e.preventDefault()
+        toggleSimulation()
+        return
+      }
+
+      if (e.key === ',' && isSimulating) {
+        e.preventDefault()
+        if (isSimulationPaused) {
+          engineRef.current?.resume()
+          setIsSimulationPaused(false)
+        } else {
+          engineRef.current?.pause()
+          setIsSimulationPaused(true)
+        }
+        return
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isSimulating, isSimulationPaused, isCompilingFirmware, handleRestartSimulation, toggleSimulation])
 
   const stopRegression = useCallback(() => {
     if (regressionMode === null) return
@@ -1362,6 +1452,10 @@ export default function CircuitEditorPage() {
               <option value="full-fidelity">Full fidelity</option>
             </select>
           </label>
+
+          <span className="vf-editor__divider" />
+
+          {/* ── Top Ribbon Simulation Controls ── */}
           {isSimulating && !canvasRenderTraceRunning && !avrCompiledTraceRunning && (
             <>
               <EditorSimulationTime />
@@ -1372,19 +1466,38 @@ export default function CircuitEditorPage() {
           <button
             className={`vf-editor__sim-btn ${isSimulating ? 'is-running' : ''}`}
             onClick={toggleSimulation}
-            disabled={regressionMode !== null || canvasRenderTraceRunning || avrCompiledTraceRunning}
+            disabled={regressionMode !== null || canvasRenderTraceRunning || avrCompiledTraceRunning || isCompilingFirmware}
             type="button"
             aria-label={canvasRenderTraceRunning ? 'Canvas trace running' : avrCompiledTraceRunning ? 'AVR trace running' : isSimulating ? 'Stop simulation' : 'Start simulation'}
+            title={isSimulating ? 'Stop simulation (.)' : 'Start simulation (Ctrl+Enter)'}
           >
-            {canvasRenderTraceRunning || avrCompiledTraceRunning ? <Gauge size={14} /> : isSimulating ? <Square size={14} /> : <Play size={14} />}
+            {canvasRenderTraceRunning || avrCompiledTraceRunning ? (
+              <Gauge size={14} />
+            ) : isCompilingFirmware ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : isSimulating ? (
+              <Square size={13} fill="currentColor" />
+            ) : (
+              <Play size={13} fill="currentColor" />
+            )}
             <span className="vf-editor__action-label">
-              {canvasRenderTraceRunning ? 'Canvas trace' : avrCompiledTraceRunning ? 'AVR trace' : isSimulating ? 'Stop' : 'Simulate'}
+              {canvasRenderTraceRunning ? 'Canvas trace' : avrCompiledTraceRunning ? 'AVR trace' : isCompilingFirmware ? 'Compiling...' : isSimulating ? 'Stop' : 'Simulate'}
             </span>
           </button>
+
           {isSimulating && !canvasRenderTraceRunning && !avrCompiledTraceRunning && (
             <>
               <button
                 className="vf-editor__tool-btn"
+                onClick={handleRestartSimulation}
+                type="button"
+                title="Restart simulation (Ctrl+Enter)"
+                aria-label="Restart simulation"
+              >
+                <RotateCw size={14} />
+              </button>
+              <button
+                className={`vf-editor__tool-btn ${isSimulationPaused ? 'is-active' : ''}`}
                 onClick={() => {
                   if (isSimulationPaused) {
                     engineRef.current?.resume()
@@ -1394,15 +1507,19 @@ export default function CircuitEditorPage() {
                     setIsSimulationPaused(true)
                   }
                 }}
-                title={isSimulationPaused ? 'Resume simulation' : 'Pause simulation'}
+                type="button"
+                title={isSimulationPaused ? 'Resume simulation (,)' : 'Pause simulation (,)'}
+                aria-label={isSimulationPaused ? 'Resume simulation' : 'Pause simulation'}
               >
-                {isSimulationPaused ? <Play size={14} /> : <Pause size={14} />}
+                {isSimulationPaused ? <Play size={14} fill="currentColor" /> : <Pause size={14} fill="currentColor" />}
               </button>
               <button
                 className="vf-editor__tool-btn"
                 onClick={() => engineRef.current?.step()}
                 disabled={!isSimulationPaused}
+                type="button"
                 title="Advance one simulation step"
+                aria-label="Step simulation"
               >
                 <StepForward size={14} />
               </button>

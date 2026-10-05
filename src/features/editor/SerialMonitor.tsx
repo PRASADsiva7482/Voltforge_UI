@@ -21,6 +21,13 @@ export default function SerialMonitor() {
     }
   }, [serialLogs]);
 
+  // Auto-open on serial logs arrival like Wokwi
+  useEffect(() => {
+    if (serialLogs.length > 0 && !isOpen) {
+      setSerialPanelOpen(true);
+    }
+  }, [serialLogs.length, isOpen, setSerialPanelOpen]);
+
   const handleSend = () => {
     if (input.trim()) {
       sendSerialInput(input.trim());
