@@ -1,7 +1,7 @@
 import keycloak, { getKeycloakConfig } from './keycloak'
 import { getBaseURL } from '../api/client'
 
-export const SESSION_CHECK_TIMEOUT_MS = 3500
+export const SESSION_CHECK_TIMEOUT_MS = 8000
 export const USER_SYNC_TIMEOUT_MS = 5000
 
 type SessionCheck = { authenticated: boolean; error: string | null }
@@ -97,12 +97,20 @@ export async function checkSignInAvailability() {
     // Discovery endpoints can be reachable while browser CORS rejects them.
     // The backend probes only its configured issuer with a bounded timeout.
     const issuer = `${base}/realms/${encodeURIComponent(realm)}`
+    const headers = new Headers()
+    headers.set('ngrok-skip-browser-warning', 'true')
     const response = await fetch(`${getBaseURL()}/auth/identity-health`, {
       signal: controller.signal,
-      credentials: 'omit',
+      credentials: 'same-origin',
+      headers,
       cache: 'no-store',
     })
     if (!response.ok) throw new Error('Sign-in service unavailable.')
+    const contentType = response.headers.get('content-type') || ''
+    if (!contentType.includes('application/json')) {
+      console.warn('Identity health check returned non-JSON response:', contentType)
+      return
+    }
     const configuration = await response.json() as { success?: boolean; data?: { issuer?: string; available?: boolean } }
     const realmSuffix = `/realms/${encodeURIComponent(realm)}`
     const isMatchingIssuer = configuration.data?.issuer === issuer

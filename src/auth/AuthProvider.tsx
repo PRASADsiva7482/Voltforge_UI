@@ -77,8 +77,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void (async () => {
       try {
         await checkSession()
-        // Keep the page and retry controls when the provider is offline.
-        await checkSignInAvailability()
+        try {
+          await checkSignInAvailability()
+        } catch (healthErr) {
+          console.warn('Identity health pre-check notice:', healthErr)
+        }
         const options = { redirectUri: loginRedirectUri() }
         if (signup) await keycloak.register(options)
         else await keycloak.login(options)
