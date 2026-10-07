@@ -23,7 +23,7 @@ export class CanvasAudioState {
         if (beeping && !wasBeeping) this.output.playTone(Number(p?.frequency) || 1000, 'square', .08);
         else if (!beeping && wasBeeping) this.output.stopTone();
         if (['PUSH_BUTTON', 'BUTTON'].includes(node.type) && p?.isPressed && !before?.isPressed) this.output.playClick('button');
-        if (node.type === 'SWITCH_SPST' && old && Boolean(p?.isClosed) !== Boolean(before?.isClosed)) this.output.playClick('switch');
+        if ((node.type === 'SWITCH_SPST' || node.type === 'SWITCH_SPDT') && old && Boolean(p?.isClosed) !== Boolean(before?.isClosed)) this.output.playClick('switch');
         if (['RELAY_SINGLE', 'RELAY_2CH', 'RELAY_4CH', 'RELAY_SPDT'].includes(node.type) && Boolean(p?.isActive) !== Boolean(before?.isActive)) this.output.playClick('relay');
       } catch { /* Sound is optional, including browsers without an audio device. */ }
     }

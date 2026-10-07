@@ -459,7 +459,7 @@ const RELAY_4CH_PINS: PinPosition[] = [
 
 // SWITCH_SPST: SVG viewBox 60×30
 const SWITCH_SPST_PINS: PinPosition[] = [
-  pin('p1', 'Pin 1', 34, 15, 'bidirectional'),
+  pin('p1', 'Pin 1', 6, 15, 'bidirectional'),
   pin('p2', 'Pin 2', 54, 15, 'bidirectional'),
 ];
 
@@ -510,6 +510,240 @@ const OSCILLOSCOPE_PINS: PinPosition[] = [
   pin('gnd', 'GND', 95, 80, 'ground'),
 ];
 
+// ── Child Component Pin Definitions ──
+// DIP-14 Logic Gates
+const IC_74HC00_PINS: PinPosition[] = [
+  pin('1a', '1A', 16, 50, 'input'),
+  pin('1b', '1B', 30, 50, 'input'),
+  pin('1y', '1Y', 44, 50, 'output'),
+  pin('2a', '2A', 58, 50, 'input'),
+  pin('2b', '2B', 72, 50, 'input'),
+  pin('2y', '2Y', 86, 50, 'output'),
+  pin('gnd', 'GND', 100, 50, 'ground'),
+  pin('3y', '3Y', 100, 0, 'output'),
+  pin('3a', '3A', 86, 0, 'input'),
+  pin('3b', '3B', 72, 0, 'input'),
+  pin('4y', '4Y', 58, 0, 'output'),
+  pin('4a', '4A', 44, 0, 'input'),
+  pin('4b', '4B', 30, 0, 'input'),
+  pin('vcc', 'VCC', 16, 0, 'power'),
+];
+
+const IC_74HC04_PINS: PinPosition[] = [
+  pin('1a', '1A', 16, 50, 'input'),
+  pin('1y', '1Y', 30, 50, 'output'),
+  pin('2a', '2A', 44, 50, 'input'),
+  pin('2y', '2Y', 58, 50, 'output'),
+  pin('3a', '3A', 72, 50, 'input'),
+  pin('3y', '3Y', 86, 50, 'output'),
+  pin('gnd', 'GND', 100, 50, 'ground'),
+  pin('4y', '4Y', 100, 0, 'output'),
+  pin('4a', '4A', 86, 0, 'input'),
+  pin('5y', '5Y', 72, 0, 'output'),
+  pin('5a', '5A', 58, 0, 'input'),
+  pin('6y', '6Y', 44, 0, 'output'),
+  pin('6a', '6A', 30, 0, 'input'),
+  pin('vcc', 'VCC', 16, 0, 'power'),
+];
+
+const IC_74HC02_PINS: PinPosition[] = [
+  pin('1y', '1Y', 16, 50, 'output'),
+  pin('1a', '1A', 30, 50, 'input'),
+  pin('1b', '1B', 44, 50, 'input'),
+  pin('2y', '2Y', 58, 50, 'output'),
+  pin('2a', '2A', 72, 50, 'input'),
+  pin('2b', '2B', 86, 50, 'input'),
+  pin('gnd', 'GND', 100, 50, 'ground'),
+  pin('3a', '3A', 100, 0, 'input'),
+  pin('3b', '3B', 86, 0, 'input'),
+  pin('3y', '3Y', 72, 0, 'output'),
+  pin('4a', '4A', 58, 0, 'input'),
+  pin('4b', '4B', 44, 0, 'input'),
+  pin('4y', '4Y', 30, 0, 'output'),
+  pin('vcc', 'VCC', 16, 0, 'power'),
+];
+
+const IC_74HC74_PINS: PinPosition[] = [
+  pin('1clr', '1CLR', 16, 50, 'input'),
+  pin('1d', '1D', 30, 50, 'input'),
+  pin('1clk', '1CLK', 44, 50, 'input'),
+  pin('1pre', '1PRE', 58, 50, 'input'),
+  pin('1q', '1Q', 86, 50, 'output'),
+  pin('1q_bar', '1Q_BAR', 72, 50, 'output'),
+  pin('gnd', 'GND', 100, 50, 'ground'),
+  pin('2q_bar', '2Q_BAR', 100, 0, 'output'),
+  pin('2q', '2Q', 86, 0, 'output'),
+  pin('2pre', '2PRE', 72, 0, 'input'),
+  pin('2clk', '2CLK', 58, 0, 'input'),
+  pin('2d', '2D', 44, 0, 'input'),
+  pin('2clr', '2CLR', 30, 0, 'input'),
+  pin('vcc', 'VCC', 16, 0, 'power'),
+];
+
+// Switches
+const SWITCH_SPDT_PINS: PinPosition[] = [
+  pin('p1', '1', 54, 8, 'bidirectional'),
+  pin('com', 'COM', 54, 15, 'bidirectional'),
+  pin('p2', '2', 54, 22, 'bidirectional'),
+];
+
+const TOGGLE_SWITCH_PINS: PinPosition[] = [
+  pin('p1', '1', 16, 40, 'bidirectional'),
+  pin('com', 'COM', 30, 40, 'bidirectional'),
+  pin('p2', '2', 44, 40, 'bidirectional'),
+];
+
+const DIP_SWITCH_4_PINS: PinPosition[] = [
+  pin('in1', '1', 16, 0, 'bidirectional'),
+  pin('in2', '2', 28, 0, 'bidirectional'),
+  pin('in3', '3', 40, 0, 'bidirectional'),
+  pin('in4', '4', 52, 0, 'bidirectional'),
+  pin('out1', '1\'', 16, 40, 'bidirectional'),
+  pin('out2', '2\'', 28, 40, 'bidirectional'),
+  pin('out3', '3\'', 40, 40, 'bidirectional'),
+  pin('out4', '4\'', 52, 40, 'bidirectional'),
+];
+
+// Instruments
+const VOLTMETER_PINS: PinPosition[] = [
+  pin('v_pos', 'V+', 24, 70, 'input'),
+  pin('com', 'COM', 66, 70, 'ground'),
+];
+
+const LOGIC_ANALYZER_PINS: PinPosition[] = [
+  pin('ch0', 'CH0', 15, 60, 'input'),
+  pin('ch1', 'CH1', 24, 60, 'input'),
+  pin('ch2', 'CH2', 33, 60, 'input'),
+  pin('ch3', 'CH3', 42, 60, 'input'),
+  pin('ch4', 'CH4', 51, 60, 'input'),
+  pin('ch5', 'CH5', 60, 60, 'input'),
+  pin('ch6', 'CH6', 69, 60, 'input'),
+  pin('ch7', 'CH7', 78, 60, 'input'),
+  pin('gnd', 'GND', 88, 60, 'ground'),
+];
+
+// Power Sources & Regulators
+const BATTERY_18650_PINS: PinPosition[] = [
+  pin('positive', '+', 15, 60, 'power'),
+  pin('negative', '−', 45, 60, 'ground'),
+];
+
+const BATTERY_CR2032_PINS: PinPosition[] = [
+  pin('positive', '+', 15, 50, 'power'),
+  pin('negative', '−', 35, 50, 'ground'),
+];
+
+const BATTERY_LIPO_PINS: PinPosition[] = [
+  pin('positive', '+', 20, 60, 'power'),
+  pin('negative', '−', 40, 60, 'ground'),
+];
+
+const BATTERY_AAA_PINS: PinPosition[] = [
+  pin('positive', '+', 15, 60, 'power'),
+  pin('negative', '−', 45, 60, 'ground'),
+];
+
+const AMS1117_PINS: PinPosition[] = [
+  pin('vin', 'VIN', 0, 15, 'power'),
+  pin('gnd_in', 'GND', 0, 35, 'ground'),
+  pin('vout', '3.3V', 60, 15, 'power'),
+  pin('gnd_out', 'GND', 60, 35, 'ground'),
+];
+
+// Sensors
+const ULTRASONIC_PINS: PinPosition[] = [
+  pin('vcc', 'VCC', 20, 60, 'power'),
+  pin('trig', 'TRIG', 33, 60, 'input'),
+  pin('echo', 'ECHO', 47, 60, 'output'),
+  pin('gnd', 'GND', 60, 60, 'ground'),
+];
+
+const DHT11_PINS: PinPosition[] = [
+  pin('vcc', 'VCC (+)', 12, 60, 'power'),
+  pin('data', 'DATA (S)', 25, 60, 'bidirectional'),
+  pin('gnd', 'GND (−)', 38, 60, 'ground'),
+];
+
+const TMP36_PINS: PinPosition[] = [
+  pin('vcc', 'Vs (+)', 16, 70, 'power'),
+  pin('vout', 'Vout', 28, 70, 'output'),
+  pin('gnd', 'GND', 40, 70, 'ground'),
+];
+
+const MQ2_PINS: PinPosition[] = [
+  pin('vcc', 'VCC', 12, 60, 'power'),
+  pin('gnd', 'GND', 24, 60, 'ground'),
+  pin('dout', 'DO', 36, 60, 'output'),
+  pin('aout', 'AO', 48, 60, 'output'),
+];
+
+// Motors
+const VIBRATION_MOTOR_PINS: PinPosition[] = [
+  pin('pos', '+', 18, 50, 'power'),
+  pin('neg', '−', 32, 50, 'ground'),
+];
+
+const GEAR_MOTOR_PINS: PinPosition[] = [
+  pin('m_pos', 'Motor +', 0, 20, 'bidirectional'),
+  pin('m_neg', 'Motor −', 0, 40, 'bidirectional'),
+];
+
+const SOLENOID_PINS: PinPosition[] = [
+  pin('coil1', 'Coil 1', 12, 50, 'bidirectional'),
+  pin('coil2', 'Coil 2', 32, 50, 'bidirectional'),
+];
+
+// Displays
+const TM1637_PINS: PinPosition[] = [
+  pin('clk', 'CLK', 25, 50, 'input'),
+  pin('dio', 'DIO', 40, 50, 'bidirectional'),
+  pin('vcc', 'VCC', 55, 50, 'power'),
+  pin('gnd', 'GND', 70, 50, 'ground'),
+];
+
+const LED_BAR_GRAPH_PINS: PinPosition[] = [
+  ...Array.from({ length: 10 }, (_, i) => pin(`a${i + 1}`, `A${i + 1}`, 7.5 + i * 5, 0, 'input')),
+  ...Array.from({ length: 10 }, (_, i) => pin(`k${i + 1}`, `K${i + 1}`, 7.5 + i * 5, 60, 'input')),
+];
+
+const MAX7219_MATRIX_PINS: PinPosition[] = [
+  pin('vcc', 'VCC', 15, 80, 'power'),
+  pin('gnd', 'GND', 27, 80, 'ground'),
+  pin('din', 'DIN', 39, 80, 'input'),
+  pin('cs', 'CS', 51, 80, 'input'),
+  pin('clk', 'CLK', 63, 80, 'input'),
+];
+
+// Passives & Relays
+const TRIMPOT_PINS: PinPosition[] = [
+  pin('p1', '1', 12, 50, 'bidirectional'),
+  pin('wiper', 'Wiper', 25, 50, 'bidirectional'),
+  pin('p2', '2', 38, 50, 'bidirectional'),
+];
+
+const PHOTO_DIODE_PINS: PinPosition[] = [
+  pin('anode', 'A', 16, 70, 'bidirectional'),
+  pin('cathode', 'K', 24, 70, 'bidirectional'),
+];
+
+const RELAY_8CH_PINS: PinPosition[] = [
+  pin('vcc', 'VCC', 12, 9, 'power'),
+  pin('gnd', 'GND', 12, 13.5, 'ground'),
+  ...Array.from({ length: 8 }, (_, i) => pin(`in${i + 1}`, `IN${i + 1}`, 12, 18 + i * 4.5, 'input')),
+  ...Array.from({ length: 8 }, (_, i) => [
+    pin(`no${i + 1}`, `NO${i + 1}`, 24 + i * 16 + 3.5, 60, 'bidirectional'),
+    pin(`com${i + 1}`, `COM${i + 1}`, 24 + i * 16 + 7, 60, 'bidirectional'),
+    pin(`nc${i + 1}`, `NC${i + 1}`, 24 + i * 16 + 10.5, 60, 'bidirectional'),
+  ]).flat(),
+];
+
+const RELAY_SSR_PINS: PinPosition[] = [
+  pin('load1', '1 (~)', 20, 0, 'bidirectional'),
+  pin('load2', '2 (~)', 50, 0, 'bidirectional'),
+  pin('ctrl_pos', '3 (+)', 20, 70, 'input'),
+  pin('ctrl_neg', '4 (−)', 50, 70, 'ground'),
+];
+
 // ── Registry ──
 const catalogBoardPinRegistry = Object.fromEntries(
   BOARD_CATALOG.map((boardItem) => [boardItem.type, createBoardPins(boardItem.footprint, boardItem.type)]),
@@ -556,11 +790,33 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
   '74HC151': IC_74HC151_PINS,
   IC_CD4017: IC_CD4017_PINS,
   'CD4017': IC_CD4017_PINS,
+  IC_74HC00: IC_74HC00_PINS,
+  '74HC00': IC_74HC00_PINS,
+  IC_74HC04: IC_74HC04_PINS,
+  '74HC04': IC_74HC04_PINS,
+  IC_74HC08: IC_74HC00_PINS,
+  '74HC08': IC_74HC00_PINS,
+  IC_74HC32: IC_74HC00_PINS,
+  '74HC32': IC_74HC00_PINS,
+  IC_74HC86: IC_74HC00_PINS,
+  '74HC86': IC_74HC00_PINS,
+  IC_74HC14: IC_74HC04_PINS,
+  '74HC14': IC_74HC04_PINS,
+  IC_74HC74: IC_74HC74_PINS,
+  '74HC74': IC_74HC74_PINS,
+  IC_74HC02: IC_74HC02_PINS,
+  '74HC02': IC_74HC02_PINS,
 
   // Power
   VOLTAGE_REGULATOR_7805: VOLTAGE_REGULATOR_PINS,
+  VOLTAGE_REGULATOR_AMS1117: AMS1117_PINS,
+  AMS1117_3V3: AMS1117_PINS,
   BATTERY_9V: POWER_SOURCE_PINS,
   BATTERY_AA: POWER_SOURCE_PINS,
+  BATTERY_18650: BATTERY_18650_PINS,
+  BATTERY_CR2032: BATTERY_CR2032_PINS,
+  BATTERY_LIPO: BATTERY_LIPO_PINS,
+  BATTERY_AAA: BATTERY_AAA_PINS,
   POWER_SUPPLY: POWER_SOURCE_PINS,
   DC_SOURCE_3V3: POWER_SOURCE_PINS,
   DC_SOURCE_5V: POWER_SOURCE_PINS,
@@ -571,12 +827,23 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
   // LEDs
   LED_STANDARD: LED_PINS,
   LED_RGB: LED_RGB_PINS,
+  LED_RED: LED_PINS,
+  LED_GREEN: LED_PINS,
+  LED_BLUE: LED_PINS,
+  LED_YELLOW: LED_PINS,
+  LED_WHITE: LED_PINS,
+  LED_ORANGE: LED_PINS,
+  LED_PURPLE: LED_PINS,
 
   // Input
   PUSH_BUTTON: BUTTON_PINS,
   BUTTON: BUTTON_PINS,
   SWITCH_SPST: SWITCH_SPST_PINS,
+  SWITCH_SPDT: SWITCH_SPDT_PINS,
+  TOGGLE_SWITCH: TOGGLE_SWITCH_PINS,
+  DIP_SWITCH_4: DIP_SWITCH_4_PINS,
   POTENTIOMETER: POTENTIOMETER_PINS,
+  TRIMPOT: TRIMPOT_PINS,
 
   // Output / Actuators
   BUZZER: BUZZER_PINS,
@@ -585,17 +852,30 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
   MOTOR_DC: DC_MOTOR_PINS,
   STEPPER_MOTOR: STEPPER_MOTOR_PINS,
   MOTOR_STEPPER: STEPPER_V2_PINS,
+  VIBRATION_MOTOR: VIBRATION_MOTOR_PINS,
+  GEAR_MOTOR: GEAR_MOTOR_PINS,
+  SOLENOID: SOLENOID_PINS,
   RELAY_SPDT: RELAY_PINS,
   RELAY_SINGLE: RELAY_SINGLE_PINS,
   RELAY_2CH: RELAY_2CH_PINS,
   RELAY_4CH: RELAY_4CH_PINS,
+  RELAY_8CH: RELAY_8CH_PINS,
+  RELAY_SSR: RELAY_SSR_PINS,
 
   // Sensors
   PIR_SENSOR: PIR_PINS,
   SENSOR_PIR: PIR_PINS,
   LDR: LDR_PINS,
   SENSOR_LDR: LDR_PINS,
+  PHOTO_DIODE: PHOTO_DIODE_PINS,
   SOIL_MOISTURE: SOIL_MOISTURE_PINS,
+  ULTRASONIC_SENSOR: ULTRASONIC_PINS,
+  HC_SR04: ULTRASONIC_PINS,
+  TEMPERATURE_SENSOR: DHT11_PINS,
+  DHT11: DHT11_PINS,
+  TMP36: TMP36_PINS,
+  GAS_SENSOR: MQ2_PINS,
+  MQ2: MQ2_PINS,
 
   // Displays
   LCD_16X2: LCD_16X2_PINS,
@@ -603,6 +883,10 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
   OLED_DISPLAY: OLED_PINS,
   DISPLAY_OLED: OLED_PINS,
   DISPLAY_7SEG: SEG7_PINS,
+  DISPLAY_7SEG_4DIGIT: TM1637_PINS,
+  TM1637: TM1637_PINS,
+  LED_BAR_GRAPH: LED_BAR_GRAPH_PINS,
+  DISPLAY_MAX7219_MATRIX: MAX7219_MATRIX_PINS,
 
   // Communication
 
@@ -612,6 +896,8 @@ export const boardPinRegistry: Record<string, PinPosition[]> = {
 
   // Instruments
   AMMETER: AMMETER_PINS,
+  VOLTMETER: VOLTMETER_PINS,
+  LOGIC_ANALYZER: LOGIC_ANALYZER_PINS,
   OSCILLOSCOPE: OSCILLOSCOPE_PINS,
 
   // Other

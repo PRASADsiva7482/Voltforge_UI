@@ -559,7 +559,9 @@ const ComponentNode = ({
   const image = useImage(processedSvgData || '');
 
   const isButton = node.type === 'PUSH_BUTTON' || node.type === 'BUTTON';
-  const isSwitch = node.type === 'SWITCH_SPST';
+  const isSpst = node.type === 'SWITCH_SPST';
+  const isSpdt = node.type === 'SWITCH_SPDT';
+  const isSwitch = isSpst || isSpdt;
   const isBoard = isBoardComponentType(node.type);
   const isServo = node.type === 'SERVO_MOTOR' || node.type === 'MOTOR_SERVO';
   const isDcMotor = node.type === 'MOTOR_DC';
@@ -1498,14 +1500,37 @@ const ComponentNode = ({
           );
         })()}
 
-        {/* Toggle Switch — realistic mechanical toggle with spring animation */}
+        {/* Toggle Switch — realistic mechanical slide switch with tactile knob (SPST & SPDT) */}
         {isSwitch && (() => {
           const isClosed = Boolean(node.properties?.isClosed);
-          const knobY = isClosed ? node.height / 2 - 5 : node.height / 2 + 5;
+          const sx = node.width / 60;
+          const sy = node.height / 30;
+          const sMin = Math.min(sx, sy);
+          const trackX = (isSpdt ? 22 : 24.5) * sx;
+          const trackY = 6 * sy;
+          const trackW = 11 * sx;
+          const trackH = 18 * sy;
+          const knobW = 11 * sx;
+          const knobH = 9 * sy;
+          const knobY = (isClosed ? (isSpdt ? 14.5 : 6.5) : (isSpdt ? 6.5 : 14.5)) * sy;
+          const stateLabel = isSpdt
+            ? (isClosed ? 'COM ↔ 2' : 'COM ↔ 1')
+            : (isClosed ? 'ON' : 'OFF');
+          const activeColor = isSpdt ? '#38bdf8' : '#22c55e';
+          const activeDarkColor = isSpdt ? '#0c4a6e' : '#052e16';
+          const activeStroke = isSpdt ? '#0284c7' : '#15803d';
           return (
             <>
               <Group
                 listening={true}
+                onMouseEnter={(e) => {
+                  const container = e.target.getStage()?.container();
+                  if (container) container.style.cursor = 'pointer';
+                }}
+                onMouseLeave={(e) => {
+                  const container = e.target.getStage()?.container();
+                  if (container) container.style.cursor = 'default';
+                }}
                 onClick={(e) => {
                   e.cancelBubble = true;
                   onSelect();
@@ -1515,6 +1540,7 @@ const ComponentNode = ({
                     properties: {
                       ...node.properties,
                       isClosed: !currentClosed,
+                      ...(isSpdt ? { position: !currentClosed ? 2 : 1 } : {}),
                     },
                   });
                 }}
@@ -1527,57 +1553,61 @@ const ComponentNode = ({
                     properties: {
                       ...node.properties,
                       isClosed: !currentClosed,
+                      ...(isSpdt ? { position: !currentClosed ? 2 : 1 } : {}),
                     },
                   });
                 }}
               >
-                {/* Track body */}
+                {/* Track recessed slot well */}
                 <Rect
-                  x={node.width / 2 - 7} y={node.height / 2 - 11}
-                  width={14} height={22}
-                  cornerRadius={7}
-                  fill={isClosed ? '#15803d' : '#1f2937'}
-                  stroke={isClosed ? '#16a34a' : '#6b7280'}
-                  strokeWidth={1.5}
-                  shadowColor={isClosed ? '#22c55e' : 'transparent'}
-                  shadowBlur={isClosed ? 8 : 0}
+                  x={trackX} y={trackY}
+                  width={trackW} height={trackH}
+                  cornerRadius={2 * sMin}
+                  fill={isClosed ? activeDarkColor : '#090d16'}
+                  stroke={isClosed ? activeStroke : '#334155'}
+                  strokeWidth={0.8 * sMin}
                   listening={false}
                 />
-                {/* Track inner highlight */}
+                {/* Tactile rectangular slider knob */}
                 <Rect
-                  x={node.width / 2 - 4} y={node.height / 2 - 8}
-                  width={8} height={16}
-                  cornerRadius={4}
-                  fill={isClosed ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.03)'}
-                  listening={false}
-                />
-                {/* Knob — slides between positions */}
-                <Circle
-                  x={node.width / 2} y={knobY}
-                  radius={5}
+                  x={trackX} y={knobY}
+                  width={knobW} height={knobH}
+                  cornerRadius={2 * sMin}
                   fill="#f8fafc"
-                  stroke={isClosed ? '#86efac' : '#94a3b8'}
-                  strokeWidth={1}
-                  shadowColor="rgba(0,0,0,0.3)"
-                  shadowBlur={3}
+                  stroke={isClosed ? activeColor : '#94a3b8'}
+                  strokeWidth={1 * sMin}
+                  shadowColor={isClosed ? activeColor : 'rgba(0,0,0,0.5)'}
+                  shadowBlur={isClosed ? 5 : 3}
                   shadowOffsetY={1}
                   listening={false}
                 />
-                {/* Specular dot on knob */}
-                <Circle
-                  x={node.width / 2 - 1} y={knobY - 1}
-                  radius={1.5}
-                  fill="rgba(255,255,255,0.6)"
+                {/* Tactile grip ridges on slider */}
+                <Line
+                  points={[trackX + 2 * sx, knobY + 2.5 * sy, trackX + 9 * sx, knobY + 2.5 * sy]}
+                  stroke={isClosed ? activeStroke : '#64748b'}
+                  strokeWidth={0.8 * sMin}
+                  listening={false}
+                />
+                <Line
+                  points={[trackX + 2 * sx, knobY + 4.5 * sy, trackX + 9 * sx, knobY + 4.5 * sy]}
+                  stroke={isClosed ? activeStroke : '#64748b'}
+                  strokeWidth={0.8 * sMin}
+                  listening={false}
+                />
+                <Line
+                  points={[trackX + 2 * sx, knobY + 6.5 * sy, trackX + 9 * sx, knobY + 6.5 * sy]}
+                  stroke={isClosed ? activeStroke : '#64748b'}
+                  strokeWidth={0.8 * sMin}
                   listening={false}
                 />
               </Group>
               {/* State label */}
               <Text
-                text={isClosed ? 'ON' : 'OFF'}
+                text={stateLabel}
                 x={0} y={node.height + 2}
                 width={node.width} align="center"
-                fontSize={7} fontFamily="JetBrains Mono" fontStyle="700"
-                fill={isClosed ? '#22c55e' : '#6b7280'}
+                fontSize={6.5 * sMin} fontFamily="JetBrains Mono" fontStyle="700"
+                fill={isClosed ? activeColor : '#64748b'}
                 listening={false}
               />
             </>
@@ -2133,6 +2163,7 @@ const ComponentNode = ({
           ref={trRef}
           flipEnabled={false}
           rotateEnabled={true}
+          resizeEnabled={!isSwitch}
           rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
           boundBoxFunc={(_, nb) => (nb.width < MIN_NODE_SIZE || nb.height < MIN_NODE_SIZE ? _ : nb)}
         />

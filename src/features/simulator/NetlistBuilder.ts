@@ -1005,6 +1005,34 @@ export function buildMNACircuit(
       continue;
     }
 
+    // ── SWITCH SPDT ──
+    if (node.type === 'SWITCH_SPDT') {
+      const isClosed = Boolean(props.isClosed);
+      const r1 = isClosed ? 1e8 : 0.01;
+      const r2 = isClosed ? 0.01 : 1e8;
+
+      const idSw1 = `r_sw_p1_${node.id}`;
+      elements.push({
+        id: idSw1,
+        type: 'RESISTOR',
+        nodeA: nodeFor(node.id, 'com'),
+        nodeB: nodeFor(node.id, 'p1'),
+        value: r1,
+      });
+      elementToComponent.set(idSw1, node.id);
+
+      const idSw2 = `r_sw_p2_${node.id}`;
+      elements.push({
+        id: idSw2,
+        type: 'RESISTOR',
+        nodeA: nodeFor(node.id, 'com'),
+        nodeB: nodeFor(node.id, 'p2'),
+        value: r2,
+      });
+      elementToComponent.set(idSw2, node.id);
+      continue;
+    }
+
     // ── Bare SPDT relay ──
     if (node.type === 'RELAY_SPDT') {
       const isActive = relayChannelActive(props);

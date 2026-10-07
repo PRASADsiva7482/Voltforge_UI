@@ -45,24 +45,298 @@ const familyPalette: Record<string, { body: string; accent: string; text: string
 
 const boardSvg = (type: string, name: string, family: string, footprint: string) => {
   const dim = BOARD_FOOTPRINT_DIMENSIONS[footprint as keyof typeof BOARD_FOOTPRINT_DIMENSIONS] || { w: 120, h: 80 };
-  const palette = familyPalette[family] || { body: '334155', accent: 'e2e8f0', text: 'ffffff' };
-  const label = svgText(name.length > 26 ? name.replace(/\b(Arduino|Raspberry Pi|Adafruit|SparkFun|NVIDIA|Google)\b/g, '').trim() : name);
-  const familyLabel = svgText(family);
-  const typeLabel = svgText(type.replace(/_/g, ' '));
-  const headerH = Math.max(16, Math.round(dim.h * 0.18));
-  const pinRailH = Math.max(7, Math.round(dim.h * 0.06));
-  const moduleW = Math.max(28, Math.round(dim.w * 0.35));
-  const moduleH = Math.max(20, Math.round(dim.h * 0.25));
+
+  // Solder mask theme
+  let pcbTop = '008184';
+  let pcbBottom = '005f63';
+  let pcbBorder = '004649';
+  let silkColor = 'ffffff';
+
+  if (type.includes('R4') || type === 'ARDUINO_PORTENTA_H7' || type.includes('GIGA')) {
+    pcbTop = '0f172a';
+    pcbBottom = '090d16';
+    pcbBorder = '1e293b';
+    silkColor = '38bdf8';
+  } else if (family === 'ESP32') {
+    pcbTop = '18181b';
+    pcbBottom = '09090b';
+    pcbBorder = '27272a';
+    silkColor = '10b981';
+  } else if (family === 'ESP8266') {
+    pcbTop = '1e293b';
+    pcbBottom = '0f172a';
+    pcbBorder = '334155';
+    silkColor = '38bdf8';
+  } else if (family === 'Raspberry Pi Pico') {
+    pcbTop = '047857';
+    pcbBottom = '064e3b';
+    pcbBorder = '065f46';
+    silkColor = 'ffffff';
+  } else if (family === 'STM32') {
+    if (type.includes('BLACK')) {
+      pcbTop = '18181b';
+      pcbBottom = '09090b';
+      pcbBorder = '27272a';
+      silkColor = 'facc15';
+    } else {
+      pcbTop = '1d4ed8';
+      pcbBottom = '1e3a8a';
+      pcbBorder = '172554';
+      silkColor = 'ffffff';
+    }
+  } else if (family === 'Teensy') {
+    pcbTop = '581c87';
+    pcbBottom = '3b0764';
+    pcbBorder = '4c1d95';
+    silkColor = 'fef08a';
+  } else if (family === 'Seeed XIAO') {
+    pcbTop = '0f766e';
+    pcbBottom = '115e59';
+    pcbBorder = '134e4a';
+    silkColor = 'ffffff';
+  } else if (family === 'Adafruit Feather') {
+    pcbTop = '18181b';
+    pcbBottom = '09090b';
+    pcbBorder = '27272a';
+    silkColor = 'fde68a';
+  } else if (family === 'SparkFun Thing Plus') {
+    pcbTop = 'b91c1c';
+    pcbBottom = '7f1d1d';
+    pcbBorder = '991b1b';
+    silkColor = 'ffffff';
+  } else if (family === 'Atmel AVR') {
+    pcbTop = '1e293b';
+    pcbBottom = '0f172a';
+    pcbBorder = '334155';
+    silkColor = 'd4d4d8';
+  }
+
+  // DIP packages (avr28, attiny8)
+  if (footprint === 'avr28' || footprint === 'attiny8') {
+    const isAvr28 = footprint === 'avr28';
+    const numPinsPerSide = isAvr28 ? 14 : 4;
+    const bodyW = dim.w - 16;
+    const bodyH = dim.h - 16;
+    const pinStep = bodyW / (numPinsPerSide + 0.5);
+    const pinStartX = 8 + pinStep * 0.75;
+    const pinW = 3;
+    const topPins = Array.from({ length: numPinsPerSide }, (_, i) => {
+      const px = pinStartX + i * pinStep;
+      return `<rect x="${(px - pinW / 2).toFixed(1)}" y="0" width="${pinW}" height="8" rx="0.5" fill="%23cbd5e1" stroke="%2394a3b8" stroke-width="0.3"/><circle cx="${px.toFixed(1)}" cy="1.5" r="1.1" fill="%230f172a"/>`;
+    }).join('');
+    const bottomPins = Array.from({ length: numPinsPerSide }, (_, i) => {
+      const px = pinStartX + i * pinStep;
+      return `<rect x="${(px - pinW / 2).toFixed(1)}" y="${dim.h - 8}" width="${pinW}" height="8" rx="0.5" fill="%23cbd5e1" stroke="%2394a3b8" stroke-width="0.3"/><circle cx="${px.toFixed(1)}" cy="${dim.h - 1.5}" r="1.1" fill="%230f172a"/>`;
+    }).join('');
+
+    const labelName = isAvr28 ? 'ATMEGA328P-PU' : 'ATTINY85-20PU';
+    return svg(`0 0 ${dim.w} ${dim.h}`,
+      '<defs>' +
+        `<linearGradient id="dip_${type}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23${pcbTop}"/><stop offset="100%25" stop-color="%23${pcbBottom}"/></linearGradient>` +
+      '</defs>' +
+      topPins +
+      bottomPins +
+      `<rect x="8" y="8" width="${bodyW}" height="${bodyH}" rx="2" fill="url(%23dip_${type})" stroke="%23${pcbBorder}" stroke-width="0.8"/>` +
+      `<path d="M 8 ${dim.h / 2 - 5} A 5 5 0 0 1 8 ${dim.h / 2 + 5} Z" fill="%2309090b"/>` +
+      `<circle cx="16" cy="${dim.h - 14}" r="1.6" fill="%2309090b" stroke="%23475569" stroke-width="0.3"/>` +
+      `<text x="${dim.w / 2}" y="${dim.h / 2 - 2}" font-size="${isAvr28 ? 6.5 : 5.5}" fill="%23f1f5f9" font-family="Arial" font-weight="bold" text-anchor="middle" letter-spacing="1">${labelName}</text>` +
+      `<text x="${dim.w / 2}" y="${dim.h / 2 + 8}" font-size="${isAvr28 ? 4 : 3.5}" fill="%2394a3b8" font-family="Arial" text-anchor="middle">ATMEL AVR MCU</text>`
+    );
+  }
+
+  const isUnoShield = footprint === 'uno' || footprint === 'mega';
+  const isUsbC = type.includes('R4') || type.includes('C3') || type.includes('S3') || type.includes('S2') || type.includes('RP2040') || type.includes('BLACK') || footprint === 'xiao';
+  const isMicroUsb = !isUsbC && (type === 'ARDUINO_LEONARDO' || type === 'ARDUINO_MICRO' || type.includes('NANO') || type === 'ARDUINO_DUE' || footprint === 'esp8266' || family === 'Teensy' || footprint === 'feather' || type === 'STM32_BLUE_PILL');
+  const isRFShield = family === 'ESP32' || family === 'ESP8266' || type.includes('PICO_W') || type.includes('33_IOT');
+
+  // Multi-layer ground plane traces
+  const copperTraces = `<rect x="5" y="5" width="${dim.w - 10}" height="${dim.h - 10}" rx="3.5" fill="none" stroke="%23${silkColor}" stroke-width="0.5" opacity="0.18"/>` +
+    `<rect x="9" y="9" width="${dim.w - 18}" height="${dim.h - 18}" rx="2.5" fill="none" stroke="%23${silkColor}" stroke-width="0.35" opacity="0.12"/>`;
+
+  // Annular ENIG mounting holes
+  const mHoles = footprint === 'xiao' || (footprint === 'esp8266' && type === 'ESP8266_ESP01') ? '' :
+    `<circle cx="12" cy="12" r="4.2" fill="%23cbd5e1" stroke="%2394a3b8" stroke-width="0.5"/><circle cx="12" cy="12" r="2.2" fill="%230f172a"/>` +
+    `<circle cx="${dim.w - 12}" cy="12" r="4.2" fill="%23cbd5e1" stroke="%2394a3b8" stroke-width="0.5"/><circle cx="${dim.w - 12}" cy="12" r="2.2" fill="%230f172a"/>` +
+    `<circle cx="12" cy="${dim.h - 12}" r="4.2" fill="%23cbd5e1" stroke="%2394a3b8" stroke-width="0.5"/><circle cx="12" cy="${dim.h - 12}" r="2.2" fill="%230f172a"/>` +
+    `<circle cx="${dim.w - 12}" cy="${dim.h - 12}" r="4.2" fill="%23cbd5e1" stroke="%2394a3b8" stroke-width="0.5"/><circle cx="${dim.w - 12}" cy="${dim.h - 12}" r="2.2" fill="%230f172a"/>`;
+
+  // Connectors
+  let connectorSvg = '';
+  if (isUnoShield) {
+    if (isUsbC) {
+      connectorSvg = `<rect x="0" y="24" width="24" height="15" rx="3" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.8"/>` +
+        `<rect x="0" y="26.5" width="14" height="10" rx="2" fill="%23090d16"/>` +
+        `<rect x="2" y="30.5" width="8" height="2" fill="%23f59e0b"/>` +
+        `<rect x="0" y="85" width="28" height="26" rx="2.5" fill="%2318181b" stroke="%2327272a" stroke-width="0.8"/>` +
+        `<circle cx="6" cy="98" r="4.5" fill="%2394a3b8"/><circle cx="6" cy="98" r="2" fill="%230f172a"/>`;
+    } else if (isMicroUsb) {
+      connectorSvg = `<rect x="0" y="25" width="20" height="13" rx="1.5" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.8"/>` +
+        `<rect x="0" y="27.5" width="11" height="8" rx="1" fill="%23090d16"/>` +
+        `<rect x="2" y="30.5" width="6" height="2" fill="%23f59e0b"/>` +
+        `<rect x="0" y="85" width="28" height="26" rx="2.5" fill="%2318181b" stroke="%2327272a" stroke-width="0.8"/>` +
+        `<circle cx="6" cy="98" r="4.5" fill="%2394a3b8"/><circle cx="6" cy="98" r="2" fill="%230f172a"/>`;
+    } else {
+      connectorSvg = `<rect x="0" y="22" width="26" height="24" rx="2" fill="%23cbd5e1" stroke="%23475569" stroke-width="0.8"/>` +
+        `<rect x="0" y="25" width="15" height="18" rx="1.5" fill="%23090d16"/>` +
+        `<rect x="2" y="29" width="8" height="2" fill="%23f59e0b"/><rect x="2" y="33" width="8" height="2" fill="%23f59e0b"/><rect x="2" y="37" width="8" height="2" fill="%23f59e0b"/>` +
+        `<rect x="0" y="85" width="28" height="26" rx="2.5" fill="%2318181b" stroke="%2327272a" stroke-width="0.8"/>` +
+        `<circle cx="6" cy="98" r="4.5" fill="%2394a3b8"/><circle cx="6" cy="98" r="2" fill="%230f172a"/>`;
+    }
+  } else {
+    const cx = (dim.w - (isUsbC ? 26 : 20)) / 2;
+    if (isUsbC) {
+      connectorSvg = `<rect x="${cx.toFixed(1)}" y="0" width="26" height="12" rx="3" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.8"/>` +
+        `<rect x="${(cx + 3).toFixed(1)}" y="0" width="20" height="5" rx="1.5" fill="%23090d16"/>` +
+        `<rect x="${(cx + 6).toFixed(1)}" y="2" width="14" height="1.5" rx="0.5" fill="%23f59e0b"/>`;
+    } else {
+      connectorSvg = `<rect x="${cx.toFixed(1)}" y="0" width="20" height="10" rx="1.5" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.8"/>` +
+        `<rect x="${(cx + 3).toFixed(1)}" y="0" width="14" height="4.5" rx="1" fill="%23090d16"/>` +
+        `<rect x="${(cx + 5).toFixed(1)}" y="1.5" width="10" height="1.5" rx="0.5" fill="%23f59e0b"/>`;
+    }
+  }
+
+  // Specific IC and module artwork
+  let icSvg = '';
+  if (type.includes('R4')) {
+    // Uno R4: Renesas RA4M1 LQFP-64 + 12x8 LED Matrix area
+    icSvg = `<rect x="92" y="66" width="34" height="34" rx="2" fill="%2318181b" stroke="%23334155" stroke-width="0.8"/>` +
+      `<circle cx="96" cy="70" r="1.2" fill="%233f3f46"/>` +
+      Array.from({ length: 8 }, (_, i) => {
+        const px = 94 + i * 4;
+        return `<rect x="${px}" y="63" width="1.5" height="3" fill="%23cbd5e1"/><rect x="${px}" y="100" width="1.5" height="3" fill="%23cbd5e1"/>`;
+      }).join('') +
+      Array.from({ length: 8 }, (_, i) => {
+        const py = 68 + i * 4;
+        return `<rect x="89" y="${py}" width="3" height="1.5" fill="%23cbd5e1"/><rect x="126" y="${py}" width="3" height="1.5" fill="%23cbd5e1"/>`;
+      }).join('') +
+      `<text x="109" y="81" font-size="4.5" fill="%23f1f5f9" font-family="Arial" font-weight="bold" text-anchor="middle">RA4M1</text>` +
+      `<text x="109" y="87" font-size="2.8" fill="%2338bdf8" font-family="Arial" text-anchor="middle">RENESAS</text>` +
+      // 12x8 LED Matrix grid (iconic to Uno R4!)
+      `<rect x="140" y="44" width="48" height="34" rx="1.5" fill="%23090d16" stroke="%23334155" stroke-width="0.6"/>` +
+      Array.from({ length: 8 }, (_, r) =>
+        Array.from({ length: 12 }, (_, c) =>
+          `<rect x="${142 + c * 3.8}" y="${46 + r * 4}" width="2.4" height="2.2" rx="0.3" fill="%23ca8a04"/><circle cx="${143.2 + c * 3.8}" cy="${47.1 + r * 4}" r="0.4" fill="%23fef08a"/>`
+        ).join('')
+      ).join('') +
+      `<text x="164" y="84" font-size="3" fill="%2338bdf8" font-family="Arial" font-weight="bold" text-anchor="middle">12x8 MATRIX</text>`;
+  } else if (type === 'ARDUINO_LEONARDO') {
+    // Leonardo: ATmega32U4 rotated 45 degrees
+    icSvg = `<g transform="translate(130, 75) rotate(45)">` +
+      `<rect x="-18" y="-18" width="36" height="36" rx="2" fill="%2318181b" stroke="%23334155" stroke-width="0.8"/>` +
+      `<circle cx="-14" cy="-14" r="1.2" fill="%233f3f46"/>` +
+      Array.from({ length: 6 }, (_, i) => {
+        const p = -12 + i * 5;
+        return `<rect x="${p}" y="-21" width="2" height="3" fill="%23cbd5e1"/><rect x="${p}" y="18" width="2" height="3" fill="%23cbd5e1"/>` +
+          `<rect x="-21" y="${p}" width="3" height="2" fill="%23cbd5e1"/><rect x="18" y="${p}" width="3" height="2" fill="%23cbd5e1"/>`;
+      }).join('') +
+      `<text x="0" y="-2" font-size="4.2" fill="%23f1f5f9" font-family="Arial" font-weight="bold" text-anchor="middle">32U4</text>` +
+      `<text x="0" y="5" font-size="2.6" fill="%2394a3b8" font-family="Arial" text-anchor="middle">ATMEL</text>` +
+      `</g>` +
+      // ICSP 6-pin header
+      `<rect x="176" y="70" width="10" height="15" rx="1" fill="%2318181b"/>` +
+      Array.from({ length: 6 }, (_, i) => `<circle cx="${179 + (i % 2) * 4}" cy="${73 + Math.floor(i / 2) * 4.5}" r="1.2" fill="%23f59e0b"/>`).join('');
+  } else if (type === 'ESP8266_ESP01') {
+    // ESP-01: Black PCB, gold antenna at top, 2x4 pin header at bottom
+    icSvg = `<rect x="8" y="10" width="${dim.w - 16}" height="32" rx="1" fill="%230f172a"/>` +
+      // Golden meander antenna trace
+      `<path d="M 12 14 L 30 14 L 30 20 L 16 20 L 16 26 L 40 26 L 40 14 L 60 14 L 60 26 L 75 26" fill="none" stroke="%23ca8a04" stroke-width="1.8" stroke-linecap="round"/>` +
+      // ESP8266EX chip
+      `<rect x="16" y="50" width="28" height="28" rx="1.5" fill="%2318181b" stroke="%23334155" stroke-width="0.6"/>` +
+      `<text x="30" y="65" font-size="4" fill="%23e2e8f0" font-family="Arial" font-weight="bold" text-anchor="middle">ESP8266</text>` +
+      // 25Q40 flash chip
+      `<rect x="52" y="52" width="22" height="18" rx="1" fill="%2318181b" stroke="%23334155" stroke-width="0.6"/>` +
+      `<text x="63" y="63" font-size="3" fill="%2394a3b8" font-family="Arial" text-anchor="middle">25Q40</text>` +
+      // 2x4 male header at bottom
+      `<rect x="25" y="${dim.h - 32}" width="45" height="22" rx="1.5" fill="%2309090b" stroke="%2327272a" stroke-width="0.8"/>` +
+      Array.from({ length: 8 }, (_, i) => {
+        const col = i % 4;
+        const row = Math.floor(i / 4);
+        return `<rect x="${29 + col * 10}" y="${dim.h - 28 + row * 10}" width="4" height="4" fill="%23ca8a04"/><circle cx="${31 + col * 10}" cy="${dim.h - 26 + row * 10}" r="1.2" fill="%23fef08a"/>`;
+      }).join('');
+  } else if (isRFShield) {
+    // RF Shield module
+    const rw = Math.min(64, dim.w - 24);
+    const rh = Math.min(46, dim.h * 0.32);
+    const rx = (dim.w - rw) / 2;
+    const ry = isUnoShield ? 48 : 22;
+    icSvg = `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="2" fill="%23374151" stroke="%234b5563" stroke-width="0.8"/>` +
+      `<rect x="${rx + 4}" y="${ry + 3}" width="${rw - 8}" height="8" rx="1" fill="%23111827"/>` +
+      `<path d="M ${rx + 10} ${ry + 5} L ${rx + rw - 10} ${ry + 5}" stroke="%23eab308" stroke-width="0.8" stroke-dasharray="2,2"/>` +
+      `<text x="${dim.w / 2}" y="${ry + 22}" font-size="4.5" fill="%23e5e7eb" font-family="Arial" font-weight="bold" text-anchor="middle">${svgText(name)}</text>` +
+      `<text x="${dim.w / 2}" y="${ry + 30}" font-size="3" fill="%239ca3af" font-family="Arial" text-anchor="middle">Wi-Fi / Espressif</text>`;
+  } else {
+    const qw = Math.min(48, Math.round(dim.w * 0.38));
+    const qh = qw;
+    const qx = isUnoShield ? 90 : (dim.w - qw) / 2;
+    const qy = isUnoShield ? 52 : Math.round(dim.h * 0.36);
+    icSvg = `<rect x="${qx}" y="${qy}" width="${qw}" height="${qh}" rx="2" fill="%2318181b" stroke="%23334155" stroke-width="0.8"/>` +
+      `<circle cx="${qx + 4}" cy="${qy + 4}" r="1.2" fill="%233f3f46"/>` +
+      Array.from({ length: 6 }, (_, i) => {
+        const step = (qw - 8) / 5;
+        const px = qx + 4 + i * step;
+        return `<rect x="${(px - 0.7).toFixed(1)}" y="${qy - 2}" width="1.4" height="2" fill="%23cbd5e1"/><rect x="${(px - 0.7).toFixed(1)}" y="${qy + qh}" width="1.4" height="2" fill="%23cbd5e1"/>`;
+      }).join('') +
+      Array.from({ length: 6 }, (_, i) => {
+        const step = (qh - 8) / 5;
+        const py = qy + 4 + i * step;
+        return `<rect x="${qx - 2}" y="${(py - 0.7).toFixed(1)}" width="2" height="1.4" fill="%23cbd5e1"/><rect x="${qx + qw}" y="${(py - 0.7).toFixed(1)}" width="2" height="1.4" fill="%23cbd5e1"/>`;
+      }).join('') +
+      `<text x="${qx + qw / 2}" y="${qy + qh / 2 - 2}" font-size="${Math.max(3.2, Math.min(5, qw / 8))}" fill="%23e2e8f0" font-family="Arial" font-weight="bold" text-anchor="middle">${svgText(name.replace(/^Arduino\s+/i, ''))}</text>` +
+      `<text x="${qx + qw / 2}" y="${qy + qh / 2 + 6}" font-size="2.8" fill="%2394a3b8" font-family="Arial" text-anchor="middle">ARM / MCU</text>`;
+  }
+
+  // Header sockets
+  let headersSvg = '';
+  if (isUnoShield) {
+    const numTop = Math.round(dim.w / 11);
+    const numBot = Math.round(dim.w / 13);
+    headersSvg = `<rect x="8" y="2" width="${dim.w - 16}" height="8.5" rx="1.2" fill="%2318181b" stroke="%2327272a" stroke-width="0.7"/>` +
+      Array.from({ length: numTop }, (_, i) => {
+        const hx = 14 + i * ((dim.w - 28) / (numTop - 1));
+        return `<rect x="${(hx - 1.5).toFixed(1)}" y="3.5" width="3" height="3.5" rx="0.4" fill="%2309090b"/><circle cx="${hx.toFixed(1)}" cy="5.25" r="0.8" fill="%23f59e0b" opacity="0.6"/>`;
+      }).join('') +
+      `<rect x="8" y="${dim.h - 10.5}" width="${dim.w - 16}" height="8.5" rx="1.2" fill="%2318181b" stroke="%2327272a" stroke-width="0.7"/>` +
+      Array.from({ length: numBot }, (_, i) => {
+        const hx = 14 + i * ((dim.w - 28) / (numBot - 1));
+        return `<rect x="${(hx - 1.5).toFixed(1)}" y="${dim.h - 9}" width="3" height="3.5" rx="0.4" fill="%2309090b"/><circle cx="${hx.toFixed(1)}" cy="${dim.h - 7.25}" r="0.8" fill="%23f59e0b" opacity="0.6"/>`;
+      }).join('');
+  } else if (type !== 'ESP8266_ESP01') {
+    const pinCount = Math.max(7, Math.min(22, Math.round((dim.h - 32) / 8.5)));
+    const step = (dim.h - 32) / (pinCount - 1);
+    headersSvg = `<rect x="1" y="10" width="8" height="${dim.h - 20}" rx="1" fill="%2318181b" stroke="%2327272a" stroke-width="0.7"/>` +
+      Array.from({ length: pinCount }, (_, i) => {
+        const hy = 16 + i * step;
+        return `<rect x="2.5" y="${(hy - 1.5).toFixed(1)}" width="3.5" height="3" rx="0.4" fill="%2309090b"/><circle cx="4.25" cy="${hy.toFixed(1)}" r="0.8" fill="%23f59e0b" opacity="0.6"/>`;
+      }).join('') +
+      `<rect x="${dim.w - 9}" y="10" width="8" height="${dim.h - 20}" rx="1" fill="%2318181b" stroke="%2327272a" stroke-width="0.7"/>` +
+      Array.from({ length: pinCount }, (_, i) => {
+        const hy = 16 + i * step;
+        return `<rect x="${dim.w - 6}" y="${(hy - 1.5).toFixed(1)}" width="3.5" height="3" rx="0.4" fill="%23090b"/><circle cx="${dim.w - 4.25}" cy="${hy.toFixed(1)}" r="0.8" fill="%23f59e0b" opacity="0.6"/>`;
+      }).join('');
+  }
+
+  // Reset button, status LEDs, and quartz crystal
+  const rstX = isUnoShield ? 38 : 16;
+  const rstY = isUnoShield ? 16 : (dim.h - 24);
+  const miscComponents = `<rect x="${rstX}" y="${rstY}" width="8" height="8" rx="1.5" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.5"/>` +
+    `<circle cx="${rstX + 4}" cy="${rstY + 4}" r="2.2" fill="%23ef4444"/>` +
+    `<rect x="${rstX + 10}" y="${rstY + 2}" width="3" height="2" rx="0.4" fill="%23ef4444"/><circle cx="${rstX + 11.5}" cy="${rstY + 3}" r="0.5" fill="%23fca5a5"/>` +
+    `<rect x="${rstX + 15}" y="${rstY + 2}" width="3" height="2" rx="0.4" fill="%2322c55e"/><circle cx="${rstX + 16.5}" cy="${rstY + 3}" r="0.5" fill="%2386efac"/>` +
+    `<rect x="${rstX + 22}" y="${rstY + 1}" width="12" height="6" rx="3" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.4"/>` +
+    `<text x="${rstX + 28}" y="${rstY + 5}" font-size="2.4" fill="%23334155" font-family="Arial" font-weight="bold" text-anchor="middle">16.0</text>`;
 
   return svg(`0 0 ${dim.w} ${dim.h}`,
-    `<rect width="${dim.w}" height="${dim.h}" rx="6" fill="%23${palette.body}"/>` +
-    `<rect x="5" y="5" width="${dim.w - 10}" height="${headerH}" rx="3" fill="%23${palette.accent}" opacity="0.22"/>` +
-    `<rect x="${Math.round((dim.w - moduleW) / 2)}" y="${headerH + 12}" width="${moduleW}" height="${moduleH}" rx="3" fill="%230f172a" opacity="0.68"/>` +
-    `<rect x="6" y="${dim.h - pinRailH - 5}" width="${dim.w - 12}" height="${pinRailH}" rx="2" fill="%230f172a" opacity="0.72"/>` +
-    `<circle cx="14" cy="14" r="3" fill="%23${palette.accent}" opacity="0.85"/><circle cx="${dim.w - 14}" cy="${dim.h - 14}" r="3" fill="%23${palette.accent}" opacity="0.85"/>` +
-    `<text x="${dim.w / 2}" y="${headerH + moduleH + 30}" font-size="${Math.max(8, Math.min(14, dim.w / 10))}" fill="%23${palette.text}" font-weight="bold" text-anchor="middle" font-family="Arial">${label}</text>` +
-    `<text x="${dim.w / 2}" y="${headerH + moduleH + 43}" font-size="${Math.max(6, Math.min(9, dim.w / 16))}" fill="%23${palette.accent}" text-anchor="middle" font-family="Arial">${familyLabel}</text>` +
-    `<text x="${dim.w / 2}" y="${dim.h - 10}" font-size="${Math.max(5, Math.min(7, dim.w / 24))}" fill="%23${palette.accent}" text-anchor="middle" font-family="Arial">${typeLabel}</text>`
+    '<defs>' +
+      `<linearGradient id="pcb_${type}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23${pcbTop}"/><stop offset="100%25" stop-color="%23${pcbBottom}"/></linearGradient>` +
+    '</defs>' +
+    `<rect width="${dim.w}" height="${dim.h}" rx="5" fill="url(%23pcb_${type})" stroke="%23${pcbBorder}" stroke-width="1.2"/>` +
+    copperTraces +
+    mHoles +
+    connectorSvg +
+    icSvg +
+    headersSvg +
+    miscComponents +
+    `<text x="${dim.w / 2}" y="${dim.h - 10}" font-size="${Math.max(5, Math.min(8.5, dim.w / 14))}" fill="%23${silkColor}" font-family="Arial" font-weight="900" text-anchor="middle" letter-spacing="0.5">${svgText(name)}</text>`
   );
 };
 
@@ -78,6 +352,50 @@ const boardComponentDimensions = Object.fromEntries(
     boardItem.type,
     BOARD_FOOTPRINT_DIMENSIONS[boardItem.footprint],
   ]),
+);
+
+const ledSvg = (gradientId: string, s1: string, s2: string, s3: string) => svg('0 0 40 80',
+  '<defs>' +
+    '<linearGradient id="led_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    `<linearGradient id="${gradientId}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%25" stop-color="%23${s1}" stop-opacity="0.95"/><stop offset="35%25" stop-color="%23${s2}" stop-opacity="0.85"/><stop offset="100%25" stop-color="%23${s3}" stop-opacity="0.95"/></linearGradient>` +
+  '</defs>' +
+  '<path d="M 15 42 L 15 50 L 14 53 L 14 57 L 15 60 L 15 80 L 17.2 80 L 17.2 60 L 16.2 57 L 16.2 53 L 17.2 50 L 17.2 42 Z" fill="url(%23led_lead)"/>' +
+  '<path d="M 23 42 L 23 80 L 25.2 80 L 25.2 42 Z" fill="url(%23led_lead)"/>' +
+  '<rect x="15" y="27" width="2.2" height="15" fill="%23cbd5e1" stroke="%2394a3b8" stroke-width="0.4"/>' +
+  '<path d="M 22.8 42 L 22.8 28 L 20 24 L 25.5 24 L 25 42 Z" fill="%23e2e8f0" stroke="%2394a3b8" stroke-width="0.4"/>' +
+  '<rect x="21.5" y="24" width="2" height="1.8" fill="%23fbbf24"/>' +
+  '<path d="M 16.5 27 Q 18.5 20.5 22 24" fill="none" stroke="%23f59e0b" stroke-width="0.6" stroke-linecap="round"/>' +
+  `<path d="M 7 38 L 7 42 L 31 42 L 31 38 Z" fill="url(%23${gradientId})" stroke="%23${s3}" stroke-width="0.6"/>` +
+  `<line x1="31" y1="38" x2="31" y2="42" stroke="%23${s1}" stroke-width="1.2"/>` +
+  `<path d="M 9 24 C 9 13.5 13.5 8 20 8 C 26.5 8 31 13.5 31 24 L 31 38 L 9 38 Z" fill="url(%23${gradientId})" stroke="%23${s3}" stroke-width="0.8"/>` +
+  '<path d="M 13 15 C 15 11 18 9.5 22 9.5" fill="none" stroke="%23ffffff" stroke-width="1.4" stroke-linecap="round" opacity="0.8"/>' +
+  '<ellipse cx="14" cy="22" rx="1.5" ry="5" fill="%23ffffff" opacity="0.4"/>'
+);
+
+const dip14Svg = (partNumber: string, subtitle: string) => svg('0 0 110 50',
+  '<defs>' +
+    '<linearGradient id="dip14_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '<linearGradient id="dip14_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23272f3d"/><stop offset="50%25" stop-color="%23171f2c"/><stop offset="100%25" stop-color="%230b1019"/></linearGradient>' +
+  '</defs>' +
+  [16, 30, 44, 58, 72, 86, 100].map((x) =>
+    `<rect x="${x - 1.8}" y="0" width="3.6" height="12" rx="0.5" fill="url(%23dip14_lead)"/>` +
+    `<polygon points="${x - 2.5},10 ${x + 2.5},10 ${x + 1.8},6 ${x - 1.8},6" fill="%2394a3b8"/>` +
+    `<circle cx="${x}" cy="1.5" r="1.1" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>`
+  ).join('') +
+  [16, 30, 44, 58, 72, 86, 100].map((x) =>
+    `<rect x="${x - 1.8}" y="38" width="3.6" height="12" rx="0.5" fill="url(%23dip14_lead)"/>` +
+    `<polygon points="${x - 1.8},44 ${x + 1.8},44 ${x + 2.5},40 ${x - 2.5},40" fill="%2394a3b8"/>` +
+    `<circle cx="${x}" cy="48.5" r="1.1" fill="%230f172a" stroke="%23cbd5e1" stroke-width="0.3"/>`
+  ).join('') +
+  '<rect x="8" y="11" width="94" height="30" rx="2.5" fill="%23000000" opacity="0.35"/>' +
+  '<rect x="8" y="10" width="94" height="30" rx="2.5" fill="url(%23dip14_body)" stroke="%23334155" stroke-width="0.75"/>' +
+  '<line x1="10" y1="11" x2="100" y2="11" stroke="%23475569" stroke-width="0.75" opacity="0.6"/>' +
+  '<line x1="10" y1="39" x2="100" y2="39" stroke="%23020617" stroke-width="0.75" opacity="0.8"/>' +
+  '<path d="M 8 20 A 5 5 0 0 1 8 30 Z" fill="%230b1019" stroke="%231e293b" stroke-width="0.6"/>' +
+  '<circle cx="15" cy="33" r="1.8" fill="%23090d16" stroke="%23334155" stroke-width="0.5"/><circle cx="15" cy="33" r="0.9" fill="%231e293b"/>' +
+  '<text x="20" y="20" font-size="5" fill="%2394a3b8" font-family="Arial" font-weight="bold">TI</text>' +
+  `<text x="55" y="26" font-size="8.5" fill="%23f1f5f9" font-family="Arial" font-weight="bold" text-anchor="middle" letter-spacing="0.8">${partNumber}</text>` +
+  `<text x="55" y="34" font-size="4" fill="%2394a3b8" font-family="Arial" text-anchor="middle" letter-spacing="0.5">${subtitle}</text>`
 );
 
 const additionalComponentSvgs: Record<string, string> = {
@@ -262,6 +580,480 @@ const additionalComponentSvgs: Record<string, string> = {
     '<ellipse cx="45" cy="12" rx="16" ry="10" fill="url(%23ntc_bead2)" stroke="%230c4a6e" stroke-width="0.8"/>' +
     '<text x="45" y="14" font-size="6" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">NTC 10k</text>' +
     '<path d="M 35 7 Q 45 4 55 7" fill="none" stroke="%23ffffff" stroke-width="1" opacity="0.5"/>'
+  ),
+
+  // ── Child Component Family Variants ──
+  // LEDs
+  LED_RED: ledSvg('led_r', 'fca5a5', 'ef4444', '991b1b'),
+  LED_GREEN: ledSvg('led_g', '86efac', '22c55e', '15803d'),
+  LED_BLUE: ledSvg('led_b', '93c5fd', '3b82f6', '1d4ed8'),
+  LED_YELLOW: ledSvg('led_y', 'fef08a', 'eab308', 'a16207'),
+  LED_WHITE: ledSvg('led_w', 'ffffff', 'f1f5f9', '94a3b8'),
+  LED_ORANGE: ledSvg('led_o', 'fed7aa', 'f97316', 'c2410c'),
+  LED_PURPLE: ledSvg('led_p', 'f3e8ff', 'a855f7', '7e22ce'),
+
+  // Logic Gates (DIP-14)
+  IC_74HC00: dip14Svg('SN74HC00N', 'QUAD 2-INPUT NAND'),
+  IC_74HC04: dip14Svg('SN74HC04N', 'HEX INVERTER'),
+  IC_74HC08: dip14Svg('SN74HC08N', 'QUAD 2-INPUT AND'),
+  IC_74HC32: dip14Svg('SN74HC32N', 'QUAD 2-INPUT OR'),
+  IC_74HC86: dip14Svg('SN74HC86N', 'QUAD 2-INPUT XOR'),
+  IC_74HC14: dip14Svg('SN74HC14N', 'HEX SCHMITT INV'),
+  IC_74HC74: dip14Svg('SN74HC74N', 'DUAL D FLIP-FLOP'),
+  IC_74HC02: dip14Svg('SN74HC02N', 'QUAD 2-INPUT NOR'),
+
+  // Switches
+  SWITCH_SPDT: svg('0 0 60 30',
+    '<defs>' +
+      '<linearGradient id="spdt_plate" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="35%25" stop-color="%23e2e8f0"/><stop offset="70%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+      '<linearGradient id="spdt_lug" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+      '<linearGradient id="spdt_bezel" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%231e293b"/><stop offset="100%25" stop-color="%23090d16"/></linearGradient>' +
+    '</defs>' +
+    // Terminal 1 solder lug (p1 at x=54, y=8)
+    '<rect x="36" y="5.5" width="22" height="5" rx="1" fill="url(%23spdt_lug)" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<circle cx="54" cy="8" r="2.4" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.5"/><circle cx="54" cy="8" r="1.2" fill="%230f172a"/>' +
+    // Common terminal solder lug (com at x=54, y=15)
+    '<rect x="36" y="12.5" width="22" height="5" rx="1" fill="url(%23spdt_lug)" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<circle cx="54" cy="15" r="2.4" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.5"/><circle cx="54" cy="15" r="1.2" fill="%230f172a"/>' +
+    // Terminal 2 solder lug (p2 at x=54, y=22)
+    '<rect x="36" y="19.5" width="22" height="5" rx="1" fill="url(%23spdt_lug)" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<circle cx="54" cy="22" r="2.4" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.5"/><circle cx="54" cy="22" r="1.2" fill="%230f172a"/>' +
+    // Switch chassis body
+    '<rect x="3" y="3" width="37" height="24" rx="3" fill="%230f172a" stroke="%231e293b" stroke-width="0.8"/>' +
+    // Brushed metallic top plate
+    '<rect x="4.5" y="4.5" width="34" height="21" rx="2" fill="url(%23spdt_plate)" stroke="%2364748b" stroke-width="0.6"/>' +
+    // Mounting rivets
+    '<circle cx="9" cy="7.5" r="1.6" fill="%23475569" stroke="%23cbd5e1" stroke-width="0.4"/><circle cx="9" cy="7.5" r="0.8" fill="%230f172a"/>' +
+    '<circle cx="9" cy="22.5" r="1.6" fill="%23475569" stroke="%23cbd5e1" stroke-width="0.4"/><circle cx="9" cy="22.5" r="0.8" fill="%230f172a"/>' +
+    // Recessed switch slot well
+    '<rect x="20" y="4" width="15" height="22" rx="2.5" fill="url(%23spdt_bezel)" stroke="%23334155" stroke-width="0.6"/>' +
+    '<rect x="21.5" y="5" width="12" height="20" rx="1.5" fill="%23020617"/>' +
+    // Position labels
+    '<text x="14" y="9.5" font-size="3.2" fill="%23334155" font-family="Arial" font-weight="900" text-anchor="middle">1</text>' +
+    '<text x="14" y="16.5" font-size="3.2" fill="%23334155" font-family="Arial" font-weight="900" text-anchor="middle">C</text>' +
+    '<text x="14" y="23.5" font-size="3.2" fill="%23334155" font-family="Arial" font-weight="900" text-anchor="middle">2</text>' +
+    // Terminal lug pin numbers
+    '<text x="46" y="9" font-size="2.2" fill="%23475569" font-family="Arial" font-weight="bold" text-anchor="middle">1</text>' +
+    '<text x="46" y="16" font-size="2.2" fill="%23475569" font-family="Arial" font-weight="bold" text-anchor="middle">C</text>' +
+    '<text x="46" y="23" font-size="2.2" fill="%23475569" font-family="Arial" font-weight="bold" text-anchor="middle">2</text>'
+  ),
+  TOGGLE_SWITCH: svg('0 0 60 40',
+    '<defs>' +
+      '<linearGradient id="tgl_metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="40%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="tgl_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%231e3a8a"/><stop offset="100%25" stop-color="%23172554"/></linearGradient>' +
+      '<linearGradient id="tgl_bat" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23e2e8f0"/><stop offset="35%25" stop-color="%23ffffff"/><stop offset="70%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    [16, 30, 44].map((x) =>
+      `<rect x="${x - 2}" y="32" width="4" height="8" rx="0.5" fill="%23cbd5e1"/>` +
+      `<circle cx="${x}" cy="38" r="1.5" fill="%230f172a"/>`
+    ).join('') +
+    '<rect x="8" y="14" width="44" height="20" rx="2" fill="url(%23tgl_body)" stroke="%230f172a" stroke-width="0.8"/>' +
+    '<text x="30" y="27" font-size="4" fill="%2393c5fd" font-family="Arial" font-weight="bold" text-anchor="middle">6A 125VAC</text>' +
+    '<rect x="22" y="7" width="16" height="7" fill="url(%23tgl_metal)" stroke="%23475569" stroke-width="0.5"/>' +
+    '<polygon points="19,14 22,11 38,11 41,14 38,17 22,17" fill="url(%23tgl_metal)" stroke="%23475569" stroke-width="0.5"/>' +
+    '<polygon points="27,11 25,2 35,2 33,11" fill="url(%23tgl_bat)" stroke="%23475569" stroke-width="0.6"/>' +
+    '<circle cx="30" cy="2" r="3.5" fill="url(%23tgl_bat)" stroke="%23475569" stroke-width="0.5"/>'
+  ),
+  DIP_SWITCH_4: svg('0 0 70 40',
+    '<defs>' +
+      '<linearGradient id="dipsw_red" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23dc2626"/><stop offset="100%25" stop-color="%23991b1b"/></linearGradient>' +
+    '</defs>' +
+    [16, 28, 40, 52].map((x) =>
+      `<rect x="${x - 1.5}" y="0" width="3" height="8" rx="0.5" fill="%23e2e8f0"/>` +
+      `<circle cx="${x}" cy="1.5" r="1.1" fill="%230f172a"/>`
+    ).join('') +
+    [16, 28, 40, 52].map((x) =>
+      `<rect x="${x - 1.5}" y="32" width="3" height="8" rx="0.5" fill="%23e2e8f0"/>` +
+      `<circle cx="${x}" cy="38.5" r="1.1" fill="%230f172a"/>`
+    ).join('') +
+    '<rect x="8" y="7" width="54" height="26" rx="2" fill="url(%23dipsw_red)" stroke="%237f1d1d" stroke-width="0.8"/>' +
+    '<text x="12" y="13" font-size="3" fill="%23ffffff" font-family="Arial" font-weight="bold">ON</text>' +
+    '<path d="M 12 15 L 14 15 L 13 17 Z" fill="%23ffffff"/>' +
+    [16, 28, 40, 52].map((x, i) =>
+      `<rect x="${x - 4}" y="12" width="8" height="18" rx="1" fill="%2318181b"/>` +
+      `<rect x="${x - 3}" y="${i % 2 === 0 ? 13 : 21}" width="6" height="8" rx="0.8" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="0.4"/>` +
+      `<line x1="${x - 2}" y1="${i % 2 === 0 ? 17 : 25}" x2="${x + 2}" y2="${i % 2 === 0 ? 17 : 25}" stroke="%2394a3b8" stroke-width="0.6"/>` +
+      `<text x="${x}" y="32" font-size="2.6" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">${i + 1}</text>`
+    ).join('')
+  ),
+
+  // Instruments
+  VOLTMETER: svg('0 0 90 70',
+    '<defs>' +
+      '<linearGradient id="vm_case" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2327272a"/><stop offset="100%25" stop-color="%2309090b"/></linearGradient>' +
+      '<linearGradient id="vm_glass" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23450a0a"/><stop offset="100%25" stop-color="%231c0505"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="86" height="58" rx="4" fill="url(%23vm_case)" stroke="%233f3f46" stroke-width="1"/>' +
+    '<circle cx="8" cy="8" r="2" fill="%2318181b" stroke="%2352525b" stroke-width="0.4"/>' +
+    '<circle cx="82" cy="8" r="2" fill="%2318181b" stroke="%2352525b" stroke-width="0.4"/>' +
+    '<rect x="12" y="10" width="66" height="34" rx="2" fill="url(%23vm_glass)" stroke="%237f1d1d" stroke-width="0.8"/>' +
+    '<text x="45" y="34" font-size="18" fill="%23ef4444" font-family="Courier New, monospace" font-weight="bold" text-anchor="middle" letter-spacing="1">0.00</text>' +
+    '<text x="68" y="26" font-size="7" fill="%23f87171" font-family="Arial" font-weight="bold">V</text>' +
+    '<text x="45" y="54" font-size="4" fill="%2394a3b8" font-family="Arial" text-anchor="middle">DIGITAL VOLTMETER 0-100V</text>' +
+    '<rect x="22" y="59" width="4" height="11" rx="1" fill="%23ef4444"/><circle cx="24" cy="69" r="1.5" fill="%23ffffff"/>' +
+    '<rect x="64" y="59" width="4" height="11" rx="1" fill="%2318181b"/><circle cx="66" cy="69" r="1.5" fill="%23ffffff"/>' +
+    '<text x="24" y="57" font-size="3" fill="%23ef4444" font-family="Arial" font-weight="bold" text-anchor="middle">V+</text>' +
+    '<text x="66" y="57" font-size="3" fill="%23cbd5e1" font-family="Arial" font-weight="bold" text-anchor="middle">COM</text>'
+  ),
+  LOGIC_ANALYZER: svg('0 0 100 60',
+    '<defs>' +
+      '<linearGradient id="la_alu" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2318181b"/><stop offset="50%25" stop-color="%2327272a"/><stop offset="100%25" stop-color="%2309090b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="3" y="3" width="94" height="48" rx="4" fill="url(%23la_alu)" stroke="%233f3f46" stroke-width="1"/>' +
+    '<rect x="6" y="6" width="88" height="42" rx="2" fill="none" stroke="%2352525b" stroke-width="0.5"/>' +
+    '<circle cx="8" cy="8" r="1.2" fill="%2371717a"/><circle cx="92" cy="8" r="1.2" fill="%2371717a"/>' +
+    '<rect x="42" y="0" width="16" height="5" rx="1" fill="%23cbd5e1" stroke="%23475569" stroke-width="0.5"/>' +
+    '<circle cx="85" cy="20" r="2" fill="%2322c55e"/><circle cx="85" cy="20" r="0.8" fill="%2386efac"/>' +
+    '<text x="85" y="27" font-size="2.6" fill="%23a1a1aa" font-family="Arial" text-anchor="middle">ACT</text>' +
+    '<text x="45" y="22" font-size="6" fill="%23f1f5f9" font-family="Arial" font-weight="bold" text-anchor="middle">LOGIC 8</text>' +
+    '<text x="45" y="30" font-size="3" fill="%2394a3b8" font-family="Arial" text-anchor="middle">24MHz 8-CHANNEL ANALYZER</text>' +
+    [15, 24, 33, 42, 51, 60, 69, 78, 88].map((x, i) =>
+      `<rect x="${x - 1.5}" y="48" width="3" height="12" rx="0.5" fill="%23f59e0b"/>` +
+      `<circle cx="${x}" cy="58.5" r="1" fill="%230f172a"/>` +
+      `<text x="${x}" y="46" font-size="2.6" fill="${i < 8 ? '%2338bdf8' : '%2394a3b8'}" font-family="Arial" font-weight="bold" text-anchor="middle">${i < 8 ? 'C' + i : 'GND'}</text>`
+    ).join('')
+  ),
+
+  // Power
+  BATTERY_18650: svg('0 0 70 80',
+    '<defs>' +
+      '<linearGradient id="bat18650_wrap" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23047857"/><stop offset="35%25" stop-color="%2310b981"/><stop offset="70%25" stop-color="%23059669"/><stop offset="100%25" stop-color="%23047857"/></linearGradient>' +
+      '<linearGradient id="bat18650_metal" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%2394a3b8"/><stop offset="35%25" stop-color="%23f8fafc"/><stop offset="70%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="18" y="10" width="34" height="60" rx="3" fill="url(%23bat18650_wrap)" stroke="%23064e3b" stroke-width="0.8"/>' +
+    '<rect x="24" y="6" width="22" height="4" rx="1" fill="url(%23bat18650_metal)"/>' +
+    '<rect x="29" y="3" width="12" height="3" rx="1" fill="url(%23bat18650_metal)" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<rect x="21" y="69" width="28" height="3" rx="1" fill="url(%23bat18650_metal)"/>' +
+    '<text x="35" y="28" font-size="4" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">INR18650-25R</text>' +
+    '<text x="35" y="36" font-size="3.2" fill="%23d1fae5" font-family="Arial" text-anchor="middle">3.7V 2500mAh</text>' +
+    '<text x="35" y="44" font-size="2.6" fill="%23a7f3d0" font-family="Arial" text-anchor="middle">LI-ION RECHARGEABLE</text>' +
+    '<text x="24" y="18" font-size="5" fill="%23ffffff" font-weight="bold">+</text>' +
+    '<text x="24" y="67" font-size="6" fill="%23ffffff" font-weight="bold">−</text>' +
+    '<circle cx="15" cy="60" r="2.5" fill="%23ef4444"/><circle cx="15" cy="60" r="1.2" fill="%23ffffff"/>' +
+    '<circle cx="45" cy="60" r="2.5" fill="%2318181b"/><circle cx="45" cy="60" r="1.2" fill="%23ffffff"/>'
+  ),
+  BATTERY_CR2032: svg('0 0 50 60',
+    '<defs>' +
+      '<radialGradient id="cr_metal" cx="40%25" cy="40%25" r="60%25"><stop offset="0%25" stop-color="%23ffffff"/><stop offset="40%25" stop-color="%23e2e8f0"/><stop offset="80%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></radialGradient>' +
+    '</defs>' +
+    '<circle cx="25" cy="25" r="20" fill="url(%23cr_metal)" stroke="%23475569" stroke-width="0.8"/>' +
+    '<circle cx="25" cy="25" r="17.5" fill="none" stroke="%23cbd5e1" stroke-width="0.5"/>' +
+    '<text x="25" y="21" font-size="5" fill="%23475569" font-family="Arial" font-weight="bold" text-anchor="middle">+ CR2032</text>' +
+    '<text x="25" y="27" font-size="3.2" fill="%2364748b" font-family="Arial" text-anchor="middle">3V LITHIUM</text>' +
+    '<text x="25" y="33" font-size="2.4" fill="%2394a3b8" font-family="Arial" text-anchor="middle">CELL</text>' +
+    '<rect x="13.5" y="42" width="3" height="8" rx="0.5" fill="%2394a3b8"/><circle cx="15" cy="49" r="1.2" fill="%230f172a"/>' +
+    '<rect x="33.5" y="42" width="3" height="8" rx="0.5" fill="%2394a3b8"/><circle cx="35" cy="49" r="1.2" fill="%230f172a"/>' +
+    '<text x="15" y="40" font-size="3" fill="%23ef4444" font-weight="bold" text-anchor="middle">+</text>' +
+    '<text x="35" y="40" font-size="4" fill="%2364748b" font-weight="bold" text-anchor="middle">−</text>'
+  ),
+  BATTERY_LIPO: svg('0 0 70 70',
+    '<defs>' +
+      '<linearGradient id="lipo_foil" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23cbd5e1"/><stop offset="30%25" stop-color="%23f8fafc"/><stop offset="70%25" stop-color="%23e2e8f0"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="8" y="10" width="54" height="42" rx="3" fill="url(%23lipo_foil)" stroke="%2394a3b8" stroke-width="0.8"/>' +
+    '<rect x="10" y="8" width="50" height="2" fill="%23cbd5e1"/><rect x="10" y="52" width="50" height="2" fill="%23cbd5e1"/>' +
+    '<rect x="14" y="9" width="42" height="6" fill="%23eab308" opacity="0.6"/>' +
+    '<text x="35" y="27" font-size="4" fill="%23334155" font-family="Arial" font-weight="bold" text-anchor="middle">3.7V 500mAh</text>' +
+    '<text x="35" y="34" font-size="3" fill="%2364748b" font-family="Arial" text-anchor="middle">Li-Polymer 1S</text>' +
+    '<text x="35" y="41" font-size="2.4" fill="%2394a3b8" font-family="Arial" text-anchor="middle">WITH PCM PROTECT</text>' +
+    '<path d="M 22 15 Q 16 35 20 60" fill="none" stroke="%23ef4444" stroke-width="1.8"/>' +
+    '<path d="M 48 15 Q 54 35 40 60" fill="none" stroke="%2318181b" stroke-width="1.8"/>' +
+    '<circle cx="20" cy="60" r="2.5" fill="%23ef4444"/><circle cx="20" cy="60" r="1.2" fill="%23ffffff"/>' +
+    '<circle cx="40" cy="60" r="2.5" fill="%2318181b"/><circle cx="40" cy="60" r="1.2" fill="%23ffffff"/>'
+  ),
+  BATTERY_AAA: svg('0 0 50 80',
+    '<defs>' +
+      '<linearGradient id="aaa_wrap" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23b45309"/><stop offset="35%25" stop-color="%23f59e0b"/><stop offset="70%25" stop-color="%23d97706"/><stop offset="100%25" stop-color="%2392400e"/></linearGradient>' +
+      '<linearGradient id="aaa_metal" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%2394a3b8"/><stop offset="35%25" stop-color="%23f8fafc"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="13" y="10" width="24" height="60" rx="2" fill="url(%23aaa_wrap)" stroke="%2378350f" stroke-width="0.8"/>' +
+    '<rect x="18" y="5" width="14" height="5" rx="1" fill="url(%23aaa_metal)"/>' +
+    '<rect x="21" y="2" width="8" height="3" rx="1" fill="url(%23aaa_metal)"/>' +
+    '<rect x="15" y="70" width="20" height="3" rx="1" fill="url(%23aaa_metal)"/>' +
+    '<text x="25" y="28" font-size="4" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">AAA</text>' +
+    '<text x="25" y="36" font-size="3" fill="%23fef3c7" font-family="Arial" text-anchor="middle">1.5V ALKALINE</text>' +
+    '<text x="25" y="44" font-size="2.4" fill="%23fde68a" font-family="Arial" text-anchor="middle">LR03</text>' +
+    '<circle cx="15" cy="60" r="2.5" fill="%23ef4444"/><circle cx="15" cy="60" r="1.2" fill="%23ffffff"/>' +
+    '<circle cx="45" cy="60" r="2.5" fill="%2318181b"/><circle cx="45" cy="60" r="1.2" fill="%23ffffff"/>'
+  ),
+  VOLTAGE_REGULATOR_AMS1117: svg('0 0 60 50',
+    '<defs>' +
+      '<linearGradient id="ams_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%231d4ed8"/><stop offset="100%25" stop-color="%231e3a8a"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="6" y="4" width="48" height="42" rx="2" fill="url(%23ams_pcb)" stroke="%23172554" stroke-width="0.8"/>' +
+    '<rect x="22" y="16" width="16" height="18" rx="1" fill="%2318181b" stroke="%23334155" stroke-width="0.5"/>' +
+    '<rect x="26" y="13" width="8" height="3" fill="%23cbd5e1"/>' +
+    '<rect x="23" y="34" width="3" height="3" fill="%23cbd5e1"/><rect x="28.5" y="34" width="3" height="3" fill="%23cbd5e1"/><rect x="34" y="34" width="3" height="3" fill="%23cbd5e1"/>' +
+    '<text x="30" y="24" font-size="2.6" fill="%23e2e8f0" font-family="Arial" font-weight="bold" text-anchor="middle">AMS1117</text>' +
+    '<text x="30" y="29" font-size="2.4" fill="%2394a3b8" font-family="Arial" text-anchor="middle">3.3</text>' +
+    '<circle cx="44" cy="12" r="1.5" fill="%23ef4444"/><circle cx="44" cy="12" r="0.6" fill="%23fca5a5"/>' +
+    '<rect x="12" y="18" width="6" height="8" rx="0.5" fill="%23ca8a04"/><line x1="12" y1="18" x2="18" y2="18" stroke="%23fef08a" stroke-width="0.5"/>' +
+    '<rect x="42" y="24" width="6" height="8" rx="0.5" fill="%23ca8a04"/><line x1="42" y1="24" x2="48" y2="24" stroke="%23fef08a" stroke-width="0.5"/>' +
+    '<rect x="0" y="13" width="7" height="4" rx="0.5" fill="%23cbd5e1"/><circle cx="1" cy="15" r="1.2" fill="%230f172a"/>' +
+    '<rect x="0" y="33" width="7" height="4" rx="0.5" fill="%23cbd5e1"/><circle cx="1" cy="35" r="1.2" fill="%230f172a"/>' +
+    '<text x="10" y="16" font-size="2.4" fill="%23ffffff" font-family="Arial" font-weight="bold">VIN</text>' +
+    '<text x="10" y="36" font-size="2.4" fill="%23ffffff" font-family="Arial" font-weight="bold">GND</text>' +
+    '<rect x="53" y="13" width="7" height="4" rx="0.5" fill="%23cbd5e1"/><circle cx="59" cy="15" r="1.2" fill="%230f172a"/>' +
+    '<rect x="53" y="33" width="7" height="4" rx="0.5" fill="%23cbd5e1"/><circle cx="59" cy="35" r="1.2" fill="%230f172a"/>' +
+    '<text x="50" y="16" font-size="2.4" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="end">3.3V</text>' +
+    '<text x="50" y="36" font-size="2.4" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="end">GND</text>'
+  ),
+
+  // Sensors
+  ULTRASONIC_SENSOR: svg('0 0 80 60',
+    '<defs>' +
+      '<linearGradient id="us_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%230284c7"/><stop offset="100%25" stop-color="%230369a1"/></linearGradient>' +
+      '<radialGradient id="us_trans" cx="45%25" cy="45%25" r="55%25"><stop offset="0%25" stop-color="%23ffffff"/><stop offset="30%25" stop-color="%23cbd5e1"/><stop offset="85%25" stop-color="%2364748b"/><stop offset="100%25" stop-color="%23334155"/></radialGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="76" height="48" rx="3" fill="url(%23us_pcb)" stroke="%23075985" stroke-width="0.8"/>' +
+    '<circle cx="24" cy="24" r="16" fill="url(%23us_trans)" stroke="%23475569" stroke-width="0.8"/>' +
+    '<circle cx="24" cy="24" r="13" fill="%231e293b"/>' +
+    '<circle cx="24" cy="24" r="12" fill="none" stroke="%2394a3b8" stroke-width="0.6" stroke-dasharray="2,2"/>' +
+    '<text x="24" y="26" font-size="6" fill="%23cbd5e1" font-family="Arial" font-weight="bold" text-anchor="middle">T</text>' +
+    '<circle cx="56" cy="24" r="16" fill="url(%23us_trans)" stroke="%23475569" stroke-width="0.8"/>' +
+    '<circle cx="56" cy="24" r="13" fill="%231e293b"/>' +
+    '<circle cx="56" cy="24" r="12" fill="none" stroke="%2394a3b8" stroke-width="0.6" stroke-dasharray="2,2"/>' +
+    '<text x="56" y="26" font-size="6" fill="%23cbd5e1" font-family="Arial" font-weight="bold" text-anchor="middle">R</text>' +
+    '<rect x="36" y="20" width="8" height="12" rx="3" fill="%23e2e8f0" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<text x="40" y="27" font-size="2.4" fill="%23334155" font-family="Arial" font-weight="bold" text-anchor="middle">HC-SR04</text>' +
+    [20, 33, 47, 60].map((x) =>
+      `<rect x="${x - 1.5}" y="48" width="3" height="12" rx="0.5" fill="%23cbd5e1"/>` +
+      `<circle cx="${x}" cy="58.5" r="1.1" fill="%230f172a"/>`
+    ).join('') +
+    '<text x="20" y="46" font-size="2.4" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">VCC</text>' +
+    '<text x="33" y="46" font-size="2.4" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">TRIG</text>' +
+    '<text x="47" y="46" font-size="2.4" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">ECHO</text>' +
+    '<text x="60" y="46" font-size="2.4" fill="%23f8fafc" font-family="Arial" font-weight="bold" text-anchor="middle">GND</text>'
+  ),
+  TEMPERATURE_SENSOR: svg('0 0 50 60',
+    '<defs>' +
+      '<linearGradient id="dht_blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2338bdf8"/><stop offset="50%25" stop-color="%230284c7"/><stop offset="100%25" stop-color="%230369a1"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="6" y="4" width="38" height="44" rx="2" fill="url(%23dht_blue)" stroke="%230284c7" stroke-width="0.8"/>' +
+    [10, 16, 22, 28].map((y) =>
+      `<line x1="12" y1="${y}" x2="38" y2="${y}" stroke="%230f172a" stroke-width="1.6" stroke-linecap="round"/>`
+    ).join('') +
+    '<text x="25" y="38" font-size="4" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">DHT11</text>' +
+    '<text x="25" y="44" font-size="2.4" fill="%23bae6fd" font-family="Arial" text-anchor="middle">TEMP / HUMIDITY</text>' +
+    [12, 25, 38].map((x) =>
+      `<rect x="${x - 1.5}" y="48" width="3" height="12" rx="0.5" fill="%23cbd5e1"/>` +
+      `<circle cx="${x}" cy="58.5" r="1.1" fill="%230f172a"/>`
+    ).join('') +
+    '<text x="12" y="55" font-size="2.4" fill="%23ef4444" font-family="Arial" font-weight="bold" text-anchor="middle">+</text>' +
+    '<text x="25" y="55" font-size="2.4" fill="%2338bdf8" font-family="Arial" font-weight="bold" text-anchor="middle">S</text>' +
+    '<text x="38" y="55" font-size="2.4" fill="%2394a3b8" font-family="Arial" font-weight="bold" text-anchor="middle">−</text>'
+  ),
+  TMP36: svg('0 0 56 70',
+    '<defs>' +
+      '<linearGradient id="to92_body" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%2318181b"/><stop offset="35%25" stop-color="%233f3f46"/><stop offset="70%25" stop-color="%2327272a"/><stop offset="100%25" stop-color="%2309090b"/></linearGradient>' +
+    '</defs>' +
+    [16, 28, 40].map((x) =>
+      `<rect x="${x - 1.2}" y="28" width="2.4" height="42" rx="0.5" fill="%23cbd5e1" stroke="%2394a3b8" stroke-width="0.3"/>` +
+      `<circle cx="${x}" cy="68.5" r="1" fill="%230f172a"/>`
+    ).join('') +
+    '<path d="M 10 12 C 10 4 46 4 46 12 L 46 28 L 10 28 Z" fill="url(%23to92_body)" stroke="%2327272a" stroke-width="0.8"/>' +
+    '<rect x="12" y="10" width="32" height="17" rx="1" fill="%2318181b"/>' +
+    '<text x="28" y="18" font-size="4" fill="%23f1f5f9" font-family="Arial" font-weight="bold" text-anchor="middle">TMP36</text>' +
+    '<text x="28" y="24" font-size="2.6" fill="%2394a3b8" font-family="Arial" text-anchor="middle">-40 to 125C</text>' +
+    '<text x="16" y="34" font-size="2.4" fill="%23ef4444" font-weight="bold" text-anchor="middle">Vs</text>' +
+    '<text x="28" y="34" font-size="2.4" fill="%2338bdf8" font-weight="bold" text-anchor="middle">Vout</text>' +
+    '<text x="40" y="34" font-size="2.4" fill="%23cbd5e1" font-weight="bold" text-anchor="middle">GND</text>'
+  ),
+  GAS_SENSOR: svg('0 0 60 60',
+    '<defs>' +
+      '<radialGradient id="mq_mesh" cx="45%25" cy="45%25" r="55%25"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="35%25" stop-color="%23cbd5e1"/><stop offset="85%25" stop-color="%2364748b"/><stop offset="100%25" stop-color="%23334155"/></radialGradient>' +
+    '</defs>' +
+    '<rect x="4" y="4" width="52" height="42" rx="3" fill="%230284c7" stroke="%230369a1" stroke-width="0.8"/>' +
+    '<circle cx="30" cy="24" r="16" fill="url(%23mq_mesh)" stroke="%23475569" stroke-width="0.8"/>' +
+    '<circle cx="30" cy="24" r="13" fill="%23334155" stroke="%2394a3b8" stroke-width="0.5" stroke-dasharray="1,1"/>' +
+    '<text x="30" y="26" font-size="4.5" fill="%23f1f5f9" font-family="Arial" font-weight="bold" text-anchor="middle">MQ-2</text>' +
+    '<text x="30" y="31" font-size="2.4" fill="%23cbd5e1" font-family="Arial" text-anchor="middle">GAS / SMOKE</text>' +
+    [12, 24, 36, 48].map((x) =>
+      `<rect x="${x - 1.5}" y="46" width="3" height="14" rx="0.5" fill="%23cbd5e1"/>` +
+      `<circle cx="${x}" cy="58.5" r="1.1" fill="%230f172a"/>`
+    ).join('') +
+    '<text x="12" y="44" font-size="2.4" fill="%23ffffff" font-weight="bold" text-anchor="middle">VCC</text>' +
+    '<text x="24" y="44" font-size="2.4" fill="%23ffffff" font-weight="bold" text-anchor="middle">GND</text>' +
+    '<text x="36" y="44" font-size="2.4" fill="%23ffffff" font-weight="bold" text-anchor="middle">DO</text>' +
+    '<text x="48" y="44" font-size="2.4" fill="%23ffffff" font-weight="bold" text-anchor="middle">AO</text>'
+  ),
+
+  // Motors
+  VIBRATION_MOTOR: svg('0 0 50 50',
+    '<defs>' +
+      '<radialGradient id="vib_coin" cx="40%25" cy="40%25" r="60%25"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="50%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2364748b"/></radialGradient>' +
+    '</defs>' +
+    '<rect x="6" y="8" width="38" height="28" rx="2" fill="%230284c7" opacity="0.6"/>' +
+    '<circle cx="25" cy="22" r="16" fill="url(%23vib_coin)" stroke="%23475569" stroke-width="0.8"/>' +
+    '<circle cx="25" cy="22" r="12" fill="none" stroke="%2394a3b8" stroke-width="0.5"/>' +
+    '<path d="M 25 10 A 12 12 0 0 1 37 22 L 25 22 Z" fill="%23ca8a04" opacity="0.4"/>' +
+    '<text x="25" y="24" font-size="3.2" fill="%23334155" font-family="Arial" font-weight="bold" text-anchor="middle">COIN MOTOR</text>' +
+    '<path d="M 21 36 Q 16 42 18 50" fill="none" stroke="%23ef4444" stroke-width="1.8"/>' +
+    '<path d="M 29 36 Q 34 42 32 50" fill="none" stroke="%233b82f6" stroke-width="1.8"/>' +
+    '<circle cx="18" cy="49" r="1.5" fill="%23ef4444"/><circle cx="32" cy="49" r="1.5" fill="%233b82f6"/>'
+  ),
+  GEAR_MOTOR: svg('0 0 80 60',
+    '<defs>' +
+      '<linearGradient id="tt_yellow" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23fde047"/><stop offset="50%25" stop-color="%23eab308"/><stop offset="100%25" stop-color="%23ca8a04"/></linearGradient>' +
+      '<linearGradient id="tt_metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2394a3b8"/><stop offset="50%25" stop-color="%23f1f5f9"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="14" width="24" height="32" rx="3" fill="url(%23tt_metal)" stroke="%23475569" stroke-width="0.8"/>' +
+    '<rect x="0" y="18" width="6" height="4" rx="0.5" fill="%23cbd5e1"/><circle cx="2" cy="20" r="1" fill="%230f172a"/>' +
+    '<rect x="0" y="38" width="6" height="4" rx="0.5" fill="%23cbd5e1"/><circle cx="2" cy="40" r="1" fill="%230f172a"/>' +
+    '<rect x="24" y="8" width="52" height="44" rx="3" fill="url(%23tt_yellow)" stroke="%23a16207" stroke-width="0.8"/>' +
+    '<circle cx="58" cy="30" r="10" fill="%23ca8a04" stroke="%23a16207" stroke-width="0.6"/>' +
+    '<rect x="54" y="24" width="8" height="12" rx="1.5" fill="%23ffffff" stroke="%23cbd5e1" stroke-width="0.5"/>' +
+    '<text x="44" y="20" font-size="3.5" fill="%2378350f" font-family="Arial" font-weight="bold">TT MOTOR</text>' +
+    '<text x="44" y="44" font-size="2.6" fill="%2378350f" font-family="Arial">1:48 RATIO</text>'
+  ),
+  SOLENOID: svg('0 0 70 50',
+    '<defs>' +
+      '<linearGradient id="sol_copper" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f59e0b"/><stop offset="50%25" stop-color="%23b45309"/><stop offset="100%25" stop-color="%2378350f"/></linearGradient>' +
+      '<linearGradient id="sol_frame" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23e2e8f0"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="4" y="8" width="46" height="34" rx="2" fill="url(%23sol_frame)" stroke="%23475569" stroke-width="0.8"/>' +
+    '<rect x="8" y="12" width="38" height="26" fill="%2318181b"/>' +
+    '<rect x="12" y="13" width="30" height="24" rx="1" fill="url(%23sol_copper)"/>' +
+    '<rect x="22" y="21" width="44" height="8" rx="2" fill="%23f1f5f9" stroke="%2364748b" stroke-width="0.6"/>' +
+    '<circle cx="62" cy="25" r="2" fill="%23cbd5e1" stroke="%23475569" stroke-width="0.4"/>' +
+    '<path d="M 46 22 L 48 28 L 50 22 L 52 28 L 54 22" fill="none" stroke="%23475569" stroke-width="0.8"/>' +
+    '<rect x="10" y="38" width="4" height="10" rx="0.5" fill="%23cbd5e1"/><circle cx="12" cy="47" r="1.2" fill="%230f172a"/>' +
+    '<rect x="30" y="38" width="4" height="10" rx="0.5" fill="%23cbd5e1"/><circle cx="32" cy="47" r="1.2" fill="%230f172a"/>'
+  ),
+
+  // Displays
+  DISPLAY_7SEG_4DIGIT: svg('0 0 100 50',
+    '<defs>' +
+      '<linearGradient id="tm_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%2318181b"/><stop offset="100%25" stop-color="%2309090b"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="96" height="42" rx="3" fill="url(%23tm_pcb)" stroke="%233f3f46" stroke-width="0.8"/>' +
+    '<rect x="8" y="6" width="84" height="28" rx="2" fill="%23300505" stroke="%237f1d1d" stroke-width="0.6"/>' +
+    ['1', '2', '0', '0'].map((d, i) => {
+      const dx = 12 + i * 20 + (i >= 2 ? 4 : 0);
+      return `<text x="${dx + 8}" y="${26}" font-size="16" fill="%23ef4444" font-family="Courier New, monospace" font-weight="bold" text-anchor="middle">${d}</text>`;
+    }).join('') +
+    '<circle cx="50" cy="16" r="1.5" fill="%23ef4444"/><circle cx="50" cy="24" r="1.5" fill="%23ef4444"/>' +
+    [25, 40, 55, 70].map((x) =>
+      `<rect x="${x - 1.5}" y="42" width="3" height="8" rx="0.5" fill="%23cbd5e1"/>` +
+      `<circle cx="${x}" cy="49" r="1.1" fill="%230f172a"/>`
+    ).join('') +
+    '<text x="25" y="39" font-size="2.4" fill="%23f1f5f9" font-family="Arial" font-weight="bold" text-anchor="middle">CLK</text>' +
+    '<text x="40" y="39" font-size="2.4" fill="%23f1f5f9" font-family="Arial" font-weight="bold" text-anchor="middle">DIO</text>' +
+    '<text x="55" y="39" font-size="2.4" fill="%23ef4444" font-family="Arial" font-weight="bold" text-anchor="middle">VCC</text>' +
+    '<text x="70" y="39" font-size="2.4" fill="%2394a3b8" font-family="Arial" font-weight="bold" text-anchor="middle">GND</text>'
+  ),
+  LED_BAR_GRAPH: svg('0 0 60 60',
+    Array.from({ length: 10 }, (_, i) => {
+      const x = 7.5 + i * 5;
+      return `<rect x="${x - 1}" y="0" width="2" height="9" fill="%23cbd5e1"/><circle cx="${x}" cy="1.5" r="0.9" fill="%230f172a"/>` +
+        `<rect x="${x - 1}" y="51" width="2" height="9" fill="%23cbd5e1"/><circle cx="${x}" cy="58.5" r="0.9" fill="%230f172a"/>`;
+    }).join('') +
+    '<rect x="4" y="8" width="52" height="44" rx="2" fill="%2309090b" stroke="%2327272a" stroke-width="0.8"/>' +
+    Array.from({ length: 10 }, (_, i) => {
+      const x = 6.5 + i * 5;
+      const color = i < 4 ? '%2322c55e' : i < 7 ? '%23eab308' : '%23ef4444';
+      return `<rect x="${x}" y="12" width="4" height="36" rx="0.5" fill="${color}" stroke="%2318181b" stroke-width="0.4"/>`;
+    }).join('')
+  ),
+  DISPLAY_MAX7219_MATRIX: svg('0 0 80 80',
+    '<defs>' +
+      '<linearGradient id="m72_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%231e3a8a"/><stop offset="100%25" stop-color="%23172554"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="76" height="70" rx="3" fill="url(%23m72_pcb)" stroke="%231e40af" stroke-width="0.8"/>' +
+    '<rect x="8" y="6" width="64" height="54" rx="2" fill="%2309090b" stroke="%23334155" stroke-width="0.8"/>' +
+    Array.from({ length: 8 }, (_, r) =>
+      Array.from({ length: 8 }, (_, c) => {
+        const cx = 13 + c * 7.7;
+        const cy = 10 + r * 6.6;
+        return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="2.2" fill="%237f1d1d" stroke="%23450a0a" stroke-width="0.3"/>`;
+      }).join('')
+    ).join('') +
+    [15, 27, 39, 51, 63].map((x) =>
+      `<rect x="${x - 1.5}" y="70" width="3" height="10" rx="0.5" fill="%23cbd5e1"/>` +
+      `<circle cx="${x}" cy="78.5" r="1.1" fill="%230f172a"/>`
+    ).join('') +
+    '<text x="15" y="68" font-size="2.4" fill="%23ef4444" font-weight="bold" text-anchor="middle">VCC</text>' +
+    '<text x="27" y="68" font-size="2.4" fill="%23cbd5e1" font-weight="bold" text-anchor="middle">GND</text>' +
+    '<text x="39" y="68" font-size="2.4" fill="%2338bdf8" font-weight="bold" text-anchor="middle">DIN</text>' +
+    '<text x="51" y="68" font-size="2.4" fill="%23facc15" font-weight="bold" text-anchor="middle">CS</text>' +
+    '<text x="63" y="68" font-size="2.4" fill="%234ade80" font-weight="bold" text-anchor="middle">CLK</text>'
+  ),
+
+  // Passives & Relays
+  TRIMPOT: svg('0 0 50 50',
+    '<defs>' +
+      '<linearGradient id="tr_blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%230284c7"/><stop offset="100%25" stop-color="%230369a1"/></linearGradient>' +
+      '<radialGradient id="tr_screw" cx="45%25" cy="45%25" r="55%25"><stop offset="0%25" stop-color="%23fef08a"/><stop offset="50%25" stop-color="%23eab308"/><stop offset="100%25" stop-color="%23854d0e"/></radialGradient>' +
+    '</defs>' +
+    '<rect x="4" y="4" width="42" height="36" rx="2" fill="url(%23tr_blue)" stroke="%23075985" stroke-width="0.8"/>' +
+    '<circle cx="25" cy="18" r="8" fill="url(%23tr_screw)" stroke="%23a16207" stroke-width="0.6"/>' +
+    '<line x1="20" y1="18" x2="30" y2="18" stroke="%2378350f" stroke-width="1.4" stroke-linecap="round"/>' +
+    '<text x="25" y="34" font-size="3.5" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">10k W103</text>' +
+    [12, 25, 38].map((x) =>
+      `<rect x="${x - 1.5}" y="38" width="3" height="12" rx="0.5" fill="%23cbd5e1"/>` +
+      `<circle cx="${x}" cy="48.5" r="1.1" fill="%230f172a"/>`
+    ).join('') +
+    '<text x="12" y="39" font-size="2.4" fill="%23ffffff" font-weight="bold" text-anchor="middle">1</text>' +
+    '<text x="25" y="39" font-size="2.4" fill="%23ffffff" font-weight="bold" text-anchor="middle">W</text>' +
+    '<text x="38" y="39" font-size="2.4" fill="%23ffffff" font-weight="bold" text-anchor="middle">2</text>'
+  ),
+  PHOTO_DIODE: svg('0 0 40 70',
+    '<defs>' +
+      '<linearGradient id="pd_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="pd_lens" x1="0" y1="0" x2="1" y2="1"><stop offset="0%25" stop-color="%23ffffff" stop-opacity="0.8"/><stop offset="40%25" stop-color="%23e2e8f0" stop-opacity="0.5"/><stop offset="100%25" stop-color="%2394a3b8" stop-opacity="0.7"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="15" y="36" width="2.2" height="34" fill="url(%23pd_lead)"/>' +
+    '<rect x="23" y="36" width="2.2" height="34" fill="url(%23pd_lead)"/>' +
+    '<circle cx="16" cy="68.5" r="1" fill="%230f172a"/><circle cx="24" cy="68.5" r="1" fill="%230f172a"/>' +
+    '<rect x="17" y="18" width="6" height="8" rx="0.5" fill="%230f172a" stroke="%233b82f6" stroke-width="0.5"/>' +
+    '<circle cx="20" cy="22" r="1" fill="%23f59e0b"/>' +
+    '<path d="M 9 20 C 9 10 13.5 6 20 6 C 26.5 6 31 10 31 20 L 31 34 L 9 34 Z" fill="url(%23pd_lens)" stroke="%23cbd5e1" stroke-width="0.8"/>' +
+    '<rect x="7" y="34" width="26" height="4" rx="0.5" fill="url(%23pd_lens)" stroke="%23cbd5e1" stroke-width="0.6"/>' +
+    '<path d="M 13 14 C 15 10 18 9 22 9" fill="none" stroke="%23ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/>'
+  ),
+  RELAY_8CH: svg('0 0 160 60',
+    '<defs>' +
+      '<linearGradient id="r8_pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%231e3a8a"/><stop offset="100%25" stop-color="%230f172a"/></linearGradient>' +
+      '<linearGradient id="r8_blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%233b82f6"/><stop offset="100%25" stop-color="%231d4ed8"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="2" y="2" width="156" height="56" rx="3" fill="url(%23r8_pcb)" stroke="%231e40af" stroke-width="0.8"/>' +
+    Array.from({ length: 8 }, (_, i) => {
+      const rx = 24 + i * 16;
+      return `<rect x="${rx}" y="6" width="14" height="28" rx="1.5" fill="url(%23r8_blue)" stroke="%231e40af" stroke-width="0.5"/>` +
+        `<text x="${rx + 7}" y="14" font-size="2" fill="%23ffffff" font-family="Arial" font-weight="bold" text-anchor="middle">SONGLE</text>` +
+        `<text x="${rx + 7}" y="20" font-size="1.8" fill="%23dbeafe" font-family="Arial" text-anchor="middle">10A 250V</text>` +
+        `<circle cx="${rx + 7}" cy="38" r="1.2" fill="%23ef4444"/><circle cx="${rx + 7}" cy="38" r="0.5" fill="%23fca5a5"/>` +
+        `<rect x="${rx}" y="42" width="14" height="14" rx="1" fill="%2315803d" stroke="%2314532d" stroke-width="0.4"/>` +
+        `<circle cx="${rx + 3.5}" cy="49" r="1.5" fill="%23cbd5e1"/><circle cx="${rx + 7}" cy="49" r="1.5" fill="%23cbd5e1"/><circle cx="${rx + 10.5}" cy="49" r="1.5" fill="%23cbd5e1"/>`;
+    }).join('') +
+    '<rect x="4" y="6" width="16" height="48" rx="1" fill="%2318181b" stroke="%2327272a" stroke-width="0.6"/>' +
+    Array.from({ length: 10 }, (_, i) => {
+      const py = 9 + i * 4.5;
+      return `<circle cx="12" cy="${py}" r="1.2" fill="%23f59e0b"/>`;
+    }).join('')
+  ),
+  RELAY_SSR: svg('0 0 70 70',
+    '<defs>' +
+      '<linearGradient id="ssr_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="35%25" stop-color="%23e2e8f0"/><stop offset="100%25" stop-color="%23cbd5e1"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="4" y="4" width="62" height="62" rx="3" fill="url(%23ssr_body)" stroke="%2394a3b8" stroke-width="1"/>' +
+    '<rect x="14" y="0" width="12" height="12" rx="1.5" fill="%2318181b" stroke="%23475569" stroke-width="0.6"/>' +
+    '<circle cx="20" cy="6" r="3" fill="%23cbd5e1"/><line x1="18" y1="6" x2="22" y2="6" stroke="%230f172a" stroke-width="0.8"/>' +
+    '<rect x="44" y="0" width="12" height="12" rx="1.5" fill="%2318181b" stroke="%23475569" stroke-width="0.6"/>' +
+    '<circle cx="50" cy="6" r="3" fill="%23cbd5e1"/><line x1="48" y1="6" x2="52" y2="6" stroke="%230f172a" stroke-width="0.8"/>' +
+    '<text x="20" y="18" font-size="3" fill="%23334155" font-family="Arial" font-weight="bold" text-anchor="middle">1 ~</text>' +
+    '<text x="50" y="18" font-size="3" fill="%23334155" font-family="Arial" font-weight="bold" text-anchor="middle">2 ~</text>' +
+    '<text x="35" y="27" font-size="5.5" fill="%23b91c1c" font-family="Arial" font-weight="bold" text-anchor="middle">FOTEK</text>' +
+    '<text x="35" y="34" font-size="4" fill="%231e293b" font-family="Arial" font-weight="bold" text-anchor="middle">SSR-40 DA</text>' +
+    '<text x="35" y="40" font-size="2.6" fill="%23475569" font-family="Arial" text-anchor="middle">LOAD: 24-380VAC 40A</text>' +
+    '<text x="35" y="45" font-size="2.6" fill="%23475569" font-family="Arial" text-anchor="middle">INPUT: 3-32VDC</text>' +
+    '<circle cx="35" cy="50" r="1.8" fill="%23ef4444"/><circle cx="35" cy="50" r="0.8" fill="%23fca5a5"/>' +
+    '<rect x="14" y="58" width="12" height="12" rx="1.5" fill="%2318181b" stroke="%23475569" stroke-width="0.6"/>' +
+    '<circle cx="20" cy="64" r="3" fill="%23cbd5e1"/><line x1="18" y1="64" x2="22" y2="64" stroke="%230f172a" stroke-width="0.8"/>' +
+    '<rect x="44" y="58" width="12" height="12" rx="1.5" fill="%2318181b" stroke="%23475569" stroke-width="0.6"/>' +
+    '<circle cx="50" cy="64" r="3" fill="%23cbd5e1"/><line x1="48" y1="64" x2="52" y2="64" stroke="%230f172a" stroke-width="0.8"/>' +
+    '<text x="20" y="56" font-size="3" fill="%23334155" font-family="Arial" font-weight="bold" text-anchor="middle">3 (+)</text>' +
+    '<text x="50" y="56" font-size="3" fill="%23334155" font-family="Arial" font-weight="bold" text-anchor="middle">4 (−)</text>'
   ),
 };
 
@@ -1485,22 +2277,34 @@ export const componentSvgs: Record<string, string> = {
   ),
   SWITCH_SPST: svg('0 0 60 30',
     '<defs>' +
-      '<linearGradient id="sw_plate" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="30%25" stop-color="%23e2e8f0"/><stop offset="70%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
-      '<linearGradient id="sw_knob" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%233f3f46"/><stop offset="50%25" stop-color="%2327272a"/><stop offset="100%25" stop-color="%2318181b"/></linearGradient>' +
-      '<linearGradient id="sw_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%2394a3b8"/><stop offset="100%25" stop-color="%2364748b"/></linearGradient>' +
+      '<linearGradient id="spst_plate" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%23f8fafc"/><stop offset="35%25" stop-color="%23e2e8f0"/><stop offset="70%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+      '<linearGradient id="spst_lead" x1="0" y1="0" x2="1" y2="0"><stop offset="0%25" stop-color="%23f1f5f9"/><stop offset="50%25" stop-color="%23cbd5e1"/><stop offset="100%25" stop-color="%2394a3b8"/></linearGradient>' +
+      '<linearGradient id="spst_bezel" x1="0" y1="0" x2="0" y2="1"><stop offset="0%25" stop-color="%231e293b"/><stop offset="100%25" stop-color="%23090d16"/></linearGradient>' +
     '</defs>' +
-    '<rect x="31" y="13" width="7" height="4" rx="0.5" fill="url(%23sw_lead)"/>' +
-    '<circle cx="34" cy="15" r="1.8" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.5"/><circle cx="34" cy="15" r="0.9" fill="%230f172a"/>' +
-    '<rect x="51" y="13" width="7" height="4" rx="0.5" fill="url(%23sw_lead)"/>' +
-    '<circle cx="54" cy="15" r="1.8" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.5"/><circle cx="54" cy="15" r="0.9" fill="%230f172a"/>' +
-    '<rect x="2" y="4" width="28" height="22" rx="2" fill="%2309090b" stroke="%2318181b" stroke-width="0.75"/>' +
-    '<rect x="4" y="6" width="24" height="18" rx="1.5" fill="url(%23sw_plate)" stroke="%2364748b" stroke-width="0.6"/>' +
-    '<circle cx="7.5" cy="15" r="1.5" fill="%23475569" stroke="%23cbd5e1" stroke-width="0.4"/>' +
-    '<rect x="12" y="10" width="13" height="10" rx="1.5" fill="%2318181b" stroke="%2309090b" stroke-width="0.5"/>' +
-    '<rect x="13" y="11" width="6" height="8" rx="1" fill="url(%23sw_knob)" stroke="%2309090b" stroke-width="0.5"/>' +
-    '<line x1="15" y1="12" x2="15" y2="18" stroke="%2352525b" stroke-width="0.6"/>' +
-    '<line x1="17" y1="12" x2="17" y2="18" stroke="%2352525b" stroke-width="0.6"/>' +
-    '<text x="21" y="9" font-size="4" fill="%23475569" font-family="Arial" font-weight="bold">ON</text>'
+    // Left terminal lug (Pin 1 at x=6, y=15)
+    '<rect x="0" y="12.5" width="14" height="5" rx="1" fill="url(%23spst_lead)" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<circle cx="6" cy="15" r="2.6" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.5"/><circle cx="6" cy="15" r="1.3" fill="%230f172a"/>' +
+    // Right terminal lug (Pin 2 at x=54, y=15)
+    '<rect x="46" y="12.5" width="14" height="5" rx="1" fill="url(%23spst_lead)" stroke="%2364748b" stroke-width="0.4"/>' +
+    '<circle cx="54" cy="15" r="2.6" fill="%23cbd5e1" stroke="%2364748b" stroke-width="0.5"/><circle cx="54" cy="15" r="1.3" fill="%230f172a"/>' +
+    // Switch chassis body
+    '<rect x="10" y="3" width="40" height="24" rx="3" fill="%230f172a" stroke="%231e293b" stroke-width="0.8"/>' +
+    // Brushed metallic top plate
+    '<rect x="12" y="4.5" width="36" height="21" rx="2" fill="url(%23spst_plate)" stroke="%2364748b" stroke-width="0.6"/>' +
+    // Mounting rivets
+    '<circle cx="16.5" cy="15" r="1.8" fill="%23475569" stroke="%23cbd5e1" stroke-width="0.4"/>' +
+    '<circle cx="16.5" cy="15" r="0.9" fill="%230f172a"/>' +
+    '<circle cx="43.5" cy="15" r="1.8" fill="%23475569" stroke="%23cbd5e1" stroke-width="0.4"/>' +
+    '<circle cx="43.5" cy="15" r="0.9" fill="%230f172a"/>' +
+    // Recessed switch slot well (fits interactive toggle perfectly at center x=30, y=15)
+    '<rect x="22" y="3.5" width="16" height="23" rx="2.5" fill="url(%23spst_bezel)" stroke="%23334155" stroke-width="0.6"/>' +
+    '<rect x="23.5" y="5" width="13" height="20" rx="1.5" fill="%23020617"/>' +
+    // Power symbol markings: | (ON) at top, O (OFF) at bottom
+    '<text x="30" y="3" font-size="3" fill="%23cbd5e1" font-family="Arial" font-weight="900" text-anchor="middle">|</text>' +
+    '<text x="30" y="29.5" font-size="3" fill="%2394a3b8" font-family="Arial" font-weight="900" text-anchor="middle">O</text>' +
+    // Terminal numbers
+    '<text x="16.5" y="10" font-size="2.6" fill="%23475569" font-family="Arial" font-weight="bold" text-anchor="middle">1</text>' +
+    '<text x="43.5" y="10" font-size="2.6" fill="%23475569" font-family="Arial" font-weight="bold" text-anchor="middle">2</text>'
   ),
   BREADBOARD: svg('0 0 220 120',
     '<defs>' +
@@ -2214,6 +3018,19 @@ Object.assign(componentSvgs, {
   '74HC138': componentSvgs.IC_74HC138,
   '74HC151': componentSvgs.IC_74HC151,
   'CD4017': componentSvgs.IC_CD4017,
+  '74HC00': componentSvgs.IC_74HC00,
+  '74HC04': componentSvgs.IC_74HC04,
+  '74HC08': componentSvgs.IC_74HC08,
+  '74HC32': componentSvgs.IC_74HC32,
+  '74HC86': componentSvgs.IC_74HC86,
+  '74HC14': componentSvgs.IC_74HC14,
+  '74HC74': componentSvgs.IC_74HC74,
+  '74HC02': componentSvgs.IC_74HC02,
+  HC_SR04: componentSvgs.ULTRASONIC_SENSOR,
+  DHT11: componentSvgs.TEMPERATURE_SENSOR,
+  TM1637: componentSvgs.DISPLAY_7SEG_4DIGIT,
+  MQ2: componentSvgs.GAS_SENSOR,
+  AMS1117_3V3: componentSvgs.VOLTAGE_REGULATOR_AMS1117,
 });
 
 // Default dimensions for each component type (width x height)
@@ -2319,4 +3136,66 @@ export const componentDimensions: Record<string, { w: number; h: number }> = {
   BREADBOARD: { w: 220, h: 120 },
   VOLTAGE_REGULATOR_7805: { w: 64, h: 72 },
   SWITCH_SPST: { w: 60, h: 30 },
+
+  // Child variant dimensions
+  LED_RED: { w: 40, h: 80 },
+  LED_GREEN: { w: 40, h: 80 },
+  LED_BLUE: { w: 40, h: 80 },
+  LED_YELLOW: { w: 40, h: 80 },
+  LED_WHITE: { w: 40, h: 80 },
+  LED_ORANGE: { w: 40, h: 80 },
+  LED_PURPLE: { w: 40, h: 80 },
+
+  IC_74HC00: { w: 110, h: 50 },
+  IC_74HC04: { w: 110, h: 50 },
+  IC_74HC08: { w: 110, h: 50 },
+  IC_74HC32: { w: 110, h: 50 },
+  IC_74HC86: { w: 110, h: 50 },
+  IC_74HC14: { w: 110, h: 50 },
+  IC_74HC74: { w: 110, h: 50 },
+  IC_74HC02: { w: 110, h: 50 },
+  '74HC00': { w: 110, h: 50 },
+  '74HC04': { w: 110, h: 50 },
+  '74HC08': { w: 110, h: 50 },
+  '74HC32': { w: 110, h: 50 },
+  '74HC86': { w: 110, h: 50 },
+  '74HC14': { w: 110, h: 50 },
+  '74HC74': { w: 110, h: 50 },
+  '74HC02': { w: 110, h: 50 },
+
+  SWITCH_SPDT: { w: 60, h: 30 },
+  TOGGLE_SWITCH: { w: 60, h: 40 },
+  DIP_SWITCH_4: { w: 70, h: 40 },
+
+  VOLTMETER: { w: 90, h: 70 },
+  LOGIC_ANALYZER: { w: 100, h: 60 },
+
+  BATTERY_18650: { w: 70, h: 80 },
+  BATTERY_CR2032: { w: 50, h: 60 },
+  BATTERY_LIPO: { w: 70, h: 70 },
+  BATTERY_AAA: { w: 50, h: 80 },
+  VOLTAGE_REGULATOR_AMS1117: { w: 60, h: 50 },
+  AMS1117_3V3: { w: 60, h: 50 },
+
+  ULTRASONIC_SENSOR: { w: 80, h: 60 },
+  HC_SR04: { w: 80, h: 60 },
+  TEMPERATURE_SENSOR: { w: 50, h: 60 },
+  DHT11: { w: 50, h: 60 },
+  TMP36: { w: 56, h: 70 },
+  GAS_SENSOR: { w: 60, h: 60 },
+  MQ2: { w: 60, h: 60 },
+
+  VIBRATION_MOTOR: { w: 50, h: 50 },
+  GEAR_MOTOR: { w: 80, h: 60 },
+  SOLENOID: { w: 70, h: 50 },
+
+  DISPLAY_7SEG_4DIGIT: { w: 100, h: 50 },
+  TM1637: { w: 100, h: 50 },
+  LED_BAR_GRAPH: { w: 60, h: 60 },
+  DISPLAY_MAX7219_MATRIX: { w: 80, h: 80 },
+
+  TRIMPOT: { w: 50, h: 50 },
+  PHOTO_DIODE: { w: 40, h: 70 },
+  RELAY_8CH: { w: 160, h: 60 },
+  RELAY_SSR: { w: 70, h: 70 },
 };

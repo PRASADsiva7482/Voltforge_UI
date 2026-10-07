@@ -52,6 +52,12 @@ export function resolveComponentDimensions(type: string, source: DimensionSource
   const canonical = componentDimensions[type];
   const defaults = source.defaultProperties || {};
 
+  // Discrete switches must strictly match their canonical package footprint
+  // to avoid desynchronizing terminal lugs, the internal slide track, and contact pins.
+  if (canonical && (type === 'SWITCH_SPST' || type === 'SWITCH_SPDT')) {
+    return { w: canonical.w, h: canonical.h };
+  }
+
   return {
     h: finiteNumber(source.height) ?? canonical?.h ?? finiteNumber(defaults.height) ?? FALLBACK_DIMENSIONS.h,
     w: finiteNumber(source.width) ?? canonical?.w ?? finiteNumber(defaults.width) ?? FALLBACK_DIMENSIONS.w,

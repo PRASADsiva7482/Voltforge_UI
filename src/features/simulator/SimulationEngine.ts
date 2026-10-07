@@ -626,8 +626,20 @@ private scopeCaptureRevision = 0;
         }
 
         // 4. Switch toggled state change
-        if (node.type === 'SWITCH_SPST' && props.isClosed !== prevProps.isClosed) {
+        if ((node.type === 'SWITCH_SPST' || node.type === 'SWITCH_SPDT') && props.isClosed !== prevProps.isClosed) {
           const isClosed = Boolean(props.isClosed);
+          if (node.type === 'SWITCH_SPDT') {
+            this.solverWorker?.postMessage({
+              type: 'UPDATE_PIN',
+              elementId: `r_sw_p1_${node.id}`,
+              voltage: isClosed ? 1e8 : 0.01,
+            });
+            this.solverWorker?.postMessage({
+              type: 'UPDATE_PIN',
+              elementId: `r_sw_p2_${node.id}`,
+              voltage: isClosed ? 0.01 : 1e8,
+            });
+          } else {
           this.solverWorker?.postMessage({
             type: 'UPDATE_PIN',
             elementId: `r_sw_${node.id}`,
@@ -638,6 +650,7 @@ private scopeCaptureRevision = 0;
             elementId: `r_sw_nc_${node.id}`,
             voltage: isClosed ? 1e8 : 0.01,
           });
+          }
         }
 
         // 5. PIR Sensor motion detected change
@@ -4055,12 +4068,24 @@ private scopeCaptureRevision = 0;
         }
       }
 
-      // SWITCH_SPST: sync solver resistance when toggled
+      // SWITCH_SPST / SWITCH_SPDT: sync solver resistance when toggled
       if (node.type === 'SWITCH_SPST') {
         const isClosed = Boolean(node.properties?.isClosed);
         this.solverWorker?.postMessage({
           type: 'UPDATE_PIN',
           elementId: `r_sw_${node.id}`,
+          voltage: isClosed ? 0.01 : 1e8,
+        });
+      } else if (node.type === 'SWITCH_SPDT') {
+        const isClosed = Boolean(node.properties?.isClosed);
+        this.solverWorker?.postMessage({
+          type: 'UPDATE_PIN',
+          elementId: `r_sw_p1_${node.id}`,
+          voltage: isClosed ? 1e8 : 0.01,
+        });
+        this.solverWorker?.postMessage({
+          type: 'UPDATE_PIN',
+          elementId: `r_sw_p2_${node.id}`,
           voltage: isClosed ? 0.01 : 1e8,
         });
       }
