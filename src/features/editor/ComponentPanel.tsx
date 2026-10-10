@@ -1,7 +1,8 @@
 import { lazy, memo, Suspense, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Cpu, Zap, Thermometer, Monitor, Power, Settings2, Search, Radio, BatteryCharging, Plus, ChevronDown, ChevronRight, Gauge, Binary } from 'lucide-react';
+import { Cpu, Zap, Thermometer, Monitor, Power, Settings2, Search, Radio, BatteryCharging, Plus, ChevronDown, ChevronRight, Gauge, Binary, Lock } from 'lucide-react';
 import { aiApi, componentApi } from '../../api/services';
+import { useAuth } from '../../auth/useAuth';
 import { useCanvasStore } from '../../store/canvasStore';
 import { createCanvasNodeFromComponent } from '../canvas/componentFactory';
 import { mergeComponentLibrary } from '../canvas/componentCatalog';
@@ -11,13 +12,56 @@ import { buildPaletteIndex, filterPaletteIndex, getPalettePage, normalizePalette
 
 const CustomComponentStudio = lazy(() => import('../components/CustomComponentStudio'));
 
-const StudioLauncher = memo(function ComponentStudioLauncher({ readOnly }: { readOnly?: boolean }) {
+/** Curated components unlocked for free interactive use in the live sandbox */
+export const SANDBOX_PERMITTED_TYPES = new Set<string>([
+  'ARDUINO_UNO',
+  'ESP32',
+  'ESP8266',
+  'RASPBERRY_PI_PICO',
+  'RESISTOR',
+  'CAPACITOR',
+  'CERAMIC_CAPACITOR',
+  'ELECTROLYTIC_CAPACITOR',
+  'PUSH_BUTTON',
+  'POTENTIOMETER',
+  'BREADBOARD',
+  'SWITCH_SPST',
+  'SWITCH_SPDT',
+  'SENSOR_LDR',
+  'LDR',
+  'ULTRASONIC_SENSOR',
+  'TEMPERATURE_SENSOR',
+  'TMP36',
+  'PIR_SENSOR',
+  'LED_STANDARD',
+  'LED_RGB',
+  'LED_RED',
+  'LED_GREEN',
+  'LED_BLUE',
+  'LED_YELLOW',
+  'BUZZER',
+  'DISPLAY_LCD_16X2',
+  'LCD_16X2',
+  'DISPLAY_OLED',
+  'RELAY_SINGLE',
+  'RELAY_SPDT',
+  'MOTOR_DC',
+  'SERVO_MOTOR',
+  'DC_SOURCE_5V',
+  'DC_SOURCE_3V3',
+  'DC_SOURCE_12V',
+  'GROUND',
+  'BATTERY_9V',
+  'BATTERY_AA',
+]);
+
+const StudioLauncher = memo(function ComponentStudioLauncher({ readOnly, isSandbox }: { readOnly?: boolean; isSandbox?: boolean }) {
   const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
-  useEffect(() => { if (readOnly) close(); }, [readOnly, close]);
+  useEffect(() => { if (readOnly || isSandbox) close(); }, [readOnly, isSandbox, close]);
   return <>
-    {!readOnly && <button
+    {!readOnly && !isSandbox && <button
       onClick={() => { setLoaded(true); setOpen(true); }}
       className="vf-panel-header__btn"
       title="Create custom component"
@@ -26,7 +70,7 @@ const StudioLauncher = memo(function ComponentStudioLauncher({ readOnly }: { rea
     ><Plus size={14} /></button>}
     {loaded && <Suspense fallback={<span role="status">Loading component studio…</span>}>
       {/* Keep the first-opened studio mounted so closing it retains the draft. */}
-      <CustomComponentStudio isOpen={open && !readOnly} onClose={close} />
+      <CustomComponentStudio isOpen={open && !readOnly && !isSandbox} onClose={close} />
     </Suspense>}
   </>;
 });
@@ -37,34 +81,62 @@ const categoryIcons: Record<string, React.FC<{ size?: number }>> = {
   COMMUNICATION: Radio, POWER: BatteryCharging, INSTRUMENT: Gauge,
 };
 
-const PaletteItem = memo(function PaletteItem({ component, coverage, readOnly, onAdd }: {
+const PaletteItem = memo(function PaletteItem({
+  component,
+  coverage,
+  readOnly,
+  isSandbox,
+  onAdd
+}: {
   component: ElectronicComponent;
   coverage?: AiComponentCoverageEntry;
   readOnly?: boolean;
+  isSandbox?: boolean;
   onAdd: (component: ElectronicComponent) => void;
 }) {
+  const isLockedInSandbox = Boolean(isSandbox && !SANDBOX_PERMITTED_TYPES.has(component.type));
+  const isItemDisabled = Boolean(readOnly || isLockedInSandbox);
+
+  const tooltipTitle = isLockedInSandbox
+    ? `Sign in to unlock ${component.name} in personal projects`
+    : coverage?.reason || component.description || component.name;
+
   return <button
     type="button"
     data-component-type={component.type}
-    onClick={() => onAdd(component)}
-    disabled={readOnly}
-    className="vf-component-panel__item"
-    style={readOnly ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
-    title={coverage?.reason}
+    onClick={() => {
+      if (isLockedInSandbox) return;
+      onAdd(component);
+    }}
+    disabled={isItemDisabled}
+    className={`vf-component-panel__item ${isLockedInSandbox ? 'is-sandbox-locked' : ''}`}
+    style={isItemDisabled ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
+    title={tooltipTitle}
+    aria-disabled={isItemDisabled}
   >
     <div className="vf-component-panel__item-icon"><Cpu size={12} /></div>
     <div className="vf-component-panel__item-info">
       <span className="vf-component-panel__item-name">{component.name}</span>
       <span className="vf-component-panel__item-type">{component.type.replace(/_/g, ' ')}</span>
     </div>
-    {coverage && <span className={`vf-component-panel__coverage-badge ${aiComponentCoverageStatusClass(coverage.status)}`}>
-      {aiComponentCoverageStatusLabel(coverage.status)}
-    </span>}
-    {component.isPremium && <span className="vf-component-panel__pro-badge">PRO</span>}
+    {isLockedInSandbox ? (
+      <span className="vf-component-panel__lock-badge" title="Sign in to unlock in personal projects">
+        <Lock size={10} />
+        <span>PRO</span>
+      </span>
+    ) : (
+      <>
+        {coverage && <span className={`vf-component-panel__coverage-badge ${aiComponentCoverageStatusClass(coverage.status)}`}>
+          {aiComponentCoverageStatusLabel(coverage.status)}
+        </span>}
+        {component.isPremium && <span className="vf-component-panel__pro-badge">PRO</span>}
+      </>
+    )}
   </button>;
 });
 
-function ComponentPanel({ readOnly }: { readOnly?: boolean }) {
+function ComponentPanel({ readOnly, isSandbox }: { readOnly?: boolean; isSandbox?: boolean }) {
+  const { isAuthenticated } = useAuth();
   const setComponentLibrary = useCanvasStore((state) => state.setComponentLibrary);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
@@ -75,7 +147,9 @@ function ComponentPanel({ readOnly }: { readOnly?: boolean }) {
 
   const { data } = useQuery({
     queryKey: ['components'],
-    queryFn: async () => { const r = await componentApi.getAll(); return r.data.data; }
+    queryFn: async () => { const r = await componentApi.getAll(); return r.data.data; },
+    enabled: !isSandbox && isAuthenticated,
+    retry: false,
   });
 
   const componentCoverageQuery = useQuery({
@@ -264,7 +338,7 @@ function ComponentPanel({ readOnly }: { readOnly?: boolean }) {
     <div className="vf-component-panel">
       <div className="vf-component-panel__header">
         <h3 className="vf-component-panel__title">Components</h3>
-        <StudioLauncher readOnly={readOnly} />
+        <StudioLauncher readOnly={readOnly} isSandbox={isSandbox} />
       </div>
       <div className="vf-component-panel__search">
 
@@ -341,6 +415,7 @@ function ComponentPanel({ readOnly }: { readOnly?: boolean }) {
                   component={component}
                   coverage={componentCoverageByType.get(component.type)}
                   readOnly={readOnly}
+                  isSandbox={isSandbox}
                   onAdd={addToCanvas}
                 />)}
               </div>

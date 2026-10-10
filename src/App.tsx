@@ -56,8 +56,10 @@ function App() {
           <Routes>
             <Route element={lazyRoute('home', <LandingPage />)} path="/" />
 
-            {/* Public share route (bypass login, read-only) */}
+            {/* Public share & sandbox routes (bypass login) */}
             <Route element={lazyRoute('shared circuit', <CircuitEditorPage />)} path="/editor/share" />
+            <Route element={lazyRoute('live sandbox', <CircuitEditorPage />)} path="/editor/sandbox" />
+            <Route element={lazyRoute('live sandbox', <CircuitEditorPage />)} path="/sandbox" />
             {/* Public database-backed project route; private projects remain
                 protected by the backend project access check. */}
             <Route element={lazyRoute('public project', <CircuitEditorPage />)} path="/public-project/:projectId" />

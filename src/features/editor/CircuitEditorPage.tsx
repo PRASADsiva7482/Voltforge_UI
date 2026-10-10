@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useCallback, useState, useRef, type ReactNode } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient, type QueryFunctionContext } from '@tanstack/react-query'
 import { useShallow } from 'zustand/react/shallow'
 import {
@@ -36,12 +36,14 @@ import {
   CircuitBoard,
   RotateCw,
   Loader2,
+  Lightbulb,
+  LogIn,
 } from 'lucide-react'
 
 import { pcbManufacturingApi, projectApi, simulationApi, projectExportApi, type PcbManufacturingPayload } from '../../api/services'
 import { useCanvasStore } from '../../store/canvasStore'
 import { usePcbStore } from '../../store/pcbStore'
-import { useProjectStore, SMART_DEVICE_PRESET } from '../../store/projectStore'
+import { useProjectStore, SMART_DEVICE_PRESET, CURATED_SANDBOX_PRESETS } from '../../store/projectStore'
 import { useSimulationStore } from '../../store/simulationStore'
 import { useThemeStore } from '../../store/themeStore'
 import { useToastStore } from '../../store/useToastStore'
@@ -187,7 +189,8 @@ function decodeShareState(value: string) {
 export default function CircuitEditorPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const addToast = useToastStore((s) => s.addToast)
@@ -315,6 +318,8 @@ export default function CircuitEditorPage() {
   }, [secondaryToolsOpen])
 
   const isPreset = projectId === 'preset-smart-device'
+  const isSharedSnapshot = !projectId && Boolean(searchParams.get('state'))
+  const isSandbox = (!projectId && !searchParams.get('state')) || location.pathname === '/sandbox' || location.pathname === '/editor/sandbox'
   const isSharedView = !projectId
   const isOwner = isPreset || Boolean(
     projectId &&
@@ -322,6 +327,37 @@ export default function CircuitEditorPage() {
     user &&
     projectSummary?.ownerKeycloakId === user.keycloakId
   )
+  const isInteractive = isOwner || isSandbox
+
+  const [sandboxPreset, setSandboxPreset] = useState<'smart-device' | 'led-blink'>(() => {
+    const p = searchParams.get('preset')
+    return p === 'led-blink' ? 'led-blink' : 'smart-device'
+  })
+
+  useEffect(() => {
+    if (!isSandbox) return
+    const p = searchParams.get('preset')
+    if ((p === 'led-blink' || p === 'smart-device') && p !== sandboxPreset) {
+      setSandboxPreset(p)
+    }
+  }, [isSandbox, searchParams, sandboxPreset])
+
+  const handleSelectSandboxPreset = useCallback((presetKey: 'smart-device' | 'led-blink') => {
+    if (sandboxPreset === presetKey) return
+    stopSimulationEngine()
+    setIsSimulating(false)
+    setIsSimulationPaused(false)
+    setSimulating(false)
+    resetCanvas()
+    resetPcb()
+    setDirty(false)
+    setSandboxPreset(presetKey)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set('preset', presetKey)
+      return next
+    }, { replace: true })
+  }, [sandboxPreset, stopSimulationEngine, setIsSimulating, setIsSimulationPaused, setSimulating, resetCanvas, resetPcb, setDirty, setSearchParams])
 
   // Collaboration integration
   const {
@@ -333,7 +369,7 @@ export default function CircuitEditorPage() {
     // The smart-device preset exists only in the frontend and has no backend
     // project record. Do not open a WebSocket for it, otherwise the server
     // rejects the subscription and the reconnect loop makes the badge blink.
-    useCollaboration(isPreset || !user ? '' : projectId || '')
+    useCollaboration(isPreset || isSandbox || !user ? '' : projectId || '')
 
   // Reset route-owned state before a new project query resolves. Zustand is a
   // singleton, so without this a project with no layout could display the
@@ -357,22 +393,24 @@ export default function CircuitEditorPage() {
       setSimulating(false)
       cancelCanvasRouting()
     }
-  }, [projectId, resetCanvas, resetPcb, setCurrentProject, setDirty, cancelCanvasRouting, setSimulating, stopSimulationEngine])
+  }, [projectId, isSandbox, resetCanvas, resetPcb, setCurrentProject, setDirty, cancelCanvasRouting, setSimulating, stopSimulationEngine])
 
-  // ── Load project ──
+  // ── Load project (zero network query for guest sandbox) ──
   const { data: fetchedProject, isLoading } = useQuery({
     queryKey: ['project', projectId] as const,
     queryFn: fetchEditorProject,
-    enabled: !!projectId && !isPreset,
+    enabled: !!projectId && !isPreset && !isSandbox,
   })
 
   // Set project layout and codes
   useEffect(() => {
-    const project = projectId === 'preset-smart-device'
-      ? SMART_DEVICE_PRESET
-      : fetchedProject?.id === projectId
-        ? fetchedProject
-        : null
+    const project = isSandbox
+      ? { ...CURATED_SANDBOX_PRESETS[sandboxPreset], id: `sandbox-live-${sandboxPreset}`, name: 'VoltForge Live Sandbox' }
+      : projectId === 'preset-smart-device'
+        ? { ...SMART_DEVICE_PRESET, id: 'preset-smart-device', name: SMART_DEVICE_PRESET.name }
+        : fetchedProject?.id === projectId
+          ? fetchedProject
+          : null
     if (project) {
       const store = useProjectStore.getState()
       const current = store.currentProject
@@ -397,7 +435,7 @@ export default function CircuitEditorPage() {
       loadPcb(storedPcb && typeof storedPcb === 'object' ? storedPcb as any : undefined)
       setDirty(false)
     }
-  }, [fetchedProject, projectId, isPreset, setCurrentProject, loadCanvas, loadPcb, setDirty, mergeProjectMetadata])
+  }, [fetchedProject, projectId, isPreset, isSandbox, sandboxPreset, searchParams, setCurrentProject, loadCanvas, loadPcb, setDirty, mergeProjectMetadata])
 
   // Parse share parameters if available
   useEffect(() => {
@@ -511,6 +549,12 @@ export default function CircuitEditorPage() {
   })
 
   const handleSave = useCallback((manual = true) => {
+    if (isSandbox) {
+      if (manual) {
+        addToast('VoltForge Live Sandbox is ephemeral. Use Copy Share Link or Export to preserve circuits.', 'info')
+      }
+      return
+    }
     const project = useProjectStore.getState()
     if (isPreset || !isOwner || project.isSaving || project.currentProject?.id !== projectId
       || project.currentProject?.owner?.keycloakId !== user?.keycloakId) return
@@ -523,7 +567,7 @@ export default function CircuitEditorPage() {
       return
     }
     if (snapshot) { setSaving(true); saveProject(snapshot) }
-  }, [isPreset, isOwner, projectId, user?.keycloakId, setSaving, saveProject, addToast])
+  }, [isPreset, isSandbox, isOwner, projectId, user?.keycloakId, setSaving, saveProject, addToast])
 
   const handleAutosave = useCallback(() => handleSave(false), [handleSave])
 
@@ -642,25 +686,29 @@ export default function CircuitEditorPage() {
       if (e.ctrlKey || e.metaKey) {
         if (e.key === 's') {
           e.preventDefault()
-          handleSave()
+          if (isSandbox) {
+            addToast('VoltForge Live Sandbox is ephemeral. Use Copy Share Link or Export to preserve circuits.', 'info')
+          } else {
+            handleSave()
+          }
         }
         if (e.key === 'z' && !e.shiftKey) {
           e.preventDefault()
-          if (isOwner) undo()
+          if (isInteractive) undo()
         }
         if (e.key === 'z' && e.shiftKey) {
           e.preventDefault()
-          if (isOwner) redo()
+          if (isInteractive) redo()
         }
         if (e.key === 'y') {
           e.preventDefault()
-          if (isOwner) redo()
+          if (isInteractive) redo()
         }
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [handleSave, undo, redo, isOwner])
+  }, [handleSave, undo, redo, isOwner, isInteractive, isSandbox, addToast])
 
   // ── Canvas resize observer ──
   useEffect(() => {
@@ -715,19 +763,19 @@ export default function CircuitEditorPage() {
           const mcuPin = targetNode.pins?.find((p) => p.id === targetPinId)
           if (mcuPin) {
             const pinNum = mcuPin.name.replace(/[^0-9]/g, '')
-            // Check if button's other pin connects to GND or VCC
-            const otherPin = node.pins?.find((p) => p.id !== (isFromNode ? wire.fromPinId : wire.toPinId))
+            const myPinId = isFromNode ? wire.fromPinId : wire.toPinId
             let connectedToVcc = false
-            if (otherPin) {
+            for (const p of (node.pins || [])) {
+              if (p.id === myPinId) continue
               const otherWires = wires.filter(
                 (w) =>
-                  (w.fromNodeId === nodeId && w.fromPinId === otherPin.id) ||
-                  (w.toNodeId === nodeId && w.toPinId === otherPin.id)
+                  (w.fromNodeId === nodeId && w.fromPinId === p.id) ||
+                  (w.toNodeId === nodeId && w.toPinId === p.id)
               )
               for (const ow of otherWires) {
                 const owTargetNode = nodes.find((n) => n.id === (ow.fromNodeId === nodeId ? ow.toNodeId : ow.fromNodeId))
                 const owTargetPinId = ow.fromNodeId === nodeId ? ow.toPinId : ow.fromPinId
-                const owTargetPin = owTargetNode?.pins?.find((p) => p.id === owTargetPinId)
+                const owTargetPin = owTargetNode?.pins?.find((tp) => tp.id === owTargetPinId)
                 if (owTargetPin && /5V|VCC|3V3/i.test(owTargetPin.name)) {
                   connectedToVcc = true
                 }
@@ -798,6 +846,9 @@ export default function CircuitEditorPage() {
           writeSerial(`> HEX execution is unavailable for ${selectedBoardType}; using the source compatibility interpreter instead`);
           useSimulationStore.getState().setExecutionMode('interpreter');
         }
+      } else if (isSandbox || !user) {
+        useSimulationStore.getState().setExecutionMode('interpreter');
+        writeSerial(`> VoltForge Live Sandbox: Running client compatibility simulation engine for ${selectedBoardType}`);
       } else {
         try {
           const compile = await simulationApi.compileFirmware({
@@ -1308,7 +1359,7 @@ export default function CircuitEditorPage() {
     )
   }
 
-  const projectName = projectSummary?.name || 'Untitled Project'
+  const projectName = isSandbox ? 'VoltForge Live Sandbox' : (projectSummary?.name || 'Untitled Project')
 
   const exportDropdownItems = [
     { label: 'Export ZIP archive', icon: <FileArchive size={15} />, onClick: handleExportZip },
@@ -1341,30 +1392,59 @@ export default function CircuitEditorPage() {
         broadcastEnabled={isLiveSyncConnected && isOwner && !isPreset && regressionMode === null && !canvasRenderTraceRunning && !avrCompiledTraceRunning}
         broadcastCanvasSync={broadcastCanvasSync}
       />
-      <EditorAutosave enabled={!isPreset && isOwner} onSave={handleAutosave} />
+      <EditorAutosave enabled={!isPreset && !isSandbox && isOwner} onSave={handleAutosave} />
       {/* ── Prioritized command ribbon ── */}
       <header className={`vf-editor__ribbon ${secondaryToolsOpen ? 'is-expanded' : ''}`}>
         <div className="vf-editor__toolbar">
           <div className="vf-editor__toolbar-left">
           <button
             className="vf-editor__back"
-            onClick={() => navigate('/projects')}
-            title="Back to projects"
+            onClick={() => navigate(isSandbox ? '/' : '/projects')}
+            title={isSandbox ? 'Back to home' : 'Back to projects'}
           >
             <ArrowLeft size={16} />
           </button>
           <div className="vf-editor__project-info">
             <div className="vf-editor__project-primary">
               <h1 className="vf-editor__project-name">{projectName}</h1>
-              <EditorDirtyIndicator />
-              {!isPreset && (
-                <span className="vf-status-badge" aria-hidden={!isLiveSyncConnected}>
-                  <span className="vf-status-badge__dot" />
-                  <span>Live Sync</span>
-                </span>
+              {!isSandbox && <EditorDirtyIndicator />}
+              {isSandbox ? (
+                <>
+                  <span className="vf-status-badge vf-status-badge--sandbox">
+                    <span className="vf-status-badge__dot" />
+                    <span>Live Sandbox · Ephemeral</span>
+                  </span>
+                  <div className="vf-editor__preset-selector" role="group" aria-label="Curated Sandbox Presets">
+                    <button
+                      type="button"
+                      className={`vf-preset-chip ${sandboxPreset === 'smart-device' ? 'is-active' : ''}`}
+                      onClick={() => handleSelectSandboxPreset('smart-device')}
+                      title="Load Smart Automation Controller (LDR, LCD, Relay, Motor)"
+                    >
+                      <Zap size={11} />
+                      <span>Smart Controller</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`vf-preset-chip ${sandboxPreset === 'led-blink' ? 'is-active' : ''}`}
+                      onClick={() => handleSelectSandboxPreset('led-blink')}
+                      title="Load Interactive LED Blink & Button"
+                    >
+                      <Lightbulb size={11} />
+                      <span>LED & Button</span>
+                    </button>
+                  </div>
+                </>
+              ) : (
+                !isPreset && (
+                  <span className="vf-status-badge" aria-hidden={!isLiveSyncConnected}>
+                    <span className="vf-status-badge__dot" />
+                    <span>Live Sync</span>
+                  </span>
+                )
               )}
             </div>
-            {projectSummary?.forkedFromId && projectSummary?.forkedFromName && (
+            {!isSandbox && projectSummary?.forkedFromId && projectSummary?.forkedFromName && (
               <span className="vf-editor__forked-from">
                 forked from{' '}
                 <a
@@ -1424,10 +1504,10 @@ export default function CircuitEditorPage() {
 
           <span className="vf-editor__divider" />
 
-          <button className="vf-editor__tool-btn" onClick={undo} disabled={!isOwner} title="Undo (Ctrl+Z)">
+          <button className="vf-editor__tool-btn" onClick={undo} disabled={!isInteractive} title="Undo (Ctrl+Z)">
             <Undo2 size={15} />
           </button>
-          <button className="vf-editor__tool-btn" onClick={redo} disabled={!isOwner} title="Redo (Ctrl+Y)">
+          <button className="vf-editor__tool-btn" onClick={redo} disabled={!isInteractive} title="Redo (Ctrl+Y)">
             <Redo2 size={15} />
           </button>
 
@@ -1528,74 +1608,106 @@ export default function CircuitEditorPage() {
         </div>
 
         <div className="vf-editor__toolbar-right">
-          <button
-            ref={secondaryToolsButtonRef}
-            className={`vf-editor__tools-toggle ${secondaryToolsOpen || activeSecondaryToolCount > 0 ? 'is-active' : ''}`}
-            onClick={() => setSecondaryToolsOpen((open) => !open)}
-            type="button"
-            aria-expanded={secondaryToolsOpen}
-            aria-controls="vf-editor-secondary-tools"
-            aria-label={`${secondaryToolsOpen ? 'Hide' : 'Show'} secondary editor tools${activeSecondaryToolCount > 0 ? `, ${activeSecondaryToolCount} active` : ''}`}
-            title={secondaryToolsOpen ? 'Hide secondary editor tools' : 'Show secondary editor tools'}
-          >
-            <SlidersHorizontal size={14} />
-            <span className="vf-editor__action-label">Tools</span>
-            {activeSecondaryToolCount > 0 && (
-              <span className="vf-editor__tools-count" aria-label={`${activeSecondaryToolCount} active tools`}>
-                {activeSecondaryToolCount}
-              </span>
-            )}
-            <ChevronDown className="vf-editor__tools-chevron" size={13} />
-          </button>
+          {isSandbox ? (
+            <>
+              {/* Light/Dark theme toggle extracted outside of tools */}
+              <button
+                className="vf-editor__theme-btn"
+                onClick={toggleTheme}
+                type="button"
+                title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+                aria-label="Toggle theme"
+              >
+                {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+                <span className="vf-editor__action-label">{theme === 'dark' ? 'Light' : 'Dark'}</span>
+              </button>
 
-          <span className="vf-editor__divider" />
+              <span className="vf-editor__divider" />
 
-          {/* Fork button if editing non-owned project, save button if owner */}
-          {isOwner ? (
-            <button
-              className="vf-editor__save-btn"
-              onClick={() => handleSave()}
-              disabled={isSaving || isPreset}
-              type="button"
-              aria-label={isSaving ? 'Saving project' : 'Save project'}
-            >
-              <Save size={14} />
-              <span className="vf-editor__action-label">{isSaving ? 'Saving...' : 'Save'}</span>
-            </button>
-          ) : projectSummary?.userForkId ? (
-            <button
-              className="vf-editor__save-btn"
-              style={{
-                background: 'linear-gradient(135deg, #10b981, #059669)',
-                borderColor: '#10b981',
-              }}
-              onClick={() => navigate(`/editor/${projectSummary.userForkId}`)}
-              type="button"
-              aria-label="Go to your fork"
-            >
-              <GitFork size={14} />
-              <span className="vf-editor__action-label">Go to your Fork</span>
-            </button>
+              {/* Login CTA button */}
+              <button
+                className="vf-editor__save-btn vf-editor__login-btn"
+                onClick={() => navigate('/login')}
+                type="button"
+                title="Sign in to save and create custom circuits"
+                aria-label="Sign in to save"
+              >
+                <LogIn size={14} />
+                <span className="vf-editor__action-label">Sign In to Save</span>
+              </button>
+            </>
           ) : (
-            <button
-              className="vf-editor__save-btn"
-              style={{
-                background: 'linear-gradient(135deg, #a855f7, #ec4899)',
-                borderColor: '#a855f7',
-              }}
-              onClick={() => forkMutation.mutate()}
-              disabled={forkMutation.isPending}
-              type="button"
-              aria-label={forkMutation.isPending ? 'Forking project' : 'Fork project to edit'}
-            >
-              <GitFork size={14} />
-              <span className="vf-editor__action-label">{forkMutation.isPending ? 'Forking...' : 'Fork to Edit'}</span>
-            </button>
+            <>
+              <button
+                ref={secondaryToolsButtonRef}
+                className={`vf-editor__tools-toggle ${secondaryToolsOpen || activeSecondaryToolCount > 0 ? 'is-active' : ''}`}
+                onClick={() => setSecondaryToolsOpen((open) => !open)}
+                type="button"
+                aria-expanded={secondaryToolsOpen}
+                aria-controls="vf-editor-secondary-tools"
+                aria-label={`${secondaryToolsOpen ? 'Hide' : 'Show'} secondary editor tools${activeSecondaryToolCount > 0 ? `, ${activeSecondaryToolCount} active` : ''}`}
+                title={secondaryToolsOpen ? 'Hide secondary editor tools' : 'Show secondary editor tools'}
+              >
+                <SlidersHorizontal size={14} />
+                <span className="vf-editor__action-label">Tools</span>
+                {activeSecondaryToolCount > 0 && (
+                  <span className="vf-editor__tools-count" aria-label={`${activeSecondaryToolCount} active tools`}>
+                    {activeSecondaryToolCount}
+                  </span>
+                )}
+                <ChevronDown className="vf-editor__tools-chevron" size={13} />
+              </button>
+
+              <span className="vf-editor__divider" />
+
+              {/* Fork button if editing non-owned project, save button if owner */}
+              {isOwner ? (
+                <button
+                  className="vf-editor__save-btn"
+                  onClick={() => handleSave()}
+                  disabled={isSaving || isPreset}
+                  type="button"
+                  aria-label={isSaving ? 'Saving project' : 'Save project'}
+                >
+                  <Save size={14} />
+                  <span className="vf-editor__action-label">{isSaving ? 'Saving...' : 'Save'}</span>
+                </button>
+              ) : projectSummary?.userForkId ? (
+                <button
+                  className="vf-editor__save-btn"
+                  style={{
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    borderColor: '#10b981',
+                  }}
+                  onClick={() => navigate(`/editor/${projectSummary.userForkId}`)}
+                  type="button"
+                  aria-label="Go to your fork"
+                >
+                  <GitFork size={14} />
+                  <span className="vf-editor__action-label">Go to your Fork</span>
+                </button>
+              ) : (
+                <button
+                  className="vf-editor__save-btn"
+                  style={{
+                    background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                    borderColor: '#a855f7',
+                  }}
+                  onClick={() => forkMutation.mutate()}
+                  disabled={forkMutation.isPending}
+                  type="button"
+                  aria-label={forkMutation.isPending ? 'Forking project' : 'Fork project to edit'}
+                >
+                  <GitFork size={14} />
+                  <span className="vf-editor__action-label">{forkMutation.isPending ? 'Forking...' : 'Fork to Edit'}</span>
+                </button>
+              )}
+            </>
           )}
         </div>
         </div>
 
-        {secondaryToolsOpen && (
+        {!isSandbox && secondaryToolsOpen && (
           <div
             ref={secondaryToolsTrayRef}
             id="vf-editor-secondary-tools"
@@ -1714,7 +1826,7 @@ export default function CircuitEditorPage() {
         {/* Left panel — Component library */}
         {leftPanelOpen && viewMode !== 'code' && (
           <aside className="vf-editor__left-panel">
-            <ComponentPanel readOnly={!isOwner || canvasRenderTraceRunning || avrCompiledTraceRunning} />
+            <ComponentPanel readOnly={isSharedSnapshot ? true : (!isInteractive || canvasRenderTraceRunning || avrCompiledTraceRunning)} isSandbox={isSandbox} />
           </aside>
         )}
 
@@ -1734,14 +1846,14 @@ export default function CircuitEditorPage() {
                       collaborators={activeUsers}
                       onComponentInteraction={handleComponentInteraction}
                       onCursorMove={broadcastCursorMove}
-                      readOnly={!isOwner || canvasRenderTraceRunning || avrCompiledTraceRunning}
+                      readOnly={isSharedSnapshot ? true : (!isInteractive || canvasRenderTraceRunning || avrCompiledTraceRunning)}
                     />
                   </div>
                 }
                 right={
                   <div className="vf-editor__code-area is-split">
                     <EditorFeatureBoundary label="code editor">
-                      <CodeEditor readOnly={!isOwner} />
+                      <CodeEditor readOnly={isSharedSnapshot ? true : !isInteractive} />
                     </EditorFeatureBoundary>
                   </div>
                 }
@@ -1759,14 +1871,14 @@ export default function CircuitEditorPage() {
                       collaborators={activeUsers}
                       onComponentInteraction={handleComponentInteraction}
                       onCursorMove={broadcastCursorMove}
-                      readOnly={!isOwner || canvasRenderTraceRunning || avrCompiledTraceRunning}
+                      readOnly={isSharedSnapshot ? true : (!isInteractive || canvasRenderTraceRunning || avrCompiledTraceRunning)}
                     />
                   </div>
                 )}
                 {viewMode === 'code' && (
                   <div className="vf-editor__code-area">
                     <EditorFeatureBoundary label="code editor">
-                      <CodeEditor readOnly={!isOwner} />
+                      <CodeEditor readOnly={isSharedSnapshot ? true : !isInteractive} />
                     </EditorFeatureBoundary>
                   </div>
                 )}
@@ -1777,7 +1889,7 @@ export default function CircuitEditorPage() {
                         width={canvasSize.width}
                         height={canvasSize.height}
                         projectName={projectName}
-                        readOnly={!isOwner}
+                        readOnly={isSharedSnapshot ? true : !isInteractive}
                       />
                     </EditorFeatureBoundary>
                   </div>
@@ -1786,17 +1898,17 @@ export default function CircuitEditorPage() {
             )}
 
             {/* Instrument floating overlays */}
-            {showMultimeter && (
+            {!isSandbox && showMultimeter && (
               <EditorFeatureBoundary label="multimeter">
                 <MultimeterPanel isOpen onClose={() => setShowMultimeter(false)} />
               </EditorFeatureBoundary>
             )}
-            {showBom && (
+            {!isSandbox && showBom && (
               <EditorFeatureBoundary label="bill of materials">
                 <BomPanel isOpen onClose={() => setShowBom(false)} />
               </EditorFeatureBoundary>
             )}
-            {showAiChat && (
+            {!isSandbox && showAiChat && (
               <EditorFeatureBoundary label="AI assistant">
                 <AiChatPanel
                   isOpen
@@ -1806,17 +1918,17 @@ export default function CircuitEditorPage() {
                 />
               </EditorFeatureBoundary>
             )}
-            {showAiValidator && (
+            {!isSandbox && showAiValidator && (
               <EditorFeatureBoundary label="AI validator">
                 <AiValidatorPanel isOpen readOnly={!isOwner} onClose={() => setShowAiValidator(false)} />
               </EditorFeatureBoundary>
             )}
-            {showIotInspector && (
+            {!isSandbox && showIotInspector && (
               <EditorFeatureBoundary label="IoT inspector">
                 <IotInspectorPanel isOpen onClose={() => setShowIotInspector(false)} />
               </EditorFeatureBoundary>
             )}
-            {solverDiagnosticsOpen && (
+            {!isSandbox && solverDiagnosticsOpen && (
               <EditorFeatureBoundary label="solver diagnostics">
                 <SolverDiagnosticsPanel
                   isOpen
@@ -1847,7 +1959,7 @@ export default function CircuitEditorPage() {
           {/* Serial monitor / Oscilloscope Trace splits */}
           <div className="vf-editor-bottom-pane">
             <SerialMonitor />
-            {oscilloscopePanelOpen && (
+            {!isSandbox && oscilloscopePanelOpen && (
               <EditorFeatureBoundary label="oscilloscope">
                 <OscilloscopePanel
                   simulationPaused={isSimulationPaused}

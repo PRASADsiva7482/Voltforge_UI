@@ -363,3 +363,176 @@ void loop() {
   updatedAt: '2026-06-13T08:00:00Z',
 };
 
+export const LED_BLINK_PRESET: Project = {
+  id: 'preset-led-blink',
+  name: 'Interactive LED & Switch Controller',
+  description: 'Interactive hardware demo: Arduino Uno R3, 220Ω resistor, 5mm Red LED, and tactile pushbutton switch.',
+  boardType: 'ARDUINO_UNO',
+  isPublic: true,
+  forkCount: 0,
+  viewCount: 0,
+  tags: 'arduino,led,button,switch,starter,template',
+  owner: {
+    id: '00000000-0000-0000-0000-000000000000',
+    keycloakId: 'system-admin',
+    username: 'system-admin',
+    email: 'admin@voltforge.in',
+    displayName: 'System Admin',
+    role: 'ADMIN',
+    accountStatus: 'ACTIVE',
+    createdAt: '2026-06-13T08:00:00Z',
+    updatedAt: '2026-06-13T08:00:00Z',
+  },
+  codeFiles: [
+    {
+      id: 'preset-code-blink',
+      filename: 'main.ino',
+      content: `// VoltForge Interactive LED & Switch Controller Preset
+const int ledPin = 13;
+const int buttonPin = 2;
+
+void setup() {
+  pinMode(ledPin, OUTPUT);
+  pinMode(buttonPin, INPUT_PULLUP);
+  Serial.begin(9600);
+  Serial.println("VoltForge LED & Switch Controller Ready!");
+  Serial.println("Click the Pushbutton switch on canvas to toggle LED.");
+}
+
+void loop() {
+  int buttonState = digitalRead(buttonPin);
+  
+  // When pushbutton is active (pressed to GND -> LOW)
+  if (buttonState == LOW) {
+    digitalWrite(ledPin, HIGH);
+    Serial.println("Switch Status: ON -> LED Lit");
+  } else {
+    digitalWrite(ledPin, LOW);
+  }
+  delay(30);
+}`,
+      language: 'cpp',
+      sortOrder: 0,
+      createdAt: '2026-06-13T08:00:00Z',
+      updatedAt: '2026-06-13T08:00:00Z',
+    }
+  ],
+  canvasLayout: {
+    viewport: { x: 0, y: 0, scale: 1 },
+    nodes: [
+      {
+        id: 'node_uno',
+        componentId: 'uno_comp',
+        type: 'ARDUINO_UNO',
+        name: 'Arduino Uno',
+        x: 80,
+        y: 190,
+        width: 200,
+        height: 150,
+        rotation: 0,
+        properties: { usbConnected: 'Yes', boardPowered: true },
+        pins: boardPinRegistry['ARDUINO_UNO'] || [],
+      },
+      {
+        id: 'node_res',
+        componentId: 'res_comp',
+        type: 'RESISTOR',
+        name: 'Resistor 220Ω',
+        x: 360,
+        y: 190,
+        width: 90,
+        height: 24,
+        rotation: 0,
+        properties: { resistance: 220 },
+        pins: boardPinRegistry['RESISTOR'] || [],
+      },
+      {
+        id: 'node_led',
+        componentId: 'led_comp',
+        type: 'LED_RED',
+        name: 'Red LED 5mm',
+        x: 520,
+        y: 170,
+        width: 40,
+        height: 80,
+        rotation: 0,
+        properties: { color: '#ef4444' },
+        pins: boardPinRegistry['LED_RED'] || [],
+      },
+      {
+        id: 'node_btn',
+        componentId: 'btn_comp',
+        type: 'PUSH_BUTTON',
+        name: 'Pushbutton Switch',
+        x: 360,
+        y: 320,
+        width: 40,
+        height: 40,
+        rotation: 0,
+        properties: { isPressed: false, buttonType: 'Latching', color: 'red' },
+        pins: boardPinRegistry['PUSH_BUTTON'] || [],
+      }
+    ],
+    wires: [
+      {
+        id: 'wire_uno_d13_to_res',
+        fromNodeId: 'node_uno',
+        fromPinId: 'd13',
+        toNodeId: 'node_res',
+        toPinId: 'p1',
+        color: '#ef4444',
+        bendPoints: [],
+        routingMode: 'auto',
+      },
+      {
+        id: 'wire_res_to_led',
+        fromNodeId: 'node_res',
+        fromPinId: 'p2',
+        toNodeId: 'node_led',
+        toPinId: 'anode',
+        color: '#ef4444',
+        bendPoints: [],
+        routingMode: 'auto',
+      },
+      {
+        id: 'wire_led_to_gnd',
+        fromNodeId: 'node_led',
+        fromPinId: 'cathode',
+        toNodeId: 'node_uno',
+        toPinId: 'gnd1',
+        color: '#3b82f6',
+        bendPoints: [],
+        routingMode: 'auto',
+      },
+      {
+        id: 'wire_uno_d2_to_btn',
+        fromNodeId: 'node_uno',
+        fromPinId: 'd2',
+        toNodeId: 'node_btn',
+        toPinId: 'p1a',
+        color: '#22c55e',
+        bendPoints: [],
+        routingMode: 'auto',
+      },
+      {
+        id: 'wire_btn_to_gnd',
+        fromNodeId: 'node_btn',
+        fromPinId: 'p2a',
+        toNodeId: 'node_uno',
+        toPinId: 'gnd2',
+        color: '#3b82f6',
+        bendPoints: [],
+        routingMode: 'auto',
+      }
+    ]
+  },
+  createdAt: '2026-06-13T08:00:00Z',
+  updatedAt: '2026-06-13T08:00:00Z',
+};
+
+export const CURATED_SANDBOX_PRESETS: Record<'smart-device' | 'led-blink', Project> = {
+  'smart-device': SMART_DEVICE_PRESET,
+  'led-blink': LED_BLINK_PRESET,
+};
+
+
