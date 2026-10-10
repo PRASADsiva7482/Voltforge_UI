@@ -13,6 +13,7 @@ import './styles/landing.css'
 import './styles/dashboard.css'
 import './styles/pages.css'
 import './styles/editor.css'
+import { ENABLE_ADMIN_NAV_MENU } from './config/navigation'
 
 const AdminPage = lazy(() => import('./features/admin/AdminPage').then((module) => ({ default: module.AdminPage })))
 const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage').then((module) => ({ default: module.DashboardPage })))
@@ -74,7 +75,7 @@ function App() {
                 <Route element={lazyRoute('profile', <ProfilePage />)} path="/profile" />
                 <Route element={lazyRoute('user profile', <ProfilePage />)} path="/profile/:userId" />
                 <Route element={lazyRoute('settings', <SettingsPage />)} path="/settings" />
-                <Route element={lazyRoute('admin', <AdminPage />)} path="/admin" />
+                <Route element={ENABLE_ADMIN_NAV_MENU ? lazyRoute('admin', <AdminPage />) : <Navigate replace to="/dashboard" />} path="/admin" />
               </Route>
               {/* Full-screen editors */}
               <Route element={lazyRoute('circuit editor', <CircuitEditorPage />)} path="/editor/:projectId" />

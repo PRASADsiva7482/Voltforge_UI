@@ -1,6 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
 import { ArrowRight } from 'lucide-react'
-import { Card } from '../ui'
 
 export type ActionCardProps = {
   icon: LucideIcon
@@ -12,14 +11,16 @@ export type ActionCardProps = {
 export function ActionCard({ icon: Icon, label, onClick, text }: ActionCardProps) {
   return (
     <button className="action-card" onClick={onClick} type="button">
-      <Card>
+      <div className="action-card__inner">
         <span className="action-card__icon">
-          <Icon size={22} />
+          <Icon size={20} />
         </span>
-        <strong>{label}</strong>
-        <p>{text}</p>
-        <ArrowRight size={17} />
-      </Card>
+        <div className="action-card__body">
+          <strong>{label}</strong>
+          <p>{text}</p>
+        </div>
+        <ArrowRight className="action-card__arrow" size={17} />
+      </div>
     </button>
   )
 }

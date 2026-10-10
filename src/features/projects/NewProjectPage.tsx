@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { ArrowLeft, Lock, Unlock } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { projectApi } from '../../api/services'
 import { Topbar } from '../../components/layout'
@@ -15,10 +15,13 @@ const boardFamilies = Array.from(new Set(boardOptions.map((board) => board.famil
 
 export function NewProjectPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { t } = useTranslation()
-  const [name, setName] = useState(t('Untitled circuit'))
+  const paramBoard = searchParams.get('board') as BoardType | null
+  const paramName = searchParams.get('name')
+  const [name, setName] = useState(paramName || t('Untitled circuit'))
   const [description, setDescription] = useState('')
-  const [boardType, setBoardType] = useState<BoardType>('ARDUINO_UNO')
+  const [boardType, setBoardType] = useState<BoardType>(paramBoard || 'ARDUINO_UNO')
   const [isPublic, setPublic] = useState(false)
 
   const createProject = useMutation({

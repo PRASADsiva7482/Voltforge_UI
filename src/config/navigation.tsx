@@ -25,6 +25,18 @@ export const legacyNavItems: NavItem[] = [
   { adminOnly: true, icon: ShieldCheck, label: 'Admin', path: '/admin' },
 ]
 
+/**
+ * Admin navigation menu flag.
+ * Temporarily disabled per requirement; will be re-enabled later with granular function control.
+ */
+export const ENABLE_ADMIN_NAV_MENU = false
+
 export function getNavItems(role: UserRole = 'USER') {
-  return legacyNavItems.filter((item) => !item.adminOnly || role === 'ADMIN')
+  return legacyNavItems.filter((item) => {
+    if (item.adminOnly) {
+      if (!ENABLE_ADMIN_NAV_MENU) return false
+      return role === 'ADMIN'
+    }
+    return true
+  })
 }
