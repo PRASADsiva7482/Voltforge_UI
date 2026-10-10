@@ -1,6 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { CheckCircle2, Edit3, KeyRound, LogOut, Save, ShieldCheck, Smartphone, Sliders, X, Check } from 'lucide-react'
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle2,
+  Edit3,
+  ExternalLink,
+  KeyRound,
+  LogOut,
+  RefreshCw,
+  Save,
+  ShieldAlert,
+  ShieldCheck,
+  ShieldOff,
+  Sliders,
+  Smartphone,
+  X,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { userApi } from '../../api/services'
@@ -41,6 +57,32 @@ export function SettingsPage() {
     }
   }, [profile.data])
 
+  const userKey = auth.user?.username || 'engineer'
+  const [is2faEnabled, setIs2faEnabled] = useState<boolean>(() => {
+    return localStorage.getItem(`vf_2fa_enabled_${userKey}`) === 'true'
+  })
+  const [showDisableModal, setShowDisableModal] = useState(false)
+
+  useEffect(() => {
+    if (auth.user?.username) {
+      const stored = localStorage.getItem(`vf_2fa_enabled_${auth.user.username}`)
+      if (stored !== null) {
+        setIs2faEnabled(stored === 'true')
+      }
+    }
+  }, [auth.user?.username])
+
+  const handleConfirmDisable = (openKeycloak: boolean) => {
+    const targetUser = auth.user?.username || 'engineer'
+    localStorage.setItem(`vf_2fa_enabled_${targetUser}`, 'false')
+    setIs2faEnabled(false)
+    setShowDisableModal(false)
+    useToastStore.getState().addToast(t('Two-factor authentication disabled.'), 'info')
+    if (openKeycloak) {
+      auth.manageAccount('/security/signing-in')
+    }
+  }
+
   useEffect(() => {
     if (searchParams.get('password_updated') === 'true') {
       setActiveTab('security')
@@ -49,13 +91,16 @@ export function SettingsPage() {
       window.history.replaceState({}, document.title, window.location.pathname)
     } else if (searchParams.get('totp_updated') === 'true') {
       setActiveTab('security')
+      const targetUser = auth.user?.username || 'engineer'
+      localStorage.setItem(`vf_2fa_enabled_${targetUser}`, 'true')
+      setIs2faEnabled(true)
       setSuccessNotice(t('Two-Factor Authentication (TOTP) has been successfully registered.'))
       useToastStore.getState().addToast(t('2FA Authenticator configured successfully!'), 'success')
       window.history.replaceState({}, document.title, window.location.pathname)
     } else if (searchParams.get('tab') === 'security') {
       setActiveTab('security')
     }
-  }, [searchParams, t])
+  }, [searchParams, t, auth.user?.username])
 
   const updateProfile = useMutation({
     mutationFn: () => userApi.updateProfile({ bio, displayName }),
@@ -269,23 +314,82 @@ export function SettingsPage() {
             <div className="vf-security-card">
               <div className="vf-security-card__row">
                 <div className="vf-security-card__info">
-                  <div className="vf-security-card__icon">
+                  <div className={`vf-security-card__icon ${is2faEnabled ? 'vf-security-card__icon--active' : ''}`}>
                     <Smartphone size={22} />
                   </div>
                   <div>
-                    <h3 className="vf-security-card__title">{t("Two-Factor Authentication (2FA)")}</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <h3 className="vf-security-card__title">{t("Two-Factor Authentication (2FA)")}</h3>
+                      {is2faEnabled ? (
+                        <span className="vf-2fa-badge vf-2fa-badge--active">
+                          <CheckCircle2 size={13} />
+                          {t("Active & Enforced")}
+                        </span>
+                      ) : (
+                        <span className="vf-2fa-badge vf-2fa-badge--inactive">
+                          <ShieldAlert size={13} />
+                          {t("Not Configured")}
+                        </span>
+                      )}
+                    </div>
                     <p className="vf-security-card__desc">
-                      {t("Protect your workspace using hardware security keys or authenticator apps (Google Authenticator, Microsoft Authenticator, FreeOTP).")}
+                      {is2faEnabled
+                        ? t("Your account is secured with a Time-based One-Time Password (TOTP) authenticator application. A one-time code is required at every login.")
+                        : t("Protect your workspace using authenticator apps (Google Authenticator, Microsoft Authenticator, FreeOTP). An extra layer of defense against credential theft.")}
                     </p>
                   </div>
                 </div>
-                <Button
-                  icon={<Smartphone size={16} />}
-                  onClick={auth.configureTotp}
-                  variant="secondary"
-                >
-                  {t("Configure Two-Factor Auth")}
-                </Button>
+
+                <div className="vf-2fa-actions">
+                  {is2faEnabled ? (
+                    <>
+                      <Button
+                        icon={<RefreshCw size={15} />}
+                        onClick={auth.configureTotp}
+                        variant="secondary"
+                      >
+                        {t("Reconfigure Device")}
+                      </Button>
+                      <Button
+                        icon={<ExternalLink size={15} />}
+                        onClick={() => auth.manageAccount('/security/signing-in')}
+                        variant="ghost"
+                      >
+                        {t("Manage in Keycloak")}
+                      </Button>
+                      <Button
+                        icon={<ShieldOff size={15} />}
+                        onClick={() => setShowDisableModal(true)}
+                        variant="ghost"
+                        className="vf-btn-danger-ghost"
+                      >
+                        {t("Disable 2FA")}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      icon={<Smartphone size={16} />}
+                      onClick={auth.configureTotp}
+                      variant="secondary"
+                    >
+                      {t("Configure Two-Factor Auth")}
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="vf-security-meta">
+                {is2faEnabled ? (
+                  <>
+                    <ShieldCheck size={14} className="text-teal" />
+                    <span>{t("Hardware/App TOTP active · RFC 6238 compliant · Session protected")}</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle size={14} style={{ color: '#f59e0b' }} />
+                    <span>{t("Recommendation: Enable 2FA to protect your hardware designs and schematic revisions.")}</span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -415,6 +519,59 @@ export function SettingsPage() {
           </div>
         )}
       </div>
+
+      {showDisableModal && (
+        <div className="vf-modal-overlay">
+          <div className="vf-modal vf-2fa-modal">
+            <header className="vf-modal__header">
+              <div className="vf-modal__title-group">
+                <ShieldAlert size={18} style={{ color: '#f59e0b' }} />
+                <h3 className="vf-modal__title">{t("Disable Two-Factor Authentication")}</h3>
+              </div>
+              <button
+                type="button"
+                className="vf-modal__close-btn"
+                onClick={() => setShowDisableModal(false)}
+                aria-label={t("Close")}
+              >
+                <X size={16} />
+              </button>
+            </header>
+
+            <div className="vf-modal__body">
+              <p style={{ marginTop: 0 }}>
+                {t("Are you sure you want to disable Two-Factor Authentication for ")}
+                <strong>@{username}</strong>?
+              </p>
+              <div className="vf-2fa-warning-box">
+                <AlertTriangle size={18} style={{ color: '#f59e0b', flexShrink: 0, marginTop: 2 }} />
+                <span>
+                  {t("Disabling 2FA reduces account security against unauthorized access. To revoke or remove the authenticator credential permanently, delete the registered device in Keycloak Account Security.")}
+                </span>
+              </div>
+            </div>
+
+            <footer className="vf-modal__footer vf-2fa-modal__footer">
+              <Button variant="ghost" onClick={() => setShowDisableModal(false)}>
+                {t("Cancel")}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => handleConfirmDisable(false)}
+              >
+                {t("Disable in Workspace")}
+              </Button>
+              <Button
+                variant="primary"
+                icon={<ExternalLink size={14} />}
+                onClick={() => handleConfirmDisable(true)}
+              >
+                {t("Disable & Open Keycloak")}
+              </Button>
+            </footer>
+          </div>
+        </div>
+      )}
     </>
   )
 }

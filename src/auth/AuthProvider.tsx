@@ -124,11 +124,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.assign(url)
   }, [])
 
-  const manageAccount = useCallback(() => {
+  const manageAccount = useCallback((hashOrPath?: string) => {
     const config = getKeycloakConfig()
     const base = (keycloak.authServerUrl || config.url)?.replace(/\/$/, '')
     const realm = keycloak.realm || config.realm
-    const url = `${base}/realms/${realm}/account`
+    const hash = hashOrPath ? (hashOrPath.startsWith('#') ? hashOrPath : `#${hashOrPath}`) : ''
+    const url = `${base}/realms/${realm}/account/${hash}`
     window.open(url, '_blank', 'noopener,noreferrer')
   }, [])
 

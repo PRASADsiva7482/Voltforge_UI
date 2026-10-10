@@ -11,7 +11,7 @@ export type AuthContextValue = {
   signup: () => void
   changePassword: () => void
   configureTotp: () => void
-  manageAccount: () => void
+  manageAccount: (hashOrPath?: string) => void
   user: AppUser | null
 }
 
