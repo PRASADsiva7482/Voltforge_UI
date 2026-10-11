@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/Button'
 import type { ComponentCategory, PinPosition } from '../../types/domain'
 import { validateComponentSchema } from '../canvas/customComponentSchema'
 import { useToastStore } from '../../store/useToastStore'
+import { sanitizeSvgData } from '../../utils/security'
 
 interface Props {
   isOpen: boolean
@@ -164,7 +165,8 @@ export default function CustomComponentStudio({ isOpen, onClose }: Props) {
                 onChange={async (event) => {
                   const file = event.target.files?.[0]
                   if (!file) return
-                  setSvgData(await file.text())
+                  const raw = await file.text()
+                  setSvgData(sanitizeSvgData(raw))
                 }}
               />
             </label>

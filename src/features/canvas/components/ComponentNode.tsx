@@ -12,6 +12,7 @@ import { isBoardComponentType } from '../boardCatalog';
 import { SIMULATION_MODELS } from '../../simulator/simulationModels';
 import PinDot from './PinDot';
 import type { CanvasNode } from '../canvasTypes';
+import { sanitizeSvgData } from '../../../utils/security';
 
 import {
   MAT_GRID_MINOR,
@@ -117,7 +118,7 @@ const useImage = (url: string) => {
     }
     const img = new window.Image();
     img.src = url.trim().startsWith('<svg')
-      ? `data:image/svg+xml;utf8,${encodeURIComponent(url)}`
+      ? `data:image/svg+xml;utf8,${encodeURIComponent(sanitizeSvgData(url))}`
       : url;
     img.onload = () => {
       svgImageCache.set(url, img);

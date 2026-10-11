@@ -74,10 +74,10 @@ export function SettingsPage() {
 
   const handleConfirmDisable = (openKeycloak: boolean) => {
     const targetUser = auth.user?.username || 'engineer'
-    localStorage.setItem(`vf_2fa_enabled_${targetUser}`, 'false')
+    localStorage.removeItem(`vf_2fa_enabled_${targetUser}`)
     setIs2faEnabled(false)
     setShowDisableModal(false)
-    useToastStore.getState().addToast(t('Two-factor authentication disabled.'), 'info')
+    useToastStore.getState().addToast(t('Two-factor authentication preference updated.'), 'info')
     if (openKeycloak) {
       auth.manageAccount('/security/signing-in')
     }
@@ -91,16 +91,18 @@ export function SettingsPage() {
       window.history.replaceState({}, document.title, window.location.pathname)
     } else if (searchParams.get('totp_updated') === 'true') {
       setActiveTab('security')
-      const targetUser = auth.user?.username || 'engineer'
-      localStorage.setItem(`vf_2fa_enabled_${targetUser}`, 'true')
-      setIs2faEnabled(true)
-      setSuccessNotice(t('Two-Factor Authentication (TOTP) has been successfully registered.'))
-      useToastStore.getState().addToast(t('2FA Authenticator configured successfully!'), 'success')
+      if (auth.isAuthenticated && auth.user?.username) {
+        const targetUser = auth.user.username
+        localStorage.setItem(`vf_2fa_enabled_${targetUser}`, 'true')
+        setIs2faEnabled(true)
+        setSuccessNotice(t('Two-Factor Authentication (TOTP) has been successfully registered.'))
+        useToastStore.getState().addToast(t('2FA Authenticator configured successfully!'), 'success')
+      }
       window.history.replaceState({}, document.title, window.location.pathname)
     } else if (searchParams.get('tab') === 'security') {
       setActiveTab('security')
     }
-  }, [searchParams, t, auth.user?.username])
+  }, [searchParams, t, auth.isAuthenticated, auth.user?.username])
 
   const updateProfile = useMutation({
     mutationFn: () => userApi.updateProfile({ bio, displayName }),

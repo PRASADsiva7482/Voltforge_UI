@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build && npm run test:bundle-budget",
     "lint": "oxlint",
-    "test": "tsc -b && oxlint && npm run test:worker-protocol && npm run test:result-subscription && npm run test:runtime-delta && npm run test:model-revision && npm run test:ai-presentation && npm run test:ai-hardware-coverage && npm run test:board-geometry && npm run test:ai-proposal && npm run test:mna-incremental && npm run test:scope-capture && npm run test:canvas-render && npm run test:avr-budget && npm run test:document-revision && npm run test:palette-index && npm run test:routing-contract && npm run test:drag-contract && npm run test:pcb-sync-contract && npm run test:ratline-contract && npm run test:pcb-scene-contract && npm run test:component-scene-contract && npm run test:render-isolation-contract",
+    "test": "tsc -b && oxlint && npm run test:security && npm run test:worker-protocol && npm run test:result-subscription && npm run test:runtime-delta && npm run test:model-revision && npm run test:ai-presentation && npm run test:ai-hardware-coverage && npm run test:board-geometry && npm run test:ai-proposal && npm run test:mna-incremental && npm run test:scope-capture && npm run test:canvas-render && npm run test:avr-budget && npm run test:document-revision && npm run test:palette-index && npm run test:routing-contract && npm run test:drag-contract && npm run test:pcb-sync-contract && npm run test:ratline-contract && npm run test:pcb-scene-contract && npm run test:component-scene-contract && npm run test:render-isolation-contract",
+    "test:security": "node scripts/run-security-contract-tests.mjs",
     "test:worker-protocol": "node scripts/run-worker-backpressure-tests.mjs",
     "test:result-subscription": "node scripts/run-result-subscription-tests.mjs",
     "test:runtime-delta": "node scripts/run-runtime-delta-tests.mjs",
@@ -51,7 +52,7 @@
     "@monaco-editor/react": "^4.7.0",
     "@tanstack/react-query": "^5.101.2",
     "avr8js": "^0.21.0",
-    "axios": "^1.18.1",
+    "axios": "^1.20.0",
     "clsx": "^2.1.1",
     "i18next": "^26.3.4",
     "i18next-browser-languagedetector": "^8.2.1",
@@ -62,7 +63,7 @@
     "react-dom": "^19.2.7",
     "react-i18next": "^17.0.8",
     "react-konva": "^19.2.5",
-    "react-router-dom": "^7.18.1",
+    "react-router-dom": "^7.18.4",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

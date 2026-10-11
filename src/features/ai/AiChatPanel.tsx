@@ -9,6 +9,7 @@ import { buildCircuitNetlist } from '../canvas/netlist'
 import { Textarea } from '../../components/ui/Field'
 import { SuggestionsList } from '../../components/ui/SuggestionsList'
 import { CodeBlock } from '../../components/ui/CodeBlock'
+import { sanitizeUrl } from '../../utils/security'
 import type { AiAction, AiArtifactIdentity, AiCitation, AiCodeFix, AiEngineeringAuthority, AiGroundingReport, AiInternetRetrievalStatus, AiLocalRetrievalStatus, AiMemoryState, AiWireSuggestion } from '../../types/domain'
 import { AiProposalReview } from './AiProposalReview'
 import {
@@ -851,11 +852,15 @@ export default function AiChatPanel({
       }
       const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
       if (linkMatch) {
-        return (
-          <a key={idx} href={linkMatch[2]} target="_blank" rel="noreferrer" className="vf-ai-link">
-            {linkMatch[1]}
-          </a>
-        )
+        const safeUrl = sanitizeUrl(linkMatch[2])
+        if (safeUrl) {
+          return (
+            <a key={idx} href={safeUrl} target="_blank" rel="noopener noreferrer" className="vf-ai-link">
+              {linkMatch[1]}
+            </a>
+          )
+        }
+        return <span key={idx} className="vf-ai-link-disabled">{linkMatch[1]}</span>
       }
       return token
     })
@@ -1270,10 +1275,11 @@ export default function AiChatPanel({
                         {citation.locator && <span className="vf-ai-chat__citation-meta">{citation.locator}</span>}
                       </>
                     )
-                    return citation.url ? (
+                    const safeCitationUrl = citation.url ? sanitizeUrl(citation.url) : null
+                    return safeCitationUrl ? (
                       <a
                         key={citation.citationId || `${citation.url}-${citationIndex}`}
-                        href={citation.url}
+                        href={safeCitationUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="vf-ai-chat__citation"

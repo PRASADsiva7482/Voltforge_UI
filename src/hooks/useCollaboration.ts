@@ -5,6 +5,7 @@ import { useCanvasStore } from '../store/canvasStore';
 import { usePcbStore } from '../store/pcbStore';
 import { useProjectStore } from '../store/projectStore';
 import { useToastStore } from '../store/useToastStore';
+import { sanitizeStompHeader } from '../utils/security';
 
 export interface CollaboratorInfo {
   color: string;
@@ -45,7 +46,9 @@ function resolveNativeWsUrl(): string {
 }
 
 function buildStompFrame(command: string, headers: Record<string, string>, body?: unknown): string {
-  const headerLines = Object.entries(headers).map(([key, value]) => `${key}:${value}`);
+  const headerLines = Object.entries(headers).map(
+    ([key, value]) => `${sanitizeStompHeader(key)}:${sanitizeStompHeader(value)}`
+  );
   const payload = body === undefined ? '' : JSON.stringify(body);
   return `${command}\n${headerLines.join('\n')}\n\n${payload}\0`;
 }

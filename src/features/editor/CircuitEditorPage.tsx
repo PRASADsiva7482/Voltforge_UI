@@ -178,12 +178,29 @@ function encodeShareState(value: unknown) {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
+const MAX_SHARE_STATE_BYTES = 1024 * 1024; // 1 MiB limit
+const MAX_SHARE_NODES = 1000;
+const MAX_SHARE_WIRES = 2000;
+
 function decodeShareState(value: string) {
-  const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
-  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
-  const binary = atob(padded)
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
-  return JSON.parse(new TextDecoder().decode(bytes))
+  if (!value || typeof value !== 'string' || value.length > MAX_SHARE_STATE_BYTES) {
+    throw new Error('Share state payload exceeds size limit');
+  }
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  const decoded = JSON.parse(new TextDecoder().decode(bytes));
+  if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) {
+    throw new Error('Invalid share state structure');
+  }
+  if (Array.isArray(decoded.nodes) && decoded.nodes.length > MAX_SHARE_NODES) {
+    throw new Error('Share state exceeds maximum allowed component count');
+  }
+  if (Array.isArray(decoded.wires) && decoded.wires.length > MAX_SHARE_WIRES) {
+    throw new Error('Share state exceeds maximum allowed wire count');
+  }
+  return decoded;
 }
 
 export default function CircuitEditorPage() {
