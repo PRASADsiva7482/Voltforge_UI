@@ -331,7 +331,14 @@ export default function CircuitEditorPage() {
 
   const [sandboxPreset, setSandboxPreset] = useState<'smart-device' | 'led-blink'>(() => {
     const p = searchParams.get('preset')
-    return p === 'led-blink' ? 'led-blink' : 'smart-device'
+    if (p === 'led-blink' || p === 'smart-device') return p
+    try {
+      const saved = localStorage.getItem('voltforge_sandbox_preset')
+      if (saved === 'led-blink' || saved === 'smart-device') return saved
+    } catch {
+      // ignore
+    }
+    return 'smart-device'
   })
 
   useEffect(() => {
@@ -339,11 +346,21 @@ export default function CircuitEditorPage() {
     const p = searchParams.get('preset')
     if ((p === 'led-blink' || p === 'smart-device') && p !== sandboxPreset) {
       setSandboxPreset(p)
+      try {
+        localStorage.setItem('voltforge_sandbox_preset', p)
+      } catch {
+        // ignore
+      }
     }
   }, [isSandbox, searchParams, sandboxPreset])
 
   const handleSelectSandboxPreset = useCallback((presetKey: 'smart-device' | 'led-blink') => {
     if (sandboxPreset === presetKey) return
+    try {
+      localStorage.setItem('voltforge_sandbox_preset', presetKey)
+    } catch {
+      // ignore
+    }
     stopSimulationEngine()
     setIsSimulating(false)
     setIsSimulationPaused(false)
@@ -1406,42 +1423,13 @@ export default function CircuitEditorPage() {
           </button>
           <div className="vf-editor__project-info">
             <div className="vf-editor__project-primary">
-              <h1 className="vf-editor__project-name">{projectName}</h1>
+              <h1 className="vf-editor__project-name" title={projectName}>{projectName}</h1>
               {!isSandbox && <EditorDirtyIndicator />}
-              {isSandbox ? (
-                <>
-                  <span className="vf-status-badge vf-status-badge--sandbox">
-                    <span className="vf-status-badge__dot" />
-                    <span>Live Sandbox · Ephemeral</span>
-                  </span>
-                  <div className="vf-editor__preset-selector" role="group" aria-label="Curated Sandbox Presets">
-                    <button
-                      type="button"
-                      className={`vf-preset-chip ${sandboxPreset === 'smart-device' ? 'is-active' : ''}`}
-                      onClick={() => handleSelectSandboxPreset('smart-device')}
-                      title="Load Smart Automation Controller (LDR, LCD, Relay, Motor)"
-                    >
-                      <Zap size={11} />
-                      <span>Smart Controller</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`vf-preset-chip ${sandboxPreset === 'led-blink' ? 'is-active' : ''}`}
-                      onClick={() => handleSelectSandboxPreset('led-blink')}
-                      title="Load Interactive LED Blink & Button"
-                    >
-                      <Lightbulb size={11} />
-                      <span>LED & Button</span>
-                    </button>
-                  </div>
-                </>
-              ) : (
-                !isPreset && (
-                  <span className="vf-status-badge" aria-hidden={!isLiveSyncConnected}>
-                    <span className="vf-status-badge__dot" />
-                    <span>Live Sync</span>
-                  </span>
-                )
+              {!isSandbox && !isPreset && (
+                <span className="vf-status-badge" aria-hidden={!isLiveSyncConnected}>
+                  <span className="vf-status-badge__dot" />
+                  <span>Live Sync</span>
+                </span>
               )}
             </div>
             {!isSandbox && projectSummary?.forkedFromId && projectSummary?.forkedFromName && (
@@ -1459,6 +1447,22 @@ export default function CircuitEditorPage() {
               </span>
             )}
           </div>
+          {isSandbox && (
+            <>
+              <span className="vf-editor__divider" />
+              <label className="vf-editor__preset-control" title="Switch curated sandbox preset">
+                <span className="vf-editor__preset-label">Preset:</span>
+                <select
+                  value={sandboxPreset}
+                  onChange={(e) => handleSelectSandboxPreset(e.target.value as 'smart-device' | 'led-blink')}
+                  aria-label="Sandbox preset"
+                >
+                  <option value="smart-device">Smart Automation (Motor & Relay)</option>
+                  <option value="led-blink">Interactive LED & Switch</option>
+                </select>
+              </label>
+            </>
+          )}
         </div>
 
         <div className="vf-editor__toolbar-center">

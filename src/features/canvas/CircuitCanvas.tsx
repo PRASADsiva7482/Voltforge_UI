@@ -3,11 +3,11 @@ import { useShallow } from 'zustand/react/shallow';
 import { Stage, Layer, Rect, Group, Text, Circle, Line, Shape } from 'react-konva';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
-import { Download, Layers, LayoutGrid, Zap } from 'lucide-react';
+import { Download, Layers, Zap } from 'lucide-react';
 import { useCanvasStore, WIRE_COLORS } from '../../store/canvasStore';
 import CanvasRoutingStatus from './CanvasRoutingStatus';
 import { useSimulationStore } from '../../store/simulationStore';
-
+import { useProjectStore } from '../../store/projectStore';
 import { useThemeStore } from '../../store/themeStore';
 import { componentPairKey, getPinAbsPos, getWireRenderPoints, snapToRoutingGuides } from '../../utils/wireRouting';
 import {
@@ -605,21 +605,48 @@ export default function CircuitCanvas({
     selectNode(null);
     selectWire(null);
     requestAnimationFrame(() => {
-      gridLayerRef.current?.visible(false);
       stage.batchDraw();
-      const dataUrl = stage.toDataURL({
-        pixelRatio: 2,
-        mimeType: 'image/png',
-      });
-      gridLayerRef.current?.visible(true);
-      stage.batchDraw();
+      try {
+        const dataUrl = stage.toDataURL({
+          pixelRatio: 2,
+          mimeType: 'image/png',
+        });
 
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = `voltforge-circuit-${Date.now()}.png`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+        // Convert base64 dataURL to Blob so browsers reliably save with the specified filename and .png extension
+        const parts = dataUrl.split(',');
+        const mime = parts[0].match(/:(.*?);/)?.[1] || 'image/png';
+        const bstr = atob(parts[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const blob = new Blob([u8arr], { type: mime });
+        const objectUrl = URL.createObjectURL(blob);
+
+        const project = useProjectStore.getState().currentProject;
+        const rawName = project?.name || 'voltforge-circuit';
+        const cleanName = rawName
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]+/g, '-')
+          .replace(/^-+|-+$/g, '') || 'voltforge-circuit';
+
+        const filename = `${cleanName}.png`;
+
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = filename;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+
+        setTimeout(() => {
+          link.remove();
+          URL.revokeObjectURL(objectUrl);
+        }, 1000);
+      } catch (err) {
+        console.error('Failed to export circuit image:', err);
+      }
     });
   }, [selectNode, selectWire]);
 
@@ -819,16 +846,6 @@ export default function CircuitCanvas({
         >
           <Download size={12} />
           <span>PNG</span>
-        </button>
-
-        <button
-          onClick={() => useCanvasStore.getState().autoArrangeLayout()}
-          disabled={readOnly}
-          className="vf-canvas-dock-btn"
-          title="Auto-arrange component layout with orthogonal routing"
-        >
-          <LayoutGrid size={12} />
-          <span>Auto-Arrange</span>
         </button>
 
         <span className="vf-canvas-dock-divider" />

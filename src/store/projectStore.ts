@@ -112,26 +112,29 @@ void setup() {
   lcd.init();
   lcd.backlight();
   Serial.begin(9600);
+  Serial.println("VoltForge Smart Controller Initialized");
 }
 
 void loop() {
   int val = analogRead(ldrPin);
   
-  // LDR is divider: V_A0 = 5V * (10k / (R_LDR + 10k))
-  // Dark: R_LDR is high (~1M) -> V_A0 is low (< 0.1V) -> val < 200
-  // Light: R_LDR is low (~100) -> V_A0 is high (~4.9V) -> val > 900
-  if (val < 300) {
+  // Voltage divider (5V -> LDR -> A0 -> 10k Resistor -> GND):
+  // Dark (light < 50%): LDR resistance is high (>50k), so A0 voltage is low (<0.8V) -> val < 400
+  // Light (light >= 50%): LDR resistance is low (<50k), so A0 voltage is high (>0.8V) -> val >= 400
+  if (val < 400) {
     digitalWrite(relayPin, HIGH);
     lcd.setCursor(0, 0);
     lcd.print("Light: DARK     ");
     lcd.setCursor(0, 1);
-    lcd.print("Motor: ACTIVE   ");
+    lcd.print("Motor: RUNNING  ");
+    Serial.println("LDR: Dark -> Relay ENERGIZED -> Motor ON");
   } else {
     digitalWrite(relayPin, LOW);
     lcd.setCursor(0, 0);
-    lcd.print("Light: LIGHT    ");
+    lcd.print("Light: BRIGHT   ");
     lcd.setCursor(0, 1);
-    lcd.print("Motor: INACTIVE ");
+    lcd.print("Motor: STOPPED  ");
+    Serial.println("LDR: Bright -> Relay IDLE -> Motor OFF");
   }
   delay(100);
 }`,
@@ -180,7 +183,7 @@ void loop() {
         width: 40,
         height: 40,
         rotation: 0,
-        properties: { lightLevel: 50, resistanceDark: 1000000, resistanceLight: 10000 },
+        properties: { lightLevel: 20, resistanceDark: 100000, resistanceLight: 1000 },
         pins: boardPinRegistry['SENSOR_LDR'] || [],
       },
       {
@@ -212,15 +215,15 @@ void loop() {
       {
         id: 'node_relay',
         componentId: 'relay_comp',
-        type: 'RELAY_SINGLE',
-        name: 'Single Channel Relay',
+        type: 'RELAY_SPDT',
+        name: 'SPDT Relay Module',
         x: 350,
         y: 420,
         width: 70,
         height: 50,
         rotation: 0,
         properties: { isActive: false },
-        pins: boardPinRegistry['RELAY_SINGLE'] || [],
+        pins: boardPinRegistry['RELAY_SPDT'] || [],
       },
       {
         id: 'node_motor',

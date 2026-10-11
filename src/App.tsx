@@ -47,6 +47,7 @@ function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
     document.documentElement.classList.toggle('light', theme === 'light')
+    document.documentElement.style.colorScheme = theme
   }, [theme])
 
   return (

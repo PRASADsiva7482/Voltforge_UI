@@ -165,8 +165,8 @@ export default function MultimeterPanel({
 
         {/* Digital LCD Display with Backlight */}
         <div style={{
-          background: isContinuityShort ? 'rgba(34, 197, 94, 0.15)' : '#0f172a',
-          border: isContinuityShort ? '1px solid #22c55e' : '1px solid #334155',
+          background: isContinuityShort ? 'rgba(16, 185, 129, 0.15)' : 'var(--vf-surface-inset, #0a0b0d)',
+          border: isContinuityShort ? '1px solid #10b981' : '1px solid var(--vf-border, rgba(255, 255, 255, 0.12))',
           borderRadius: '6px',
           padding: '10px',
           textAlign: 'right',

@@ -53,9 +53,9 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
       width="560px"
       icon={<Wifi size={14} />}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: '#0f172a', color: '#e2e8f0', fontSize: '12px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--vf-surface, #121316)', color: 'var(--vf-text, #d4d4d8)', fontSize: '12px' }}>
         {/* Navigation Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid #1e293b', padding: '0 8px', backgroundColor: '#090d16', gap: '4px' }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))', padding: '0 8px', backgroundColor: 'var(--vf-bg, #090a0c)', gap: '4px' }}>
           <button
             onClick={() => setActiveTab('traffic')}
             style={{
@@ -140,7 +140,7 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
         {/* Tab 1: Packet Traffic */}
         {activeTab === 'traffic' && (
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 12px', backgroundColor: '#131d31', borderBottom: '1px solid #1e293b' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 12px', backgroundColor: 'var(--vf-surface-raised, #181a1e)', borderBottom: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))' }}>
               <div style={{ display: 'flex', gap: '6px' }}>
                 {(['ALL', 'WIFI', 'HTTP', 'MQTT'] as const).map((t) => (
                   <button
@@ -150,8 +150,8 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
                       padding: '2px 8px',
                       borderRadius: '4px',
                       border: 'none',
-                      backgroundColor: filterType === t ? '#38bdf8' : '#1e293b',
-                      color: filterType === t ? '#0f172a' : '#94a3b8',
+                      backgroundColor: filterType === t ? 'var(--vf-teal, #6366f1)' : 'var(--vf-surface, #121316)',
+                      color: filterType === t ? '#ffffff' : '#94a3b8',
                       fontSize: '11px',
                       fontWeight: 600,
                       cursor: 'pointer',
@@ -229,7 +229,7 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
         {/* Tab 2: MQTT Broker Status */}
         {activeTab === 'mqtt' && (
           <div style={{ padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', backgroundColor: '#131d31', borderRadius: '6px', border: '1px solid #1e293b' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', backgroundColor: 'var(--vf-surface-raised, #181a1e)', borderRadius: '6px', border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))' }}>
               {mqttStatus.connected ? <CheckCircle2 color="#22c55e" size={20} /> : <XCircle color="#ef4444" size={20} />}
               <div>
                 <div style={{ fontWeight: 600, color: '#f8fafc' }}>
@@ -253,10 +253,11 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
                     <span
                       key={top}
                       style={{
-                        backgroundColor: '#1e293b',
+                        backgroundColor: 'var(--vf-surface, #121316)',
+                        border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))',
                         padding: '4px 8px',
                         borderRadius: '4px',
-                        color: '#38bdf8',
+                        color: 'var(--vf-teal, #818cf8)',
                         fontFamily: "'JetBrains Mono', monospace",
                         fontSize: '11px',
                       }}
@@ -274,28 +275,28 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
         {activeTab === 'wifi' && (
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-              <div style={{ padding: '10px', backgroundColor: '#131d31', borderRadius: '6px', border: '1px solid #1e293b' }}>
+              <div style={{ padding: '10px', backgroundColor: 'var(--vf-surface-raised, #181a1e)', borderRadius: '6px', border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))' }}>
                 <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>Network SSID</div>
-                <div style={{ fontWeight: 600, fontSize: '13px', color: '#38bdf8', marginTop: '2px' }}>
+                <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--vf-teal, #818cf8)', marginTop: '2px' }}>
                   {wifiStatus.ssid || 'None'}
                 </div>
               </div>
 
-              <div style={{ padding: '10px', backgroundColor: '#131d31', borderRadius: '6px', border: '1px solid #1e293b' }}>
+              <div style={{ padding: '10px', backgroundColor: 'var(--vf-surface-raised, #181a1e)', borderRadius: '6px', border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))' }}>
                 <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>IP Address</div>
                 <div style={{ fontWeight: 600, fontSize: '13px', color: '#22c55e', marginTop: '2px', fontFamily: 'monospace' }}>
                   {wifiStatus.ip}
                 </div>
               </div>
 
-              <div style={{ padding: '10px', backgroundColor: '#131d31', borderRadius: '6px', border: '1px solid #1e293b' }}>
+              <div style={{ padding: '10px', backgroundColor: 'var(--vf-surface-raised, #181a1e)', borderRadius: '6px', border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))' }}>
                 <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>MAC Address</div>
                 <div style={{ fontWeight: 600, fontSize: '11px', color: '#cbd5e1', marginTop: '2px', fontFamily: 'monospace' }}>
                   {wifiStatus.mac}
                 </div>
               </div>
 
-              <div style={{ padding: '10px', backgroundColor: '#131d31', borderRadius: '6px', border: '1px solid #1e293b' }}>
+              <div style={{ padding: '10px', backgroundColor: 'var(--vf-surface-raised, #181a1e)', borderRadius: '6px', border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))' }}>
                 <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>Signal Strength</div>
                 <div style={{ fontWeight: 600, fontSize: '13px', color: '#facc15', marginTop: '2px' }}>
                   {wifiStatus.rssi ? `${wifiStatus.rssi} dBm (Good)` : 'Disconnected'}
@@ -319,8 +320,8 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
                 style={{
                   width: '100%',
                   padding: '8px',
-                  backgroundColor: '#131d31',
-                  border: '1px solid #1e293b',
+                  backgroundColor: 'var(--vf-surface-raised, #181a1e)',
+                  border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))',
                   borderRadius: '4px',
                   color: '#f8fafc',
                   fontFamily: 'monospace',
@@ -340,8 +341,8 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
                 style={{
                   width: '100%',
                   padding: '8px',
-                  backgroundColor: '#131d31',
-                  border: '1px solid #1e293b',
+                  backgroundColor: 'var(--vf-surface-raised, #181a1e)',
+                  border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))',
                   borderRadius: '4px',
                   color: '#f8fafc',
                   fontFamily: 'monospace',

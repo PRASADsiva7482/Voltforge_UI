@@ -898,27 +898,6 @@ private scopeCaptureRevision = 0;
           }
         }
 
-        // ── LDR: light level slowly drifts ──
-        if (node.type === 'LDR' || node.type === 'SENSOR_LDR') {
-          const baseLight = Number(props.lightLevel ?? 50);
-          const lightVariation = Math.sin(elapsed * 0.1) * 15 + Math.cos(elapsed * 0.3) * 8;
-          const newLight = Math.max(0, Math.min(100, Math.round(baseLight + lightVariation)));
-          if (props.lightLevel !== newLight) {
-            nodeChanges.lightLevel = newLight;
-            changed = true;
-          }
-        }
-
-        // ── Soil Moisture: moisture slowly changes ──
-        if (node.type === 'SOIL_MOISTURE') {
-          const baseMoisture = Number(props.moistureLevel ?? 50);
-          const moistureVariation = Math.sin(elapsed * 0.08) * 10 + Math.cos(elapsed * 0.2) * 5;
-          const newMoisture = Math.max(0, Math.min(100, Math.round(baseMoisture + moistureVariation)));
-          if (props.moistureLevel !== newMoisture) {
-            nodeChanges.moistureLevel = newMoisture;
-            changed = true;
-          }
-        }
 
         if (changed) {
           updatesList.push({
@@ -3883,7 +3862,10 @@ private scopeCaptureRevision = 0;
         const m2Node = pinToMNANode.get(`${node.id}:${terminalPinB?.id || 'm2'}`) ?? 0;
         const appliedVoltage = (result.nodeVoltages[m1Node] ?? 0) - (result.nodeVoltages[m2Node] ?? 0);
         const currentMa = Math.abs(current) * 1000;
-        const isSpinning = Math.abs(appliedVoltage) >= 0.5 && currentMa >= 1;
+        const windingResistance = Math.max(0.1, Number(node.properties?.windingResistance ?? node.properties?.resistance ?? 10));
+        const ohmCurrentMa = (Math.abs(appliedVoltage) / windingResistance) * 1000;
+        const effectiveCurrentMa = currentMa >= 1 ? currentMa : ohmCurrentMa;
+        const isSpinning = Math.abs(appliedVoltage) >= 0.5 && effectiveCurrentMa >= 1;
         const ratedVoltage = Math.max(1, Number(String(node.properties?.voltage || '5').replace(/[^0-9.]/g, '')) || 5);
         const ratedRpm = Math.max(1, Number(node.properties?.ratedRpm || node.properties?.rpm || 3000));
         const rpm = isSpinning
@@ -3895,7 +3877,7 @@ private scopeCaptureRevision = 0;
           node.properties?.isSpinning !== isSpinning ||
           node.properties?.rpm !== rpm ||
           node.properties?.appliedVoltage !== appliedVoltage ||
-          node.properties?.currentMa !== currentMa
+          node.properties?.currentMa !== effectiveCurrentMa
         ) {
           useCanvasStore.getState().updateRuntimeNode(node.id, {
             properties: {
@@ -3904,7 +3886,7 @@ private scopeCaptureRevision = 0;
               rpm,
               direction,
               appliedVoltage,
-              currentMa,
+              currentMa: effectiveCurrentMa,
             },
           });
         }

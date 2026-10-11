@@ -61,19 +61,21 @@
   gap: 8px;
 }
 
-.vf-editor__toolbar-left,
-.vf-editor__toolbar-right {
-  flex: 1 1 0;
+.vf-editor__toolbar-left {
+  flex: 0 0 auto;
   min-width: 0;
 }
 
 .vf-editor__toolbar-center {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
+  justify-content: center;
   min-width: 0;
 }
 
 .vf-editor__toolbar-right {
+  flex: 0 0 auto;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .vf-editor__back {
@@ -174,6 +176,33 @@
   background: var(--vf-surface, #ffffff);
   color: var(--vf-text-strong, #111816);
   font-size: 10px;
+  color-scheme: light dark;
+}
+
+html.dark .vf-editor__solver-control select {
+  background: #14161a;
+  color: #f4f4f6;
+  border-color: rgba(255, 255, 255, 0.14);
+  color-scheme: dark;
+}
+
+html.light .vf-editor__solver-control select,
+:root:not(.dark) .vf-editor__solver-control select {
+  background: #ffffff;
+  color: #111827;
+  border-color: #cbd5e1;
+  color-scheme: light;
+}
+
+html.dark .vf-editor__solver-control select option {
+  background-color: #1a1c23;
+  color: #f4f4f6;
+}
+
+html.light .vf-editor__solver-control select option,
+:root:not(.dark) .vf-editor__solver-control select option {
+  background-color: #ffffff;
+  color: #111827;
 }
 
 .vf-editor__solver-control select:disabled {
@@ -668,12 +697,14 @@
 
   .vf-editor__forked-from,
   .vf-editor__project-primary .vf-status-badge > span:last-child,
-  .vf-editor__solver-control > span {
+  .vf-editor__solver-control > span,
+  .vf-editor__preset-label {
     display: none;
   }
 
-  .vf-editor__solver-control select {
-    max-width: 104px;
+  .vf-editor__solver-control select,
+  .vf-editor__preset-control select {
+    max-width: 140px;
   }
 
   .vf-editor__simulation-time,
@@ -1825,7 +1856,7 @@
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--vf-border, #dce5de);
-  background: #0a0f1e;
+  background: var(--vf-surface-inset, #0a0b0d);
   flex-shrink: 0;
   transition: height 0.2s ease;
 }
@@ -2267,7 +2298,7 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #090d16;
+  background: var(--vf-surface-inset, #090a0c);
 }
 
 .vf-pcb-toolbar {
@@ -2280,10 +2311,10 @@
   gap: 8px;
   max-width: calc(100% - 24px);
   padding: 6px 8px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.92);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  background: rgba(18, 19, 22, 0.95);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(10px);
   overflow-x: auto;
 }
@@ -2313,7 +2344,8 @@
 .vf-pcb-segment {
   padding: 2px;
   border-radius: 6px;
-  background: #111827;
+  background: var(--vf-surface, #121316);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .vf-pcb-segment__item,
@@ -2349,7 +2381,8 @@
 .vf-pcb-chip {
   min-height: 22px;
   padding: 0 7px;
-  background: #1e293b;
+  background: var(--vf-surface-raised, #181a1e);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   color: #94a3b8;
 }
 
@@ -2929,45 +2962,80 @@
   font-size: 12px;
 }
 
-/* ── Live Sandbox Header UI Controls ── */
-.vf-editor__preset-selector {
-  display: inline-flex;
+/* ── Live Sandbox Header Preset Control (Uniform styling) ── */
+.vf-editor__preset-control {
+  display: flex;
   align-items: center;
-  gap: 4px;
-  background: var(--vf-surface-inset, rgba(0, 0, 0, 0.2));
-  border: 1px solid var(--vf-border, rgba(255, 255, 255, 0.1));
-  border-radius: 999px;
-  padding: 2px 4px;
-  margin-left: 8px;
+  gap: 6px;
+  color: var(--vf-text-muted, #94a3b8);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.vf-preset-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
+.vf-editor__preset-label {
   font-size: 11px;
   font-weight: 600;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--vf-text-muted, #94a3b8);
+  color: var(--vf-text-secondary, #94a3b8);
+  letter-spacing: 0.02em;
+}
+
+.vf-editor__preset-control select {
+  height: 28px;
+  padding: 0 24px 0 8px;
+  border: 1px solid var(--vf-border, #dee2e6);
+  border-radius: 6px;
+  background: var(--vf-surface, #ffffff);
+  color: var(--vf-text-strong, #111827);
+  font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 160ms ease;
-  user-select: none;
-  white-space: nowrap;
+  transition: all 150ms ease;
+  color-scheme: light dark;
 }
 
-.vf-preset-chip:hover {
-  color: var(--vf-text-primary, #ffffff);
-  background: var(--vf-surface-hover, rgba(255, 255, 255, 0.08));
+html.dark .vf-editor__preset-control select {
+  background: #14161a;
+  color: #f4f4f6;
+  border-color: rgba(255, 255, 255, 0.14);
+  color-scheme: dark;
 }
 
-.vf-preset-chip.is-active {
-  background: linear-gradient(135deg, rgba(8, 127, 131, 0.25), rgba(14, 165, 233, 0.25));
-  border-color: var(--vf-teal, #087f83);
-  color: #38bdf8;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+html.light .vf-editor__preset-control select,
+:root:not(.dark) .vf-editor__preset-control select {
+  background: #ffffff;
+  color: #111827;
+  border-color: #cbd5e1;
+  color-scheme: light;
+}
+
+/* Explicit option styling so native options never render white-on-white or dark-on-dark */
+.vf-editor__preset-control select option {
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+html.dark .vf-editor__preset-control select option {
+  background-color: #1a1c23;
+  color: #f4f4f6;
+}
+
+html.light .vf-editor__preset-control select option,
+:root:not(.dark) .vf-editor__preset-control select option {
+  background-color: #ffffff;
+  color: #111827;
+}
+
+.vf-editor__preset-control select:hover {
+  border-color: var(--vf-teal, #6366f1);
+}
+
+.vf-editor__preset-control select:focus {
+  outline: none;
+  border-color: var(--vf-teal, #6366f1);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
 }
 
 .vf-editor__theme-btn {
@@ -2987,21 +3055,21 @@
 }
 
 .vf-editor__theme-btn:hover {
-  color: var(--vf-text-primary, #ffffff);
-  background: var(--vf-surface-hover, rgba(255, 255, 255, 0.08));
-  border-color: var(--vf-teal, #087f83);
+  color: var(--vf-text-strong, #ffffff);
+  background: var(--vf-surface-raised, rgba(255, 255, 255, 0.08));
+  border-color: var(--vf-teal, #6366f1);
 }
 
 .vf-editor__login-btn {
-  background: linear-gradient(135deg, #0ea5e9, #2563eb) !important;
-  border-color: #0ea5e9 !important;
+  background: var(--vf-teal, #6366f1) !important;
+  border-color: var(--vf-teal, #6366f1) !important;
   color: #ffffff !important;
-  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.28);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
 }
 
 .vf-editor__login-btn:hover {
-  background: linear-gradient(135deg, #38bdf8, #1d4ed8) !important;
-  border-color: #38bdf8 !important;
-  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+  background: var(--vf-teal-dark, #4f46e5) !important;
+  border-color: var(--vf-teal-dark, #4f46e5) !important;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.45);
 }
 

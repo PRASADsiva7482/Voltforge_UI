@@ -1492,7 +1492,7 @@ export function buildMNACircuit(
       const rLight = resistanceOhms(props.resistanceLight, SIMULATION_MODELS.sensors.ldrLightResistance);
       const rawLight = numericProperty(props.lightLevel, 50);
       const light = Math.max(0, Math.min(1, rawLight > 1 ? rawLight / 100 : rawLight));
-      const resistance = rDark - (rDark - rLight) * light;
+      const resistance = rDark > rLight ? rDark * Math.pow(rLight / rDark, light) : rDark;
 
       const id = `ldr_${node.id}`;
       elements.push({

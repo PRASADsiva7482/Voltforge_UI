@@ -29,7 +29,7 @@
 
 .action-card:hover .action-card__inner {
   border-color: var(--vf-teal);
-  box-shadow: 0 6px 20px -2px rgba(13, 148, 136, 0.15), var(--vf-shadow);
+  box-shadow: 0 6px 20px -2px rgba(99, 102, 241, 0.2), var(--vf-shadow);
   transform: translateY(-2px);
 }
 
@@ -137,7 +137,7 @@
 
 .starter-card:hover {
   border-color: var(--vf-teal);
-  box-shadow: 0 8px 24px -4px rgba(13, 148, 136, 0.16), var(--vf-shadow);
+  box-shadow: 0 8px 24px -4px rgba(99, 102, 241, 0.22), var(--vf-shadow);
   transform: translateY(-2px);
 }
 
@@ -252,4 +252,3 @@
   gap: 12px;
   margin-bottom: 18px;
 }
-
