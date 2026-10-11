@@ -1,4 +1,5 @@
 import { Download, Gauge, Play, Square } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { FloatingPanel } from '../../components/ui/FloatingPanel';
 import type { SimulationFidelityMode } from '../simulator/simulationModels';
 import type { MaximumComponentRegressionTrace } from '../simulator/regression/maxComponentRegression';
@@ -68,6 +69,7 @@ export default function SolverDiagnosticsPanel({
   onRunAvrCompiledTrace,
   onStopAvrCompiledTrace,
 }: SolverDiagnosticsPanelProps) {
+  const { t } = useTranslation();
   const diagnostics = useSimulationStore((state) => state.solverDiagnostics);
   const avrWorkload = useSimulationStore((state) => state.avrWorkload);
   const preset = createMaximumComponentRegressionPreset();
@@ -78,42 +80,42 @@ export default function SolverDiagnosticsPanel({
     <FloatingPanel
       isOpen={isOpen}
       onClose={onClose}
-      title="Solver, canvas, and AVR diagnostics"
+      title={t("Solver, canvas, and AVR diagnostics")}
       icon={<Gauge size={15} />}
       width="390px"
     >
       <div className="vf-solver-diagnostics">
         <p className="vf-solver-diagnostics__hint">
-          Solver and AVR workload samples are published at 4 Hz. Normal simulation payloads and per-frame store publication remain unchanged.
+          {t("Solver and AVR workload samples are published at 4 Hz. Normal simulation payloads and per-frame store publication remain unchanged.")}
         </p>
 
         <div className="vf-solver-diagnostics__grid">
-          <Metric label="Frame wall" value={formatMs(diagnostics?.frameWallTimeMs ?? NaN)} />
-          <Metric label="Budget use" value={diagnostics ? `${diagnostics.budgetUtilizationPercent.toFixed(0)}%` : '—'} />
-          <Metric label="Steps/frame" value={diagnostics ? String(diagnostics.stepsThisFrame) : '—'} />
-          <Metric label="Completed" value={diagnostics ? diagnostics.completedSteps.toLocaleString() : '—'} />
-          <Metric label="Timestep" value={diagnostics ? `${(diagnostics.selectedTimeStep_s * 1000).toFixed(2)} ms` : '—'} />
-          <Metric label="Sim rate" value={formatRate(diagnostics?.simulationTimeRate ?? 0)} />
-          <Metric label="Sim time" value={diagnostics ? `${diagnostics.simulationTime_s.toFixed(3)} s` : '—'} />
-          <Metric label="Convergence" value={diagnostics ? (diagnostics.converged ? 'OK' : 'Failed') : '—'} />
+          <Metric label={t("Frame wall")} value={formatMs(diagnostics?.frameWallTimeMs ?? NaN)} />
+          <Metric label={t("Budget use")} value={diagnostics ? `${diagnostics.budgetUtilizationPercent.toFixed(0)}%` : '—'} />
+          <Metric label={t("Steps/frame")} value={diagnostics ? String(diagnostics.stepsThisFrame) : '—'} />
+          <Metric label={t("Completed")} value={diagnostics ? diagnostics.completedSteps.toLocaleString() : '—'} />
+          <Metric label={t("Timestep")} value={diagnostics ? `${(diagnostics.selectedTimeStep_s * 1000).toFixed(2)} ms` : '—'} />
+          <Metric label={t("Sim rate")} value={formatRate(diagnostics?.simulationTimeRate ?? 0)} />
+          <Metric label={t("Sim time")} value={diagnostics ? `${diagnostics.simulationTime_s.toFixed(3)} s` : '—'} />
+          <Metric label={t("Convergence")} value={diagnostics ? (diagnostics.converged ? 'OK' : 'Failed') : '—'} />
         </div>
 
         {diagnostics?.budgetLimited && (
-          <div className="vf-solver-diagnostics__warning">Worker frame reached its configured budget.</div>
+          <div className="vf-solver-diagnostics__warning">{t("Worker frame reached its configured budget.")}</div>
         )}
 
         {(avrWorkload.active || avrCompiledTraceRunning) && (
           <div className="vf-solver-diagnostics__section">
-            <div className="vf-solver-diagnostics__section-title">Live AVR execution budget</div>
+            <div className="vf-solver-diagnostics__section-title">{t("Live AVR execution budget")}</div>
             <div className="vf-solver-diagnostics__grid">
-              <Metric label="Instruction rate" value={avrWorkload.instructionsPerSecond > 0 ? `${Math.round(avrWorkload.instructionsPerSecond).toLocaleString()}/s` : '—'} />
-              <Metric label="Emulated clock" value={avrWorkload.emulatedClockHz > 0 ? `${(avrWorkload.emulatedClockHz / 1_000_000).toFixed(2)} MHz` : '—'} />
-              <Metric label="Main-thread use" value={`${avrWorkload.mainThreadUtilizationPercent.toFixed(1)}%`} />
-              <Metric label="Cycle debt" value={formatMs(avrWorkload.pendingCycleLagMs)} />
-              <Metric label="Average slice" value={formatMs(avrWorkload.averageSliceMs)} />
-              <Metric label="Maximum slice" value={formatMs(avrWorkload.maximumSliceMs)} />
-              <Metric label="Deadline overshoot" value={formatMs(avrWorkload.maximumDeadlineOvershootMs)} />
-              <Metric label="Slice budget" value={formatMs(avrWorkload.sliceBudgetMs)} />
+              <Metric label={t("Instruction rate")} value={avrWorkload.instructionsPerSecond > 0 ? `${Math.round(avrWorkload.instructionsPerSecond).toLocaleString()}/s` : '—'} />
+              <Metric label={t("Emulated clock")} value={avrWorkload.emulatedClockHz > 0 ? `${(avrWorkload.emulatedClockHz / 1_000_000).toFixed(2)} MHz` : '—'} />
+              <Metric label={t("Main-thread use")} value={`${avrWorkload.mainThreadUtilizationPercent.toFixed(1)}%`} />
+              <Metric label={t("Cycle debt")} value={formatMs(avrWorkload.pendingCycleLagMs)} />
+              <Metric label={t("Average slice")} value={formatMs(avrWorkload.averageSliceMs)} />
+              <Metric label={t("Maximum slice")} value={formatMs(avrWorkload.maximumSliceMs)} />
+              <Metric label={t("Deadline overshoot")} value={formatMs(avrWorkload.maximumDeadlineOvershootMs)} />
+              <Metric label={t("Slice budget")} value={formatMs(avrWorkload.sliceBudgetMs)} />
             </div>
             {(avrWorkload.budgetLimited || avrWorkload.hardLimitReached || avrWorkload.backgroundStallCount > 0) && (
               <div className="vf-solver-diagnostics__checks">
@@ -132,7 +134,7 @@ export default function SolverDiagnosticsPanel({
         )}
 
         <div className="vf-solver-diagnostics__section">
-          <div className="vf-solver-diagnostics__section-title">Maximum-component regression</div>
+          <div className="vf-solver-diagnostics__section-title">{t("Maximum-component regression")}</div>
           <p className="vf-solver-diagnostics__meta">
             {MAX_COMPONENT_REGRESSION_ID} · {preset.nodes.length} nodes · {preset.wires.length} wires · {MAX_COMPONENT_REGRESSION_DURATION_MS / 1000}s per mode
           </p>
@@ -147,19 +149,19 @@ export default function SolverDiagnosticsPanel({
               type="button"
             >
               <Play size={13} />
-              Run both traces
+              {t("Run both traces")}
             </button>
             {regressionMode !== null && (
-              <button className="vf-editor__tool-btn" onClick={onStopRegression} title="Stop regression" type="button">
+              <button className="vf-editor__tool-btn" onClick={onStopRegression} title={t("Stop regression")} type="button">
                 <Square size={13} />
-                {regressionMode === 'both' ? 'Running' : regressionMode}
+                {regressionMode === 'both' ? t('Running') : regressionMode}
               </button>
             )}
           </div>
         </div>
 
         <div className="vf-solver-diagnostics__section">
-          <div className="vf-solver-diagnostics__section-title">Maximum-canvas rendering trace</div>
+          <div className="vf-solver-diagnostics__section-title">{t("Maximum-canvas rendering trace")}</div>
           <p className="vf-solver-diagnostics__meta">
             Loads the same maximum preset, replays deterministic current results, and pans/zooms through disabled, Adaptive, overview-limited, and Full detail modes before restoring this project.
           </p>
@@ -174,12 +176,12 @@ export default function SolverDiagnosticsPanel({
               type="button"
             >
               <Play size={13} />
-              Run canvas trace
+              {t("Run canvas trace")}
             </button>
             {canvasRenderTraceRunning && (
-              <button className="vf-editor__tool-btn" onClick={onStopCanvasRenderTrace} title="Stop canvas trace" type="button">
+              <button className="vf-editor__tool-btn" onClick={onStopCanvasRenderTrace} title={t("Stop canvas trace")} type="button">
                 <Square size={13} />
-                Running
+                {t('Running')}
               </button>
             )}
             {canvasRenderTrace && (
@@ -189,7 +191,7 @@ export default function SolverDiagnosticsPanel({
                   canvasRenderTrace,
                   `voltforge-canvas-render-${canvasRenderTrace.fixtureId}-${Date.now()}.json`,
                 )}
-                title="Download canvas rendering trace JSON"
+                title={t("Download canvas rendering trace JSON")}
                 type="button"
               >
                 <Download size={13} />
@@ -224,7 +226,7 @@ export default function SolverDiagnosticsPanel({
         )}
 
         <div className="vf-solver-diagnostics__section">
-          <div className="vf-solver-diagnostics__section-title">Compiled ATmega328P responsiveness trace</div>
+          <div className="vf-solver-diagnostics__section-title">{t("Compiled ATmega328P responsiveness trace")}</div>
           <p className="vf-solver-diagnostics__meta">
             {AVR_COMPILED_TRACE_ID} · GPIO, timer/PWM, UART, ADC, and I2C · {AVR_COMPILED_TRACE_DURATION_MS / 1000}s per fidelity mode
           </p>
@@ -239,12 +241,12 @@ export default function SolverDiagnosticsPanel({
               type="button"
             >
               <Play size={13} />
-              Run AVR trace
+              {t("Run AVR trace")}
             </button>
             {avrCompiledTraceRunning && (
-              <button className="vf-editor__tool-btn" onClick={onStopAvrCompiledTrace} title="Stop compiled AVR trace" type="button">
+              <button className="vf-editor__tool-btn" onClick={onStopAvrCompiledTrace} title={t("Stop compiled AVR trace")} type="button">
                 <Square size={13} />
-                Running
+                {t('Running')}
               </button>
             )}
             {avrCompiledTrace && (
@@ -254,7 +256,7 @@ export default function SolverDiagnosticsPanel({
                   avrCompiledTrace,
                   `voltforge-avr-${avrCompiledTrace.fixtureId}-${Date.now()}.json`,
                 )}
-                title="Download compiled AVR trace JSON"
+                title={t("Download compiled AVR trace JSON")}
                 type="button"
               >
                 <Download size={13} />
@@ -307,7 +309,7 @@ export default function SolverDiagnosticsPanel({
 
         {regressionRuns.length > 1 && (
           <div className="vf-solver-diagnostics__section">
-            <div className="vf-solver-diagnostics__section-title">Fidelity comparison</div>
+            <div className="vf-solver-diagnostics__section-title">{t("Fidelity comparison")}</div>
             <div className="vf-solver-diagnostics__trace-summary">
               {regressionRuns.slice(-2).map((run) => (
                 <span key={`${run.fixtureId}-${run.fidelityMode}`}>

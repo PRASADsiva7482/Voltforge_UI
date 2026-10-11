@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Wifi, Send, Trash2, Globe, Radio, CheckCircle2, XCircle } from 'lucide-react';
 import { FloatingPanel } from '../../components/ui/FloatingPanel';
 import { VirtualNetworkStack, type NetworkLogEntry } from '../simulator/network/VirtualNetworkStack';
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function IotInspectorPanel({ isOpen, onClose }: Props) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'traffic' | 'mqtt' | 'wifi' | 'inject'>('traffic');
   const [logs, setLogs] = useState<NetworkLogEntry[]>([]);
   const [filterType, setFilterType] = useState<'ALL' | 'WIFI' | 'HTTP' | 'MQTT'>('ALL');
@@ -49,7 +51,7 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
     <FloatingPanel
       isOpen={isOpen}
       onClose={onClose}
-      title="IoT & Cloud Telemetry Inspector"
+      title={t("IoT & Cloud Telemetry Inspector")}
       width="560px"
       icon={<Wifi size={14} />}
     >
@@ -73,7 +75,7 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
             }}
           >
             <Radio size={13} />
-            <span>Packet Traffic ({logs.length})</span>
+            <span>{t("Packet Traffic")} ({logs.length})</span>
           </button>
 
           <button
@@ -93,7 +95,7 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
             }}
           >
             <Globe size={13} />
-            <span>MQTT Broker</span>
+            <span>{t("MQTT Broker")}</span>
           </button>
 
           <button
@@ -113,7 +115,7 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
             }}
           >
             <Wifi size={13} />
-            <span>WiFi Stack</span>
+            <span>{t("WiFi Stack")}</span>
           </button>
 
           <button
@@ -133,7 +135,7 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
             }}
           >
             <Send size={13} />
-            <span>Cloud Injector</span>
+            <span>{t("Cloud Injector")}</span>
           </button>
         </div>
 
@@ -175,14 +177,14 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
                 }}
               >
                 <Trash2 size={12} />
-                <span>Clear</span>
+                <span>{t("Clear")}</span>
               </button>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '8px', fontFamily: "'JetBrains Mono', monospace", fontSize: '11px' }}>
               {filteredLogs.length === 0 ? (
                 <div style={{ textAlign: 'center', color: '#64748b', padding: '32px' }}>
-                  No network traffic captured yet. Start simulation with WiFi/MQTT code.
+                  {t("No network traffic captured yet. Start simulation with WiFi/MQTT code.")}
                 </div>
               ) : (
                 filteredLogs.map((l) => {
@@ -233,7 +235,7 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
               {mqttStatus.connected ? <CheckCircle2 color="#22c55e" size={20} /> : <XCircle color="#ef4444" size={20} />}
               <div>
                 <div style={{ fontWeight: 600, color: '#f8fafc' }}>
-                  {mqttStatus.connected ? 'Broker Connected' : 'Broker Disconnected'}
+                  {mqttStatus.connected ? t("Broker Connected") : t("Broker Disconnected")}
                 </div>
                 <div style={{ color: '#94a3b8', fontSize: '11px' }}>
                   {mqttStatus.broker}:{mqttStatus.port} (Client ID: {mqttStatus.clientId})
@@ -243,10 +245,10 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
 
             <div>
               <div style={{ fontWeight: 600, color: '#94a3b8', marginBottom: '6px', fontSize: '11px', textTransform: 'uppercase' }}>
-                Active Subscriptions ({mqttStatus.subscribedTopics.length})
+                {t("Active Subscriptions")} ({mqttStatus.subscribedTopics.length})
               </div>
               {mqttStatus.subscribedTopics.length === 0 ? (
-                <div style={{ color: '#64748b', fontStyle: 'italic' }}>No topics subscribed by device code</div>
+                <div style={{ color: '#64748b', fontStyle: 'italic' }}>{t("No topics subscribed by device code")}</div>
               ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {mqttStatus.subscribedTopics.map((top) => (
@@ -276,30 +278,30 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
               <div style={{ padding: '10px', backgroundColor: 'var(--vf-surface-raised, #181a1e)', borderRadius: '6px', border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))' }}>
-                <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>Network SSID</div>
+                <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>{t("Network SSID")}</div>
                 <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--vf-teal, #818cf8)', marginTop: '2px' }}>
-                  {wifiStatus.ssid || 'None'}
+                  {wifiStatus.ssid || t('None')}
                 </div>
               </div>
 
               <div style={{ padding: '10px', backgroundColor: 'var(--vf-surface-raised, #181a1e)', borderRadius: '6px', border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))' }}>
-                <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>IP Address</div>
+                <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>{t("IP Address")}</div>
                 <div style={{ fontWeight: 600, fontSize: '13px', color: '#22c55e', marginTop: '2px', fontFamily: 'monospace' }}>
                   {wifiStatus.ip}
                 </div>
               </div>
 
               <div style={{ padding: '10px', backgroundColor: 'var(--vf-surface-raised, #181a1e)', borderRadius: '6px', border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))' }}>
-                <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>MAC Address</div>
+                <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>{t("MAC Address")}</div>
                 <div style={{ fontWeight: 600, fontSize: '11px', color: '#cbd5e1', marginTop: '2px', fontFamily: 'monospace' }}>
                   {wifiStatus.mac}
                 </div>
               </div>
 
               <div style={{ padding: '10px', backgroundColor: 'var(--vf-surface-raised, #181a1e)', borderRadius: '6px', border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))' }}>
-                <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>Signal Strength</div>
+                <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>{t("Signal Strength")}</div>
                 <div style={{ fontWeight: 600, fontSize: '13px', color: '#facc15', marginTop: '2px' }}>
-                  {wifiStatus.rssi ? `${wifiStatus.rssi} dBm (Good)` : 'Disconnected'}
+                  {wifiStatus.rssi ? `${wifiStatus.rssi} dBm` : t('Disconnected')}
                 </div>
               </div>
             </div>
@@ -311,7 +313,7 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
               <label style={{ display: 'block', color: '#94a3b8', fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>
-                MQTT Topic
+                {t("MQTT Topic")}
               </label>
               <input
                 type="text"
@@ -332,7 +334,7 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
 
             <div>
               <label style={{ display: 'block', color: '#94a3b8', fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>
-                Message Payload (JSON / String)
+                {t("Message Payload (JSON / String)")}
               </label>
               <textarea
                 rows={4}
@@ -370,7 +372,7 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
               }}
             >
               <Send size={13} />
-              <span>Simulate Cloud Message to Device</span>
+              <span>{t("Simulate Cloud Message to Device")}</span>
             </button>
           </div>
         )}

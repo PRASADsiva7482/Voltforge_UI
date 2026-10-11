@@ -1,5 +1,6 @@
 import { Component } from 'react';
 import type { ReactNode } from 'react';
+import i18n from '../../../i18n';
 
 interface Props {
   children: ReactNode;
@@ -53,8 +54,8 @@ export default class CanvasErrorBoundary extends Component<Props, State> {
                 />
               </svg>
             </div>
-            <h2>Canvas Rendering Error</h2>
-            <p>Something went wrong while rendering the circuit canvas.</p>
+            <h2>{i18n.t('Canvas Rendering Error')}</h2>
+            <p>{i18n.t('Something went wrong while rendering the circuit canvas.')}</p>
             {this.state.error && (
               <p className="vf-canvas-error__detail">
                 {this.state.error.message}
@@ -64,7 +65,7 @@ export default class CanvasErrorBoundary extends Component<Props, State> {
               onClick={this.handleReload}
               className="vf-button vf-button--primary"
             >
-              Reload Canvas
+              {i18n.t('Reload Canvas')}
             </button>
           </div>
         </div>

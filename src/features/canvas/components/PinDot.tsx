@@ -136,8 +136,22 @@ const PinDot = memo(function PinDot({
         shadowEnabled={hovered}
         shadowColor={hovered ? glowColor : 'transparent'}
         shadowBlur={hovered ? 8 : 0}
-        hitStrokeWidth={PIN_HIT_STROKE_WIDTH}
+        hitStrokeWidth={24}
         onClick={(e: KonvaEventObject<MouseEvent>) => {
+          e.cancelBubble = true;
+          if (isProbeMode) {
+            onProbeToggle?.({ nodeId, pinId: pin.id, x: pin.x, y: pin.y });
+            return;
+          }
+          if (readOnly) return;
+          if (isWiring) {
+            if (wiringFromNodeId === nodeId) return;
+            finishWiring(nodeId, pin.id);
+          } else {
+            startWiring(nodeId, pin.id);
+          }
+        }}
+        onTap={(e: KonvaEventObject<TouchEvent>) => {
           e.cancelBubble = true;
           if (isProbeMode) {
             onProbeToggle?.({ nodeId, pinId: pin.id, x: pin.x, y: pin.y });

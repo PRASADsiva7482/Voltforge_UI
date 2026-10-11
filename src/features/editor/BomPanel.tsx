@@ -1,4 +1,5 @@
 import { Download, Package } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useCanvasStore } from '../../store/canvasStore'
 import { FloatingPanel } from '../../components/ui/FloatingPanel'
 import { DataTable, type TableColumn } from '../../components/ui/DataTable'
@@ -17,6 +18,7 @@ interface BomItem {
 }
 
 export default function BomPanel({ isOpen, onClose }: Props) {
+  const { t } = useTranslation()
   const { nodes } = useCanvasStore()
 
   // Generate BOM item list grouped by component type
@@ -63,10 +65,10 @@ export default function BomPanel({ isOpen, onClose }: Props) {
         <span className="vf-bom-index">{(index ?? 0) + 1}</span>
       ),
       align: 'left',
-    },
+      },
     {
       id: 'component',
-      header: 'Component',
+      header: t('Component'),
       render: (item) => (
         <div className="vf-bom-details">
           <div className="vf-bom-name">{item.name}</div>
@@ -77,7 +79,7 @@ export default function BomPanel({ isOpen, onClose }: Props) {
     },
     {
       id: 'quantity',
-      header: 'Qty',
+      header: t('Qty'),
       render: (item) => (
         <span className="vf-bom-qty">{item.quantity}</span>
       ),
@@ -90,7 +92,7 @@ export default function BomPanel({ isOpen, onClose }: Props) {
   const footer = bomItems.length > 0 ? (
     <div className="vf-bom-footer">
       <span className="vf-bom-summary">
-        {bomItems.length} types · {totalQty} total
+        {bomItems.length} {t('types')} · {totalQty} {t('total')}
       </span>
       <button
         onClick={exportCsv}
@@ -98,7 +100,7 @@ export default function BomPanel({ isOpen, onClose }: Props) {
         type="button"
       >
         <Download size={12} />
-        <span>Export CSV</span>
+        <span>{t("Export CSV")}</span>
       </button>
     </div>
   ) : undefined
@@ -107,7 +109,7 @@ export default function BomPanel({ isOpen, onClose }: Props) {
     <FloatingPanel
       isOpen={isOpen}
       onClose={onClose}
-      title="Bill of Materials"
+      title={t("Bill of Materials")}
       icon={<Package size={14} />}
       width="280px"
       footer={footer}
@@ -115,7 +117,7 @@ export default function BomPanel({ isOpen, onClose }: Props) {
       <div className="vf-bom-content">
         {bomItems.length === 0 ? (
           <p className="vf-bom-empty">
-            Add components to canvas to generate BOM
+            {t("Add components to canvas to generate BOM")}
           </p>
         ) : (
           <DataTable columns={columns} rows={bomItems} />

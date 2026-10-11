@@ -1,4 +1,5 @@
 import { CheckSquare, RotateCcw, Square } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { AiProposal } from './aiProposal'
 
 interface Props {
@@ -22,15 +23,16 @@ export function AiProposalReview({
   selectedIds,
   undoAvailable = false,
 }: Props) {
+  const { t } = useTranslation()
   const selectedCount = selectedIds.length
   return (
     <section className="vf-ai-proposal" aria-labelledby={`vf-ai-proposal-${proposal.id}`}>
       <div className="vf-ai-proposal__heading">
         <div>
-          <strong id={`vf-ai-proposal-${proposal.id}`}>Review proposed changes</strong>
+          <strong id={`vf-ai-proposal-${proposal.id}`}>{t("Review proposed changes")}</strong>
           <span>{proposal.items.length} typed change(s) bound to the source project revision.</span>
         </div>
-        {isStale && <span className="vf-ai-proposal__stale" role="status">Stale — regenerate</span>}
+        {isStale && <span className="vf-ai-proposal__stale" role="status">{t("Stale — regenerate")}</span>}
       </div>
       <div className="vf-ai-proposal__list">
         {proposal.items.map((item) => {
@@ -58,11 +60,11 @@ export function AiProposalReview({
         <div>
           {undoAvailable && onUndo && (
             <button type="button" disabled={isWorking} onClick={onUndo}>
-              <RotateCcw size={12} aria-hidden="true" /> Undo AI changes
+              <RotateCcw size={12} aria-hidden="true" /> {t("Undo AI changes")}
             </button>
           )}
           <button type="button" disabled={isStale || isWorking || selectedCount === 0} onClick={onApply}>
-            {isWorking ? 'Applying…' : 'Apply selected'}
+            {isWorking ? t('Applying…') : t('Apply selected')}
           </button>
         </div>
       </div>

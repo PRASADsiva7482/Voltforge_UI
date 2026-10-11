@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, CheckCircle, Download, Layers, ShieldCheck } from 'lucide-react';
 import { FloatingPanel } from '../../components/ui/FloatingPanel';
 import { pcbManufacturingApi, type PcbManufacturingPayload } from '../../api/services';
@@ -17,6 +18,7 @@ export default function PcbExportModal({
   projectName,
   wires = [],
 }: Props) {
+  const { t } = useTranslation();
   const {
     boardHeight_mm,
     boardWidth_mm,
@@ -116,16 +118,16 @@ export default function PcbExportModal({
     <FloatingPanel
       isOpen={isOpen}
       onClose={onClose}
-      title="PCB Design Rules Check & Gerber Export"
+      title={t("PCB Design Rules Check & Gerber Export")}
       width="520px"
       icon={<Layers size={14} />}
     >
       <div className="vf-pcb-export">
         <div className="vf-pcb-export__summary">
           <div>
-            <div className="vf-pcb-export__title">Design Rule Check (DRC)</div>
+            <div className="vf-pcb-export__title">{t('Design Rule Check (DRC)')}</div>
             <div className="vf-pcb-export__hint">
-              6 mil clearance, 6 mil trace width, drill sizing, board outline, and unrouted net checks.
+              {t('6 mil clearance, 6 mil trace width, drill sizing, board outline, and unrouted net checks.')}
             </div>
           </div>
 
@@ -136,7 +138,7 @@ export default function PcbExportModal({
             disabled={isRunningDrc}
           >
             <ShieldCheck size={14} />
-            <span>{isRunningDrc ? 'Checking...' : 'Run DRC'}</span>
+            <span>{isRunningDrc ? t('Checking...') : t('Run DRC')}</span>
           </button>
         </div>
 
@@ -145,13 +147,13 @@ export default function PcbExportModal({
         {drcRan && (
           <section className="vf-pcb-export__section">
             <div className="vf-pcb-export__section-title">
-              DRC Results ({violations.length} {violations.length === 1 ? 'item' : 'items'})
+              {t('DRC Results')} ({violations.length} {violations.length === 1 ? 'item' : 'items'})
             </div>
 
             {violations.length === 0 ? (
               <div className="vf-pcb-export__pass">
                 <CheckCircle size={16} />
-                <span>All design rules passed. Board is ready for manufacturing.</span>
+                <span>{t('All design rules passed. Board is ready for manufacturing.')}</span>
               </div>
             ) : (
               <div className="vf-pcb-export__violations">
@@ -175,9 +177,9 @@ export default function PcbExportModal({
         )}
 
         <section className="vf-pcb-export__section">
-          <div className="vf-pcb-export__title">Gerber & Drill Package (RS-274X)</div>
+          <div className="vf-pcb-export__title">{t('Gerber & Drill Package (RS-274X)')}</div>
           <div className="vf-pcb-export__hint">
-            Exports Top/Bottom Copper, Solder Mask, Silkscreen, Edge Cuts, and Excellon drill files as a fabrication ZIP.
+            {t('Exports Top/Bottom Copper, Solder Mask, Silkscreen, Edge Cuts, and Excellon drill files as a fabrication ZIP.')}
           </div>
 
           <button
@@ -187,16 +189,16 @@ export default function PcbExportModal({
             className="vf-button vf-button--md vf-button--primary vf-pcb-export__download"
             title={
               !drcRan
-                ? 'Run DRC before export'
+                ? t('Run DRC before export')
                 : hasErrors
-                  ? 'Fix DRC errors before export'
+                  ? t('Fix DRC errors before export')
                   : hasWarnings
-                    ? 'Exports with warnings'
-                    : 'Download Gerber ZIP'
+                    ? t('Exports with warnings')
+                    : t('Download Gerber ZIP')
             }
           >
             <Download size={14} />
-            <span>{isExporting ? 'Exporting...' : 'Download Gerber ZIP'}</span>
+            <span>{isExporting ? t('Exporting...') : t('Download Gerber ZIP')}</span>
           </button>
         </section>
       </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { AlertTriangle, Info, Play, ShieldAlert } from 'lucide-react'
 import { useCanvasStore } from '../../store/canvasStore'
 import { useProjectStore } from '../../store/projectStore'
@@ -36,6 +37,7 @@ interface AppliedAiTransaction {
 }
 
 export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: Props) {
+  const { t } = useTranslation()
   const { modelRevision, nodes, wires } = useCanvasStore()
   const { activeCodeFile, currentProject, updateCodeFileContent } = useProjectStore()
   const addToast = useToastStore((s) => s.addToast)
@@ -206,7 +208,7 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
     <FloatingPanel
       isOpen={isOpen}
       onClose={onClose}
-      title="AI Circuit Validator"
+      title={t("AI Circuit Validator")}
       icon={<ShieldAlert size={14} />}
       width="380px"
     >
@@ -215,7 +217,7 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
           <div className="vf-validator-empty-state">
             <ShieldAlert size={40} className="vf-validator-empty-icon" />
             <p className="vf-validator-empty-text">
-              Validate wiring, power paths, pin usage, and firmware alignment.
+              {t("Validate wiring, power paths, pin usage, and firmware alignment.")}
             </p>
             <Button
               onClick={handleValidate}
@@ -223,7 +225,7 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
               variant="primary"
               className="vf-validator-btn"
             >
-              Start Validation
+              {t("Start Validation")}
             </Button>
           </div>
         )}
@@ -232,7 +234,7 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
           <div className="vf-validator-loading-state">
             <LoadingSpinner size="md" className="vf-validator-spinner" />
             <p className="vf-validator-loading-text">
-              AI is analyzing circuit topology...
+              {t("AI is analyzing circuit topology...")}
             </p>
           </div>
         )}
@@ -248,7 +250,7 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
               return (
                 <Callout
                   type={isCircuitValid ? 'success' : 'error'}
-                  title={isCircuitValid ? 'Circuit looks safe!' : 'Circuit validation failed'}
+                  title={isCircuitValid ? t('Circuit looks safe!') : t('Circuit validation failed')}
                   className="vf-validator-callout"
                 >
                   {validationResult.generalFeedback}
@@ -257,7 +259,7 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
             })()}
 
             <div className="vf-validator__score">
-              <span className="vf-validator__score-label">Safety Score</span>
+              <span className="vf-validator__score-label">{t("Safety Score")}</span>
               <span className={`vf-validator__score-value ${getScoreColorClass(validationResult.safetyScore)}`}>
                 {validationResult.safetyScore}/100
               </span>
@@ -267,13 +269,13 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
 
             {typeof validationResult.confidence === 'number' && (
               <div className="vf-validator__confidence">
-                Confidence {Math.round(validationResult.confidence * 100)}%
+                {t("Confidence")} {Math.round(validationResult.confidence * 100)}%
               </div>
             )}
 
             {validationResult.issues && validationResult.issues.length > 0 && (
               <div className="vf-validator__issues">
-                <h5 className="vf-validator__issues-title">Detected Issues</h5>
+                <h5 className="vf-validator__issues-title">{t("Detected Issues")}</h5>
                 {validationResult.issues.map((issue, i) => (
                   <div
                     key={`${issue.componentId}-${i}`}
@@ -297,7 +299,7 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
                     </div>
                     {issue.suggestedFix && (
                       <p className="vf-alert-card__fix">
-                        Fix: {issue.suggestedFix}
+                        {t("Fix:")} {issue.suggestedFix}
                       </p>
                     )}
                   </div>
@@ -330,7 +332,7 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
               variant="secondary"
               className="vf-validator-btn vf-validator-btn--retry"
             >
-              Re-Validate Circuit
+              {t("Re-Validate Circuit")}
             </Button>
           </div>
         )}

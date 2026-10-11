@@ -1,4 +1,5 @@
 import { lazy, memo, Suspense, useRef, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useProjectStore } from '../../store/projectStore';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useSimulationStore } from '../../store/simulationStore';
@@ -103,6 +104,7 @@ function generateFullCode(userCode: string, boardType?: string): string {
 }
 
 function CodeEditor({ readOnly }: { readOnly?: boolean }) {
+  const { t } = useTranslation();
   const activeCodeFile = useProjectStore((s) => s.activeCodeFile);
   // Keep the subscribed snapshot stable while a project is absent or denied.
   const codeFiles = useProjectStore((s) => s.currentProject?.codeFiles) ?? [];
@@ -217,16 +219,16 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
                   fontSize: '11px',
                   fontWeight: 600,
                 }}
-                title="Custom Intel HEX firmware; AVR8js execution is available only for Uno/Nano/ATmega328P boards"
+                title={t("Custom Intel HEX firmware; AVR8js execution is available only for Uno/Nano/ATmega328P boards")}
               >
                 <Cpu size={12} />
-                <span>{canRunCustomHex ? 'AVR8js: Custom HEX' : 'Custom HEX: Interpreter'}</span>
+                <span>{canRunCustomHex ? t('AVR8js: Custom HEX') : t('Custom HEX: Interpreter')}</span>
                 <button
                   disabled={readOnly}
                   onClick={(e) => {
                     e.stopPropagation();
                     setCustomHex(null);
-                    addToast('Cleared custom HEX, using source compiler/interpreter', 'info');
+                    addToast(t('Cleared custom HEX, using source compiler/interpreter'), 'info');
                   }}
                   style={{
                     background: 'none',
@@ -247,11 +249,11 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
                 className="vf-code-editor__action-btn"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={readOnly}
-                title="Upload compiled Intel HEX file; direct AVR8js execution is available only for Uno/Nano/ATmega328P boards"
+                title={t("Upload compiled Intel HEX file; direct AVR8js execution is available only for Uno/Nano/ATmega328P boards")}
                 style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
               >
                 <Upload size={12} />
-                <span>Load .hex</span>
+                <span>{t('Load .hex')}</span>
               </button>
             )}
 
@@ -262,7 +264,7 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
               className="vf-code-editor__action-btn"
               onClick={handleFormatCode}
               disabled={readOnly}
-              title={readOnly ? "Format Code (Disabled in Read-only)" : "Format Code (Auto-indent)"}
+              title={readOnly ? t("Format Code (Disabled in Read-only)") : t("Format Code (Auto-indent)")}
             >
               <AlignLeft size={13} />
             </button>
@@ -271,17 +273,17 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
             <button
               className={`vf-code-editor__action-btn vf-code-editor__action-btn--full ${showFullCode ? 'is-active' : ''}`}
               onClick={() => setShowFullCode(!showFullCode)}
-              title={showFullCode ? "Show user code only" : "Show full generated sketch code"}
+              title={showFullCode ? t("Show user code only") : t("Show full generated sketch code")}
             >
               {showFullCode ? <EyeOff size={13} /> : <Eye size={13} />}
-              <span>{showFullCode ? 'User Code' : 'Full Sketch'}</span>
+              <span>{showFullCode ? t('User Code') : t('Full Sketch')}</span>
             </button>
 
             {/* Fullscreen button */}
             <button
               className="vf-code-editor__action-btn"
               onClick={() => setIsFullscreen(!isFullscreen)}
-              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+              title={isFullscreen ? t("Exit Fullscreen") : t("Fullscreen")}
             >
               {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
             </button>
@@ -294,7 +296,7 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
         <div className="vf-code-editor__banner">
           <Eye size={13} />
           <span>
-            <strong>Full Sketch View</strong> — Read-only boilerplate containing auto-generated libraries and pin definitions.
+            <strong>{t('Full Sketch View')}</strong> — {t('Read-only boilerplate containing auto-generated libraries and pin definitions.')}
           </span>
         </div>
       )}
@@ -305,7 +307,7 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
           <Suspense fallback={
             <div className="vf-code-editor__loading">
               <Loader2 size={24} className="vf-spin" />
-              <span>Loading editor...</span>
+              <span>{t('Loading editor...')}</span>
             </div>
           }>
             <MonacoEditor
@@ -344,9 +346,76 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
           </Suspense>
         ) : (
           <div className="vf-code-editor__empty">
-            <p>No code file selected</p>
+            <p>{t('No code file selected')}</p>
           </div>
         )}
+      </div>
+
+      {/* Mobile Snippets Bar */}
+      <div className="vf-code-editor__snippets-bar" role="toolbar" aria-label="Arduino quick snippets">
+        {[
+          { label: 'pinMode()', code: 'pinMode(13, OUTPUT);\n' },
+          { label: 'digitalWrite()', code: 'digitalWrite(13, HIGH);\n' },
+          { label: 'digitalRead()', code: 'digitalRead(2)' },
+          { label: 'analogRead()', code: 'analogRead(A0)' },
+          { label: 'delay()', code: 'delay(500);\n' },
+          { label: 'Serial.println()', code: 'Serial.println("");\n' },
+          { label: 'if (...)', code: 'if () {\n  \n}' },
+        ].map((snip) => (
+          <button
+            key={snip.label}
+            type="button"
+            className="vf-code-editor__snippet-chip"
+            disabled={readOnly || showFullCode}
+            onClick={() => {
+              if (readOnly || showFullCode || !editorRef.current) return;
+              const editor = editorRef.current;
+              const selection = editor.getSelection();
+              if (selection) {
+                editor.executeEdits('snippet-insert', [
+                  {
+                    range: selection,
+                    text: snip.code,
+                    forceMoveMarkers: true,
+                  },
+                ]);
+                editor.focus();
+              }
+            }}
+          >
+            {snip.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Mobile / Touch Symbol Accessory Bar */}
+      <div className="vf-code-editor__mobile-bar" role="toolbar" aria-label="Coding quick symbols">
+        {['{', '}', '(', ')', '[', ']', ';', '=', '<', '>', '/', '*', '//', '_', 'TAB'].map((sym) => (
+          <button
+            key={sym}
+            type="button"
+            className="vf-code-editor__symbol-btn"
+            disabled={readOnly || showFullCode}
+            onClick={() => {
+              if (readOnly || showFullCode || !editorRef.current) return;
+              const editor = editorRef.current;
+              const textToInsert = sym === 'TAB' ? '  ' : sym;
+              const selection = editor.getSelection();
+              if (selection) {
+                editor.executeEdits('quick-insert', [
+                  {
+                    range: selection,
+                    text: textToInsert,
+                    forceMoveMarkers: true,
+                  },
+                ]);
+                editor.focus();
+              }
+            }}
+          >
+            {sym}
+          </button>
+        ))}
       </div>
     </div>
   );

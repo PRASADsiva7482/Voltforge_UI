@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Clock, Sparkles } from 'lucide-react';
 import labCatalog from './labCatalog.json';
@@ -11,6 +12,7 @@ const difficultyClass: Record<LabChallenge['difficulty'], string> = {
 };
 
 export function LabExplorerPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const challenges = labCatalog as unknown as LabChallenge[];
@@ -25,12 +27,12 @@ export function LabExplorerPage() {
       <header className="vf-labs-hero">
         <span className="vf-badge vf-badge--info">
           <Sparkles size={13} />
-          Interactive Circuit Labs
+          {t('Interactive Circuit Labs')}
         </span>
         <div>
-          <h1>Circuit Engineering Challenges</h1>
+          <h1>{t('Circuit Engineering Challenges')}</h1>
           <p>
-            Practice electronics fundamentals with focused lab tasks, live validation, and progressive hints.
+            {t('Practice electronics fundamentals with focused lab tasks, live validation, and progressive hints.')}
           </p>
         </div>
       </header>
@@ -43,7 +45,7 @@ export function LabExplorerPage() {
             className={`vf-labs-filter__item ${selectedCategory === category ? 'is-active' : ''}`}
             onClick={() => setSelectedCategory(category)}
           >
-            {category === 'ALL' ? 'All Categories' : category}
+            {category === 'ALL' ? t('All Categories') : category}
           </button>
         ))}
       </div>
@@ -58,7 +60,7 @@ export function LabExplorerPage() {
                 </span>
                 <span className="vf-lab-card__time">
                   <Clock size={12} />
-                  {lab.estimatedMinutes} mins
+                  {lab.estimatedMinutes} {t('mins')}
                 </span>
               </div>
 
@@ -67,7 +69,7 @@ export function LabExplorerPage() {
 
               <div className="vf-lab-card__objectives">
                 <div className="vf-lab-card__objectives-title">
-                  Objectives ({lab.objectives.length})
+                  {t('Objectives')} ({lab.objectives.length})
                 </div>
                 {lab.objectives.map((objective) => (
                   <div key={objective.id} className="vf-lab-card__objective">
@@ -83,7 +85,7 @@ export function LabExplorerPage() {
               className="vf-button vf-button--md vf-button--primary vf-lab-card__start"
               onClick={() => navigate(`/labs/${lab.id}`)}
             >
-              <span>Start Lab</span>
+              <span>{t('Start Lab')}</span>
               <ArrowRight size={14} />
             </button>
           </article>

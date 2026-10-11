@@ -1,8 +1,10 @@
 import { useRef, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSimulationStore, BAUD_RATES } from '../../store/simulationStore';
 import { Terminal, Send, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function SerialMonitor() {
+  const { t } = useTranslation();
   const serialLogs = useSimulationStore((s) => s.serialLogs);
   const baudRate = useSimulationStore((s) => s.baudRate);
   const setBaudRate = useSimulationStore((s) => s.setBaudRate);
@@ -39,7 +41,7 @@ export default function SerialMonitor() {
     <div className={`vf-serial-monitor ${isOpen ? 'is-open' : ''}`}>
       <button className="vf-serial-monitor__toggle" onClick={onToggle}>
         <Terminal size={14} />
-        <span>Serial Monitor</span>
+        <span>{t("Serial Monitor")}</span>
         <span className="vf-serial-monitor__log-count">{serialLogs.length}</span>
         {isOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
       </button>
@@ -54,13 +56,13 @@ export default function SerialMonitor() {
             >
               {BAUD_RATES.map(b => <option key={b} value={b}>{b} baud</option>)}
             </select>
-            <button className="vf-serial-monitor__clear" onClick={clearSerial} title="Clear">
+            <button className="vf-serial-monitor__clear" onClick={clearSerial} title={t("Clear")}>
               <Trash2 size={12} />
             </button>
           </div>
           <div className="vf-serial-monitor__output" ref={scrollRef}>
             {serialLogs.length === 0 ? (
-              <span className="vf-serial-monitor__placeholder">No serial output yet...</span>
+              <span className="vf-serial-monitor__placeholder">{t("No serial output yet...")}</span>
             ) : (
               serialLogs.map((line, i) => (
                 <div
@@ -75,7 +77,7 @@ export default function SerialMonitor() {
           <div className="vf-serial-monitor__input-row">
             <input
               className="vf-serial-monitor__input"
-              placeholder="Type a command..."
+              placeholder={t("Type a command...")}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSend(); }}

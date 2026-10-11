@@ -63,6 +63,9 @@ export default function PcbCanvas({ width, height, projectName, readOnly = false
     updateViaPosition: s.updateViaPosition,
   })));
 
+  const safeWidth = Math.max(Math.round(width || 0), 100);
+  const safeHeight = Math.max(Math.round(height || 0), 100);
+
   usePcbSchematicSync();
   const [showExportModal, setShowExportModal] = useState(false);
   const openExport = useCallback(() => setShowExportModal(true), []);
@@ -167,8 +170,8 @@ export default function PcbCanvas({ width, height, projectName, readOnly = false
 
       <Stage
         ref={stageRef}
-        width={width}
-        height={height}
+        width={safeWidth}
+        height={safeHeight}
         draggable
         x={sceneViewport.x}
         y={sceneViewport.y}

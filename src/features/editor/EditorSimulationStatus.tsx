@@ -1,9 +1,11 @@
+import { useTranslation } from 'react-i18next'
 import { useSimulationStore } from '../../store/simulationStore'
 
 export function EditorSimulationTime() {
+  const { t } = useTranslation()
   const simulationTime = useSimulationStore((state) => state.simulationTime)
   return (
-    <span className="vf-editor__simulation-time" title="Monotonic physical simulation time">
+    <span className="vf-editor__simulation-time" title={t('Monotonic physical simulation time')}>
       t={simulationTime.toFixed(3)}s
     </span>
   )

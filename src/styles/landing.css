@@ -1647,3 +1647,52 @@ html.dark .landing-footer__bottom {
     align-items: flex-start;
   }
 }
+
+/* ── Small Mobile Phones (iPhone SE, Galaxy A, etc. <= 480px) ── */
+@media (max-width: 480px) {
+  .landing-hero {
+    padding: 24px 16px;
+    gap: 28px;
+  }
+
+  .landing-hero h1 {
+    font-size: clamp(28px, 8.5vw, 36px);
+  }
+
+  .landing-hero__actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .landing-hero__actions .vf-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .hero-scene {
+    height: 360px;
+  }
+
+  /* Hide secondary floating cards on narrow screens to prevent overlapping */
+  .hero-node--relay,
+  .hero-node--bom {
+    display: none !important;
+  }
+
+  .hero-node--mcu {
+    width: 140px;
+    padding: 6px 8px;
+  }
+
+  .hero-node--sensor {
+    top: 8%;
+    left: 4%;
+  }
+
+  .hero-code-card {
+    bottom: 8%;
+    left: 4%;
+    max-width: 150px;
+    font-size: 8.5px;
+  }
+}

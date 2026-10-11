@@ -1,5 +1,6 @@
 import { Component, Suspense, type ErrorInfo, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
+import i18n from '../../i18n'
 
 interface LazyRouteBoundaryProps {
   children: ReactNode
@@ -30,19 +31,19 @@ class ChunkErrorBoundary extends Component<ChunkErrorBoundaryProps, ChunkErrorBo
     return (
       <main className="vf-route-state" role="alert" aria-labelledby="vf-route-error-title">
         <div className="vf-route-state__card vf-route-state__card--error">
-          <span className="vf-route-state__eyebrow">Unable to open {this.props.label}</span>
-          <h1 id="vf-route-error-title">This part of VoltForge could not be loaded.</h1>
+          <span className="vf-route-state__eyebrow">{i18n.t('Unable to open')} {this.props.label}</span>
+          <h1 id="vf-route-error-title">{i18n.t('This part of VoltForge could not be loaded.')}</h1>
           <p>
             {isOffline
-              ? 'You appear to be offline. Reconnect, then retry this page.'
-              : 'The application may have been updated while this tab was open. Reload to use the latest files.'}
+              ? i18n.t('You appear to be offline. Reconnect, then retry this page.')
+              : i18n.t('The application may have been updated while this tab was open. Reload to use the latest files.')}
           </p>
           <div className="vf-route-state__actions">
             <button className="vf-button vf-button--md vf-button--primary" type="button" onClick={() => window.location.reload()}>
-              Retry
+              {i18n.t('Retry')}
             </button>
             <a className="vf-button vf-button--md vf-button--secondary" href="/">
-              Go to home
+              {i18n.t('Go to home')}
             </a>
           </div>
         </div>
@@ -56,7 +57,7 @@ function RouteLoading({ label }: { label: string }) {
     <main className="vf-route-state" aria-busy="true" aria-live="polite">
       <div className="vf-route-state__card" role="status">
         <span className="vf-route-state__spinner" aria-hidden="true" />
-        <span>Loading {label}…</span>
+        <span>{i18n.t('Loading {{label}}…', { label, defaultValue: `Loading ${label}…` })}</span>
       </div>
     </main>
   )

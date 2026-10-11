@@ -17,10 +17,12 @@ import {
 import { Badge, Button } from '../ui'
 import { useAuth } from '../../auth/useAuth'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 export function HeroCircuitScene() {
   const auth = useAuth()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [activePin, setActivePin] = useState<string | null>('A0')
   const [isSimulating, setIsSimulating] = useState(true)
 
@@ -29,16 +31,16 @@ export function HeroCircuitScene() {
       <div className="landing-hero__copy">
         <div className="landing-hero__badge-container">
           <Badge dot tone="success">
-            Next-Gen Browser Electronics Studio
+            {t("Next-Gen Browser Electronics Studio")}
           </Badge>
         </div>
 
         <h1 id="landing-title">
-          Build, simulate, and ship circuits.
+          {t("Build, simulate, and ship circuits.")}
         </h1>
 
         <p className="landing-hero__description">
-          The all-in-one cloud workspace for hardware engineers. Wire schematics, write microcontroller firmware, inspect transient signals, and export BOMs in real-time.
+          {t("The all-in-one cloud workspace for hardware engineers. Wire schematics, write microcontroller firmware, inspect transient signals, and export BOMs in real-time.")}
         </p>
 
         <div className="landing-hero__actions">
@@ -49,7 +51,7 @@ export function HeroCircuitScene() {
               variant="primary"
               trailingIcon={<ArrowRight size={16} />}
             >
-              Open Dashboard
+              {t("Open Dashboard")}
             </Button>
           ) : (
             <>
@@ -60,7 +62,7 @@ export function HeroCircuitScene() {
                 variant="primary"
                 trailingIcon={<ArrowRight size={16} />}
               >
-                Start Free
+                {t("Sign Up")}
               </Button>
               <Button
                 onClick={() => navigate('/editor/share')}
@@ -68,7 +70,7 @@ export function HeroCircuitScene() {
                 variant="secondary"
                 icon={<Play size={16} />}
               >
-                Launch Sandbox
+                {t("Launch Sandbox")}
               </Button>
             </>
           )}
@@ -77,19 +79,19 @@ export function HeroCircuitScene() {
         <div className="landing-proof">
           <span className="landing-proof__item">
             <Zap size={14} className="text-teal" />
-            <span>MNA Solver</span>
+            <span>{t("MNA Solver")}</span>
           </span>
           <span className="landing-proof__item">
             <Cpu size={14} className="text-teal" />
-            <span>AVR8js 16MHz</span>
+            <span>{t("AVR8js 16MHz")}</span>
           </span>
           <span className="landing-proof__item">
             <Code2 size={14} className="text-teal" />
-            <span>C++ IDE</span>
+            <span>{t("C++ IDE")}</span>
           </span>
           <span className="landing-proof__item">
             <PackageCheck size={14} className="text-teal" />
-            <span>Instant BOM</span>
+            <span>{t("Instant BOM")}</span>
           </span>
         </div>
       </div>
@@ -103,17 +105,17 @@ export function HeroCircuitScene() {
           </div>
           <div className="hero-scene__title">
             <Cpu size={14} />
-            <span>Voltforge Studio · Lab #04: Opto-Relay Trigger</span>
+            <span>{t('Voltforge Studio · Lab #04: Opto-Relay Trigger')}</span>
           </div>
           <div className="hero-scene__toolbar-actions">
             <button
               type="button"
               className={`hero-scene__sim-btn ${isSimulating ? 'is-active' : ''}`}
               onClick={() => setIsSimulating(!isSimulating)}
-              title="Toggle virtual circuit power"
+              title={t("Toggle virtual circuit power")}
             >
               <Radio size={13} className={isSimulating ? 'vf-pulse-icon' : ''} />
-              <span>{isSimulating ? 'Simulating (10kHz)' : 'Paused'}</span>
+              <span>{isSimulating ? t('Simulating (10kHz)') : t('Paused')}</span>
             </button>
           </div>
         </div>
@@ -197,7 +199,7 @@ export function HeroCircuitScene() {
             </div>
             <div className="hero-node__status-bar">
               <span className="hero-node__led-dot" />
-              <span>TX/RX Heartbeat Active</span>
+              <span>{t('TX/RX Heartbeat Active')}</span>
             </div>
           </div>
 
@@ -207,8 +209,8 @@ export function HeroCircuitScene() {
               <Gauge size={20} />
             </div>
             <div>
-              <strong>LDR Light Sensor</strong>
-              <small>Analog Out · 3.2V (640 Lux)</small>
+              <strong>{t('LDR Light Sensor')}</strong>
+              <small>{t('Analog Out · 3.2V (640 Lux)')}</small>
             </div>
           </div>
 
@@ -218,8 +220,8 @@ export function HeroCircuitScene() {
               <Zap size={20} />
             </div>
             <div>
-              <strong>5V Opto-Relay</strong>
-              <small>State: Energized (NC Opened)</small>
+              <strong>{t('5V Opto-Relay')}</strong>
+              <small>{t('State: Energized (NC Opened)')}</small>
             </div>
           </div>
 
@@ -229,8 +231,8 @@ export function HeroCircuitScene() {
               <PackageCheck size={20} />
             </div>
             <div>
-              <strong>Bill of Materials</strong>
-              <small>3 Parts Verified · Footprints OK</small>
+              <strong>{t('Bill of Materials')}</strong>
+              <small>{t('3 Parts Verified · Footprints OK')}</small>
             </div>
           </div>
 
@@ -244,7 +246,7 @@ export function HeroCircuitScene() {
           <div className="hero-scope">
             <div className="hero-scope__label">
               <Activity size={14} className="text-teal" />
-              <span>Scope Ch1: 10 kHz</span>
+              <span>{t('Scope Ch1: 10 kHz')}</span>
             </div>
             <svg viewBox="0 0 160 40" preserveAspectRatio="none">
               <polyline points="0,20 20,20 30,5 45,35 60,20 85,20 95,5 110,35 125,20 160,20" />
@@ -255,11 +257,11 @@ export function HeroCircuitScene() {
         <div className="hero-scene__footer">
           <span>
             <Cable size={14} />
-            Interactive Netlist Routing
+            {t('Interactive Netlist Routing')}
           </span>
           <span className="hero-scene__footer-right">
             <CheckCircle2 size={14} className="text-teal" />
-            AVR transient solver synchronized
+            {t('AVR transient solver synchronized')}
           </span>
         </div>
       </div>

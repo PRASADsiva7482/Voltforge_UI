@@ -19,8 +19,10 @@ import { CapabilityCard, HeroCircuitScene, LandingNav, MenuPreview, WorkflowStri
 import { BrandMark } from '../../components/brand/BrandMark'
 import { Button } from '../../components/ui'
 import { useAuth } from '../../auth/useAuth'
+import { useTranslation } from 'react-i18next'
 
 const capabilities = [
+
   {
     icon: CircuitBoard,
     label: 'Circuit Editor',
@@ -95,6 +97,7 @@ const workflow = [
 export function LandingPage() {
   const auth = useAuth()
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   return (
     <main className="landing-page">
@@ -104,10 +107,10 @@ export function LandingPage() {
       {/* 1. CAPABILITIES SECTION */}
       <section className="landing-section" id="capabilities">
         <div className="landing-section__heading">
-          <p className="vf-eyebrow">Platform Capabilities</p>
-          <h2>One unified platform for modern electronics engineering.</h2>
+          <p className="vf-eyebrow">{t("Platform Capabilities")}</p>
+          <h2>{t("One unified platform for modern electronics engineering.")}</h2>
           <p className="landing-section__subtext">
-            Everything you need to design, program, test, and validate embedded systems without needing physical hardware on your desk.
+            {t("Everything you need to design, program, test, and validate embedded systems without needing physical hardware on your desk.")}
           </p>
         </div>
         <div className="capability-grid">
@@ -120,10 +123,10 @@ export function LandingPage() {
       {/* 2. WORKFLOW SECTION */}
       <section className="landing-section landing-section--workflow" id="workflow">
         <div className="landing-section__heading landing-section__heading--center">
-          <p className="vf-eyebrow">Engineering Workflow</p>
-          <h2>From idea to simulated circuit in four streamlined steps.</h2>
+          <p className="vf-eyebrow">{t("Engineering Workflow")}</p>
+          <h2>{t("From idea to simulated circuit in four streamlined steps.")}</h2>
           <p className="landing-section__subtext">
-            A frictionless pipeline designed for rapid prototyping, education, and embedded systems development.
+            {t("A frictionless pipeline designed for rapid prototyping, education, and embedded systems development.")}
           </p>
         </div>
         <WorkflowStrip steps={workflow} />
@@ -132,10 +135,10 @@ export function LandingPage() {
       {/* 3. WORKSPACE SECTION */}
       <section className="landing-section workspace-preview" id="workspace">
         <div className="landing-section__heading">
-          <p className="vf-eyebrow">Cloud Workspace</p>
-          <h2>Keep your circuits, firmware, and prototypes organized.</h2>
+          <p className="vf-eyebrow">{t("Cloud Workspace")}</p>
+          <h2>{t("Keep your circuits, firmware, and prototypes organized.")}</h2>
           <p className="landing-section__subtext">
-            Manage your personal electronics projects, explore verified open-source schematics, and level up your skills in Challenge Labs.
+            {t("Manage your personal electronics projects, explore verified open-source schematics, and level up your skills in Challenge Labs.")}
           </p>
         </div>
         <MenuPreview />
@@ -146,11 +149,11 @@ export function LandingPage() {
         <div className="landing-cta-banner__content">
           <div className="landing-cta-banner__badge">
             <Sparkles size={14} className="text-teal" />
-            <span>Zero Install · 100% In-Browser Simulation</span>
+            <span>{t("Zero Install · 100% In-Browser Simulation")}</span>
           </div>
-          <h2>Ready to bring your circuits to life?</h2>
+          <h2>{t("Ready to bring your circuits to life?")}</h2>
           <p>
-            Start breadboarding, writing firmware, and simulating transient circuits right in your browser in seconds. No breadboards, jumper wires, or USB programmers needed.
+            {t("Start breadboarding, writing firmware, and simulating transient circuits right in your browser in seconds. No breadboards, jumper wires, or USB programmers needed.")}
           </p>
           <div className="landing-cta-banner__actions">
             <Button
@@ -160,7 +163,7 @@ export function LandingPage() {
               icon={<Play size={16} />}
               trailingIcon={<ArrowRight size={16} />}
             >
-              Launch Simulator Sandbox
+              {t("Launch Simulator Sandbox")}
             </Button>
             {!auth.isAuthenticated && (
               <Button
@@ -168,7 +171,7 @@ export function LandingPage() {
                 size="lg"
                 variant="secondary"
               >
-                Create Free Account
+                {t("Sign Up")}
               </Button>
             )}
           </div>
@@ -182,72 +185,67 @@ export function LandingPage() {
           <div className="landing-footer__brand-col">
             <BrandMark />
             <p className="landing-footer__tagline">
-              Next-generation cloud electronics workspace for circuit simulation, firmware development, and embedded engineering.
+              {t("Next-generation cloud electronics workspace for circuit simulation, firmware development, and embedded engineering.")}
             </p>
             <div className="landing-footer__status">
               <span className="status-dot status-dot--active" />
-              <span>All Systems Operational · AVR Engine v2.4</span>
+              <span>{t("All Systems Operational · AVR Engine v2.4")}</span>
             </div>
           </div>
 
           {/* Column 1: Platform */}
           <div className="landing-footer__col">
-            <h4>Platform</h4>
+            <h4>{t("Platform")}</h4>
             <ul>
               <li>
-                <Link to="/editor/share">Circuit Canvas Sandbox</Link>
+                <Link to="/editor/share">{t("Circuit Canvas Sandbox")}</Link>
               </li>
               <li>
-                <a href="#capabilities">Firmware Studio</a>
+                <a href="#capabilities">{t("Firmware Studio")}</a>
               </li>
               <li>
-                <Link to="/labs">Challenge Labs</Link>
+                <Link to="/labs">{t("Challenge Labs")}</Link>
               </li>
               <li>
-                <Link to="/explore">Public Circuit Gallery</Link>
+                <Link to="/explore">{t("Public Circuit Gallery")}</Link>
               </li>
               <li>
-                <a href="#workflow">BOM & Netlist Export</a>
+                <a href="#workflow">{t("BOM & Netlist Export")}</a>
               </li>
             </ul>
           </div>
 
           {/* Column 2: Resources & Learning */}
           <div className="landing-footer__col">
-            <h4>Resources</h4>
+            <h4>{t("Resources")}</h4>
             <ul>
               <li>
-                <a href="#preview">Interactive Tour</a>
+                <a href="#preview">{t("Interactive Tour")}</a>
               </li>
               <li>
-                <Link to="/labs">Microcontroller Tutorials</Link>
+                <Link to="/labs">{t("Microcontroller Tutorials")}</Link>
               </li>
               <li>
-                <a href="#workflow">Documentation</a>
-              </li>
-              <li>
-                <a href="https://github.com" target="_blank" rel="noopener noreferrer">
-                  GitHub Repository
-                </a>
+                <a href="#workflow">{t("Documentation")}</a>
               </li>
             </ul>
           </div>
 
           {/* Column 3: Security & Governance */}
           <div className="landing-footer__col">
-            <h4>Security</h4>
+            <h4>{t("Security")}</h4>
             <ul>
               <li>
-                <span>Guarded by Volt Security Shield</span>
+                <span>{t("Guarded by Volt Security Shield")}</span>
               </li>
               <li>
-                <span>256-Bit TLS Enclave</span>
+                <span>{t("256-Bit TLS Enclave")}</span>
               </li>
               <li>
-                <span>Two-Factor Authentication (TOTP)</span>
+                <span>{t("Two-Factor Authentication (TOTP)")}</span>
               </li>
               <li>
-                <span>RFC 6238 Compliant</span>
+                <span>{t("RFC 6238 Compliant")}</span>
               </li>
             </ul>
           </div>
@@ -255,16 +253,16 @@ export function LandingPage() {
 
         {/* Bottom Bar */}
         <div className="landing-footer__bottom">
-          <span>© 2026 Voltforge. All rights reserved.</span>
+          <span>{t("© 2026 Voltforge. All rights reserved.")}</span>
           <div className="landing-footer__meta-tags">
             <span>
-              <Cpu size={14} /> 50+ MCUs & Components
+              <Cpu size={14} /> {t("50+ MCUs & Components")}
             </span>
             <span>
-              <Compass size={14} /> Open Schematics
+              <Compass size={14} /> {t("Open Schematics")}
             </span>
             <span>
-              <ShieldCheck size={14} /> TLS Encrypted Enclave
+              <ShieldCheck size={14} /> {t("TLS Encrypted Enclave")}
             </span>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Activity,
   Binary,
@@ -68,35 +69,48 @@ const terminalLines = [
 ]
 
 export function CircuitPlayground() {
+  const { t } = useTranslation()
   const [activeNode, setActiveNode] = useState(nodes[0].id)
   const [activeTab, setActiveTab] = useState('design')
   const [mode, setMode] = useState('select')
 
   const selectedNode = nodes.find((node) => node.id === activeNode) ?? nodes[0]
 
+  const localizedTabs = [
+    { count: 12, id: 'design', label: t('Design') },
+    { count: 4, id: 'simulate', label: t('Simulate') },
+    { count: 2, id: 'firmware', label: t('Firmware') },
+  ]
+
+  const localizedModes = [
+    { icon: <MousePointer2 size={15} />, id: 'select', label: t('Select') },
+    { icon: <Cable size={15} />, id: 'wire', label: t('Wire') },
+    { icon: <Crosshair size={15} />, id: 'probe', label: t('Probe') },
+  ]
+
   return (
-    <section className="vf-playground" aria-label="Circuit playground">
+    <section className="vf-playground" aria-label={t('Circuit playground')}>
       <header className="vf-playground__header">
         <div>
-          <p className="vf-eyebrow">Circuit playground</p>
-          <h2>Workspace shell for schematic, firmware, and simulation</h2>
+          <p className="vf-eyebrow">{t('Circuit playground')}</p>
+          <h2>{t('Workspace shell for schematic, firmware, and simulation')}</h2>
         </div>
         <div className="vf-playground__actions">
           <Button icon={<Play size={16} />} variant="primary">
-            Run simulation
+            {t('Run simulation')}
           </Button>
-          <IconButton icon={<Save size={17} />} label="Save project" tone="primary" />
-          <IconButton icon={<Maximize2 size={17} />} label="Fullscreen" />
+          <IconButton icon={<Save size={17} />} label={t('Save project')} tone="primary" />
+          <IconButton icon={<Maximize2 size={17} />} label={t('Fullscreen')} />
         </div>
       </header>
 
-      <Tabs items={tabs} onChange={setActiveTab} value={activeTab} />
+      <Tabs items={localizedTabs} onChange={setActiveTab} value={activeTab} />
 
       <div className="vf-playground__grid">
         <aside className="vf-playground__palette" aria-label="Component palette">
           <div className="vf-panel-heading">
-            <span>Palette</span>
-            <Badge tone="info">4 ready</Badge>
+            <span>{t('Palette')}</span>
+            <Badge tone="info">4 {t('ready')}</Badge>
           </div>
           {palette.map((item) => (
             <button className="vf-palette-item" key={item.label} type="button">
@@ -111,11 +125,11 @@ export function CircuitPlayground() {
 
         <div className="vf-canvas-panel">
           <Toolbar>
-            <SegmentedControl onChange={setMode} options={modes} value={mode} />
+            <SegmentedControl onChange={setMode} options={localizedModes} value={mode} />
             <span className="vf-toolbar__divider" />
-            <IconButton icon={<Grid2X2 size={16} />} label="Toggle grid" />
-            <IconButton icon={<RotateCcw size={16} />} label="Reset view" />
-            <IconButton icon={<Settings2 size={16} />} label="Canvas settings" />
+            <IconButton icon={<Grid2X2 size={16} />} label={t('Toggle grid')} />
+            <IconButton icon={<RotateCcw size={16} />} label={t('Reset view')} />
+            <IconButton icon={<Settings2 size={16} />} label={t('Canvas settings')} />
           </Toolbar>
 
           <div className="vf-circuit-canvas">
@@ -146,21 +160,21 @@ export function CircuitPlayground() {
 
         <aside className="vf-playground__inspector" aria-label="Inspector">
           <div className="vf-panel-heading">
-            <span>Inspector</span>
+            <span>{t('Inspector')}</span>
             <Badge dot tone="success">
-              Linked
+              {t('Linked')}
             </Badge>
           </div>
           <PropertyGrid
             items={[
-              { label: 'Selection', value: selectedNode.label },
-              { label: 'Mode', value: mode },
-              { label: 'Pin map', value: selectedNode.id === 'uno' ? 'D2, D8, 5V, GND' : selectedNode.meta },
-              { label: 'Rule check', value: 'No blocking errors' },
+              { label: t('Selection'), value: selectedNode.label },
+              { label: t('Mode'), value: mode },
+              { label: t('Pin map'), value: selectedNode.id === 'uno' ? 'D2, D8, 5V, GND' : selectedNode.meta },
+              { label: t('Rule check'), value: t('No blocking errors') },
             ]}
           />
           <div className="vf-inspector-callout">
-            <span>Verify terminal outputs and watch signal waves on the oscilloscope grid below.</span>
+            <span>{t('Verify terminal outputs and watch signal waves on the oscilloscope grid below.')}</span>
           </div>
         </aside>
       </div>
@@ -169,8 +183,8 @@ export function CircuitPlayground() {
         <Terminal lines={terminalLines} />
         <div className="vf-scope">
           <header>
-            <span>Oscilloscope</span>
-            <Badge tone="success">Live</Badge>
+            <span>{t('Oscilloscope')}</span>
+            <Badge tone="success">{t('Live')}</Badge>
           </header>
           <div className="vf-scope__screen">
             <svg viewBox="0 0 320 100" preserveAspectRatio="none">

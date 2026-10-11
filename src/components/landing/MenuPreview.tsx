@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Activity, ArrowUpRight, Cpu, Layers, Sparkles, Zap } from 'lucide-react'
 import { getNavItems } from '../../config/navigation'
 import { Badge } from '../ui'
@@ -36,10 +37,11 @@ const previewProjects = [
 ]
 
 export function MenuPreview() {
+  const { t } = useTranslation()
   return (
     <div className="menu-preview">
       <div className="menu-preview__rail">
-        <div className="menu-preview__rail-title">Navigation</div>
+        <div className="menu-preview__rail-title">{t('Navigation')}</div>
         {getNavItems().map((item, idx) => {
           const Icon = item.icon
           const isActive = idx === 0
@@ -49,7 +51,7 @@ export function MenuPreview() {
               className={`menu-preview__rail-item ${isActive ? 'is-active' : ''}`}
             >
               <Icon size={16} />
-              <span>{item.label}</span>
+              <span>{t(item.label)}</span>
             </span>
           )
         })}
@@ -60,12 +62,12 @@ export function MenuPreview() {
           <div>
             <div className="menu-preview__badge-wrapper">
               <Badge tone="success" dot>
-                Live Workspace Experience
+                {t('Live Workspace Experience')}
               </Badge>
             </div>
-            <h3 className="menu-preview__heading">Pick up where you left off.</h3>
+            <h3 className="menu-preview__heading">{t('Pick up where you left off.')}</h3>
             <p className="menu-preview__subtext">
-              Jump straight into recent circuits, test live microcontroller code, or explore community hardware schematics.
+              {t('Jump straight into recent circuits, test live microcontroller code, or explore community hardware schematics.')}
             </p>
           </div>
         </div>
@@ -98,15 +100,15 @@ export function MenuPreview() {
         <div className="menu-preview__metrics">
           <div className="menu-preview__metric">
             <Sparkles size={14} className="text-teal" />
-            <span>50+ Microcontrollers & Sensors</span>
+            <span>{t('50+ Microcontrollers & Sensors')}</span>
           </div>
           <div className="menu-preview__metric">
             <Activity size={14} className="text-teal" />
-            <span>Cycle-Accurate Transient Simulation</span>
+            <span>{t('Cycle-Accurate Transient Simulation')}</span>
           </div>
           <div className="menu-preview__metric">
             <Layers size={14} className="text-teal" />
-            <span>Automated Netlist & BOM Routing</span>
+            <span>{t('Automated Netlist & BOM Routing')}</span>
           </div>
         </div>
       </div>

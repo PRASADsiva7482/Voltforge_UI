@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Settings, Globe, Lock, Save, Trash2, Cpu, Search } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
@@ -31,6 +32,7 @@ const BOARD_FAMILIES = Array.from(
   .map(([family]) => family)
 
 export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
+  const { t } = useTranslation()
   const { currentProject, setCurrentProject, mergeProjectMetadata } = useProjectStore()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -136,11 +138,11 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
         icon={<Trash2 size={14} />}
         onClick={() => setConfirmDeleteOpen(true)}
       >
-        Delete Project
+        {t('Delete Project')}
       </Button>
       <div className="vf-settings-footer-actions">
         <Button variant="ghost" size="sm" onClick={onClose}>
-          Cancel
+          {t('Cancel')}
         </Button>
         <Button
           variant="primary"
@@ -150,7 +152,7 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
           isLoading={updateMutation.isPending}
           icon={<Save size={14} />}
         >
-          Save Changes
+          {t('Save Changes')}
         </Button>
       </div>
     </div>
@@ -161,13 +163,13 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        title="Project Settings"
+        title={t('Project Settings')}
         icon={<Settings size={18} />}
         footer={footer}
         size="md"
       >
         <div className="vf-settings-form">
-          <FieldShell label="Project Name">
+          <FieldShell label={t('Project Name')}>
             <TextInput
               id="settings-name"
               type="text"
@@ -176,7 +178,7 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
             />
           </FieldShell>
 
-          <FieldShell label="Description">
+          <FieldShell label={t('Description')}>
             <Textarea
               id="settings-desc"
               value={description}
@@ -185,14 +187,14 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
             />
           </FieldShell>
 
-          <FieldShell label={`Board Platform (${filteredBoards.length})`}>
+          <FieldShell label={`${t('Board Platform')} (${filteredBoards.length})`}>
             {/* Search input */}
             <div className="vf-settings-board-search">
               <Search size={14} className="vf-settings-board-search__icon" />
               <input
                 className="vf-settings-board-search__input"
                 type="text"
-                placeholder="Search boards…"
+                placeholder={t('Search boards…')}
                 value={boardSearch}
                 onChange={(e) => setBoardSearch(e.target.value)}
               />
@@ -205,7 +207,7 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
                 className={`vf-settings-family-chip ${selectedFamily === 'All' ? 'is-active' : ''}`}
                 onClick={() => setSelectedFamily('All')}
               >
-                All
+                {t('All')}
               </button>
               {BOARD_FAMILIES.map((family) => (
                 <button
@@ -256,7 +258,7 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
                   </button>
                 ))}
                 {filteredBoards.length === 0 && (
-                  <div className="vf-settings-board-empty">No boards match your search.</div>
+                  <div className="vf-settings-board-empty">{t('No boards match your search.')}</div>
                 )}
               </div>
             </div>
@@ -270,11 +272,11 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
           </FieldShell>
 
           <FieldShell
-            label="Project Visibility"
+            label={t('Project Visibility')}
             hint={
               isPublic
-                ? 'Anyone can view and fork this project.'
-                : 'Only you can access this project.'
+                ? t('Anyone can view and fork this project.')
+                : t('Only you can access this project.')
             }
           >
             <div className="vf-settings-visibility-row">
@@ -284,7 +286,7 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
                 className={`vf-settings-visibility-btn ${isPublic ? 'is-active' : ''}`}
               >
                 <Globe size={14} />
-                <span>Public</span>
+                <span>{t('Public')}</span>
               </button>
               <button
                 type="button"
@@ -292,18 +294,18 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
                 className={`vf-settings-visibility-btn ${!isPublic ? 'is-active' : ''}`}
               >
                 <Lock size={14} />
-                <span>Private</span>
+                <span>{t('Private')}</span>
               </button>
             </div>
           </FieldShell>
 
-          <FieldShell label="Tags">
+          <FieldShell label={t('Tags')}>
             <TextInput
               id="settings-tags"
               type="text"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
-              placeholder="iot, arduino, sensor (comma-separated)"
+              placeholder={t('iot, arduino, sensor (comma-separated)')}
             />
           </FieldShell>
         </div>
@@ -313,10 +315,10 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
         isOpen={confirmDeleteOpen}
         onClose={() => setConfirmDeleteOpen(false)}
         onConfirm={handleDelete}
-        title="Delete Project permanently?"
-        message="Are you sure you want to delete this project permanently? All files, netlist, and collaboration session history will be lost."
-        confirmLabel="Yes, Delete"
-        cancelLabel="Cancel"
+        title={t('Delete Project permanently?')}
+        message={t('Are you sure you want to delete this project permanently? All files, netlist, and collaboration session history will be lost.')}
+        confirmLabel={t('Yes, Delete')}
+        cancelLabel={t('Cancel')}
       />
     </>
   )

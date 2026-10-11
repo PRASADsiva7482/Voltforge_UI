@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Gauge, Volume2, VolumeX } from 'lucide-react'
 import { FloatingPanel } from '../../components/ui/FloatingPanel'
 import { Tabs } from '../../components/ui/Tabs'
+import { useTranslation } from 'react-i18next'
 
 import { useSimulationStore } from '../../store/simulationStore'
 
@@ -28,6 +29,7 @@ export default function MultimeterPanel({
   redProbePin: propRedPin,
   blackProbePin: propBlackPin,
 }: Props) {
+  const { t } = useTranslation()
   const storeLiveMeter = useSimulationStore((s) => s.liveMeter)
   const setMeterMode = useSimulationStore((s) => s.setMeterMode)
   const voltage = propVoltage !== undefined ? propVoltage : storeLiveMeter.voltage
@@ -97,9 +99,9 @@ export default function MultimeterPanel({
 
   const displayReading = isHold && holdValue !== null ? holdValue : rawReading
   const displayString = mode === 'CONT'
-    ? (resistanceUnsafe ? 'POWER OFF' : isContinuityShort ? '0.00 BEEP' : 'OPEN')
+    ? (resistanceUnsafe ? t('POWER OFF') : isContinuityShort ? t('0.00 BEEP') : t('OPEN'))
     : mode === 'OHM' && resistanceUnsafe
-      ? 'POWER OFF'
+      ? t('POWER OFF')
       : mode === 'OHM' && !Number.isFinite(displayReading)
         ? 'OL'
         : displayReading.toFixed(2)
@@ -116,7 +118,7 @@ export default function MultimeterPanel({
     <FloatingPanel
       isOpen={isOpen}
       onClose={onClose}
-      title="Digital Multimeter (DMM)"
+      title={t("Digital Multimeter (DMM)")}
       icon={<Gauge size={14} className="vf-pulse-dot" />}
       width="280px"
     >
@@ -145,7 +147,7 @@ export default function MultimeterPanel({
               fontWeight: 600
             }}
           >
-            {isHold ? 'HOLD ACTIVE' : 'DATA HOLD'}
+            {isHold ? t('HOLD ACTIVE') : t('DATA HOLD')}
           </button>
 
           <button
@@ -157,7 +159,7 @@ export default function MultimeterPanel({
               color: soundEnabled ? '#22c55e' : '#64748b',
               cursor: 'pointer'
             }}
-            title={soundEnabled ? 'Buzzer Sound On' : 'Buzzer Sound Muted'}
+            title={soundEnabled ? t('Buzzer Sound On') : t('Buzzer Sound Muted')}
           >
             {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
           </button>
@@ -174,7 +176,7 @@ export default function MultimeterPanel({
           transition: 'all 0.15s ease'
         }}>
           <div style={{ fontSize: '10px', color: '#94a3b8', display: 'flex', justifyContent: 'space-between' }}>
-            <span>AUTO RANGE</span>
+            <span>{t("AUTO RANGE")}</span>
             <span>{unit}</span>
           </div>
           <div style={{
@@ -225,10 +227,10 @@ export default function MultimeterPanel({
 
         <p className="vf-multimeter-hint" style={{ fontSize: '10px', color: resistanceUnsafe ? '#f87171' : '#64748b', textAlign: 'center', marginTop: '6px' }}>
           {mode === 'mA'
-            ? 'Current mode inserts a 0.1 Ω shunt between both probes'
+            ? t('Current mode inserts a 0.1 Ω shunt between both probes')
             : mode === 'OHM' || mode === 'CONT'
-              ? resistanceUnsafe ? 'Turn off every external power source before measuring resistance' : 'Resistance mode uses the meter’s internal 1 V test source'
-              : 'Attach both probe clips to pins on the canvas to measure voltage'}
+              ? resistanceUnsafe ? t('Turn off every external power source before measuring resistance') : t('Resistance mode uses the meter’s internal 1 V test source')
+              : t('Attach both probe clips to pins on the canvas to measure voltage')}
         </p>
       </div>
     </FloatingPanel>

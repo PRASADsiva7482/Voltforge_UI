@@ -38,8 +38,20 @@ import {
   Loader2,
   Lightbulb,
   LogIn,
+  Terminal,
+  Plus,
+  X,
+  Rows2,
+  Maximize2,
+  Scan,
+  Minus,
+  Copy,
 } from 'lucide-react'
 
+import { createCanvasNodeFromComponent } from '../canvas/componentFactory'
+import { builtinCanvasComponents } from '../canvas/componentCatalog'
+
+import { useViewport } from '../../hooks/useViewport'
 import { pcbManufacturingApi, projectApi, simulationApi, projectExportApi, type PcbManufacturingPayload } from '../../api/services'
 import { useCanvasStore } from '../../store/canvasStore'
 import { usePcbStore } from '../../store/pcbStore'
@@ -49,6 +61,7 @@ import { useThemeStore } from '../../store/themeStore'
 import { useToastStore } from '../../store/useToastStore'
 import { useAuth } from '../../auth/useAuth'
 import { useCollaboration } from '../../hooks/useCollaboration'
+import { useTranslation } from 'react-i18next'
 
 import { analyzeCircuitSafety } from '../canvas/pinRegistry'
 import { isBoardComponentType, supportsAvr8js } from '../canvas/boardCatalog'
@@ -131,14 +144,16 @@ function SecondaryToolButton({
   onClick: () => void
   pressed?: boolean
 }) {
+  const { t } = useTranslation()
+  const translatedLabel = t(label)
   return (
     <button
       className={`vf-editor__secondary-tool ${pressed ? 'is-active' : ''}`}
       onClick={onClick}
       type="button"
-      aria-label={label}
+      aria-label={translatedLabel}
       aria-pressed={typeof pressed === 'boolean' ? pressed : undefined}
-      title={label}
+      title={translatedLabel}
     >
       {icon}
     </button>
@@ -203,6 +218,20 @@ function decodeShareState(value: string) {
   return decoded;
 }
 
+const QUICK_MOBILE_COMPONENTS = [
+  { type: 'RESISTOR', label: 'Resistor', symbol: '⚡' },
+  { type: 'LED_STANDARD', label: 'LED', symbol: '💡' },
+  { type: 'PUSH_BUTTON', label: 'Button', symbol: '🔘' },
+  { type: 'POTENTIOMETER', label: 'Pot', symbol: '🎛️' },
+  { type: 'BREADBOARD', label: 'Breadboard', symbol: '🔌' },
+  { type: 'ARDUINO_UNO', label: 'Arduino Uno', symbol: '💻' },
+  { type: 'BUZZER', label: 'Buzzer', symbol: '🔊' },
+  { type: 'LDR', label: 'LDR', symbol: '☀️' },
+  { type: 'SERVO_MOTOR', label: 'Servo', symbol: '⚙️' },
+  { type: 'RELAY_SINGLE', label: 'Relay', symbol: '⏱️' },
+  { type: 'CERAMIC_CAPACITOR', label: 'Capacitor', symbol: '🔋' },
+]
+
 export default function CircuitEditorPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
@@ -245,8 +274,70 @@ export default function CircuitEditorPage() {
   const loadPcb = usePcbStore((s) => s.loadPcb)
 
   // Visual/Panel toggles
+  const { isMobile, isTablet } = useViewport()
+  const { t } = useTranslation()
+  const [mobileTab, setMobileTab] = useState<'canvas' | 'code' | 'console' | 'pcb'>('canvas')
+  const [mobileLayoutMode, setMobileLayoutMode] = useState<'single' | 'split'>('single')
+  const [splitBottomTab, setSplitBottomTab] = useState<'code' | 'console'>('code')
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const selectedNodeId = useCanvasStore((s) => s.selectedNodeId)
+  const selectedWireId = useCanvasStore((s) => s.selectedWireId)
+  const nodes = useCanvasStore((s) => s.nodes)
+  const wires = useCanvasStore((s) => s.wires)
+  const selectedNode = selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) : null
+  const selectedWire = selectedWireId ? wires.find((w) => w.id === selectedWireId) : null
+
+  const handleQuickAdd = useCallback((type: string) => {
+    const library = useCanvasStore.getState().componentLibrary
+    const comp = library.find((c) => c.type === type) || builtinCanvasComponents.find((c) => c.type === type)
+    if (!comp) return
+
+    const { viewport } = useCanvasStore.getState()
+    const targetCenterX = Math.min(Math.max((typeof window !== 'undefined' ? window.innerWidth : 390) / 2, 120), 300)
+    const targetCenterY = Math.min(Math.max((typeof window !== 'undefined' ? window.innerHeight : 700) / 2 - 80, 120), 300)
+    const spawnX = (targetCenterX - viewport.x) / viewport.scale
+    const spawnY = (targetCenterY - viewport.y) / viewport.scale
+
+    const node = createCanvasNodeFromComponent(comp, { x: spawnX, y: spawnY })
+    useCanvasStore.getState().addNode(node)
+    useCanvasStore.getState().selectNode(node.id)
+  }, [])
+
+  const handleDuplicateSelected = useCallback(() => {
+    if (!selectedNode) return
+    const library = useCanvasStore.getState().componentLibrary
+    const comp = library.find((c) => c.type === selectedNode.type) || builtinCanvasComponents.find((c) => c.type === selectedNode.type)
+    if (!comp) return
+
+    const clone = createCanvasNodeFromComponent(comp, {
+      x: selectedNode.x + 35,
+      y: selectedNode.y + 35,
+      rotation: selectedNode.rotation,
+      properties: { ...selectedNode.properties },
+    })
+    useCanvasStore.getState().addNode(clone)
+    useCanvasStore.getState().selectNode(clone.id)
+  }, [selectedNode])
+
+  const handleTouchZoom = useCallback((factor: number) => {
+    const vp = useCanvasStore.getState().viewport
+    const newScale = Math.min(Math.max(vp.scale * factor, 0.25), 3)
+    useCanvasStore.getState().setViewport({ ...vp, scale: newScale })
+  }, [])
+
+  const handleResetZoom = useCallback(() => {
+    useCanvasStore.getState().setViewport({ x: 20, y: 20, scale: 1 })
+  }, [])
+
   const [viewMode, setViewMode] = useState<ViewMode>('split')
   const [leftPanelOpen, setLeftPanelOpen] = useState(true)
+
+  useEffect(() => {
+    if (isMobile) {
+      setLeftPanelOpen(false)
+    }
+  }, [isMobile])
+
   const [isSimulating, setIsSimulating] = useState(false)
   const [isSimulationPaused, setIsSimulationPaused] = useState(false)
   const [isCompilingFirmware, setIsCompilingFirmware] = useState(false)
@@ -750,15 +841,17 @@ export default function CircuitEditorPage() {
     if (!el) return
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setCanvasSize({
-          width: entry.contentRect.width,
-          height: entry.contentRect.height,
-        })
+        if (entry.contentRect.width > 30 && entry.contentRect.height > 30) {
+          setCanvasSize({
+            width: Math.round(entry.contentRect.width),
+            height: Math.round(entry.contentRect.height),
+          })
+        }
       }
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [leftPanelOpen, viewMode])
+  }, [leftPanelOpen, viewMode, mobileTab, isMobile, mobileLayoutMode])
 
   // ── Component Interaction (button press, relay activation, etc.) ──
   const handleComponentInteraction = useCallback(
@@ -1388,7 +1481,7 @@ export default function CircuitEditorPage() {
     return (
       <div className="vf-editor-loading">
         <Zap size={32} className="vf-spin" />
-        <span>Loading project...</span>
+        <span>{t("Loading project...")}</span>
       </div>
     )
   }
@@ -1427,8 +1520,89 @@ export default function CircuitEditorPage() {
         broadcastCanvasSync={broadcastCanvasSync}
       />
       <EditorAutosave enabled={!isPreset && !isSandbox && isOwner} onSave={handleAutosave} />
-      {/* ── Prioritized command ribbon ── */}
-      <header className={`vf-editor__ribbon ${secondaryToolsOpen ? 'is-expanded' : ''}`}>
+      {/* ── Mobile or Desktop command ribbon ── */}
+      {isMobile ? (
+        <header className="vf-editor-mobile-header">
+          <div className="vf-editor-mobile-header__main">
+            <button
+              className="vf-editor__back"
+              onClick={() => navigate(isSandbox ? '/' : '/projects')}
+              title={isSandbox ? 'Back to home' : 'Back to projects'}
+            >
+              <ArrowLeft size={16} />
+            </button>
+            <div className="vf-editor-mobile-header__title-wrap">
+              <span className="vf-editor-mobile-header__title" title={projectName}>{projectName}</span>
+              {!isSandbox && <EditorDirtyIndicator />}
+            </div>
+            <div className="vf-editor-mobile-header__actions">
+              <button
+                type="button"
+                className={`vf-editor-mobile-header__btn ${mobileLayoutMode === 'split' ? 'is-active' : ''}`}
+                onClick={() => setMobileLayoutMode((m) => (m === 'single' ? 'split' : 'single'))}
+                aria-label={mobileLayoutMode === 'single' ? t("Switch to Split View") : t("Switch to Single View")}
+                title={mobileLayoutMode === 'single' ? t("Switch to Split View") : t("Switch to Single View")}
+              >
+                {mobileLayoutMode === 'single' ? <Rows2 size={15} /> : <Square size={15} />}
+              </button>
+              <button
+                type="button"
+                className={`vf-editor-mobile-header__btn ${mobileMenuOpen ? 'is-active' : ''}`}
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label="Editor options & instruments"
+                title="Tools & Menu"
+              >
+                <SlidersHorizontal size={15} />
+              </button>
+            </div>
+          </div>
+          {mobileLayoutMode === 'single' && (
+            <div className="vf-editor-mobile-tabs" role="tablist" aria-label="Editor workspace tabs">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mobileTab === 'canvas'}
+              className={`vf-editor-mobile-tab ${mobileTab === 'canvas' ? 'is-active' : ''}`}
+              onClick={() => setMobileTab('canvas')}
+            >
+              <Layout size={13} />
+              <span>{t("Circuit")}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mobileTab === 'code'}
+              className={`vf-editor-mobile-tab ${mobileTab === 'code' ? 'is-active' : ''}`}
+              onClick={() => setMobileTab('code')}
+            >
+              <Code2 size={13} />
+              <span>{t("Code")}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mobileTab === 'console'}
+              className={`vf-editor-mobile-tab ${mobileTab === 'console' ? 'is-active' : ''}`}
+              onClick={() => setMobileTab('console')}
+            >
+              <Terminal size={13} />
+              <span>{t("Console")}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mobileTab === 'pcb'}
+              className={`vf-editor-mobile-tab ${mobileTab === 'pcb' ? 'is-active' : ''}`}
+              onClick={() => setMobileTab('pcb')}
+            >
+              <Layers size={13} />
+              <span>{t("PCB")}</span>
+            </button>
+          </div>
+          )}
+        </header>
+      ) : (
+        <header className={`vf-editor__ribbon ${secondaryToolsOpen ? 'is-expanded' : ''}`}>
         <div className="vf-editor__toolbar">
           <div className="vf-editor__toolbar-left">
           <button
@@ -1445,7 +1619,7 @@ export default function CircuitEditorPage() {
               {!isSandbox && !isPreset && (
                 <span className="vf-status-badge" aria-hidden={!isLiveSyncConnected}>
                   <span className="vf-status-badge__dot" />
-                  <span>Live Sync</span>
+                  <span>{t("Live Sync")}</span>
                 </span>
               )}
             </div>
@@ -1467,15 +1641,15 @@ export default function CircuitEditorPage() {
           {isSandbox && (
             <>
               <span className="vf-editor__divider" />
-              <label className="vf-editor__preset-control" title="Switch curated sandbox preset">
-                <span className="vf-editor__preset-label">Preset:</span>
+              <label className="vf-editor__preset-control" title={t("Switch curated sandbox preset")}>
+                <span className="vf-editor__preset-label">{t("Preset:")}</span>
                 <select
                   value={sandboxPreset}
                   onChange={(e) => handleSelectSandboxPreset(e.target.value as 'smart-device' | 'led-blink')}
                   aria-label="Sandbox preset"
                 >
-                  <option value="smart-device">Smart Automation (Motor & Relay)</option>
-                  <option value="led-blink">Interactive LED & Switch</option>
+                  <option value="smart-device">{t("Smart Automation (Motor & Relay)")}</option>
+                  <option value="led-blink">{t("Interactive LED & Switch")}</option>
                 </select>
               </label>
             </>
@@ -1487,7 +1661,7 @@ export default function CircuitEditorPage() {
             <button
               className={`vf-editor__view-btn ${viewMode === 'canvas' ? 'is-active' : ''}`}
               onClick={() => setViewMode('canvas')}
-              title="Canvas view"
+              title={t("Canvas view")}
               type="button"
               aria-pressed={viewMode === 'canvas'}
             >
@@ -1496,7 +1670,7 @@ export default function CircuitEditorPage() {
             <button
               className={`vf-editor__view-btn ${viewMode === 'split' ? 'is-active' : ''}`}
               onClick={() => setViewMode('split')}
-              title="Split view"
+              title={t("Split view")}
               type="button"
               aria-pressed={viewMode === 'split'}
             >
@@ -1506,7 +1680,7 @@ export default function CircuitEditorPage() {
             <button
               className={`vf-editor__view-btn ${viewMode === 'code' ? 'is-active' : ''}`}
               onClick={() => setViewMode('code')}
-              title="Code view"
+              title={t("Code view")}
               type="button"
               aria-pressed={viewMode === 'code'}
             >
@@ -1515,7 +1689,7 @@ export default function CircuitEditorPage() {
             <button
               className={`vf-editor__view-btn ${viewMode === 'pcb' ? 'is-active' : ''}`}
               onClick={() => setViewMode('pcb')}
-              title="2-Layer PCB Layout view"
+              title={t("2-Layer PCB Layout view")}
               type="button"
               aria-pressed={viewMode === 'pcb'}
             >
@@ -1525,10 +1699,10 @@ export default function CircuitEditorPage() {
 
           <span className="vf-editor__divider" />
 
-          <button className="vf-editor__tool-btn" onClick={undo} disabled={!isInteractive} title="Undo (Ctrl+Z)">
+          <button className="vf-editor__tool-btn" onClick={undo} disabled={!isInteractive} title={t("Undo (Ctrl+Z)")}>
             <Undo2 size={15} />
           </button>
-          <button className="vf-editor__tool-btn" onClick={redo} disabled={!isInteractive} title="Redo (Ctrl+Y)">
+          <button className="vf-editor__tool-btn" onClick={redo} disabled={!isInteractive} title={t("Redo (Ctrl+Y)")}>
             <Redo2 size={15} />
           </button>
 
@@ -1540,7 +1714,7 @@ export default function CircuitEditorPage() {
               ? 'Stop the simulation before changing solver and AVR fidelity'
               : 'Adaptive widens expensive solver timesteps and gives AVR execution a 4 ms frame slice; Full fidelity keeps the solver timestep and gives AVR an 8 ms slice'}
           >
-            <span>Fidelity</span>
+            <span>{t("Fidelity")}</span>
             <select
               value={fidelityMode}
               disabled={isSimulating}
@@ -1549,8 +1723,8 @@ export default function CircuitEditorPage() {
               )}
               aria-label="Solver fidelity"
             >
-              <option value="adaptive">Adaptive</option>
-              <option value="full-fidelity">Full fidelity</option>
+              <option value="adaptive">{t("Adaptive")}</option>
+              <option value="full-fidelity">{t("Full fidelity")}</option>
             </select>
           </label>
 
@@ -1582,7 +1756,7 @@ export default function CircuitEditorPage() {
               <Play size={13} fill="currentColor" />
             )}
             <span className="vf-editor__action-label">
-              {canvasRenderTraceRunning ? 'Canvas trace' : avrCompiledTraceRunning ? 'AVR trace' : isCompilingFirmware ? 'Compiling...' : isSimulating ? 'Stop' : 'Simulate'}
+              {canvasRenderTraceRunning ? 'Canvas trace' : avrCompiledTraceRunning ? 'AVR trace' : isCompilingFirmware ? t('Compiling...') : isSimulating ? t('Stop') : t('Run')}
             </span>
           </button>
 
@@ -1592,7 +1766,7 @@ export default function CircuitEditorPage() {
                 className="vf-editor__tool-btn"
                 onClick={handleRestartSimulation}
                 type="button"
-                title="Restart simulation (Ctrl+Enter)"
+                title={t("Restart simulation (Ctrl+Enter)")}
                 aria-label="Restart simulation"
               >
                 <RotateCw size={14} />
@@ -1636,11 +1810,11 @@ export default function CircuitEditorPage() {
                 className="vf-editor__theme-btn"
                 onClick={toggleTheme}
                 type="button"
-                title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+                title={theme === 'dark' ? t('Switch to light theme') : t('Switch to dark theme')}
                 aria-label="Toggle theme"
               >
                 {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-                <span className="vf-editor__action-label">{theme === 'dark' ? 'Light' : 'Dark'}</span>
+                <span className="vf-editor__action-label">{theme === 'dark' ? t('Light') : t('Dark')}</span>
               </button>
 
               <span className="vf-editor__divider" />
@@ -1650,11 +1824,11 @@ export default function CircuitEditorPage() {
                 className="vf-editor__save-btn vf-editor__login-btn"
                 onClick={() => navigate('/login')}
                 type="button"
-                title="Sign in to save and create custom circuits"
+                title={t("Sign in to save and create custom circuits")}
                 aria-label="Sign in to save"
               >
                 <LogIn size={14} />
-                <span className="vf-editor__action-label">Sign In to Save</span>
+                <span className="vf-editor__action-label">{t("Sign In")}</span>
               </button>
             </>
           ) : (
@@ -1670,7 +1844,7 @@ export default function CircuitEditorPage() {
                 title={secondaryToolsOpen ? 'Hide secondary editor tools' : 'Show secondary editor tools'}
               >
                 <SlidersHorizontal size={14} />
-                <span className="vf-editor__action-label">Tools</span>
+                <span className="vf-editor__action-label">{t("Tools & Menu")}</span>
                 {activeSecondaryToolCount > 0 && (
                   <span className="vf-editor__tools-count" aria-label={`${activeSecondaryToolCount} active tools`}>
                     {activeSecondaryToolCount}
@@ -1691,7 +1865,7 @@ export default function CircuitEditorPage() {
                   aria-label={isSaving ? 'Saving project' : 'Save project'}
                 >
                   <Save size={14} />
-                  <span className="vf-editor__action-label">{isSaving ? 'Saving...' : 'Save'}</span>
+                  <span className="vf-editor__action-label">{isSaving ? t('Loading') : t('Save')}</span>
                 </button>
               ) : projectSummary?.userForkId ? (
                 <button
@@ -1705,7 +1879,7 @@ export default function CircuitEditorPage() {
                   aria-label="Go to your fork"
                 >
                   <GitFork size={14} />
-                  <span className="vf-editor__action-label">Go to your Fork</span>
+                  <span className="vf-editor__action-label">{t("Fork")}</span>
                 </button>
               ) : (
                 <button
@@ -1720,7 +1894,7 @@ export default function CircuitEditorPage() {
                   aria-label={forkMutation.isPending ? 'Forking project' : 'Fork project to edit'}
                 >
                   <GitFork size={14} />
-                  <span className="vf-editor__action-label">{forkMutation.isPending ? 'Forking...' : 'Fork to Edit'}</span>
+                  <span className="vf-editor__action-label">{forkMutation.isPending ? t('Loading') : t('Fork')}</span>
                 </button>
               )}
             </>
@@ -1738,7 +1912,7 @@ export default function CircuitEditorPage() {
             aria-orientation="horizontal"
           >
             <div className="vf-editor__secondary-group">
-              <span className="vf-editor__secondary-label">Inspect</span>
+              <span className="vf-editor__secondary-label">{t("Inspect")}</span>
               <SecondaryToolButton
                 icon={<Gauge size={15} />}
                 label="Multimeter"
@@ -1762,7 +1936,7 @@ export default function CircuitEditorPage() {
             <span className="vf-editor__secondary-divider" />
 
             <div className="vf-editor__secondary-group">
-              <span className="vf-editor__secondary-label">Assist</span>
+              <span className="vf-editor__secondary-label">{t("Assist")}</span>
               <SecondaryToolButton
                 icon={<Sparkles size={15} />}
                 label="AI assistant"
@@ -1792,7 +1966,7 @@ export default function CircuitEditorPage() {
             <span className="vf-editor__secondary-divider" />
 
             <div className="vf-editor__secondary-group">
-              <span className="vf-editor__secondary-label">Workspace</span>
+              <span className="vf-editor__secondary-label">{t("Workspace")}</span>
               <SecondaryToolButton
                 icon={theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
                 label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
@@ -1815,7 +1989,7 @@ export default function CircuitEditorPage() {
             <span className="vf-editor__secondary-divider" />
 
             <div className="vf-editor__secondary-group">
-              <span className="vf-editor__secondary-label">Project</span>
+              <span className="vf-editor__secondary-label">{t("Project")}</span>
               <SecondaryToolButton
                 icon={<Share2 size={15} />}
                 label="Copy share link"
@@ -1841,81 +2015,208 @@ export default function CircuitEditorPage() {
           </div>
         )}
       </header>
+      )}
 
       {/* ── Main content ── */}
       <div className="vf-editor__body">
-        {/* Left panel — Component library */}
-        {leftPanelOpen && viewMode !== 'code' && (
+        {/* Left panel — Component library (Desktop only) */}
+        {!isMobile && leftPanelOpen && viewMode !== 'code' && (
           <aside className="vf-editor__left-panel">
-            <ComponentPanel readOnly={isSharedSnapshot ? true : (!isInteractive || canvasRenderTraceRunning || avrCompiledTraceRunning)} isSandbox={isSandbox} />
+            <ComponentPanel
+              readOnly={isSharedSnapshot ? true : (!isInteractive || canvasRenderTraceRunning || avrCompiledTraceRunning)}
+              isSandbox={isSandbox}
+            />
           </aside>
         )}
 
-        {/* Center Workspace (uses resizable SplitPane in split view) */}
+        {/* Center Workspace */}
         <div className="vf-editor__center">
           <div className="vf-editor__workspace" onContextMenu={handleContextMenu}>
-            {viewMode === 'split' ? (
-              <SplitPane
-                left={
-                  <div ref={canvasContainerRef} className="vf-editor__canvas-area is-split">
-                    <CircuitCanvas
-                      width={canvasSize.width}
-                      height={canvasSize.height}
-                      isSimulating={isSimulating}
-                      isProbeMode={showMultimeter}
-                      onProbeToggle={toggleMeterProbe}
-                      collaborators={activeUsers}
-                      onComponentInteraction={handleComponentInteraction}
-                      onCursorMove={broadcastCursorMove}
-                      readOnly={isSharedSnapshot ? true : (!isInteractive || canvasRenderTraceRunning || avrCompiledTraceRunning)}
-                    />
-                  </div>
-                }
-                right={
-                  <div className="vf-editor__code-area is-split">
-                    <EditorFeatureBoundary label="code editor">
-                      <CodeEditor readOnly={isSharedSnapshot ? true : !isInteractive} />
-                    </EditorFeatureBoundary>
-                  </div>
-                }
-              />
-            ) : (
-              <>
-                {viewMode === 'canvas' && (
-                  <div ref={canvasContainerRef} className="vf-editor__canvas-area">
-                    <CircuitCanvas
-                      width={canvasSize.width}
-                      height={canvasSize.height}
-                      isSimulating={isSimulating}
-                      isProbeMode={showMultimeter}
-                      onProbeToggle={toggleMeterProbe}
-                      collaborators={activeUsers}
-                      onComponentInteraction={handleComponentInteraction}
-                      onCursorMove={broadcastCursorMove}
-                      readOnly={isSharedSnapshot ? true : (!isInteractive || canvasRenderTraceRunning || avrCompiledTraceRunning)}
-                    />
-                  </div>
-                )}
-                {viewMode === 'code' && (
-                  <div className="vf-editor__code-area">
-                    <EditorFeatureBoundary label="code editor">
-                      <CodeEditor readOnly={isSharedSnapshot ? true : !isInteractive} />
-                    </EditorFeatureBoundary>
-                  </div>
-                )}
-                {viewMode === 'pcb' && (
-                  <div ref={canvasContainerRef} className="vf-editor__canvas-area">
-                    <EditorFeatureBoundary label="PCB workspace">
-                      <PcbCanvas
+            {isMobile ? (
+              // ── Mobile Tabbed or Split Stack Workspace ──
+              mobileLayoutMode === 'split' ? (
+                <div className="vf-editor-mobile-stack">
+                  <div className="vf-editor-mobile-stack__top">
+                    <div ref={canvasContainerRef} className="vf-editor__canvas-area is-mobile-stack">
+                      <CircuitCanvas
                         width={canvasSize.width}
                         height={canvasSize.height}
-                        projectName={projectName}
-                        readOnly={isSharedSnapshot ? true : !isInteractive}
+                        isSimulating={isSimulating}
+                        isProbeMode={showMultimeter}
+                        onProbeToggle={toggleMeterProbe}
+                        collaborators={activeUsers}
+                        onComponentInteraction={handleComponentInteraction}
+                        onCursorMove={broadcastCursorMove}
+                        readOnly={isSharedSnapshot ? true : (!isInteractive || canvasRenderTraceRunning || avrCompiledTraceRunning)}
                       />
-                    </EditorFeatureBoundary>
+                    </div>
                   </div>
-                )}
-              </>
+                  <div className="vf-editor-mobile-stack__divider">
+                    <div className="vf-editor-mobile-stack__tabs">
+                      <button
+                        type="button"
+                        className={`vf-editor-mobile-stack__tab ${splitBottomTab === 'code' ? 'is-active' : ''}`}
+                        onClick={() => setSplitBottomTab('code')}
+                      >
+                        <Code2 size={12} />
+                        <span>{t("Code")}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`vf-editor-mobile-stack__tab ${splitBottomTab === 'console' ? 'is-active' : ''}`}
+                        onClick={() => setSplitBottomTab('console')}
+                      >
+                        <Terminal size={12} />
+                        <span>{t("Console")}</span>
+                      </button>
+                    </div>
+                    <div className="vf-editor-mobile-stack__divider-actions">
+                      <button
+                        type="button"
+                        className={`vf-editor-mobile-stack__run-btn ${isSimulating ? 'is-running' : ''}`}
+                        onClick={toggleSimulation}
+                        disabled={isCompilingFirmware}
+                        title={isSimulating ? 'Stop simulation' : 'Start simulation'}
+                      >
+                        {isCompilingFirmware ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : isSimulating ? (
+                          <Square size={12} fill="currentColor" />
+                        ) : (
+                          <Play size={12} fill="currentColor" />
+                        )}
+                        <span>{isSimulating ? t('Stop') : t('Run')}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="vf-editor-mobile-stack__mode-toggle"
+                        onClick={() => setMobileLayoutMode('single')}
+                        title={t("Switch to Single View")}
+                      >
+                        <Maximize2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="vf-editor-mobile-stack__bottom">
+                    {splitBottomTab === 'code' ? (
+                      <EditorFeatureBoundary label="code editor">
+                        <CodeEditor readOnly={isSharedSnapshot ? true : !isInteractive} />
+                      </EditorFeatureBoundary>
+                    ) : (
+                      <div className="vf-editor__mobile-console-pane">
+                        <SerialMonitor />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {mobileTab === 'canvas' && (
+                    <div ref={canvasContainerRef} className="vf-editor__canvas-area">
+                      <CircuitCanvas
+                        width={canvasSize.width}
+                        height={canvasSize.height}
+                        isSimulating={isSimulating}
+                        isProbeMode={showMultimeter}
+                        onProbeToggle={toggleMeterProbe}
+                        collaborators={activeUsers}
+                        onComponentInteraction={handleComponentInteraction}
+                        onCursorMove={broadcastCursorMove}
+                        readOnly={isSharedSnapshot ? true : (!isInteractive || canvasRenderTraceRunning || avrCompiledTraceRunning)}
+                      />
+                    </div>
+                  )}
+                  {mobileTab === 'code' && (
+                    <div className="vf-editor__code-area">
+                      <EditorFeatureBoundary label="code editor">
+                        <CodeEditor readOnly={isSharedSnapshot ? true : !isInteractive} />
+                      </EditorFeatureBoundary>
+                    </div>
+                  )}
+                  {mobileTab === 'console' && (
+                    <div className="vf-editor__mobile-console-pane">
+                      <SerialMonitor />
+                    </div>
+                  )}
+                  {mobileTab === 'pcb' && (
+                    <div ref={canvasContainerRef} className="vf-editor__canvas-area">
+                      <EditorFeatureBoundary label="PCB workspace">
+                        <PcbCanvas
+                          width={canvasSize.width}
+                          height={canvasSize.height}
+                          projectName={projectName}
+                          readOnly={isSharedSnapshot ? true : !isInteractive}
+                        />
+                      </EditorFeatureBoundary>
+                    </div>
+                  )}
+                </>
+              )
+            ) : (
+              // ── Desktop / Tablet Workspace ──
+              viewMode === 'split' ? (
+                <SplitPane
+                  left={
+                    <div ref={canvasContainerRef} className="vf-editor__canvas-area is-split">
+                      <CircuitCanvas
+                        width={canvasSize.width}
+                        height={canvasSize.height}
+                        isSimulating={isSimulating}
+                        isProbeMode={showMultimeter}
+                        onProbeToggle={toggleMeterProbe}
+                        collaborators={activeUsers}
+                        onComponentInteraction={handleComponentInteraction}
+                        onCursorMove={broadcastCursorMove}
+                        readOnly={isSharedSnapshot ? true : (!isInteractive || canvasRenderTraceRunning || avrCompiledTraceRunning)}
+                      />
+                    </div>
+                  }
+                  right={
+                    <div className="vf-editor__code-area is-split">
+                      <EditorFeatureBoundary label="code editor">
+                        <CodeEditor readOnly={isSharedSnapshot ? true : !isInteractive} />
+                      </EditorFeatureBoundary>
+                    </div>
+                  }
+                />
+              ) : (
+                <>
+                  {viewMode === 'canvas' && (
+                    <div ref={canvasContainerRef} className="vf-editor__canvas-area">
+                      <CircuitCanvas
+                        width={canvasSize.width}
+                        height={canvasSize.height}
+                        isSimulating={isSimulating}
+                        isProbeMode={showMultimeter}
+                        onProbeToggle={toggleMeterProbe}
+                        collaborators={activeUsers}
+                        onComponentInteraction={handleComponentInteraction}
+                        onCursorMove={broadcastCursorMove}
+                        readOnly={isSharedSnapshot ? true : (!isInteractive || canvasRenderTraceRunning || avrCompiledTraceRunning)}
+                      />
+                    </div>
+                  )}
+                  {viewMode === 'code' && (
+                    <div className="vf-editor__code-area">
+                      <EditorFeatureBoundary label="code editor">
+                        <CodeEditor readOnly={isSharedSnapshot ? true : !isInteractive} />
+                      </EditorFeatureBoundary>
+                    </div>
+                  )}
+                  {viewMode === 'pcb' && (
+                    <div ref={canvasContainerRef} className="vf-editor__canvas-area">
+                      <EditorFeatureBoundary label="PCB workspace">
+                        <PcbCanvas
+                          width={canvasSize.width}
+                          height={canvasSize.height}
+                          projectName={projectName}
+                          readOnly={isSharedSnapshot ? true : !isInteractive}
+                        />
+                      </EditorFeatureBoundary>
+                    </div>
+                  )}
+                </>
+              )
             )}
 
             {/* Instrument floating overlays */}
@@ -1977,28 +2278,514 @@ export default function CircuitEditorPage() {
             <PropertyEditor readOnly={!isOwner || canvasRenderTraceRunning || avrCompiledTraceRunning} />
           </div>
 
-          {/* Serial monitor / Oscilloscope Trace splits */}
-          <div className="vf-editor-bottom-pane">
-            <SerialMonitor />
-            {!isSandbox && oscilloscopePanelOpen && (
-              <EditorFeatureBoundary label="oscilloscope">
-                <OscilloscopePanel
-                  simulationPaused={isSimulationPaused}
-                  onPause={() => {
-                    engineRef.current?.pause()
-                    setIsSimulationPaused(true)
-                  }}
-                  onResume={() => {
-                    engineRef.current?.resume()
-                    setIsSimulationPaused(false)
-                  }}
-                  onStep={() => engineRef.current?.step()}
-                />
-              </EditorFeatureBoundary>
-            )}
-          </div>
+          {/* Serial monitor / Oscilloscope Trace splits (Desktop only, mobile has dedicated console tab) */}
+          {!isMobile && (
+            <div className="vf-editor-bottom-pane">
+              <SerialMonitor />
+              {!isSandbox && oscilloscopePanelOpen && (
+                <EditorFeatureBoundary label="oscilloscope">
+                  <OscilloscopePanel
+                    simulationPaused={isSimulationPaused}
+                    onPause={() => {
+                      engineRef.current?.pause()
+                      setIsSimulationPaused(true)
+                    }}
+                    onResume={() => {
+                      engineRef.current?.resume()
+                      setIsSimulationPaused(false)
+                    }}
+                    onStep={() => engineRef.current?.step()}
+                  />
+                </EditorFeatureBoundary>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ── Mobile Floating Action Controls: Single Canvas Mode ── */}
+      {isMobile && mobileLayoutMode === 'single' && mobileTab === 'canvas' && (
+        <>
+          {/* Touch Zoom Controls on left */}
+          <div className="vf-editor-mobile-zoom-pill" role="group" aria-label="Touch zoom">
+            <button
+              type="button"
+              onClick={() => handleTouchZoom(1.25)}
+              title={t("Zoom In")}
+              aria-label={t("Zoom In")}
+            >
+              <Plus size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={handleResetZoom}
+              title={t("Fit to Screen")}
+              aria-label={t("Fit to Screen")}
+            >
+              <Scan size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTouchZoom(0.8)}
+              title={t("Zoom Out")}
+              aria-label={t("Zoom Out")}
+            >
+              <Minus size={14} />
+            </button>
+          </div>
+
+          {/* Contextual Selection HUD or Quick Component Tray */}
+          {selectedNode ? (
+            <div className="vf-editor-mobile-selected-hud" role="toolbar" aria-label="Selected component actions">
+              <div className="vf-editor-mobile-selected-hud__info">
+                <span className="vf-editor-mobile-selected-hud__name">{selectedNode.name || selectedNode.type}</span>
+                <button
+                  type="button"
+                  className="vf-editor-mobile-selected-hud__close"
+                  onClick={() => useCanvasStore.getState().selectNode(null)}
+                  title={t("Deselect")}
+                  aria-label={t("Deselect")}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+              <div className="vf-editor-mobile-selected-hud__actions">
+                <button
+                  type="button"
+                  className="vf-editor-mobile-selected-hud__btn"
+                  onClick={() => {
+                    const node = nodes.find((n) => n.id === selectedNode.id)
+                    if (node && !node.properties?.locked) {
+                      const newRotation = ((node.rotation || 0) + 90) % 360
+                      useCanvasStore.getState().updateNode(node.id, { rotation: newRotation })
+                    }
+                  }}
+                  title={t("Rotate 90°")}
+                >
+                  <RotateCw size={13} />
+                  <span>{t("Rotate")}</span>
+                </button>
+                <button
+                  type="button"
+                  className="vf-editor-mobile-selected-hud__btn"
+                  onClick={handleDuplicateSelected}
+                  title={t("Duplicate")}
+                >
+                  <Copy size={13} />
+                  <span>{t("Duplicate")}</span>
+                </button>
+                <button
+                  type="button"
+                  className="vf-editor-mobile-selected-hud__btn vf-editor-mobile-selected-hud__btn--danger"
+                  onClick={() => {
+                    useCanvasStore.getState().removeNode(selectedNode.id)
+                    useCanvasStore.getState().selectNode(null)
+                  }}
+                  title={t("Delete component")}
+                >
+                  <Trash2 size={13} />
+                  <span>{t("Delete")}</span>
+                </button>
+              </div>
+            </div>
+          ) : selectedWire ? (
+            <div className="vf-editor-mobile-selected-hud" role="toolbar" aria-label="Selected wire actions">
+              <div className="vf-editor-mobile-selected-hud__info">
+                <span className="vf-editor-mobile-selected-hud__name">{selectedWire.color || 'wire'}</span>
+                <button
+                  type="button"
+                  className="vf-editor-mobile-selected-hud__close"
+                  onClick={() => useCanvasStore.getState().selectWire(null)}
+                  title={t("Deselect")}
+                  aria-label={t("Deselect")}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+              <div className="vf-editor-mobile-selected-hud__actions">
+                <button
+                  type="button"
+                  className="vf-editor-mobile-selected-hud__btn vf-editor-mobile-selected-hud__btn--danger"
+                  onClick={() => {
+                    useCanvasStore.getState().removeWire(selectedWire.id)
+                    useCanvasStore.getState().selectWire(null)
+                  }}
+                  title={t("Delete wire")}
+                >
+                  <Trash2 size={13} />
+                  <span>{t("Delete Wire")}</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Quick Component Carousel when nothing is selected */
+            <div className="vf-editor-mobile-quick-tray" role="toolbar" aria-label="Quick components">
+              {QUICK_MOBILE_COMPONENTS.map((item) => (
+                <button
+                  key={item.type}
+                  type="button"
+                  className="vf-editor-mobile-quick-chip"
+                  onClick={() => handleQuickAdd(item.type)}
+                  disabled={!isInteractive || isSharedSnapshot}
+                  title={`Add ${item.label}`}
+                >
+                  <span className="vf-editor-mobile-quick-chip__icon">{item.symbol}</span>
+                  <span className="vf-editor-mobile-quick-chip__label">{t(item.label)}</span>
+                </button>
+              ))}
+              <button
+                type="button"
+                className="vf-editor-mobile-quick-chip vf-editor-mobile-quick-chip--more"
+                onClick={() => setLeftPanelOpen(true)}
+                title={t("More Components")}
+              >
+                <Plus size={13} />
+                <span>{t("More Components")}</span>
+              </button>
+            </div>
+          )}
+
+          {/* Primary Action Button (Play/Stop Simulation) */}
+          <div className="vf-editor-mobile-fab-bar">
+            <button
+              type="button"
+              className={`vf-editor-mobile-fab vf-editor-mobile-fab--sim ${isSimulating ? 'is-running' : ''}`}
+              onClick={toggleSimulation}
+              disabled={isCompilingFirmware}
+              title={isSimulating ? 'Stop simulation' : 'Start simulation'}
+              aria-label={isSimulating ? 'Stop simulation' : 'Start simulation'}
+            >
+              {isCompilingFirmware ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : isSimulating ? (
+                <Square size={16} fill="currentColor" />
+              ) : (
+                <Play size={16} fill="currentColor" />
+              )}
+              <span>{isSimulating ? t('Stop') : t('Run')}</span>
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* ── Mobile Floating Action Controls: Split Stack Mode ── */}
+      {isMobile && mobileLayoutMode === 'split' && (
+        <>
+          {/* Compact touch zoom pill for top split canvas */}
+          <div className="vf-editor-mobile-zoom-pill vf-editor-mobile-zoom-pill--split" role="group" aria-label="Touch zoom">
+            <button
+              type="button"
+              onClick={() => handleTouchZoom(1.25)}
+              title={t("Zoom In")}
+              aria-label={t("Zoom In")}
+            >
+              <Plus size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={handleResetZoom}
+              title={t("Fit to Screen")}
+              aria-label={t("Fit to Screen")}
+            >
+              <Scan size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTouchZoom(0.8)}
+              title={t("Zoom Out")}
+              aria-label={t("Zoom Out")}
+            >
+              <Minus size={14} />
+            </button>
+          </div>
+
+          {/* Contextual Selection HUD for top split canvas */}
+          {selectedNode && (
+            <div className="vf-editor-mobile-selected-hud vf-editor-mobile-selected-hud--split" role="toolbar" aria-label="Selected component actions">
+              <div className="vf-editor-mobile-selected-hud__info">
+                <span className="vf-editor-mobile-selected-hud__name">{selectedNode.name || selectedNode.type}</span>
+                <button
+                  type="button"
+                  className="vf-editor-mobile-selected-hud__close"
+                  onClick={() => useCanvasStore.getState().selectNode(null)}
+                  title={t("Deselect")}
+                  aria-label={t("Deselect")}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+              <div className="vf-editor-mobile-selected-hud__actions">
+                <button
+                  type="button"
+                  className="vf-editor-mobile-selected-hud__btn"
+                  onClick={() => {
+                    const node = nodes.find((n) => n.id === selectedNode.id)
+                    if (node && !node.properties?.locked) {
+                      const newRotation = ((node.rotation || 0) + 90) % 360
+                      useCanvasStore.getState().updateNode(node.id, { rotation: newRotation })
+                    }
+                  }}
+                  title={t("Rotate 90°")}
+                >
+                  <RotateCw size={13} />
+                  <span>{t("Rotate")}</span>
+                </button>
+                <button
+                  type="button"
+                  className="vf-editor-mobile-selected-hud__btn"
+                  onClick={handleDuplicateSelected}
+                  title={t("Duplicate")}
+                >
+                  <Copy size={13} />
+                  <span>{t("Duplicate")}</span>
+                </button>
+                <button
+                  type="button"
+                  className="vf-editor-mobile-selected-hud__btn vf-editor-mobile-selected-hud__btn--danger"
+                  onClick={() => {
+                    useCanvasStore.getState().removeNode(selectedNode.id)
+                    useCanvasStore.getState().selectNode(null)
+                  }}
+                  title={t("Delete component")}
+                >
+                  <Trash2 size={13} />
+                  <span>{t("Delete")}</span>
+                </button>
+              </div>
+            </div>
+          )}
+          {selectedWire && (
+            <div className="vf-editor-mobile-selected-hud vf-editor-mobile-selected-hud--split" role="toolbar" aria-label="Selected wire actions">
+              <div className="vf-editor-mobile-selected-hud__info">
+                <span className="vf-editor-mobile-selected-hud__name">{selectedWire.color || 'wire'}</span>
+                <button
+                  type="button"
+                  className="vf-editor-mobile-selected-hud__close"
+                  onClick={() => useCanvasStore.getState().selectWire(null)}
+                  title={t("Deselect")}
+                  aria-label={t("Deselect")}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+              <div className="vf-editor-mobile-selected-hud__actions">
+                <button
+                  type="button"
+                  className="vf-editor-mobile-selected-hud__btn vf-editor-mobile-selected-hud__btn--danger"
+                  onClick={() => {
+                    useCanvasStore.getState().removeWire(selectedWire.id)
+                    useCanvasStore.getState().selectWire(null)
+                  }}
+                  title={t("Delete wire")}
+                >
+                  <Trash2 size={13} />
+                  <span>{t("Delete Wire")}</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Mobile Component Library Bottom Sheet ── */}
+      {isMobile && leftPanelOpen && (
+        <div className="vf-mobile-sheet-overlay">
+          <div className="vf-mobile-sheet-backdrop" onClick={() => setLeftPanelOpen(false)} aria-hidden="true" />
+          <div className="vf-mobile-component-sheet" role="dialog" aria-modal="true" aria-label="Component library">
+            <ComponentPanel
+              readOnly={isSharedSnapshot ? true : (!isInteractive || canvasRenderTraceRunning || avrCompiledTraceRunning)}
+              isSandbox={isSandbox}
+              onClose={() => setLeftPanelOpen(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── Mobile Menu & Tools Bottom Sheet ── */}
+      {isMobile && mobileMenuOpen && (
+        <div className="vf-mobile-sheet-overlay">
+          <div className="vf-mobile-sheet-backdrop" onClick={() => setMobileMenuOpen(false)} aria-hidden="true" />
+          <div className="vf-mobile-menu-sheet" role="dialog" aria-modal="true" aria-label="Editor tools and actions">
+            <div className="vf-mobile-menu-sheet__header">
+              <h3>{t("Tools & Instruments")}</h3>
+              <button
+                type="button"
+                className="vf-mobile-menu-sheet__close"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-label="Close menu"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="vf-mobile-menu-sheet__body">
+              {isSandbox && (
+                <div className="vf-mobile-menu-item">
+                  <label>{t("Curated Sandbox Preset")}</label>
+                  <select
+                    value={sandboxPreset}
+                    onChange={(e) => {
+                      handleSelectSandboxPreset(e.target.value as 'smart-device' | 'led-blink')
+                      setMobileMenuOpen(false)
+                    }}
+                  >
+                    <option value="smart-device">{t("Smart Automation (Motor & Relay)")}</option>
+                    <option value="led-blink">{t("Interactive LED & Switch")}</option>
+                  </select>
+                </div>
+              )}
+
+              <div className="vf-mobile-menu-item">
+                <label>{t("Solver Fidelity")}</label>
+                <select
+                  value={fidelityMode}
+                  disabled={isSimulating}
+                  onChange={(e) => setFidelityMode(e.target.value === 'full-fidelity' ? 'full-fidelity' : 'adaptive')}
+                >
+                  <option value="adaptive">{t("Adaptive Timestep")}</option>
+                  <option value="full-fidelity">{t("Full Fidelity (Cycle-Accurate)")}</option>
+                </select>
+              </div>
+
+              <div className="vf-mobile-menu-grid">
+                <button
+                  type="button"
+                  className={`vf-mobile-menu-action ${showAiChat ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setShowAiChat(!showAiChat)
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  <Sparkles size={16} />
+                  <span>{t("AI Assistant")}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`vf-mobile-menu-action ${showBom ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setShowBom(!showBom)
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  <Package size={16} />
+                  <span>{t("Bill of Materials")}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`vf-mobile-menu-action ${showIotInspector ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setShowIotInspector(!showIotInspector)
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  <Wifi size={16} />
+                  <span>{t("IoT Inspector")}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`vf-mobile-menu-action ${showMultimeter ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setShowMultimeter(!showMultimeter)
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  <Gauge size={16} />
+                  <span>{t("Multimeter")}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`vf-mobile-menu-action ${oscilloscopePanelOpen ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setOscilloscopePanelOpen(!oscilloscopePanelOpen)
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  <Activity size={16} />
+                  <span>{t("Oscilloscope")}</span>
+                </button>
+                <button
+                  type="button"
+                  className="vf-mobile-menu-action"
+                  onClick={() => {
+                    toggleTheme()
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                  <span>{theme === 'dark' ? t("Light Theme") : t("Dark Theme")}</span>
+                </button>
+                <button
+                  type="button"
+                  className="vf-mobile-menu-action"
+                  onClick={() => {
+                    undo()
+                    setMobileMenuOpen(false)
+                  }}
+                  disabled={!isInteractive}
+                >
+                  <Undo2 size={16} />
+                  <span>{t("Undo")}</span>
+                </button>
+                <button
+                  type="button"
+                  className="vf-mobile-menu-action"
+                  onClick={() => {
+                    redo()
+                    setMobileMenuOpen(false)
+                  }}
+                  disabled={!isInteractive}
+                >
+                  <Redo2 size={16} />
+                  <span>{t("Redo")}</span>
+                </button>
+                <button
+                  type="button"
+                  className="vf-mobile-menu-action"
+                  onClick={() => {
+                    handleShare()
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  <Share2 size={16} />
+                  <span>{t("Share Link")}</span>
+                </button>
+              </div>
+
+              <div className="vf-mobile-menu-footer">
+                {isOwner ? (
+                  <button
+                    type="button"
+                    className="vf-mobile-menu-primary-btn"
+                    onClick={() => {
+                      handleSave()
+                      setMobileMenuOpen(false)
+                    }}
+                    disabled={isSaving || isPreset}
+                  >
+                    <Save size={15} />
+                    <span>{isSaving ? 'Saving Project...' : 'Save Project'}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="vf-mobile-menu-primary-btn"
+                    onClick={() => {
+                      if (projectSummary?.userForkId) {
+                        navigate(`/editor/${projectSummary.userForkId}`)
+                      } else {
+                        forkMutation.mutate()
+                      }
+                      setMobileMenuOpen(false)
+                    }}
+                  >
+                    <GitFork size={15} />
+                    <span>{projectSummary?.userForkId ? 'Go to your Fork' : 'Fork Project to Edit'}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Settings Modal */}
       {showSettings && (

@@ -1,6 +1,6 @@
 import { lazy, memo, Suspense, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Cpu, Zap, Thermometer, Monitor, Power, Settings2, Search, Radio, BatteryCharging, Plus, ChevronDown, ChevronRight, Gauge, Binary, Lock } from 'lucide-react';
+import { Cpu, Zap, Thermometer, Monitor, Power, Settings2, Search, Radio, BatteryCharging, Plus, ChevronDown, ChevronRight, Gauge, Binary, Lock, X } from 'lucide-react';
 import { aiApi, componentApi } from '../../api/services';
 import { useAuth } from '../../auth/useAuth';
 import { useCanvasStore } from '../../store/canvasStore';
@@ -9,6 +9,7 @@ import { mergeComponentLibrary } from '../canvas/componentCatalog';
 import type { AiComponentCoverageEntry, AiComponentCoverageResponse, ElectronicComponent } from '../../types/domain';
 import { aiComponentCoverageStatusClass, aiComponentCoverageStatusLabel } from '../ai/aiHardwareCoverage';
 import { buildPaletteIndex, filterPaletteIndex, getPalettePage, normalizePaletteSearch } from './componentPalette';
+import { useTranslation } from 'react-i18next';
 
 const CustomComponentStudio = lazy(() => import('../components/CustomComponentStudio'));
 
@@ -56,6 +57,7 @@ export const SANDBOX_PERMITTED_TYPES = new Set<string>([
 ]);
 
 const StudioLauncher = memo(function ComponentStudioLauncher({ readOnly, isSandbox }: { readOnly?: boolean; isSandbox?: boolean }) {
+  const { t } = useTranslation();
   const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
@@ -64,11 +66,11 @@ const StudioLauncher = memo(function ComponentStudioLauncher({ readOnly, isSandb
     {!readOnly && !isSandbox && <button
       onClick={() => { setLoaded(true); setOpen(true); }}
       className="vf-panel-header__btn"
-      title="Create custom component"
-      aria-label="Create custom component"
+      title={t("Create custom component")}
+      aria-label={t("Create custom component")}
       type="button"
     ><Plus size={14} /></button>}
-    {loaded && <Suspense fallback={<span role="status">Loading component studio…</span>}>
+    {loaded && <Suspense fallback={<span role="status">{t("Loading component studio…")}</span>}>
       {/* Keep the first-opened studio mounted so closing it retains the draft. */}
       <CustomComponentStudio isOpen={open && !readOnly && !isSandbox} onClose={close} />
     </Suspense>}
@@ -94,6 +96,7 @@ const PaletteItem = memo(function PaletteItem({
   isSandbox?: boolean;
   onAdd: (component: ElectronicComponent) => void;
 }) {
+  const { t } = useTranslation();
   const isLockedInSandbox = Boolean(isSandbox && !SANDBOX_PERMITTED_TYPES.has(component.type));
   const isItemDisabled = Boolean(readOnly || isLockedInSandbox);
 
@@ -120,7 +123,7 @@ const PaletteItem = memo(function PaletteItem({
       <span className="vf-component-panel__item-type">{component.type.replace(/_/g, ' ')}</span>
     </div>
     {isLockedInSandbox ? (
-      <span className="vf-component-panel__lock-badge" title="Sign in to unlock in personal projects">
+      <span className="vf-component-panel__lock-badge" title={t("Sign in to unlock in personal projects")}>
         <Lock size={10} />
         <span>PRO</span>
       </span>
@@ -135,7 +138,8 @@ const PaletteItem = memo(function PaletteItem({
   </button>;
 });
 
-function ComponentPanel({ readOnly, isSandbox }: { readOnly?: boolean; isSandbox?: boolean }) {
+function ComponentPanel({ readOnly, isSandbox, onClose }: { readOnly?: boolean; isSandbox?: boolean; onClose?: () => void }) {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const setComponentLibrary = useCanvasStore((state) => state.setComponentLibrary);
   const [search, setSearch] = useState('');
@@ -323,12 +327,19 @@ function ComponentPanel({ readOnly, isSandbox }: { readOnly?: boolean; isSandbox
   const addToCanvas = useCallback((component: ElectronicComponent) => {
     if (readOnly) return;
     const { viewport } = useCanvasStore.getState();
-    const spawnX = (300 - viewport.x) / viewport.scale;
-    const spawnY = (250 - viewport.y) / viewport.scale;
+    const currentWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+    const currentHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+    const targetCenterX = Math.min(Math.max(currentWidth / 2, 160), 450);
+    const targetCenterY = Math.min(Math.max(currentHeight / 2 - 40, 160), 320);
+    const spawnX = (targetCenterX - viewport.x) / viewport.scale;
+    const spawnY = (targetCenterY - viewport.y) / viewport.scale;
 
     const node = createCanvasNodeFromComponent(component, { x: spawnX, y: spawnY });
     useCanvasStore.getState().addNode(node);
-  }, [readOnly]);
+    if (onClose) {
+      onClose();
+    }
+  }, [readOnly, onClose]);
 
   const toggleCategory = (cat: string) => {
     setCollapsed(prev => ({ ...prev, [cat]: !prev[cat] }));
@@ -337,15 +348,28 @@ function ComponentPanel({ readOnly, isSandbox }: { readOnly?: boolean; isSandbox
   return (
     <div className="vf-component-panel">
       <div className="vf-component-panel__header">
-        <h3 className="vf-component-panel__title">Components</h3>
-        <StudioLauncher readOnly={readOnly} isSandbox={isSandbox} />
+        <h3 className="vf-component-panel__title">{t("Components")}</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <StudioLauncher readOnly={readOnly} isSandbox={isSandbox} />
+          {onClose && (
+            <button
+              type="button"
+              className="vf-component-panel__close-btn"
+              onClick={onClose}
+              title={t("Close component library")}
+              aria-label={t("Close component library")}
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
       </div>
       <div className="vf-component-panel__search">
 
         <Search size={14} />
         <input
           type="text"
-          placeholder="Search components..."
+          placeholder={t("Search components...")}
           aria-label="Search components"
           aria-controls={listId}
           value={search}
@@ -365,27 +389,27 @@ function ComponentPanel({ readOnly, isSandbox }: { readOnly?: boolean; isSandbox
           setCollapsed(previous => ({ ...previous, [value]: false }));
         }}
       >
-        <option value="">{normalizedSearch ? 'Searching all categories' : 'All categories'}</option>
+        <option value="">{normalizedSearch ? t('Searching all categories') : t('All categories')}</option>
         {categories.map(value => <option key={value} value={value}>{value}</option>)}
       </select>
-      <div className="vf-component-panel__coverage-summary" title="Evaluates which components have verified AI Copilot code generation & Wokwi simulation support">
+      <div className="vf-component-panel__coverage-summary" title={t("Evaluates which components have verified AI Copilot code generation & Wokwi simulation support")}>
         <span role="status" aria-live="polite">
           {componentCoverageQuery.isFetching
-            ? 'Checking AI component coverage...'
+            ? t('Checking AI component coverage...')
             : componentCoverageQuery.isError
-              ? 'AI component coverage unavailable'
+              ? t('AI component coverage unavailable')
               : componentCoverageQuery.data
                 ? `${componentCoverageQuery.data.summary?.verified ?? 0} exact / ${componentCoverageQuery.data.summary?.variantRequired ?? 0} require a variant / ${componentCoverageQuery.data.summary?.simulationOnly ?? 0} simulation-only`
-                : 'AI coverage not checked'}
+                : t('AI coverage not checked')}
         </span>
         <button
           type="button"
           className="vf-component-panel__coverage-action"
           disabled={componentCoverageQuery.isFetching}
-          title="Inspect which components are verified by the AI code generator and simulation engine"
+          title={t("Inspect which components are verified by the AI code generator and simulation engine")}
           onClick={() => { void componentCoverageQuery.refetch({ cancelRefetch: false }); }}
         >
-          {componentCoverageQuery.isError ? 'Retry AI coverage' : componentCoverageQuery.data ? 'Refresh AI coverage' : 'Check AI coverage'}
+          {componentCoverageQuery.isError ? t('Retry AI coverage') : componentCoverageQuery.data ? t('Refresh AI coverage') : t('Check AI coverage')}
         </button>
       </div>
       <div className="vf-component-panel__list" ref={listRef} id={listId} tabIndex={-1} role="region" aria-label="Component results">
@@ -406,7 +430,7 @@ function ComponentPanel({ readOnly, isSandbox }: { readOnly?: boolean; isSandbox
               >
                 <Icon size={14} />
                 <span>{category}</span>
-                <span className="vf-component-panel__count" title="Components on this page">{components.length}</span>
+                <span className="vf-component-panel__count" title={t("Components on this page")}>{components.length}</span>
                 {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
               </button>
               <div className="vf-component-panel__items" id={categoryId} hidden={isCollapsed}>
@@ -423,16 +447,16 @@ function ComponentPanel({ readOnly, isSandbox }: { readOnly?: boolean; isSandbox
           );
         })}
         {filtered.length === 0 && (
-          <p className="vf-component-panel__empty">No components found</p>
+          <p className="vf-component-panel__empty">{t("No projects found")}</p>
         )}
       </div>
       <div className="vf-component-panel__pagination">
         <span role="status" aria-live="polite" aria-atomic="true">
-          {filtered.length ? `${page.start + 1}–${page.end} of ${filtered.length}` : '0 components'}
+          {filtered.length ? `${page.start + 1}–${page.end} of ${filtered.length}` : t('0 components')}
         </span>
         {page.pageCount > 1 && <div className="vf-component-panel__page-buttons">
-          <button type="button" aria-label="Previous components" aria-controls={listId} disabled={page.page === 0} onClick={() => changePage(page.page - 1)}>Previous</button>
-          <button type="button" aria-label="Next components" aria-controls={listId} disabled={page.page === page.pageCount - 1} onClick={() => changePage(page.page + 1)}>Next</button>
+          <button type="button" aria-label="Previous components" aria-controls={listId} disabled={page.page === 0} onClick={() => changePage(page.page - 1)}>{t("Back")}</button>
+          <button type="button" aria-label="Next components" aria-controls={listId} disabled={page.page === page.pageCount - 1} onClick={() => changePage(page.page + 1)}>{t("Next")}</button>
         </div>}
       </div>
     </div>

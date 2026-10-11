@@ -4,6 +4,7 @@ import { Stage, Layer, Rect, Group, Text, Circle, Line, Shape } from 'react-konv
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { Download, Layers, Zap } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useCanvasStore, WIRE_COLORS } from '../../store/canvasStore';
 import CanvasRoutingStatus from './CanvasRoutingStatus';
 import { useSimulationStore } from '../../store/simulationStore';
@@ -146,6 +147,7 @@ const CanvasMat = memo(({
 
 // ── Wire Color Picker Toolbar ──
 const WireToolbar = memo(() => {
+  const { t } = useTranslation();
   const { wiringColor, setWiringColor, wiringMode, setWiringMode, isWiring } = useCanvasStore(useShallow(state => ({
     wiringColor: state.wiringColor,
     setWiringColor: state.setWiringColor,
@@ -172,7 +174,7 @@ const WireToolbar = memo(() => {
 
   return (
     <div className="vf-wire-toolbar">
-      <span className="vf-wire-toolbar__label">Wire Color:</span>
+      <span className="vf-wire-toolbar__label">{t('Wire Color:')}</span>
       <div className="vf-wire-toolbar__swatches">
         {WIRE_COLORS.map((c) => (
           <button
@@ -185,9 +187,9 @@ const WireToolbar = memo(() => {
       </div>
       <span className="vf-wire-toolbar__divider" />
       <button onClick={cycleMode} className="vf-wire-toolbar__mode">
-        {modeLabels[wiringMode]}
+        {t(modeLabels[wiringMode])}
       </button>
-      <span className="vf-wire-toolbar__hint">Click a pin to connect • ESC to cancel</span>
+      <span className="vf-wire-toolbar__hint">{t('Click a pin to connect • ESC to cancel')}</span>
     </div>
   );
 });
@@ -336,7 +338,11 @@ export default function CircuitCanvas({
   isProbeMode,
   isSimulating,
 }: Props) {
+  const { t } = useTranslation();
   const isDark = useThemeStore((state) => state.theme === 'dark');
+
+  const safeWidth = Math.max(Math.round(width || 0), 100);
+  const safeHeight = Math.max(Math.round(height || 0), 100);
 
   const [selectComponentDocument] = useState(createComponentVisibilitySnapshot);
   const documentNodes = useCanvasStore(selectComponentDocument);
@@ -381,7 +387,7 @@ export default function CircuitCanvas({
     }
     return ids;
   }, [probeNodeIds, selectedNodeId, draggingNodeId, wiringFrom?.nodeId, activeInteractionId, wires, selectedWireId, activeNewBendPoint?.wireId]);
-  const visibleNodes = useMemo(() => componentIndex.select(viewport, width, height, previousVisible.current, retainedNodeIds), [componentIndex, viewport, width, height, retainedNodeIds]);
+  const visibleNodes = useMemo(() => componentIndex.select(viewport, safeWidth, safeHeight, previousVisible.current, retainedNodeIds), [componentIndex, viewport, safeWidth, safeHeight, retainedNodeIds]);
   useLayoutEffect(() => { previousVisible.current = new Set(visibleNodes.map(node => node.id)); }, [visibleNodes]);
 
   const invalidateComponentHitGraph = useCallback(() => {
@@ -425,7 +431,7 @@ export default function CircuitCanvas({
 
   useLayoutEffect(() => {
     invalidateComponentHitGraph();
-  }, [invalidateComponentHitGraph, documentNodes, visibleNodes, selectedNodeId, viewport, width, height, viewMode, readOnly, isProbeMode, activeInteractionId]);
+  }, [invalidateComponentHitGraph, documentNodes, visibleNodes, selectedNodeId, viewport, safeWidth, safeHeight, viewMode, readOnly, isProbeMode, activeInteractionId]);
 
   useLayoutEffect(() => {
     const layer = componentLayerRef.current;
@@ -515,6 +521,83 @@ export default function CircuitCanvas({
     },
     []
   );
+
+  // Multi-touch gestures for mobile/tablet pinch-to-zoom and two-finger pan
+  const touchStateRef = useRef<{
+    lastDist: number | null;
+    lastCenter: { x: number; y: number } | null;
+  }>({ lastDist: null, lastCenter: null });
+
+  const handleTouchStart = useCallback((e: KonvaEventObject<TouchEvent>) => {
+    const touches = e.evt.touches;
+    if (touches.length === 2) {
+      const t1 = touches[0];
+      const t2 = touches[1];
+      const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      const center = {
+        x: (t1.clientX + t2.clientX) / 2,
+        y: (t1.clientY + t2.clientY) / 2,
+      };
+      touchStateRef.current = { lastDist: dist, lastCenter: center };
+      const stage = stageRef.current;
+      if (stage && stage.isDragging()) {
+        stage.stopDrag();
+      }
+    } else {
+      touchStateRef.current = { lastDist: null, lastCenter: null };
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: KonvaEventObject<TouchEvent>) => {
+    const touches = e.evt.touches;
+    if (touches.length === 2) {
+      e.evt.preventDefault();
+      const stage = stageRef.current;
+      if (!stage) return;
+
+      const t1 = touches[0];
+      const t2 = touches[1];
+      const newDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      const newCenter = {
+        x: (t1.clientX + t2.clientX) / 2,
+        y: (t1.clientY + t2.clientY) / 2,
+      };
+
+      const { lastDist, lastCenter } = touchStateRef.current;
+      if (lastDist !== null && lastCenter !== null && lastDist > 0) {
+        const container = stage.container().getBoundingClientRect();
+        const stageCenterX = newCenter.x - container.left;
+        const stageCenterY = newCenter.y - container.top;
+
+        const scaleFactor = newDist / lastDist;
+        const oldScale = stage.scaleX();
+        const newScale = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, oldScale * scaleFactor));
+
+        const deltaX = newCenter.x - lastCenter.x;
+        const deltaY = newCenter.y - lastCenter.y;
+
+        const mousePointTo = {
+          x: (stageCenterX - stage.x()) / oldScale,
+          y: (stageCenterY - stage.y()) / oldScale,
+        };
+
+        const newPos = {
+          x: stageCenterX - mousePointTo.x * newScale + deltaX,
+          y: stageCenterY - mousePointTo.y * newScale + deltaY,
+        };
+
+        stage.scale({ x: newScale, y: newScale });
+        stage.position(newPos);
+        setViewport({ scale: newScale, x: newPos.x, y: newPos.y });
+      }
+
+      touchStateRef.current = { lastDist: newDist, lastCenter: newCenter };
+    }
+  }, [setViewport]);
+
+  const handleTouchEnd = useCallback(() => {
+    touchStateRef.current = { lastDist: null, lastCenter: null };
+  }, []);
 
   // Wheel zoom
   const handleWheel = useCallback(
@@ -660,16 +743,34 @@ export default function CircuitCanvas({
     }}>
       <CanvasAudioBridge isSimulating={isSimulating} />
       <CanvasRoutingStatus />
+      {isWiring && (
+        <div className="vf-canvas-mobile-wire-banner" role="status" aria-live="polite">
+          <span>{t('Wiring Mode: Tap any pin to connect')}</span>
+          <button
+            type="button"
+            className="vf-canvas-mobile-wire-cancel"
+            onClick={(e) => {
+              e.stopPropagation();
+              cancelWiring();
+            }}
+          >
+            {t('Cancel')}
+          </button>
+        </div>
+      )}
       <CanvasErrorBoundary>
         <Stage
           ref={stageRef}
-          width={width}
-          height={height}
+          width={safeWidth}
+          height={safeHeight}
           draggable
           x={viewport.x}
           y={viewport.y}
           scaleX={viewport.scale}
           scaleY={viewport.scale}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
           onDragStart={() => {
             beginComponentHitGraphInteraction();
           }}
@@ -705,6 +806,14 @@ export default function CircuitCanvas({
           }}
           onWheel={handleWheel}
           onClick={(e: KonvaEventObject<MouseEvent>) => {
+            if (e.target === e.target.getStage()) {
+              invalidateComponentHitGraph();
+              selectNode(null);
+              selectWire(null);
+              if (isWiring) cancelWiring();
+            }
+          }}
+          onTap={(e: KonvaEventObject<TouchEvent>) => {
             if (e.target === e.target.getStage()) {
               invalidateComponentHitGraph();
               selectNode(null);
@@ -748,7 +857,7 @@ export default function CircuitCanvas({
         >
           {/* Grid layer (below everything) */}
           <Layer ref={gridLayerRef} listening={false}>
-            <CanvasMat width={width} height={height} viewport={viewport} isDark={isDark} />
+            <CanvasMat width={safeWidth} height={safeHeight} viewport={viewport} isDark={isDark} />
           </Layer>
 
           {viewMode === 'pcb' && (
@@ -842,10 +951,10 @@ export default function CircuitCanvas({
         <button
           onClick={handleExportImage}
           className="vf-canvas-dock-btn"
-          title="Export circuit diagram as PNG"
+          title={t('Export circuit diagram as PNG')}
         >
           <Download size={12} />
-          <span>PNG</span>
+          <span>{t('PNG')}</span>
         </button>
 
         <span className="vf-canvas-dock-divider" />
@@ -853,24 +962,24 @@ export default function CircuitCanvas({
         <button
           onClick={() => useSimulationStore.getState().setShowCurrentFlow(!useSimulationStore.getState().showCurrentFlow)}
           className={`vf-canvas-dock-btn ${showCurrentFlow ? 'is-active' : ''}`}
-          title="Toggle animated current flow particles on wires"
+          title={t('Toggle animated current flow particles on wires')}
         >
           <Zap size={12} />
-          <span>Current Flow</span>
+          <span>{t('Current Flow')}</span>
         </button>
 
         <button
           onClick={() => useSimulationStore.getState().setThermalHeatmapEnabled(!useSimulationStore.getState().thermalHeatmapEnabled)}
           className={`vf-canvas-dock-btn ${thermalHeatmapEnabled ? 'is-active' : ''}`}
-          title="Toggle live component power and thermal stress heat map"
+          title={t('Toggle live component power and thermal stress heat map')}
         >
-          <span>Thermal Map</span>
+          <span>{t('Thermal Map')}</span>
         </button>
 
         {viewMode === 'pcb' && (
           <div className="vf-canvas-dock-btn">
             <Layers size={12} />
-            <span>2-layer PCB traces</span>
+            <span>{t('2-layer PCB traces')}</span>
           </div>
         )}
       </div>
@@ -882,12 +991,12 @@ export default function CircuitCanvas({
           )}
           className={`vf-canvas-quality-control ${currentFlowBudget.isLimited ? 'is-limited' : 'is-full'}`}
           title={currentFlowQualityMode === 'full'
-            ? 'Full current-flow detail is enabled. Click to restore the adaptive rendering budget.'
-            : `Current-flow detail is limited for ${currentFlowBudget.limitLabel}. Electrical values are unchanged. Click for full detail.`}
+            ? t('Full current-flow detail is enabled. Click to restore the adaptive rendering budget.')
+            : t('Current-flow detail is limited for {{label}}. Electrical values are unchanged. Click for full detail.', { label: currentFlowBudget.limitLabel })}
         >
           {currentFlowQualityMode === 'full'
-            ? 'Flow detail: Full · Use adaptive'
-            : 'Flow detail limited · Use full'}
+            ? t('Flow detail: Full · Use adaptive')
+            : t('Flow detail limited · Use full')}
         </button>
       )}
 

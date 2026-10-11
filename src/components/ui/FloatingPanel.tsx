@@ -22,8 +22,10 @@ export function FloatingPanel({
   if (!isOpen) return null
 
   return (
-    <div className="vf-floating-panel" style={width ? { width } : undefined}>
-      {/* Header */}
+    <>
+      <div className="vf-floating-panel-backdrop" onClick={onClose} aria-hidden="true" />
+      <div className="vf-floating-panel" style={width ? { width } : undefined}>
+        {/* Header */}
       <header className="vf-floating-panel__header">
         <div className="vf-floating-panel__title-row">
           {icon && <span className="vf-floating-panel__icon">{icon}</span>}
@@ -40,5 +42,6 @@ export function FloatingPanel({
       {/* Footer */}
       {footer && <div className="vf-floating-panel__footer">{footer}</div>}
     </div>
+    </>
   )
 }

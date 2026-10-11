@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import { ArrowRight, CheckCircle2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 export type WorkflowStep = {
   icon: LucideIcon
@@ -9,6 +10,7 @@ export type WorkflowStep = {
 }
 
 export function WorkflowStrip({ steps }: { steps: WorkflowStep[] }) {
+  const { t } = useTranslation()
   return (
     <div className="workflow-strip">
       {steps.map((step, index) => {
@@ -22,9 +24,9 @@ export function WorkflowStrip({ steps }: { steps: WorkflowStep[] }) {
                 <Icon size={18} />
               </span>
             </div>
-            <strong className="workflow-strip__label">{step.label}</strong>
+            <strong className="workflow-strip__label">{t(step.label)}</strong>
             {step.description ? (
-              <p className="workflow-strip__desc">{step.description}</p>
+              <p className="workflow-strip__desc">{t(step.description)}</p>
             ) : null}
             {index < steps.length - 1 ? (
               <div className="workflow-strip__connector" aria-hidden="true">

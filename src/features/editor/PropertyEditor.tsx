@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useCanvasStore, WIRE_COLORS } from '../../store/canvasStore';
 import { Trash2 } from 'lucide-react';
 import type { Wire } from '../../types/domain';
@@ -35,6 +36,7 @@ function formatValue(val: unknown): string {
 }
 
 export default function PropertyEditor({ readOnly }: { readOnly?: boolean }) {
+  const { t } = useTranslation();
   const selectedNodeId = useCanvasStore((s) => s.selectedNodeId);
   const selectedWireId = useCanvasStore((s) => s.selectedWireId);
   const nodes = useCanvasStore((s) => s.nodes);
@@ -62,7 +64,7 @@ export default function PropertyEditor({ readOnly }: { readOnly?: boolean }) {
     <FloatingPanel
       isOpen={!!(selectedNode || selectedWire)}
       onClose={onClose}
-      title={selectedNode ? selectedNode.name : 'Wire Properties'}
+      title={selectedNode ? selectedNode.name : t('Wire Properties')}
       width="280px"
     >
       <div className="vf-prop-editor">
@@ -198,13 +200,13 @@ export default function PropertyEditor({ readOnly }: { readOnly?: boolean }) {
               return (
                 <>
                   <div className="vf-prop-editor__section">
-                    <label className="vf-prop-editor__label">From</label>
+                    <label className="vf-prop-editor__label">{t('From')}</label>
                     <span className="vf-prop-editor__type">
                       {fromNode?.name || selectedWire.fromNodeId} : {selectedWire.fromPinId}
                     </span>
                   </div>
                   <div className="vf-prop-editor__section">
-                    <label className="vf-prop-editor__label">To</label>
+                    <label className="vf-prop-editor__label">{t('To')}</label>
                     <span className="vf-prop-editor__type">
                       {toNode?.name || selectedWire.toNodeId} : {selectedWire.toPinId}
                     </span>
@@ -226,14 +228,14 @@ export default function PropertyEditor({ readOnly }: { readOnly?: boolean }) {
                   </div>
 
                   <div className="vf-prop-editor__section">
-                    <label className="vf-prop-editor__label">Routing</label>
+                    <label className="vf-prop-editor__label">{t('Routing')}</label>
                     <select
                       className="vf-prop-editor__input"
                       value={selectedWire.routingMode}
                       onChange={(e) => updateWire(selectedWire.id, { routingMode: e.target.value as Wire['routingMode'] })}
                       disabled={readOnly}
                     >
-                      {modes.map(m => <option key={m} value={m}>{m}</option>)}
+                      {modes.map(m => <option key={m} value={m}>{t(m === 'straight' ? 'Straight' : m === 'orthogonal' ? 'Orthogonal' : m === 'auto' ? 'Smart-route' : 'Curved')}</option>)}
                     </select>
                   </div>
 
@@ -242,7 +244,7 @@ export default function PropertyEditor({ readOnly }: { readOnly?: boolean }) {
                     <input
                       className="vf-prop-editor__input"
                       value={selectedWire.label || ''}
-                      placeholder="Optional wire label"
+                      placeholder={t('Optional wire label')}
                       onChange={(e) => updateWire(selectedWire.id, { label: e.target.value || undefined })}
                       disabled={readOnly}
                     />
@@ -286,7 +288,7 @@ export default function PropertyEditor({ readOnly }: { readOnly?: boolean }) {
             onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)')}
           >
             <Trash2 size={14} />
-            Delete {selectedNode ? 'Component' : 'Wire'}
+            {selectedNode ? t('Delete Component') : t('Delete Wire')}
           </button>
         )}
       </div>

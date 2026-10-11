@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Bot, Brain, Send, Sparkles, User } from 'lucide-react'
 import { useCanvasStore } from '../../store/canvasStore'
 import { useProjectStore } from '../../store/projectStore'
@@ -120,6 +121,7 @@ export default function AiChatPanel({
   onClose,
   projectContext,
 }: Props) {
+  const { t } = useTranslation()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
@@ -1047,7 +1049,7 @@ export default function AiChatPanel({
           </div>
           <div>
             <h3 className="vf-ai-chat__brand-name">VoltForge AI</h3>
-            <span className="vf-ai-chat__brand-sub">Local project engineering assistant</span>
+            <span className="vf-ai-chat__brand-sub">{t('Local project engineering assistant')}</span>
           </div>
         </div>
         <div className="vf-ai-chat__header-actions">
@@ -1078,10 +1080,10 @@ export default function AiChatPanel({
           <strong>{runPresentation.label}</strong>
           <span className="vf-ai-chat__status-detail">{runPresentation.detail}</span>
         </div>
-        {sessionId && <span className="vf-ai-chat__status-session">Session active</span>}
+        {sessionId && <span className="vf-ai-chat__status-session">{t('Session active')}</span>}
         {isStreaming && (
-          <button type="button" className="vf-ai-chat__cancel" onClick={cancelStream} aria-label="Cancel VoltForge AI response">
-            Stop
+          <button type="button" className="vf-ai-chat__cancel" onClick={cancelStream} aria-label={t('Cancel VoltForge AI response')}>
+            {t('Stop')}
           </button>
         )}
       </div>
@@ -1090,8 +1092,8 @@ export default function AiChatPanel({
         <section className="vf-ai-chat__memory" aria-labelledby="vf-ai-memory-heading">
           <div className="vf-ai-chat__memory-heading">
             <div>
-              <strong id="vf-ai-memory-heading">Bounded project memory</strong>
-              <span>{memoryState?.enabled ? `${memoryState.entryCount} inspectable item(s)` : 'Disabled by default'}</span>
+              <strong id="vf-ai-memory-heading">{t('Bounded project memory')}</strong>
+              <span>{memoryState?.enabled ? `${memoryState.entryCount} ${t('inspectable item(s)')}` : t('Disabled by default')}</span>
             </div>
             <button
               type="button"
@@ -1099,16 +1101,16 @@ export default function AiChatPanel({
               disabled={isMemoryBusy || !currentProject}
               onClick={() => void setMemoryEnabled(!memoryState?.enabled)}
             >
-              {memoryState?.enabled ? 'Disable' : 'Enable'}
+              {memoryState?.enabled ? t('Disable') : t('Enable')}
             </button>
           </div>
           <p className="vf-ai-chat__memory-note">
-            User memory is revision-bound context, never engineering evidence or training data.
+            {t('User memory is revision-bound context, never engineering evidence or training data.')}
           </p>
-          {memoryLoadState === 'loading' && <div className="vf-ai-chat__memory-status" role="status">Loading project memory…</div>}
+          {memoryLoadState === 'loading' && <div className="vf-ai-chat__memory-status" role="status">{t('Loading project memory…')}</div>}
           {memoryLoadState === 'unavailable' && (
             <div className="vf-ai-chat__memory-status" role="status">
-              Project memory is unavailable. Chat remains available and no memory was changed.
+              {t('Project memory is unavailable. Chat remains available and no memory was changed.')}
             </div>
           )}
           {memoryState && (
@@ -1120,9 +1122,9 @@ export default function AiChatPanel({
                     value={memoryDraft}
                     onChange={(event) => setMemoryDraft(event.target.value)}
                     maxLength={1200}
-                    placeholder="Fact to remember for this project"
+                    placeholder={t('Fact to remember for this project')}
                   />
-                  <button type="button" disabled={isMemoryBusy || !memoryDraft.trim()} onClick={() => void rememberFact()}>Remember</button>
+                  <button type="button" disabled={isMemoryBusy || !memoryDraft.trim()} onClick={() => void rememberFact()}>{t('Remember')}</button>
                 </div>
               )}
               <div className="vf-ai-chat__memory-list">
@@ -1130,25 +1132,25 @@ export default function AiChatPanel({
                   <div key={entry.memoryId} className="vf-ai-chat__memory-entry">
                     <div className="vf-ai-chat__memory-entry-meta">
                       <span>{entry.kind}</span>
-                      {entry.staleForProjectRevision && <span className="is-stale">stale revision</span>}
+                      {entry.staleForProjectRevision && <span className="is-stale">{t('stale revision')}</span>}
                     </div>
                     {editingMemoryId === entry.memoryId ? (
                       <div className="vf-ai-chat__memory-edit">
                         <input aria-label={`Correct memory ${entry.memoryId}`} value={editingMemoryContent} maxLength={1200} onChange={(event) => setEditingMemoryContent(event.target.value)} />
-                        <button type="button" disabled={isMemoryBusy} aria-label={`Save correction for memory ${entry.memoryId}`} onClick={() => void saveMemoryCorrection()}>Save</button>
+                        <button type="button" disabled={isMemoryBusy} aria-label={`Save correction for memory ${entry.memoryId}`} onClick={() => void saveMemoryCorrection()}>{t('Save')}</button>
                       </div>
                     ) : <p>{entry.content}</p>}
                     <div className="vf-ai-chat__memory-entry-actions">
-                      <button type="button" disabled={isMemoryBusy} aria-label={`Correct memory ${entry.memoryId}`} onClick={() => { setEditingMemoryId(entry.memoryId); setEditingMemoryContent(entry.content) }}>Correct</button>
-                      <button type="button" disabled={isMemoryBusy} aria-label={`Delete memory ${entry.memoryId}`} onClick={() => void deleteMemory(entry.memoryId)}>Delete</button>
+                      <button type="button" disabled={isMemoryBusy} aria-label={`Correct memory ${entry.memoryId}`} onClick={() => { setEditingMemoryId(entry.memoryId); setEditingMemoryContent(entry.content) }}>{t('Correct')}</button>
+                      <button type="button" disabled={isMemoryBusy} aria-label={`Delete memory ${entry.memoryId}`} onClick={() => void deleteMemory(entry.memoryId)}>{t('Delete')}</button>
                     </div>
                   </div>
                 ))}
-                {memoryState.entries.length === 0 && <span className="vf-ai-chat__memory-empty">No approved memory yet.</span>}
+                {memoryState.entries.length === 0 && <span className="vf-ai-chat__memory-empty">{t('No approved memory yet.')}</span>}
               </div>
               <div className="vf-ai-chat__memory-footer">
-                <button type="button" disabled={!sessionId || isMemoryBusy} onClick={() => void clearMemory('session')}>Clear session</button>
-                <button type="button" disabled={isMemoryBusy} onClick={() => void clearMemory('project')}>Clear project</button>
+                <button type="button" disabled={!sessionId || isMemoryBusy} onClick={() => void clearMemory('session')}>{t('Clear session')}</button>
+                <button type="button" disabled={isMemoryBusy} onClick={() => void clearMemory('project')}>{t('Clear project')}</button>
               </div>
             </>
           )}
@@ -1162,13 +1164,13 @@ export default function AiChatPanel({
             <div className="vf-ai-chat__welcome-icon">
               <Bot size={28} />
             </div>
-            <h3>VoltForge AI Assistant</h3>
-            <p>Ask me about circuits, components, Arduino code, or debugging</p>
+            <h3>{t('VoltForge AI Assistant')}</h3>
+            <p>{t('Ask me about circuits, components, Arduino code, or debugging')}</p>
             <SuggestionsList
               suggestions={[
-                'How do I connect an LED to Arduino?',
-                'Generate code for a temperature sensor',
-                'What resistor do I need for a 5V LED?',
+                t('How do I connect an LED to Arduino?'),
+                t('Generate code for a temperature sensor'),
+                t('What resistor do I need for a 5V LED?'),
               ]}
               onSelect={(suggestion) => setInput(suggestion)}
             />
@@ -1191,7 +1193,7 @@ export default function AiChatPanel({
                 <details className="vf-ai-chat__thinking" open={msg.isStreaming && !msg.content}>
                   <summary className="vf-ai-chat__thinking-summary">
                     <Brain size={12} />
-                    <span>{msg.isStreaming && !msg.content ? 'Running engineering checks...' : 'Engineering checks'}</span>
+                    <span>{msg.isStreaming && !msg.content ? t('Running engineering checks...') : t('Engineering checks')}</span>
                   </summary>
                   <div className="vf-ai-chat__thinking-content">
                     {msg.thought.split('\n').filter(Boolean).map((step, si) => (
@@ -1217,7 +1219,7 @@ export default function AiChatPanel({
 
               {msg.role === 'assistant' && msg.sourceMetadata && collectAiSources(msg.sourceMetadata).length > 0 && (
                 <div className="vf-ai-chat__sources" aria-label="Response source trail">
-                  <span className="vf-ai-chat__sources-label">Source trail</span>
+                  <span className="vf-ai-chat__sources-label">{t('Source trail')}</span>
                   {collectAiSources(msg.sourceMetadata).map((source) => (
                     <span key={source.kind} className={`vf-ai-chat__source vf-ai-chat__source--${source.kind}`} title={source.detail}>
                       {source.label}
@@ -1229,14 +1231,14 @@ export default function AiChatPanel({
               {/* Confidence badge */}
               {msg.role === 'assistant' && !msg.isStreaming && typeof msg.confidence === 'number' && (
                 <div className="vf-ai-chat__meta">
-                  Confidence {Math.round(msg.confidence * 100)}%
-                  {msg.confidence < 0.65 && <span className="vf-ai-chat__low-confidence">Low confidence — verify before use.</span>}
+                  {t('Confidence')} {Math.round(msg.confidence * 100)}%
+                  {msg.confidence < 0.65 && <span className="vf-ai-chat__low-confidence">{t('Low confidence — verify before use.')}</span>}
                 </div>
               )}
 
               {msg.role === 'assistant' && !msg.isStreaming && msg.uncertainty && (
                 <div className="vf-ai-chat__uncertainty" role="status">
-                  <strong>Evidence uncertainty</strong>
+                  <strong>{t('Evidence uncertainty')}</strong>
                   <span>{msg.uncertainty.reasonCode || 'Some supporting evidence is incomplete.'}</span>
                   {msg.uncertainty.missingEvidence?.length ? (
                     <span>Missing: {msg.uncertainty.missingEvidence.join(', ').replaceAll('_', ' ').toLowerCase()}</span>
@@ -1246,11 +1248,11 @@ export default function AiChatPanel({
 
               {msg.role === 'assistant' && !msg.isStreaming && msg.grounding && ['uncertain', 'conflicted'].includes(msg.grounding.status) && (
                 <div className={`vf-ai-chat__grounding vf-ai-chat__grounding--${msg.grounding.status}`} role="status">
-                  <strong>{msg.grounding.status === 'conflicted' ? 'Evidence conflict' : 'Evidence unavailable'}</strong>
+                  <strong>{msg.grounding.status === 'conflicted' ? t('Evidence conflict') : t('Evidence unavailable')}</strong>
                   <span>
                     {msg.grounding.status === 'conflicted'
-                      ? 'Sources disagree, so VoltForge AI did not present the disputed claim as fact.'
-                      : 'An unsupported factual claim was replaced with explicit uncertainty.'}
+                      ? t('Sources disagree, so VoltForge AI did not present the disputed claim as fact.')
+                      : t('An unsupported factual claim was replaced with explicit uncertainty.')}
                   </span>
                   {msg.grounding.uncertainty.missingEvidence.length > 0 && (
                     <span>{msg.grounding.uncertainty.missingEvidence.join(', ').replaceAll('_', ' ').toLowerCase()}</span>
@@ -1269,8 +1271,8 @@ export default function AiChatPanel({
                           {kind ? evidenceKindLabels[kind] : 'Evidence'}
                         </span>
                         <span>{citation.title || citation.citationId || 'Evidence item'}</span>
-                        {citation.supportStatus === 'conflicted' && <span className="vf-ai-chat__citation-state">conflicted</span>}
-                        {citation.untrustedContent && <span className="vf-ai-chat__citation-state">untrusted source</span>}
+                        {citation.supportStatus === 'conflicted' && <span className="vf-ai-chat__citation-state">{t('conflicted')}</span>}
+                        {citation.untrustedContent && <span className="vf-ai-chat__citation-state">{t('untrusted source')}</span>}
                         {citation.snippet && <span className="vf-ai-chat__citation-snippet">{citation.snippet}</span>}
                         {citation.locator && <span className="vf-ai-chat__citation-meta">{citation.locator}</span>}
                       </>
@@ -1321,7 +1323,7 @@ export default function AiChatPanel({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask VoltForge AI..."
+            placeholder={t('Ask VoltForge AI...')}
             aria-label="Ask VoltForge AI about the current project"
             rows={1}
             className="vf-ai-chat__textarea"

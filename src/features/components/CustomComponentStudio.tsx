@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, Save, Trash2, Upload } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { componentApi } from '../../api/services'
@@ -26,6 +27,7 @@ function nextPinId(pins: PinPosition[]) {
 }
 
 export default function CustomComponentStudio({ isOpen, onClose }: Props) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const addToast = useToastStore((s) => s.addToast)
   const [name, setName] = useState('')
@@ -88,7 +90,7 @@ export default function CustomComponentStudio({ isOpen, onClose }: Props) {
   const footer = (
     <div className="vf-studio-footer-content">
       <span className="vf-studio-footer-status">
-        {pins.length} pin anchors
+        {pins.length} {t('pin anchors')}
       </span>
       <Button
         variant="primary"
@@ -100,14 +102,14 @@ export default function CustomComponentStudio({ isOpen, onClose }: Props) {
         isLoading={saveMutation.isPending}
         onClick={() => saveMutation.mutate()}
       >
-        Save Component
+        {t('Save Component')}
       </Button>
     </div>
   )
 
   const breadcrumbItems = [
-    { label: 'Component Panel' },
-    { label: 'Custom Component Studio' },
+    { label: t('Component Panel') },
+    { label: t('Custom Component Studio') },
   ]
 
   return (
@@ -121,24 +123,24 @@ export default function CustomComponentStudio({ isOpen, onClose }: Props) {
       <div className="vf-studio-layout">
         {/* Left Settings Panel */}
         <aside className="vf-studio-sidebar vf-studio-sidebar--left">
-          <FieldShell label="Component Name">
+          <FieldShell label={t('Component Name')}>
             <TextInput
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Temperature Sensor"
+              placeholder={t('e.g. Temperature Sensor')}
             />
           </FieldShell>
 
-          <FieldShell label="Description">
+          <FieldShell label={t('Description')}>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter component details..."
+              placeholder={t('Enter component details...')}
               className="vf-studio-desc-input"
             />
           </FieldShell>
 
-          <FieldShell label="Category">
+          <FieldShell label={t('Category')}>
             <SelectField
               value={category}
               onChange={(e) => setCategory(e.target.value as ComponentCategory)}
@@ -157,7 +159,7 @@ export default function CustomComponentStudio({ isOpen, onClose }: Props) {
           <div className="vf-studio-upload-section">
             <label className="vf-studio-upload-btn">
               <Upload size={16} />
-              <span>Upload SVG File</span>
+              <span>{t('Upload SVG File')}</span>
               <input
                 type="file"
                 accept=".svg,image/svg+xml"
@@ -176,7 +178,7 @@ export default function CustomComponentStudio({ isOpen, onClose }: Props) {
                 checked={publishToCommunity}
                 onChange={(e) => setPublishToCommunity(e.target.checked)}
               />
-              <span>Publish to Community Hub</span>
+              <span>{t('Publish to Community Hub')}</span>
             </label>
           </div>
         </aside>
@@ -203,7 +205,7 @@ export default function CustomComponentStudio({ isOpen, onClose }: Props) {
               />
             ) : (
               <div className="vf-studio-canvas__empty">
-                Upload an SVG to begin adding pin anchors
+                {t('Upload an SVG to begin adding pin anchors')}
               </div>
             )}
             {pins.map((pin) => (
@@ -243,19 +245,19 @@ export default function CustomComponentStudio({ isOpen, onClose }: Props) {
             className="vf-studio-add-pin-btn"
             icon={<Plus size={14} />}
           >
-            Add Pin Anchor
+            {t('Add Pin Anchor')}
           </Button>
 
           {selectedPin ? (
             <div className="vf-studio-pin-details">
-              <FieldShell label="Pin Identifier">
+              <FieldShell label={t('Pin Identifier')}>
                 <TextInput
                   value={selectedPin.name}
                   onChange={(e) => upsertPin(selectedPin.id, { name: e.target.value })}
                 />
               </FieldShell>
 
-              <FieldShell label="Electrical Type">
+              <FieldShell label={t('Electrical Type')}>
                 <SelectField
                   value={selectedPin.type}
                   onChange={(e) =>
@@ -264,15 +266,15 @@ export default function CustomComponentStudio({ isOpen, onClose }: Props) {
                     })
                   }
                 >
-                  {PIN_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
+                  {PIN_TYPES.map((tType) => (
+                    <option key={tType} value={tType}>
+                      {tType}
                     </option>
                   ))}
                 </SelectField>
               </FieldShell>
 
-              <FieldShell label="Coordinates (X / Y)">
+              <FieldShell label={t('Coordinates (X / Y)')}>
                 <div className="vf-studio-coord-grid">
                   <TextInput
                     type="number"
@@ -296,12 +298,12 @@ export default function CustomComponentStudio({ isOpen, onClose }: Props) {
                 icon={<Trash2 size={13} />}
                 onClick={deleteSelectedPin}
               >
-                Delete Pin Anchor
+                {t('Delete Pin Anchor')}
               </Button>
             </div>
           ) : (
             <p className="vf-studio-sidebar-empty">
-              Select or click on the canvas to edit a pin anchor.
+              {t('Select or click on the canvas to edit a pin anchor.')}
             </p>
           )}
         </aside>

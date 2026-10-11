@@ -5,6 +5,7 @@ import { OscilloscopeScreen } from '../../components/ui/OscilloscopeScreen'
 import { SelectField } from '../../components/ui/Field'
 import { SIMULATION_MODELS } from '../simulator/simulationModels'
 import { analyzeProtocols } from '../simulator/logic/protocolAnalyzers'
+import { useTranslation } from 'react-i18next'
 
 interface Props {
   className?: string
@@ -17,6 +18,7 @@ interface Props {
 type ScopeMode = 'oscilloscope' | 'logic_analyzer' | 'dual'
 
 export default function OscilloscopePanel({ className = '', onPause, onResume, onStep, simulationPaused }: Props) {
+  const { t } = useTranslation()
   const oscilloscopeData = useSimulationStore((s) => s.oscilloscopeData)
   const logicCapture = useSimulationStore((s) => s.logicCapture)
   const oscilloscopeSamplePeriodMs = useSimulationStore((s) => s.oscilloscopeSamplePeriodMs)
@@ -146,7 +148,7 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
       <header className="vf-panel-header">
         <div className="vf-panel-header__left">
           <Activity size={14} className="vf-pulse-dot" />
-          <span className="vf-panel-header__title">Logic & Scope Analyzer</span>
+          <span className="vf-panel-header__title">{t("Logic & Scope Analyzer")}</span>
           
           {/* Mode Switcher */}
           <div style={{ display: 'flex', gap: '4px', marginLeft: '12px' }}>
@@ -164,7 +166,7 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
               }}
               onClick={() => setMode('oscilloscope')}
             >
-              Analog Scope
+              {t("Analog Scope")}
             </button>
             <button
               type="button"
@@ -180,7 +182,7 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
               }}
               onClick={() => setMode('logic_analyzer')}
             >
-              Digital Logic
+              {t("Digital Logic")}
             </button>
           </div>
         </div>
@@ -202,10 +204,10 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
               border: 'none',
               cursor: 'pointer'
             }}
-            title={audioEnabled ? 'Mute simulated circuit audio' : 'Enable live WebAudio SPICE tone synthesizer'}
+            title={audioEnabled ? t("Mute simulated circuit audio") : t("Enable live WebAudio SPICE tone synthesizer")}
           >
             {audioEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
-            {audioEnabled ? 'Audio: ON' : 'Audio: OFF'}
+            {audioEnabled ? t("Audio: ON") : t("Audio: OFF")}
           </button>
 
 
@@ -252,7 +254,7 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
           <button
             onClick={handlePauseToggle}
             className="vf-panel-header__btn"
-            title={effectivePaused ? 'Resume' : 'Pause'}
+            title={effectivePaused ? t('Resume') : t('Pause')}
             type="button"
           >
             {effectivePaused ? (
@@ -264,7 +266,7 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
           <button
             onClick={onStep}
             className="vf-panel-header__btn"
-            title="Advance one simulation step"
+            title={t("Advance one simulation step")}
             type="button"
             disabled={!effectivePaused}
           >
@@ -275,7 +277,7 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
           <button
             onClick={() => setExpanded(!expanded)}
             className="vf-panel-header__btn"
-            title={expanded ? 'Collapse' : 'Expand'}
+            title={expanded ? t('Collapse') : t('Expand')}
             type="button"
           >
             {expanded ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
@@ -285,7 +287,7 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
           <button
             onClick={() => setOscilloscopePanelOpen(false)}
             className="vf-panel-header__btn"
-            title="Close"
+            title={t("Close")}
             type="button"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
@@ -308,7 +310,7 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
           <div style={{ padding: '8px 12px', background: '#0a0f1e', height: '100%', overflowY: 'auto' }}>
             {logicChannelKeys.length === 0 ? (
               <div style={{ color: '#64748b', fontSize: '11px' }}>
-                Connect up to eight oscilloscope inputs to capture digital traffic.
+                {t("Connect up to eight oscilloscope inputs to capture digital traffic.")}
               </div>
             ) : (
               <>
@@ -338,7 +340,7 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
                   })}
                 </div>
                 <div style={{ marginTop: '8px', paddingTop: '6px', borderTop: '1px solid #1e293b', color: '#94a3b8', fontSize: '10px' }}>
-                  Capture: {activeLogicCapture.length} samples · {activeLogicCapture.length > 1 ? `${((activeLogicCapture[activeLogicCapture.length - 1].timestamp_s - activeLogicCapture[0].timestamp_s) * 1e6).toFixed(0)} µs` : '0 µs'}
+                  {t("Capture:")} {activeLogicCapture.length} {t("samples")} · {activeLogicCapture.length > 1 ? `${((activeLogicCapture[activeLogicCapture.length - 1].timestamp_s - activeLogicCapture[0].timestamp_s) * 1e6).toFixed(0)} µs` : '0 µs'}
                 </div>
                 <div style={{ marginTop: '6px', display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '6px' }}>
                   <div><b style={{ color: '#38bdf8' }}>I²C</b> {protocolAnalysis.i2c.filter((event) => event.kind === 'BYTE').slice(-3).map((event) => `0x${(event.value || 0).toString(16).padStart(2, '0')}${event.ack ? ' ✓' : ' ✕'}`).join(' ') || '—'}</div>
@@ -352,12 +354,12 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
 
         {channelKeys.length === 0 && mode === 'oscilloscope' && (
           <div className="vf-oscilloscope-empty">
-            <span>Connect an on-canvas oscilloscope CH1 or CH2 probe to view local solver data</span>
+            <span>{t("Connect an on-canvas oscilloscope CH1 or CH2 probe to view local solver data")}</span>
           </div>
         )}
         {effectivePaused && (
           <div className="vf-oscilloscope-paused-badge">
-            PAUSED
+            {t("PAUSED")}
           </div>
         )}
       </div>

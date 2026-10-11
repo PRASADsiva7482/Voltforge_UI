@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, BookOpen, CheckCircle2, Circle, HelpCircle, Play, Square, Trophy, X } from 'lucide-react';
 import { useCanvasStore } from '../../store/canvasStore';
@@ -13,6 +14,7 @@ import { LabCriteriaEvaluator, type EvaluationResult, type LabChallenge } from '
 import type { CanvasRouteCache } from '../../types/domain';
 
 export function LabChallengeRunner() {
+  const { t } = useTranslation();
   const { labId } = useParams<{ labId: string }>();
   const navigate = useNavigate();
   const challenge = (labCatalog as unknown as LabChallenge[]).find((item) => item.id === labId);
@@ -139,9 +141,9 @@ export function LabChallengeRunner() {
   if (!challenge) {
     return (
       <div className="vf-lab-missing">
-        <h2>Challenge not found</h2>
+        <h2>{t('Challenge not found')}</h2>
         <button type="button" className="vf-button vf-button--md vf-button--primary" onClick={() => navigate('/labs')}>
-          Back to Labs
+          {t('Back to Labs')}
         </button>
       </div>
     );
@@ -153,7 +155,7 @@ export function LabChallengeRunner() {
         <div className="vf-lab-runner__header-left">
           <button type="button" className="vf-button vf-button--sm vf-button--secondary" onClick={() => navigate('/labs')}>
             <ArrowLeft size={14} />
-            <span>Labs</span>
+            <span>{t('Labs')}</span>
           </button>
 
           <div className="vf-lab-runner__title">
@@ -172,7 +174,7 @@ export function LabChallengeRunner() {
             onClick={() => setShowHintModal(true)}
           >
             <HelpCircle size={14} />
-            <span>Hints ({revealedHints}/{challenge.hints.length})</span>
+            <span>{t('Hints')} ({revealedHints}/{challenge.hints.length})</span>
           </button>
 
           <button
@@ -181,13 +183,13 @@ export function LabChallengeRunner() {
             onClick={toggleSimulation}
           >
             {isSimulating ? <Square size={14} /> : <Play size={14} />}
-            <span>{isSimulating ? 'Stop' : 'Simulate & Verify'}</span>
+            <span>{isSimulating ? t('Stop') : t('Simulate & Verify')}</span>
           </button>
         </div>
       </header>
 
       <section className="vf-lab-objectives">
-        <span className="vf-lab-objectives__label">Objectives</span>
+        <span className="vf-lab-objectives__label">{t('Objectives')}</span>
         {challenge.objectives.map((objective) => {
           const result = evalResult.objectiveResults.find((item) => item.objectiveId === objective.id);
           const isPassed = Boolean(result?.passed);
@@ -222,13 +224,13 @@ export function LabChallengeRunner() {
             <header className="vf-modal__header">
               <h3>
                 <HelpCircle size={18} />
-                Challenge Hints ({revealedHints}/{challenge.hints.length})
+                {t('Challenge Hints')} ({revealedHints}/{challenge.hints.length})
               </h3>
               <button
                 type="button"
                 className="vf-modal__close-btn"
                 onClick={() => setShowHintModal(false)}
-                aria-label="Close hints"
+                aria-label={t('Close hints')}
               >
                 <X size={16} />
               </button>
@@ -237,11 +239,11 @@ export function LabChallengeRunner() {
             <div className="vf-modal__body vf-lab-dialog__body">
               {challenge.hints.slice(0, revealedHints).map((hint, index) => (
                 <div key={`${hint}-${index}`} className="vf-lab-hint">
-                  <strong>Hint {index + 1}</strong>
+                  <strong>{t('Hint')} {index + 1}</strong>
                   <span>{hint}</span>
                 </div>
               ))}
-              {revealedHints === 0 && <p className="vf-lab-dialog__empty">No hints revealed yet.</p>}
+              {revealedHints === 0 && <p className="vf-lab-dialog__empty">{t('No hints revealed yet.')}</p>}
             </div>
 
             <footer className="vf-modal__footer">
@@ -251,11 +253,11 @@ export function LabChallengeRunner() {
                   className="vf-button vf-button--sm vf-button--primary"
                   onClick={() => setRevealedHints((count) => count + 1)}
                 >
-                  Reveal Next Hint
+                  {t('Reveal Next Hint')}
                 </button>
               ) : <span />}
               <button type="button" className="vf-button vf-button--sm vf-button--secondary" onClick={() => setShowHintModal(false)}>
-                Close
+                {t('Close')}
               </button>
             </footer>
           </div>
@@ -268,25 +270,25 @@ export function LabChallengeRunner() {
             <div className="vf-lab-complete__icon">
               <Trophy size={44} />
             </div>
-            <h2>Challenge Completed</h2>
+            <h2>{t('Challenge Completed')}</h2>
             <p>
-              You met every validation target for <strong>{challenge.title}</strong>.
+              {t('You met every validation target for')} <strong>{challenge.title}</strong>.
             </p>
 
             <div className="vf-lab-complete__theory">
               <div>
                 <BookOpen size={14} />
-                <span>Engineering Theory & Solution</span>
+                <span>{t('Engineering Theory & Solution')}</span>
               </div>
               <p>{challenge.theoryExplanation}</p>
             </div>
 
             <div className="vf-lab-complete__actions">
               <button type="button" className="vf-button vf-button--md vf-button--primary" onClick={() => navigate('/labs')}>
-                Next Lab
+                {t('Next Lab')}
               </button>
               <button type="button" className="vf-button vf-button--md vf-button--secondary" onClick={() => setShowCompletedModal(false)}>
-                Continue Experimenting
+                {t('Continue Experimenting')}
               </button>
             </div>
           </div>
