@@ -280,6 +280,7 @@ export default function CircuitEditorPage() {
   const [mobileLayoutMode, setMobileLayoutMode] = useState<'single' | 'split'>('single')
   const [splitBottomTab, setSplitBottomTab] = useState<'code' | 'console'>('code')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [showMobileProperties, setShowMobileProperties] = useState(false)
   const selectedNodeId = useCanvasStore((s) => s.selectedNodeId)
   const selectedWireId = useCanvasStore((s) => s.selectedWireId)
   const nodes = useCanvasStore((s) => s.nodes)
@@ -2275,7 +2276,9 @@ export default function CircuitEditorPage() {
                 />
               </EditorFeatureBoundary>
             )}
-            <PropertyEditor readOnly={!isOwner || canvasRenderTraceRunning || avrCompiledTraceRunning} />
+            {(!isMobile || showMobileProperties) && (
+              <PropertyEditor readOnly={!isOwner || canvasRenderTraceRunning || avrCompiledTraceRunning} />
+            )}
           </div>
 
           {/* Serial monitor / Oscilloscope Trace splits (Desktop only, mobile has dedicated console tab) */}
@@ -2338,11 +2341,22 @@ export default function CircuitEditorPage() {
           {selectedNode ? (
             <div className="vf-editor-mobile-selected-hud" role="toolbar" aria-label="Selected component actions">
               <div className="vf-editor-mobile-selected-hud__info">
-                <span className="vf-editor-mobile-selected-hud__name">{selectedNode.name || selectedNode.type}</span>
+                <span
+                  className="vf-editor-mobile-selected-hud__name"
+                  onClick={() => setShowMobileProperties((p) => !p)}
+                  title={t("Tap to toggle properties")}
+                  role="button"
+                  tabIndex={0}
+                >
+                  {selectedNode.name || selectedNode.type}
+                </span>
                 <button
                   type="button"
                   className="vf-editor-mobile-selected-hud__close"
-                  onClick={() => useCanvasStore.getState().selectNode(null)}
+                  onClick={() => {
+                    setShowMobileProperties(false)
+                    useCanvasStore.getState().selectNode(null)
+                  }}
                   title={t("Deselect")}
                   aria-label={t("Deselect")}
                 >

@@ -3,7 +3,27 @@ import { findCatalogComponent } from './componentCatalog';
 import { componentDimensions } from './componentSvgs';
 import { getPinsForComponent } from './pinRegistry';
 
+import { isBoardComponentType } from './boardCatalog';
+
 const FALLBACK_DIMENSIONS = { w: 120, h: 90 };
+
+export function isFixedPackageFootprint(type: string): boolean {
+  return (
+    type.startsWith('IC_') ||
+    /^(74HC|CD40|NE555)/i.test(type) ||
+    type === 'SWITCH_SPST' ||
+    type === 'SWITCH_SPDT' ||
+    type === 'PUSH_BUTTON' ||
+    type === 'BUTTON' ||
+    type === 'RELAY_SINGLE' ||
+    type === 'RELAY_SPDT' ||
+    type === 'RELAY_2CH' ||
+    type === 'RELAY_4CH' ||
+    type === 'MULTIMETER' ||
+    type === 'OSCILLOSCOPE' ||
+    type === 'LOGIC_ANALYZER'
+  );
+}
 
 export type CanvasNodeSeed = Partial<CanvasNode> & {
   id: string;
@@ -52,9 +72,10 @@ export function resolveComponentDimensions(type: string, source: DimensionSource
   const canonical = componentDimensions[type];
   const defaults = source.defaultProperties || {};
 
-  // Discrete switches must strictly match their canonical package footprint
-  // to avoid desynchronizing terminal lugs, the internal slide track, and contact pins.
-  if (canonical && (type === 'SWITCH_SPST' || type === 'SWITCH_SPDT')) {
+  // Fixed physical package footprints (DIP ICs, discrete switches, instruments, relays, boards)
+  // must strictly match their canonical package footprint to prevent desynchronizing
+  // physical pin leads, internal tracks, and interactive connector pointers (PinDots).
+  if (canonical && (isFixedPackageFootprint(type) || isBoardComponentType(type))) {
     return { w: canonical.w, h: canonical.h };
   }
 
@@ -104,8 +125,21 @@ function resolvePins(
     if (hasLegacyPin) return existingPins;
   }
 
-  if (canonicalPins.length > 0 && componentDimensions[node.type]) {
-    return canonicalPins;
+  const canonicalDim = componentDimensions[node.type];
+  if (canonicalPins.length > 0 && canonicalDim) {
+    if (canonicalDim.w === width && canonicalDim.h === height) {
+      return canonicalPins;
+    }
+    // Proportional scaling fallback: if width or height deviates from canonical,
+    // scale canonical pins so that connector pointers (PinDots) always align
+    // precisely with the scaled SVG leads instead of remaining stuck inside the body.
+    const scaleX = width / canonicalDim.w;
+    const scaleY = height / canonicalDim.h;
+    return canonicalPins.map((pin) => ({
+      ...pin,
+      x: Math.round(pin.x * scaleX * 100) / 100,
+      y: Math.round(pin.y * scaleY * 100) / 100,
+    }));
   }
 
   return existingPins.length > 0 ? existingPins : canonicalPins;

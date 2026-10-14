@@ -564,12 +564,15 @@ const ComponentNode = ({
   const isSpdt = node.type === 'SWITCH_SPDT';
   const isSwitch = isSpst || isSpdt;
   const isBoard = isBoardComponentType(node.type);
+  const isIC = node.type.startsWith('IC_') || /^(74HC|CD40|NE555)/i.test(node.type);
+  const isInstrument = node.type === 'MULTIMETER' || node.type === 'OSCILLOSCOPE' || node.type === 'LOGIC_ANALYZER';
+  const isRelay = node.type === 'RELAY_SINGLE' || node.type === 'RELAY_2CH' || node.type === 'RELAY_4CH' || node.type === 'RELAY_SPDT';
+  const isFixedPackage = isSwitch || isBoard || isIC || isButton || isRelay || isInstrument;
   const isServo = node.type === 'SERVO_MOTOR' || node.type === 'MOTOR_SERVO';
   const isDcMotor = node.type === 'MOTOR_DC';
   const isStepper = node.type === 'MOTOR_STEPPER' || node.type === 'STEPPER_MOTOR';
   const is7Seg = node.type === 'DISPLAY_7SEG';
   const isBuzzer = node.type === 'BUZZER';
-  const isRelay = node.type === 'RELAY_SINGLE' || node.type === 'RELAY_2CH' || node.type === 'RELAY_4CH' || node.type === 'RELAY_SPDT';
   const isPressed = Boolean(node.properties?.isPressed);
 
   useEffect(() => {
@@ -2164,7 +2167,7 @@ const ComponentNode = ({
           ref={trRef}
           flipEnabled={false}
           rotateEnabled={true}
-          resizeEnabled={!isSwitch}
+          resizeEnabled={!isFixedPackage}
           rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
           boundBoxFunc={(_, nb) => (nb.width < MIN_NODE_SIZE || nb.height < MIN_NODE_SIZE ? _ : nb)}
         />
