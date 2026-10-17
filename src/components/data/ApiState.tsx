@@ -1,13 +1,16 @@
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, LoaderCircle } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { Button, Card } from '../ui'
+import { Skeleton } from '../ui/Skeleton'
 
 export function LoadingState({ label }: { label?: string }) {
   const { t } = useTranslation()
   return (
     <Card className="api-state">
-      <LoaderCircle className="vf-spin" size={24} />
-      <strong>{label ? t(label) : t('Loading')}</strong>
+      <strong role="status">{label ? t(label) : t('Loading')}</strong>
+      <Skeleton height={16} width="65%" />
+      <Skeleton height={16} width="90%" />
+      <Skeleton height={16} width="45%" />
     </Card>
   )
 }

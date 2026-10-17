@@ -173,7 +173,7 @@ export function LandingNav() {
                   border: '1px solid var(--vf-border)',
                   padding: '6px 12px',
                   background: i18n.language?.startsWith(lng.code) ? 'var(--vf-accent-soft, rgba(0, 255, 200, 0.12))' : 'transparent',
-                  color: i18n.language?.startsWith(lng.code) ? 'var(--vf-accent, #00f0c0)' : 'var(--vf-text)',
+                  color: i18n.language?.startsWith(lng.code) ? 'var(--vf-accent)' : 'var(--vf-text)',
                   fontSize: '12px',
                   cursor: 'pointer',
                 }}

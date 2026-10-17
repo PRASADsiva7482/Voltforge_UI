@@ -277,15 +277,15 @@ export default function PropertyEditor({ readOnly }: { readOnly?: boolean }) {
               marginTop: '16px',
               borderRadius: '6px',
               border: 'none',
-              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-              color: '#ef4444',
+              backgroundColor: 'var(--vf-error-soft)',
+              color: 'var(--vf-error)',
               fontWeight: 600,
               fontSize: '12px',
               cursor: 'pointer',
               transition: 'background 0.2s',
             }}
-            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)')}
-            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)')}
+            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'var(--vf-error-soft)')}
+            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'var(--vf-error-soft)')}
           >
             <Trash2 size={14} />
             {selectedNode ? t('Delete Component') : t('Delete Wire')}

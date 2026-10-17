@@ -140,8 +140,8 @@ export default function MultimeterPanel({
               padding: '2px 8px',
               fontSize: '11px',
               borderRadius: '4px',
-              background: isHold ? '#f59e0b' : '#334155',
-              color: isHold ? '#000' : '#e2e8f0',
+              background: isHold ? 'var(--vf-warning)' : 'var(--vf-surface-raised)',
+              color: isHold ? 'var(--vf-bg)' : 'var(--vf-text)',
               border: 'none',
               cursor: 'pointer',
               fontWeight: 600
@@ -156,7 +156,7 @@ export default function MultimeterPanel({
             style={{
               background: 'transparent',
               border: 'none',
-              color: soundEnabled ? '#22c55e' : '#64748b',
+              color: soundEnabled ? 'var(--vf-success)' : 'var(--vf-text-soft)',
               cursor: 'pointer'
             }}
             title={soundEnabled ? t('Buzzer Sound On') : t('Buzzer Sound Muted')}
@@ -167,15 +167,15 @@ export default function MultimeterPanel({
 
         {/* Digital LCD Display with Backlight */}
         <div style={{
-          background: isContinuityShort ? 'rgba(16, 185, 129, 0.15)' : 'var(--vf-surface-inset, #0a0b0d)',
-          border: isContinuityShort ? '1px solid #10b981' : '1px solid var(--vf-border, rgba(255, 255, 255, 0.12))',
+          background: isContinuityShort ? 'var(--vf-success-soft)' : 'var(--vf-surface-inset)',
+          border: isContinuityShort ? '1px solid var(--vf-success)' : '1px solid var(--vf-border)',
           borderRadius: '6px',
           padding: '10px',
           textAlign: 'right',
           boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)',
           transition: 'all 0.15s ease'
         }}>
-          <div style={{ fontSize: '10px', color: '#94a3b8', display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: '10px', color: 'var(--vf-text-muted)', display: 'flex', justifyContent: 'space-between' }}>
             <span>{t("AUTO RANGE")}</span>
             <span>{unit}</span>
           </div>
@@ -183,7 +183,7 @@ export default function MultimeterPanel({
             fontSize: '28px',
             fontFamily: 'monospace',
             fontWeight: 700,
-            color: isContinuityShort ? '#22c55e' : '#38bdf8',
+            color: isContinuityShort ? 'var(--vf-success)' : 'var(--vf-accent)',
             letterSpacing: '1px',
             marginTop: '4px'
           }}>
@@ -211,21 +211,21 @@ export default function MultimeterPanel({
           justifyContent: 'space-between',
           marginTop: '12px',
           padding: '6px 8px',
-          background: '#1e293b',
+          background: 'var(--vf-surface-raised)',
           borderRadius: '4px',
           fontSize: '11px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#ef4444', fontWeight: 600 }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--vf-error)', fontWeight: 600 }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--vf-error)' }} />
             <span>{redProbePin}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#94a3b8', fontWeight: 600 }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#000000', border: '1px solid #64748b' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--vf-text-muted)', fontWeight: 600 }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#000000', border: '1px solid var(--vf-text-soft)' }} />
             <span>{blackProbePin}</span>
           </div>
         </div>
 
-        <p className="vf-multimeter-hint" style={{ fontSize: '10px', color: resistanceUnsafe ? '#f87171' : '#64748b', textAlign: 'center', marginTop: '6px' }}>
+        <p className="vf-multimeter-hint" style={{ fontSize: '10px', color: resistanceUnsafe ? 'var(--vf-error)' : 'var(--vf-text-soft)', textAlign: 'center', marginTop: '6px' }}>
           {mode === 'mA'
             ? t('Current mode inserts a 0.1 Ω shunt between both probes')
             : mode === 'OHM' || mode === 'CONT'

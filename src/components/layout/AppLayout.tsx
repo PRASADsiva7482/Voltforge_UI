@@ -14,6 +14,7 @@ export function AppLayout() {
 
   return (
     <main className="app-shell">
+      <a className="vf-skip-link" href="#workspace-content">{t('Skip to content')}</a>
       {/* Mobile-only Header */}
       <header className="app-mobile-topbar" aria-label={t("Mobile navigation header")}>
         <BrandMark />
@@ -39,7 +40,7 @@ export function AppLayout() {
       <Sidebar />
 
       {/* Main Content Area */}
-      <div className="app-content">
+      <div className="app-content" id="workspace-content" tabIndex={-1}>
         <Outlet />
       </div>
 

@@ -54,8 +54,10 @@ export const ACTIVE_GLOW_PADDING = 4;
 export const ACTIVE_GLOW_SHADOW_BLUR = 16;
 
 // ── Canvas background ─────────────────────────────────────────────────────
-export const CANVAS_BG_DARK = '#000000';
-export const CANVAS_BG_LIGHT = '#f5f7f2';
+export const CANVAS_BG_DARK = '#171816';
+export const CANVAS_BG_LIGHT = '#F4F1E8';
+export const CANVAS_GRID_DARK = { minor: '#252620', major: '#393A32', text: '#F4F0E8' };
+export const CANVAS_GRID_LIGHT = { minor: '#E7E2D6', major: '#D8D2C5', text: '#25251F' };
 
 // ── Origin axis color ─────────────────────────────────────────────────────
 export const ORIGIN_AXIS_COLOR = 'rgba(34,197,94,0.24)';

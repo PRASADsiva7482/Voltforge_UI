@@ -5,10 +5,19 @@ import { focusManager, onlineManager, QueryClient, QueryClientProvider } from '@
 import ComponentPanel from '../../src/features/editor/ComponentPanel'
 import { builtinCanvasComponents } from '../../src/features/canvas/componentCatalog'
 import { useCanvasStore } from '../../src/store/canvasStore'
+import { AuthContext, type AuthContextValue } from '../../src/auth/AuthContext'
+import '../../src/i18n'
 import '../../src/index.css'
 import '../../src/App.css'
 import '../../src/styles/components.css'
 import '../../src/styles/editor.css'
+import '../../src/styles/workspace.css'
+
+const noop = () => {}
+const auth: AuthContextValue = {
+  isAuthenticated: true, isLoading: false, isRedirecting: false, error: null, user: null,
+  login: noop, logout: noop, signup: noop, changePassword: noop, configureTotp: noop, manageAccount: noop,
+}
 
 const categories = ['BOARD', 'PASSIVE', 'LOGIC', 'LED', 'SENSOR', 'DISPLAY', 'MOTOR', 'RELAY', 'COMMUNICATION', 'POWER', 'INSTRUMENT']
 const catalogue = [...builtinCanvasComponents, ...Array.from({ length: 1000 - builtinCanvasComponents.length }, (_, i) => ({
@@ -35,4 +44,4 @@ function Fixture() {
   window.__paletteAudit.onlineManager = onlineManager
   return <div style={{ width: 272, height: '100vh' }}>{mounted && <ComponentPanel readOnly={readOnly} />}</div>
 }
-createRoot(document.getElementById('root')!).render(<StrictMode><QueryClientProvider client={client}><Fixture /></QueryClientProvider></StrictMode>)
+createRoot(document.getElementById('root')!).render(<StrictMode><AuthContext.Provider value={auth}><QueryClientProvider client={client}><Fixture /></QueryClientProvider></AuthContext.Provider></StrictMode>)

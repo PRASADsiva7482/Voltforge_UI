@@ -9,6 +9,7 @@ import { Box, Button, FieldShell, SelectField, TextInput, Textarea, Toggle } fro
 import { BOARD_CATALOG } from '../canvas/boardCatalog'
 import { generateDefaultCode } from '../../utils/codeTemplates'
 import type { BoardType } from '../../types/domain'
+import { useToastStore } from '../../store/useToastStore'
 
 const boardOptions = BOARD_CATALOG
 const boardFamilies = Array.from(new Set(boardOptions.map((board) => board.family)))
@@ -21,7 +22,7 @@ export function NewProjectPage() {
   const paramName = searchParams.get('name')
   const [name, setName] = useState(paramName || t('Untitled circuit'))
   const [description, setDescription] = useState('')
-  const [boardType, setBoardType] = useState<BoardType>(paramBoard || 'ARDUINO_UNO')
+  const [boardType, setBoardType] = useState<BoardType>(boardOptions.some(board => board.type === paramBoard) ? paramBoard! : 'ARDUINO_UNO')
   const [isPublic, setPublic] = useState(false)
 
   const createProject = useMutation({
@@ -29,7 +30,7 @@ export function NewProjectPage() {
       projectApi.create({
         boardType,
         description,
-        name,
+        name: name.trim(),
         isPublic,
         codeFiles: [
           {
@@ -41,6 +42,7 @@ export function NewProjectPage() {
         ],
       }),
     onSuccess: (event) => {
+      useToastStore.getState().addToast(t('Project created'), 'success')
       navigate(`/editor/${event.data.data.id}`)
     },
   })
@@ -49,14 +51,15 @@ export function NewProjectPage() {
     <>
       <Topbar eyebrow={t("Projects")} title={t("New project")} />
 
-      <section className="content-band form-grid">
+      <section className="vf-form-layout">
         <Box>
+          <form onSubmit={event => { event.preventDefault(); if (name.trim() && !createProject.isPending) createProject.mutate() }}>
           <div className="form-grid">
             <FieldShell label={t("Project name")}>
-              <TextInput value={name} onChange={(event) => setName(event.target.value)} />
+              <TextInput required maxLength={200} aria-invalid={!name.trim()} value={name} onChange={(event) => setName(event.target.value)} />
             </FieldShell>
             <FieldShell label={t("Description")}>
-              <Textarea rows={3} value={description} onChange={(event) => setDescription(event.target.value)} />
+              <Textarea maxLength={5000} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} />
             </FieldShell>
             <FieldShell label={t("Development board")}>
               <SelectField value={boardType} onChange={(event) => setBoardType(event.target.value as BoardType)}>
@@ -79,12 +82,14 @@ export function NewProjectPage() {
             <Button icon={<ArrowLeft size={16} />} onClick={() => navigate('/projects')}>
               {t("Back")}
             </Button>
-            <Button icon={isPublic ? <Unlock size={16} /> : <Lock size={16} />} isLoading={createProject.isPending} onClick={() => createProject.mutate()} variant="primary">
+            <Button type="submit" disabled={!name.trim()} icon={isPublic ? <Unlock size={16} /> : <Lock size={16} />} isLoading={createProject.isPending} variant="primary">
               {t("Create project")}
             </Button>
           </div>
-          {createProject.isError ? <p className="form-error">{t("Project API offline. Check your services and try again.")}</p> : null}
+          {createProject.isError ? <p role="alert" className="form-error">{t('Could not create the project. Your entries are preserved. Please try again.')}</p> : null}
+          </form>
         </Box>
+        <aside className="vf-form-aside"><p className="vf-eyebrow">{t('Project setup')}</p><h2>{t('A home for your circuit.')}</h2><p>{t('Your project keeps the schematic, component settings, and firmware together.')}</p><p>{t('Choose a board to generate starter firmware. Simulation and compilation support vary by board; the editor shows available capabilities.')}</p><p>{isPublic ? t('Public projects can be viewed by the community.') : t('Private projects are visible only to authorized collaborators.')}</p></aside>
       </section>
     </>
   )

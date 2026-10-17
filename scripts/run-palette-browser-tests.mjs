@@ -18,6 +18,7 @@ const checks = [], measurements = {}, errors = [], requests = []
 const sha = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
 let browser
 let coverageRequests = 0, coverageStatus = 500, coverageGate, releaseCoverage
+let catalogOnly = false
 const html = '<!doctype html><html><head><title>Palette audit</title></head><body><div id="root"></div><script type="module" src="/scripts/fixtures/palette-entry.tsx"></script></body></html>'
 const plugin = {
   name: 'palette-audit-only', enforce: 'pre',
@@ -86,7 +87,7 @@ try {
     if (url.pathname.endsWith('/ai/component-coverage')) {
       coverageRequests++
       if (coverageGate) await coverageGate
-      const data = { entries: [{ componentType: 'RESISTOR', status: 'verified', reason: 'Recovered coverage' }], summary: { verified: 1, variantRequired: 0, simulationOnly: 0 } }
+      const data = catalogOnly ? { schemaVersion: 1, components: [{ componentType: 'RESISTOR' }] } : { entries: [{ componentType: 'RESISTOR', status: 'verified', reason: 'Recovered coverage' }], summary: { verified: 1, variantRequired: 0, simulationOnly: 0 } }
       return route.fulfill({ status: coverageStatus, json: coverageStatus === 200 ? { success: true, data } : { success: false, message: 'Coverage unavailable' } })
     }
     if (url.pathname.includes('/api/v1/')) return route.fulfill({ status: 503, json: { success: false } })
@@ -217,7 +218,8 @@ try {
       await page.evaluate(() => window.__paletteAudit.store.getState().setViewport({ x: 100, y: 50, scale: 2 }))
       await page.locator('[data-component-type="RESISTOR"]').focus(); await page.keyboard.press('Enter')
       const node = await page.evaluate(() => window.__paletteAudit.store.getState().nodes.at(-1))
-      assert.equal(node.type, 'RESISTOR'); assert.equal(node.x, 100); assert.equal(node.y, 100)
+      // Current placement targets screen position (450, 320) at this viewport size.
+      assert.equal(node.type, 'RESISTOR'); assert.equal(node.x * 2 + 100, 450); assert.equal(node.y * 2 + 50, 320)
     })
     await check('Read-only mode keeps search available and prevents insertion and creation', async () => {
       await page.evaluate(() => window.__paletteAudit.setReadOnly(true)); await settle(page)
@@ -336,6 +338,12 @@ try {
     })
   }
   measurements.coverage.finalRequests = coverageRequests
+  if (phase === 'after') await check('A component catalog does not fabricate verified AI coverage', async () => {
+    coverageStatus = 200; catalogOnly = true
+    await page.getByRole('button', { name: 'Check AI coverage', exact: true }).click()
+    await page.getByText('AI component coverage unavailable', { exact: true }).waitFor()
+    assert.equal(await page.locator('.vf-component-panel__coverage-badge').count(), 0)
+  })
 } catch (error) {
   checks.push({ name: 'Harness completed', passed: false, error: error.stack || error.message })
   console.error(error)

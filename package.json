@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test:design-system": "node scripts/run-design-system-browser-tests.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build && npm run test:bundle-budget",
     "lint": "oxlint",

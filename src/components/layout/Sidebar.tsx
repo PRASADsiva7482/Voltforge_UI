@@ -14,7 +14,8 @@ export function Sidebar() {
   return (
     <aside className="app-sidebar" aria-label={t("Voltforge sections")}>
       <BrandMark />
-      <nav>
+      <p className="vf-eyebrow app-sidebar__label">{t('Workspace')}</p>
+      <nav aria-label={t('Main navigation')}>
         {navItems.map((item) => {
           const Icon = item.icon
           return (
@@ -25,7 +26,7 @@ export function Sidebar() {
           )
         })}
       </nav>
-      <Box tone="accent">
+      <Box className="app-sidebar__account" tone="raised">
         <p className="vf-eyebrow">{t("Session")}</p>
         <NavLink
           to="/profile"

@@ -26,6 +26,8 @@ import {
   ZOOM_STEP,
   CANVAS_BG_DARK,
   CANVAS_BG_LIGHT,
+  CANVAS_GRID_DARK,
+  CANVAS_GRID_LIGHT,
   ORIGIN_AXIS_COLOR,
   PCB_TRACE_TOP,
   PCB_TRACE_BOTTOM,
@@ -67,8 +69,8 @@ const CanvasMat = memo(({
   isDark: boolean;
 }) => {
   const scale = viewport.scale || 1;
-  const minorStroke = isDark ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.055)';
-  const majorStroke = isDark ? 'rgba(255,255,255,0.055)' : 'rgba(15,23,42,0.11)';
+  const minorStroke = (isDark ? CANVAS_GRID_DARK : CANVAS_GRID_LIGHT).minor;
+  const majorStroke = (isDark ? CANVAS_GRID_DARK : CANVAS_GRID_LIGHT).major;
 
   return (
     <Group>
@@ -934,7 +936,7 @@ export default function CircuitCanvas({
                   x={8}
                   y={-14}
                   fontSize={10}
-                  fill={isDark ? '#e5e7eb' : '#0f172a'}
+                  fill={(isDark ? CANVAS_GRID_DARK : CANVAS_GRID_LIGHT).text}
                   fontFamily="Inter"
                 />
               </Group>

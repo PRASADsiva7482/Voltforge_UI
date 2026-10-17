@@ -159,8 +159,8 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
                 fontSize: '11px',
                 padding: '2px 8px',
                 borderRadius: '4px',
-                background: mode === 'oscilloscope' ? '#334155' : 'transparent',
-                color: mode === 'oscilloscope' ? '#38bdf8' : '#94a3b8',
+                background: mode === 'oscilloscope' ? 'var(--vf-surface-raised)' : 'transparent',
+                color: mode === 'oscilloscope' ? 'var(--vf-accent)' : 'var(--vf-text-muted)',
                 border: 'none',
                 cursor: 'pointer'
               }}
@@ -175,8 +175,8 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
                 fontSize: '11px',
                 padding: '2px 8px',
                 borderRadius: '4px',
-                background: mode === 'logic_analyzer' ? '#334155' : 'transparent',
-                color: mode === 'logic_analyzer' ? '#22c55e' : '#94a3b8',
+                background: mode === 'logic_analyzer' ? 'var(--vf-surface-raised)' : 'transparent',
+                color: mode === 'logic_analyzer' ? 'var(--vf-success)' : 'var(--vf-text-muted)',
                 border: 'none',
                 cursor: 'pointer'
               }}
@@ -199,8 +199,8 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
               fontSize: '11px',
               padding: '2px 8px',
               borderRadius: '4px',
-              background: audioEnabled ? '#10b981' : '#334155',
-              color: '#ffffff',
+              background: audioEnabled ? 'var(--vf-success)' : 'var(--vf-surface-raised)',
+              color: 'var(--vf-on-primary)',
               border: 'none',
               cursor: 'pointer'
             }}
@@ -258,7 +258,7 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
             type="button"
           >
             {effectivePaused ? (
-              <Play size={12} style={{ color: '#22c55e' }} />
+              <Play size={12} style={{ color: 'var(--vf-success)' }} />
             ) : (
               <Pause size={12} />
             )}
@@ -307,9 +307,9 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
           />
         ) : (
           /* Digital Logic Analyzer Multi-Channel View */
-          <div style={{ padding: '8px 12px', background: '#0a0f1e', height: '100%', overflowY: 'auto' }}>
+          <div style={{ padding: '8px 12px', background: 'var(--vf-surface-inset)', height: '100%', overflowY: 'auto' }}>
             {logicChannelKeys.length === 0 ? (
-              <div style={{ color: '#64748b', fontSize: '11px' }}>
+              <div style={{ color: 'var(--vf-text-soft)', fontSize: '11px' }}>
                 {t("Connect up to eight oscilloscope inputs to capture digital traffic.")}
               </div>
             ) : (
@@ -324,28 +324,28 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
                     const isHigh = latest >= 2.5
                     return (
                       <div key={ch} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '112px', fontSize: '10px', fontWeight: 600, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div style={{ width: '112px', fontSize: '10px', fontWeight: 600, color: 'var(--vf-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {ch}
                         </div>
-                        <div style={{ width: '37px', padding: '1px 4px', borderRadius: '3px', fontSize: '9px', fontWeight: 700, textAlign: 'center', background: isHigh ? 'rgba(34, 197, 94, 0.2)' : 'rgba(100, 116, 139, 0.2)', color: isHigh ? '#22c55e' : '#64748b' }}>
+                        <div style={{ width: '37px', padding: '1px 4px', borderRadius: '3px', fontSize: '9px', fontWeight: 700, textAlign: 'center', background: isHigh ? 'var(--vf-success-soft)' : 'var(--vf-surface-raised)', color: isHigh ? 'var(--vf-success)' : 'var(--vf-text-soft)' }}>
                           {isHigh ? 'HIGH' : 'LOW'}
                         </div>
-                        <div style={{ flex: 1, height: '14px', background: '#1e293b', borderRadius: '2px', display: 'flex', alignItems: 'stretch', overflow: 'hidden' }}>
+                        <div style={{ flex: 1, height: '14px', background: 'var(--vf-surface-raised)', borderRadius: '2px', display: 'flex', alignItems: 'stretch', overflow: 'hidden' }}>
                           {(captured.length > 0 ? captured : [latest]).map((value, index) => (
-                            <span key={`${ch}-${index}`} style={{ flex: '1 1 0', minWidth: '1px', background: value >= 2.5 ? '#22c55e' : '#334155' }} />
+                            <span key={`${ch}-${index}`} style={{ flex: '1 1 0', minWidth: '1px', background: value >= 2.5 ? 'var(--vf-success)' : 'var(--vf-surface-raised)' }} />
                           ))}
                         </div>
                       </div>
                     )
                   })}
                 </div>
-                <div style={{ marginTop: '8px', paddingTop: '6px', borderTop: '1px solid #1e293b', color: '#94a3b8', fontSize: '10px' }}>
+                <div style={{ marginTop: '8px', paddingTop: '6px', borderTop: '1px solid var(--vf-surface-raised)', color: 'var(--vf-text-muted)', fontSize: '10px' }}>
                   {t("Capture:")} {activeLogicCapture.length} {t("samples")} · {activeLogicCapture.length > 1 ? `${((activeLogicCapture[activeLogicCapture.length - 1].timestamp_s - activeLogicCapture[0].timestamp_s) * 1e6).toFixed(0)} µs` : '0 µs'}
                 </div>
                 <div style={{ marginTop: '6px', display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '6px' }}>
-                  <div><b style={{ color: '#38bdf8' }}>I²C</b> {protocolAnalysis.i2c.filter((event) => event.kind === 'BYTE').slice(-3).map((event) => `0x${(event.value || 0).toString(16).padStart(2, '0')}${event.ack ? ' ✓' : ' ✕'}`).join(' ') || '—'}</div>
-                  <div><b style={{ color: '#f59e0b' }}>SPI</b> {protocolAnalysis.spi.slice(-2).map((frame) => `M${frame.mosi.toString(16).padStart(2, '0')} R${frame.miso.toString(16).padStart(2, '0')}`).join(' ') || '—'}</div>
-                  <div><b style={{ color: '#a855f7' }}>UART</b> {protocolAnalysis.uart.slice(-8).map((frame) => frame.text === '.' ? `0x${frame.value.toString(16).padStart(2, '0')}` : frame.text).join('') || '—'}</div>
+                  <div><b style={{ color: 'var(--vf-accent)' }}>I²C</b> {protocolAnalysis.i2c.filter((event) => event.kind === 'BYTE').slice(-3).map((event) => `0x${(event.value || 0).toString(16).padStart(2, '0')}${event.ack ? ' ✓' : ' ✕'}`).join(' ') || '—'}</div>
+                  <div><b style={{ color: 'var(--vf-warning)' }}>SPI</b> {protocolAnalysis.spi.slice(-2).map((frame) => `M${frame.mosi.toString(16).padStart(2, '0')} R${frame.miso.toString(16).padStart(2, '0')}`).join(' ') || '—'}</div>
+                  <div><b style={{ color: 'var(--vf-accent)' }}>UART</b> {protocolAnalysis.uart.slice(-8).map((frame) => frame.text === '.' ? `0x${frame.value.toString(16).padStart(2, '0')}` : frame.text).join('') || '—'}</div>
                 </div>
               </>
             )}

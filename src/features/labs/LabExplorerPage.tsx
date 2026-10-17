@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Clock, Sparkles } from 'lucide-react';
 import labCatalog from './labCatalog.json';
 import type { LabChallenge } from './labCriteriaEvaluator';
+import { Topbar } from '../../components/layout';
 
 const difficultyClass: Record<LabChallenge['difficulty'], string> = {
   Advanced: 'is-advanced',
@@ -24,6 +25,7 @@ export function LabExplorerPage() {
 
   return (
     <div className="vf-labs-page">
+      <Topbar eyebrow={t('Engineering Labs')} title={t('Challenge Labs')} />
       <header className="vf-labs-hero">
         <span className="vf-badge vf-badge--info">
           <Sparkles size={13} />
@@ -42,6 +44,7 @@ export function LabExplorerPage() {
           <button
             key={category}
             type="button"
+            aria-pressed={selectedCategory === category}
             className={`vf-labs-filter__item ${selectedCategory === category ? 'is-active' : ''}`}
             onClick={() => setSelectedCategory(category)}
           >

@@ -15,6 +15,7 @@ export interface DropdownProps {
 export function Dropdown({ items, trigger }: DropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (isOpen) ref.current?.querySelector<HTMLButtonElement>('.vf-dropdown__item')?.focus() }, [isOpen])
 
   useEffect(() => {
     if (!isOpen) return
@@ -28,7 +29,15 @@ export function Dropdown({ items, trigger }: DropdownProps) {
   }, [isOpen])
 
   return (
-    <div ref={ref} className="vf-dropdown">
+    <div ref={ref} className="vf-dropdown" onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setIsOpen(false) }} onKeyDown={e => {
+      if (e.key === 'Escape') { setIsOpen(false); ref.current?.querySelector<HTMLElement>('button, [tabindex="0"]')?.focus() }
+      if (isOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        e.preventDefault()
+        const buttons = Array.from(ref.current?.querySelectorAll<HTMLButtonElement>('.vf-dropdown__item') ?? [])
+        const index = buttons.indexOf(document.activeElement as HTMLButtonElement)
+        buttons[(index + (e.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length]?.focus()
+      }
+    }}>
       <div onClick={() => setIsOpen(!isOpen)}>{trigger}</div>
       {isOpen && (
         <div className="vf-dropdown__menu">

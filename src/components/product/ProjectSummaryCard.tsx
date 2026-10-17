@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Cpu, Eye, GitFork, Lock, MoreHorizontal, Trash2, Unlock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge, Button, Card, IconButton, ConfirmDialog } from '../ui'
@@ -18,6 +18,10 @@ export function ProjectSummaryCard({ onOpen, onDelete, project }: ProjectSummary
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const { t } = useTranslation()
+  const actionsRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (menuOpen) actionsRef.current?.querySelector<HTMLButtonElement>('.vf-project-card__dropdown-btn')?.focus()
+  }, [menuOpen])
 
   const handleActionClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -34,17 +38,22 @@ export function ProjectSummaryCard({ onOpen, onDelete, project }: ProjectSummary
     setConfirmOpen(false)
     onDelete?.(project.id)
   }
+  const closeConfirmation = () => {
+    setConfirmOpen(false)
+    requestAnimationFrame(() => actionsRef.current?.querySelector<HTMLButtonElement>('button')?.focus())
+  }
 
   return (
     <>
       <Card
         actions={
           onDelete ? (
-            <div className="vf-project-card__actions-wrapper" onClick={(e) => e.stopPropagation()}>
+            <div ref={actionsRef} className="vf-project-card__actions-wrapper" onClick={(e) => e.stopPropagation()} onKeyDown={e => { if (e.key === 'Escape') { setMenuOpen(false); actionsRef.current?.querySelector('button')?.focus() } }} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setMenuOpen(false) }}>
               <IconButton
                 icon={<MoreHorizontal size={17} />}
                 label={t("Actions for project")}
                 onClick={handleActionClick}
+                aria-expanded={menuOpen}
                 size="sm"
               />
               {menuOpen && (
@@ -105,7 +114,7 @@ export function ProjectSummaryCard({ onOpen, onDelete, project }: ProjectSummary
         confirmLabel={t("Yes, Delete")}
         cancelLabel={t("No, Keep It")}
         onConfirm={handleConfirmDelete}
-        onClose={() => setConfirmOpen(false)}
+        onClose={closeConfirmation}
       />
     </>
   )

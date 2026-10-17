@@ -25,9 +25,11 @@ import { ErrorState, LoadingState } from '../../components/data'
 import { Topbar } from '../../components/layout'
 import { Badge, Button, FieldShell, Tabs, TextInput } from '../../components/ui'
 import { useToastStore } from '../../store/useToastStore'
+import { useThemeStore } from '../../store/themeStore'
 import './SettingsPage.css'
 
 export function SettingsPage() {
+  const { preference, setTheme } = useThemeStore()
   const auth = useAuth()
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
@@ -388,7 +390,7 @@ export function SettingsPage() {
                   </>
                 ) : (
                   <>
-                    <AlertTriangle size={14} style={{ color: '#f59e0b' }} />
+                    <AlertTriangle size={14} style={{ color: 'var(--vf-warning)' }} />
                     <span>{t("Recommendation: Enable 2FA to protect your hardware designs and schematic revisions.")}</span>
                   </>
                 )}
@@ -425,6 +427,13 @@ export function SettingsPage() {
             </div>
 
             <div className="vf-pref-group">
+                <div className="vf-pref-row">
+                  <FieldShell label={t('Appearance')} hint={t('Applies immediately across your workspace.')}>
+                    <select className="vf-input" value={preference} onChange={event => setTheme(event.target.value as 'system' | 'dark' | 'light')}>
+                      <option value="system">{t('Use system preference')}</option><option value="dark">{t('Dark — Graphite')}</option><option value="light">{t('Light — Ivory')}</option>
+                    </select>
+                  </FieldShell>
+                </div>
               {/* Setting 1: Default Editor Layout */}
               <div className="vf-pref-row">
                 <div>
@@ -527,7 +536,7 @@ export function SettingsPage() {
           <div className="vf-modal vf-2fa-modal">
             <header className="vf-modal__header">
               <div className="vf-modal__title-group">
-                <ShieldAlert size={18} style={{ color: '#f59e0b' }} />
+                <ShieldAlert size={18} style={{ color: 'var(--vf-warning)' }} />
                 <h3 className="vf-modal__title">{t("Disable Two-Factor Authentication")}</h3>
               </div>
               <button
@@ -546,7 +555,7 @@ export function SettingsPage() {
                 <strong>@{username}</strong>?
               </p>
               <div className="vf-2fa-warning-box">
-                <AlertTriangle size={18} style={{ color: '#f59e0b', flexShrink: 0, marginTop: 2 }} />
+                <AlertTriangle size={18} style={{ color: 'var(--vf-warning)', flexShrink: 0, marginTop: 2 }} />
                 <span>
                   {t("Disabling 2FA reduces account security against unauthorized access. To revoke or remove the authenticator credential permanently, delete the registered device in Keycloak Account Security.")}
                 </span>

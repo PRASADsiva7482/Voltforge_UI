@@ -1,4 +1,5 @@
-import { lazy, memo, Suspense, useRef, useState, useMemo } from 'react';
+import { lazy, memo, Suspense, useRef, useState, useMemo, useEffect, useCallback } from 'react';
+import { useThemeStore } from '../../store/themeStore';
 import { useTranslation } from 'react-i18next';
 import { useProjectStore } from '../../store/projectStore';
 import { useCanvasStore } from '../../store/canvasStore';
@@ -104,6 +105,23 @@ function generateFullCode(userCode: string, boardType?: string): string {
 }
 
 function CodeEditor({ readOnly }: { readOnly?: boolean }) {
+  const theme = useThemeStore(s => s.theme);
+  const applyEditorTheme = useCallback((monaco: Parameters<OnMount>[1]) => {
+    const css = getComputedStyle(document.documentElement);
+    const token = (name: string) => css.getPropertyValue(name).trim();
+    monaco.editor.defineTheme('voltforge', {
+      base: theme === 'dark' ? 'vs-dark' : 'vs', inherit: true, rules: [],
+      colors: {
+        'editor.background': token('--vf-surface-inset'),
+        'editor.foreground': token('--vf-text'),
+        'editorLineNumber.foreground': token('--vf-text-soft'),
+        'editorCursor.foreground': token('--vf-primary'),
+        'editor.lineHighlightBackground': token('--vf-surface-raised'),
+        'editor.selectionBackground': token('--vf-hover'),
+      },
+    });
+    monaco.editor.setTheme('voltforge');
+  }, [theme]);
   const { t } = useTranslation();
   const activeCodeFile = useProjectStore((s) => s.activeCodeFile);
   // Keep the subscribed snapshot stable while a project is absent or denied.
@@ -128,7 +146,9 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
   const handleEditorMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
+    applyEditorTheme(monaco);
   };
+  useEffect(() => { if (monacoRef.current) applyEditorTheme(monacoRef.current) }, [applyEditorTheme]);
 
   const handleFormatCode = () => {
     const editor = editorRef.current;
@@ -208,9 +228,9 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
               <div
                 className="vf-code-editor__action-btn"
                 style={{
-                    backgroundColor: canRunCustomHex ? 'rgba(56, 189, 248, 0.15)' : 'rgba(250, 204, 21, 0.15)',
-                  borderColor: '#38bdf8',
-                  color: '#38bdf8',
+                    backgroundColor: canRunCustomHex ? 'var(--vf-accent-soft)' : 'var(--vf-warning-soft)',
+                  borderColor: 'var(--vf-accent)',
+                  color: 'var(--vf-accent)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px',
@@ -235,7 +255,7 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
                     border: 'none',
                     padding: 0,
                     cursor: 'pointer',
-                    color: '#94a3b8',
+                    color: 'var(--vf-text-muted)',
                     display: 'flex',
                     alignItems: 'center',
                   }}
@@ -313,7 +333,7 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
             <MonacoEditor
               height="100%"
               language={lang}
-              theme="vs-dark"
+              theme="voltforge"
               value={displayedContent}
               onMount={handleEditorMount}
               onChange={(value) => {

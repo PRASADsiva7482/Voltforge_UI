@@ -20,9 +20,18 @@ export function SegmentedControl({ className, onChange, options, value }: Segmen
       {options.map((option) => (
         <button
           aria-selected={value === option.id}
+          tabIndex={value === option.id ? 0 : -1}
           className="vf-segmented__item"
           key={option.id}
           onClick={() => onChange(option.id)}
+          onKeyDown={event => {
+            const index = options.findIndex(item => item.id === option.id)
+            const next = event.key === 'ArrowRight' ? (index + 1) % options.length : event.key === 'ArrowLeft' ? (index + options.length - 1) % options.length : event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : -1
+            if (next < 0) return
+            event.preventDefault()
+            onChange(options[next].id)
+            event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
+          }}
           role="tab"
           type="button"
         >

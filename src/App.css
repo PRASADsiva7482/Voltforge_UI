@@ -26,9 +26,9 @@
 }
 
 .brand-mark__icon {
-  background: var(--vf-teal-soft);
+  background: var(--vf-primary-soft);
   border-radius: 8px;
-  color: var(--vf-teal-dark);
+  color: var(--vf-primary-hover);
   display: grid;
   height: 38px;
   place-items: center;
@@ -188,9 +188,9 @@
 }
 
 .auth-loader__mark {
-  background: var(--vf-teal);
+  background: var(--vf-primary);
   border-radius: 16px;
-  color: #ffffff;
+  color: var(--vf-on-primary);
   display: grid;
   height: 70px;
   margin-bottom: 12px;
@@ -256,8 +256,8 @@
     justify-content: space-between;
     padding: 12px 16px;
     padding-top: calc(12px + var(--vf-safe-top, 0px));
-    background: var(--vf-sidebar, #ffffff);
-    border-bottom: 1px solid var(--vf-border, #e2e8f0);
+    background: var(--vf-sidebar);
+    border-bottom: 1px solid var(--vf-border);
     position: sticky;
     top: 0;
     z-index: 90;
@@ -286,8 +286,8 @@
 
   .app-mobile-topbar__user.is-active,
   .app-mobile-topbar__user:hover {
-    border-color: var(--vf-teal, #087f83);
-    color: var(--vf-teal, #087f83);
+    border-color: var(--vf-primary-text);
+    color: var(--vf-primary-text);
   }
 
   .app-content {
@@ -328,8 +328,8 @@
     right: 0;
     height: 60px;
     padding-bottom: var(--vf-safe-bottom, 0px);
-    background: var(--vf-surface, #ffffff);
-    border-top: 1px solid var(--vf-border, #e2e8f0);
+    background: var(--vf-surface);
+    border-top: 1px solid var(--vf-border);
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
     z-index: 100;
     backdrop-filter: blur(16px);
@@ -337,8 +337,8 @@
   }
 
   html.dark .app-mobile-nav {
-    background: rgba(17, 18, 21, 0.94);
-    border-top-color: rgba(255, 255, 255, 0.08);
+    background: var(--vf-surface);
+    border-top-color: var(--vf-border);
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
   }
 
@@ -350,7 +350,7 @@
     gap: 3px;
     flex: 1;
     height: 100%;
-    color: var(--vf-text-muted, #64748b);
+    color: var(--vf-text-muted);
     text-decoration: none;
     font-size: 10px;
     font-weight: 600;
@@ -369,20 +369,20 @@
   }
 
   .app-mobile-nav__item.is-active {
-    color: var(--vf-teal, #087f83);
+    color: var(--vf-primary-text);
   }
 
   html.dark .app-mobile-nav__item.is-active {
-    color: var(--vf-teal-accent, #2dd4bf);
+    color: var(--vf-primary-text);
   }
 
   .app-mobile-nav__item.is-active .app-mobile-nav__icon-wrap {
-    background: rgba(8, 127, 131, 0.12);
+    background: var(--vf-primary-soft);
     transform: translateY(-1px);
   }
 
   html.dark .app-mobile-nav__item.is-active .app-mobile-nav__icon-wrap {
-    background: rgba(45, 212, 191, 0.15);
+    background: var(--vf-primary-soft);
   }
 }
 
@@ -392,8 +392,8 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  color: var(--vf-text, #34413d);
-  background: var(--vf-bg, #f6f8f7);
+  color: var(--vf-text);
+  background: var(--vf-bg);
 }
 
 .vf-route-state__card {
@@ -403,9 +403,9 @@
   justify-content: center;
   gap: 12px;
   padding: 24px;
-  border: 1px solid var(--vf-border, #dfe5e2);
+  border: 1px solid var(--vf-border);
   border-radius: 14px;
-  background: var(--vf-surface, #fff);
+  background: var(--vf-surface);
   box-shadow: 0 12px 40px rgba(17, 24, 39, 0.08);
 }
 
@@ -420,17 +420,17 @@
 }
 
 .vf-route-state__card h1 {
-  color: var(--vf-text-strong, #111816);
+  color: var(--vf-text-strong);
   font-size: clamp(1.35rem, 3vw, 1.8rem);
 }
 
 .vf-route-state__card p {
-  color: var(--vf-text-muted, #66736f);
+  color: var(--vf-text-muted);
   line-height: 1.6;
 }
 
 .vf-route-state__eyebrow {
-  color: var(--vf-red, #be3b3b);
+  color: var(--vf-error);
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -448,8 +448,8 @@
   width: 22px;
   height: 22px;
   flex: 0 0 auto;
-  border: 3px solid var(--vf-border, #dfe5e2);
-  border-top-color: var(--vf-teal, #087f83);
+  border: 3px solid var(--vf-border);
+  border-top-color: var(--vf-primary-text);
   border-radius: 50%;
   animation: vf-route-spin 0.8s linear infinite;
 }

@@ -13,6 +13,7 @@ import './styles/landing.css'
 import './styles/dashboard.css'
 import './styles/pages.css'
 import './styles/editor.css'
+import './styles/workspace.css'
 import { ENABLE_ADMIN_NAV_MENU } from './config/navigation'
 
 const AdminPage = lazy(() => import('./features/admin/AdminPage').then((module) => ({ default: module.AdminPage })))

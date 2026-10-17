@@ -342,7 +342,7 @@ export default function CircuitEditorPage() {
   const [isSimulating, setIsSimulating] = useState(false)
   const [isSimulationPaused, setIsSimulationPaused] = useState(false)
   const [isCompilingFirmware, setIsCompilingFirmware] = useState(false)
-  const canvasContainerRef = useRef<HTMLDivElement>(null)
+  const [canvasContainer, setCanvasContainer] = useState<HTMLDivElement | null>(null)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
   const hydratedVersionRef = useRef<{ id: string; revision: string } | null>(null)
   const sharedCanvasStateRef = useRef<string | null>(null)
@@ -838,7 +838,7 @@ export default function CircuitEditorPage() {
 
   // ── Canvas resize observer ──
   useEffect(() => {
-    const el = canvasContainerRef.current
+    const el = canvasContainer
     if (!el) return
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -852,7 +852,7 @@ export default function CircuitEditorPage() {
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [leftPanelOpen, viewMode, mobileTab, isMobile, mobileLayoutMode])
+  }, [canvasContainer])
 
   // ── Component Interaction (button press, relay activation, etc.) ──
   const handleComponentInteraction = useCallback(
@@ -1510,7 +1510,7 @@ export default function CircuitEditorPage() {
     : [
         { label: 'Undo', icon: <Undo2 size={12} />, onClick: undo },
         { label: 'Redo', icon: <Redo2 size={12} />, onClick: redo },
-        { label: 'Clear Workspace', icon: <Trash2 size={12} style={{ color: '#be3b3b' }} />, destructive: true, onClick: clearCanvas },
+        { label: 'Clear Workspace', icon: <Trash2 size={12} style={{ color: 'var(--vf-error)' }} />, destructive: true, onClick: clearCanvas },
       ]
 
   return (
@@ -1872,8 +1872,9 @@ export default function CircuitEditorPage() {
                 <button
                   className="vf-editor__save-btn"
                   style={{
-                    background: 'linear-gradient(135deg, #10b981, #059669)',
-                    borderColor: '#10b981',
+                    background: 'var(--vf-success-soft)',
+                    color: 'var(--vf-success)',
+                    borderColor: 'var(--vf-success)',
                   }}
                   onClick={() => navigate(`/editor/${projectSummary.userForkId}`)}
                   type="button"
@@ -1886,8 +1887,9 @@ export default function CircuitEditorPage() {
                 <button
                   className="vf-editor__save-btn"
                   style={{
-                    background: 'linear-gradient(135deg, #a855f7, #ec4899)',
-                    borderColor: '#a855f7',
+                    background: 'var(--vf-primary-soft)',
+                    color: 'var(--vf-primary-text)',
+                    borderColor: 'var(--vf-accent)',
                   }}
                   onClick={() => forkMutation.mutate()}
                   disabled={forkMutation.isPending}
@@ -2038,7 +2040,7 @@ export default function CircuitEditorPage() {
               mobileLayoutMode === 'split' ? (
                 <div className="vf-editor-mobile-stack">
                   <div className="vf-editor-mobile-stack__top">
-                    <div ref={canvasContainerRef} className="vf-editor__canvas-area is-mobile-stack">
+                    <div ref={setCanvasContainer} className="vf-editor__canvas-area is-mobile-stack">
                       <CircuitCanvas
                         width={canvasSize.width}
                         height={canvasSize.height}
@@ -2113,7 +2115,7 @@ export default function CircuitEditorPage() {
               ) : (
                 <>
                   {mobileTab === 'canvas' && (
-                    <div ref={canvasContainerRef} className="vf-editor__canvas-area">
+                    <div ref={setCanvasContainer} className="vf-editor__canvas-area">
                       <CircuitCanvas
                         width={canvasSize.width}
                         height={canvasSize.height}
@@ -2140,7 +2142,7 @@ export default function CircuitEditorPage() {
                     </div>
                   )}
                   {mobileTab === 'pcb' && (
-                    <div ref={canvasContainerRef} className="vf-editor__canvas-area">
+                    <div ref={setCanvasContainer} className="vf-editor__canvas-area">
                       <EditorFeatureBoundary label="PCB workspace">
                         <PcbCanvas
                           width={canvasSize.width}
@@ -2158,7 +2160,7 @@ export default function CircuitEditorPage() {
               viewMode === 'split' ? (
                 <SplitPane
                   left={
-                    <div ref={canvasContainerRef} className="vf-editor__canvas-area is-split">
+                    <div ref={setCanvasContainer} className="vf-editor__canvas-area is-split">
                       <CircuitCanvas
                         width={canvasSize.width}
                         height={canvasSize.height}
@@ -2183,7 +2185,7 @@ export default function CircuitEditorPage() {
               ) : (
                 <>
                   {viewMode === 'canvas' && (
-                    <div ref={canvasContainerRef} className="vf-editor__canvas-area">
+                    <div ref={setCanvasContainer} className="vf-editor__canvas-area">
                       <CircuitCanvas
                         width={canvasSize.width}
                         height={canvasSize.height}
@@ -2205,7 +2207,7 @@ export default function CircuitEditorPage() {
                     </div>
                   )}
                   {viewMode === 'pcb' && (
-                    <div ref={canvasContainerRef} className="vf-editor__canvas-area">
+                    <div ref={setCanvasContainer} className="vf-editor__canvas-area">
                       <EditorFeatureBoundary label="PCB workspace">
                         <PcbCanvas
                           width={canvasSize.width}

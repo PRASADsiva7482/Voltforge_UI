@@ -55,9 +55,9 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
       width="560px"
       icon={<Wifi size={14} />}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--vf-surface, #121316)', color: 'var(--vf-text, #d4d4d8)', fontSize: '12px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--vf-surface)', color: 'var(--vf-text)', fontSize: '12px' }}>
         {/* Navigation Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))', padding: '0 8px', backgroundColor: 'var(--vf-bg, #090a0c)', gap: '4px' }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--vf-border)', padding: '0 8px', backgroundColor: 'var(--vf-bg)', gap: '4px' }}>
           <button
             onClick={() => setActiveTab('traffic')}
             style={{
@@ -67,8 +67,8 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
               padding: '8px 12px',
               background: 'none',
               border: 'none',
-              borderBottom: activeTab === 'traffic' ? '2px solid #38bdf8' : '2px solid transparent',
-              color: activeTab === 'traffic' ? '#38bdf8' : '#94a3b8',
+              borderBottom: activeTab === 'traffic' ? '2px solid var(--vf-accent)' : '2px solid transparent',
+              color: activeTab === 'traffic' ? 'var(--vf-accent)' : 'var(--vf-text-muted)',
               cursor: 'pointer',
               fontWeight: 600,
               fontSize: '12px',
@@ -87,8 +87,8 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
               padding: '8px 12px',
               background: 'none',
               border: 'none',
-              borderBottom: activeTab === 'mqtt' ? '2px solid #38bdf8' : '2px solid transparent',
-              color: activeTab === 'mqtt' ? '#38bdf8' : '#94a3b8',
+              borderBottom: activeTab === 'mqtt' ? '2px solid var(--vf-accent)' : '2px solid transparent',
+              color: activeTab === 'mqtt' ? 'var(--vf-accent)' : 'var(--vf-text-muted)',
               cursor: 'pointer',
               fontWeight: 600,
               fontSize: '12px',
@@ -107,8 +107,8 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
               padding: '8px 12px',
               background: 'none',
               border: 'none',
-              borderBottom: activeTab === 'wifi' ? '2px solid #38bdf8' : '2px solid transparent',
-              color: activeTab === 'wifi' ? '#38bdf8' : '#94a3b8',
+              borderBottom: activeTab === 'wifi' ? '2px solid var(--vf-accent)' : '2px solid transparent',
+              color: activeTab === 'wifi' ? 'var(--vf-accent)' : 'var(--vf-text-muted)',
               cursor: 'pointer',
               fontWeight: 600,
               fontSize: '12px',
@@ -127,8 +127,8 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
               padding: '8px 12px',
               background: 'none',
               border: 'none',
-              borderBottom: activeTab === 'inject' ? '2px solid #38bdf8' : '2px solid transparent',
-              color: activeTab === 'inject' ? '#38bdf8' : '#94a3b8',
+              borderBottom: activeTab === 'inject' ? '2px solid var(--vf-accent)' : '2px solid transparent',
+              color: activeTab === 'inject' ? 'var(--vf-accent)' : 'var(--vf-text-muted)',
               cursor: 'pointer',
               fontWeight: 600,
               fontSize: '12px',
@@ -142,7 +142,7 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
         {/* Tab 1: Packet Traffic */}
         {activeTab === 'traffic' && (
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 12px', backgroundColor: 'var(--vf-surface-raised, #181a1e)', borderBottom: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 12px', backgroundColor: 'var(--vf-surface-raised)', borderBottom: '1px solid var(--vf-border)' }}>
               <div style={{ display: 'flex', gap: '6px' }}>
                 {(['ALL', 'WIFI', 'HTTP', 'MQTT'] as const).map((t) => (
                   <button
@@ -152,8 +152,8 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
                       padding: '2px 8px',
                       borderRadius: '4px',
                       border: 'none',
-                      backgroundColor: filterType === t ? 'var(--vf-teal, #6366f1)' : 'var(--vf-surface, #121316)',
-                      color: filterType === t ? '#ffffff' : '#94a3b8',
+                      backgroundColor: filterType === t ? 'var(--vf-primary)' : 'var(--vf-surface)',
+                      color: filterType === t ? 'var(--vf-on-primary)' : 'var(--vf-text-muted)',
                       fontSize: '11px',
                       fontWeight: 600,
                       cursor: 'pointer',
@@ -171,7 +171,7 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
                   gap: '4px',
                   background: 'none',
                   border: 'none',
-                  color: '#ef4444',
+                  color: 'var(--vf-error)',
                   fontSize: '11px',
                   cursor: 'pointer',
                 }}
@@ -183,13 +183,13 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '8px', fontFamily: "'JetBrains Mono', monospace", fontSize: '11px' }}>
               {filteredLogs.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#64748b', padding: '32px' }}>
+                <div style={{ textAlign: 'center', color: 'var(--vf-text-soft)', padding: '32px' }}>
                   {t("No network traffic captured yet. Start simulation with WiFi/MQTT code.")}
                 </div>
               ) : (
                 filteredLogs.map((l) => {
-                  const typeColor = l.type === 'MQTT' ? '#38bdf8' : l.type === 'HTTP' ? '#a855f7' : '#22c55e';
-                  const dirColor = l.direction === 'OUT' ? '#f59e0b' : l.direction === 'IN' ? '#4ade80' : '#94a3b8';
+                  const typeColor = l.type === 'MQTT' ? 'var(--vf-accent)' : l.type === 'HTTP' ? 'var(--vf-accent)' : 'var(--vf-success)';
+                  const dirColor = l.direction === 'OUT' ? 'var(--vf-warning)' : l.direction === 'IN' ? 'var(--vf-success)' : 'var(--vf-text-muted)';
                   return (
                     <div
                       key={l.id}
@@ -197,11 +197,11 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
                         display: 'flex',
                         gap: '8px',
                         padding: '4px 6px',
-                        borderBottom: '1px solid rgba(255,255,255,0.04)',
+                        borderBottom: '1px solid var(--vf-border)',
                         alignItems: 'flex-start',
                       }}
                     >
-                      <span style={{ color: '#64748b', fontSize: '10px', minWidth: '60px' }}>{l.timestamp}</span>
+                      <span style={{ color: 'var(--vf-text-soft)', fontSize: '10px', minWidth: '60px' }}>{l.timestamp}</span>
                       <span
                         style={{
                           backgroundColor: `${typeColor}22`,
@@ -219,7 +219,7 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
                       <span style={{ color: dirColor, fontWeight: 600, minWidth: '45px', fontSize: '10px' }}>
                         [{l.direction}]
                       </span>
-                      <span style={{ color: '#e2e8f0', wordBreak: 'break-all' }}>{l.summary}</span>
+                      <span style={{ color: 'var(--vf-text)', wordBreak: 'break-all' }}>{l.summary}</span>
                     </div>
                   );
                 })
@@ -231,35 +231,35 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
         {/* Tab 2: MQTT Broker Status */}
         {activeTab === 'mqtt' && (
           <div style={{ padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', backgroundColor: 'var(--vf-surface-raised, #181a1e)', borderRadius: '6px', border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))' }}>
-              {mqttStatus.connected ? <CheckCircle2 color="#22c55e" size={20} /> : <XCircle color="#ef4444" size={20} />}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', backgroundColor: 'var(--vf-surface-raised)', borderRadius: '6px', border: '1px solid var(--vf-border)' }}>
+              {mqttStatus.connected ? <CheckCircle2 color="var(--vf-success)" size={20} /> : <XCircle color="var(--vf-error)" size={20} />}
               <div>
-                <div style={{ fontWeight: 600, color: '#f8fafc' }}>
+                <div style={{ fontWeight: 600, color: 'var(--vf-text)' }}>
                   {mqttStatus.connected ? t("Broker Connected") : t("Broker Disconnected")}
                 </div>
-                <div style={{ color: '#94a3b8', fontSize: '11px' }}>
+                <div style={{ color: 'var(--vf-text-muted)', fontSize: '11px' }}>
                   {mqttStatus.broker}:{mqttStatus.port} (Client ID: {mqttStatus.clientId})
                 </div>
               </div>
             </div>
 
             <div>
-              <div style={{ fontWeight: 600, color: '#94a3b8', marginBottom: '6px', fontSize: '11px', textTransform: 'uppercase' }}>
+              <div style={{ fontWeight: 600, color: 'var(--vf-text-muted)', marginBottom: '6px', fontSize: '11px', textTransform: 'uppercase' }}>
                 {t("Active Subscriptions")} ({mqttStatus.subscribedTopics.length})
               </div>
               {mqttStatus.subscribedTopics.length === 0 ? (
-                <div style={{ color: '#64748b', fontStyle: 'italic' }}>{t("No topics subscribed by device code")}</div>
+                <div style={{ color: 'var(--vf-text-soft)', fontStyle: 'italic' }}>{t("No topics subscribed by device code")}</div>
               ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {mqttStatus.subscribedTopics.map((top) => (
                     <span
                       key={top}
                       style={{
-                        backgroundColor: 'var(--vf-surface, #121316)',
-                        border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))',
+                        backgroundColor: 'var(--vf-surface)',
+                        border: '1px solid var(--vf-border)',
                         padding: '4px 8px',
                         borderRadius: '4px',
-                        color: 'var(--vf-teal, #818cf8)',
+                        color: 'var(--vf-primary)',
                         fontFamily: "'JetBrains Mono', monospace",
                         fontSize: '11px',
                       }}
@@ -277,30 +277,30 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
         {activeTab === 'wifi' && (
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-              <div style={{ padding: '10px', backgroundColor: 'var(--vf-surface-raised, #181a1e)', borderRadius: '6px', border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))' }}>
-                <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>{t("Network SSID")}</div>
-                <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--vf-teal, #818cf8)', marginTop: '2px' }}>
+              <div style={{ padding: '10px', backgroundColor: 'var(--vf-surface-raised)', borderRadius: '6px', border: '1px solid var(--vf-border)' }}>
+                <div style={{ color: 'var(--vf-text-muted)', fontSize: '10px', textTransform: 'uppercase' }}>{t("Network SSID")}</div>
+                <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--vf-primary)', marginTop: '2px' }}>
                   {wifiStatus.ssid || t('None')}
                 </div>
               </div>
 
-              <div style={{ padding: '10px', backgroundColor: 'var(--vf-surface-raised, #181a1e)', borderRadius: '6px', border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))' }}>
-                <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>{t("IP Address")}</div>
-                <div style={{ fontWeight: 600, fontSize: '13px', color: '#22c55e', marginTop: '2px', fontFamily: 'monospace' }}>
+              <div style={{ padding: '10px', backgroundColor: 'var(--vf-surface-raised)', borderRadius: '6px', border: '1px solid var(--vf-border)' }}>
+                <div style={{ color: 'var(--vf-text-muted)', fontSize: '10px', textTransform: 'uppercase' }}>{t("IP Address")}</div>
+                <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--vf-success)', marginTop: '2px', fontFamily: 'monospace' }}>
                   {wifiStatus.ip}
                 </div>
               </div>
 
-              <div style={{ padding: '10px', backgroundColor: 'var(--vf-surface-raised, #181a1e)', borderRadius: '6px', border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))' }}>
-                <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>{t("MAC Address")}</div>
-                <div style={{ fontWeight: 600, fontSize: '11px', color: '#cbd5e1', marginTop: '2px', fontFamily: 'monospace' }}>
+              <div style={{ padding: '10px', backgroundColor: 'var(--vf-surface-raised)', borderRadius: '6px', border: '1px solid var(--vf-border)' }}>
+                <div style={{ color: 'var(--vf-text-muted)', fontSize: '10px', textTransform: 'uppercase' }}>{t("MAC Address")}</div>
+                <div style={{ fontWeight: 600, fontSize: '11px', color: 'var(--vf-text-muted)', marginTop: '2px', fontFamily: 'monospace' }}>
                   {wifiStatus.mac}
                 </div>
               </div>
 
-              <div style={{ padding: '10px', backgroundColor: 'var(--vf-surface-raised, #181a1e)', borderRadius: '6px', border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))' }}>
-                <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>{t("Signal Strength")}</div>
-                <div style={{ fontWeight: 600, fontSize: '13px', color: '#facc15', marginTop: '2px' }}>
+              <div style={{ padding: '10px', backgroundColor: 'var(--vf-surface-raised)', borderRadius: '6px', border: '1px solid var(--vf-border)' }}>
+                <div style={{ color: 'var(--vf-text-muted)', fontSize: '10px', textTransform: 'uppercase' }}>{t("Signal Strength")}</div>
+                <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--vf-warning)', marginTop: '2px' }}>
                   {wifiStatus.rssi ? `${wifiStatus.rssi} dBm` : t('Disconnected')}
                 </div>
               </div>
@@ -312,7 +312,7 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
         {activeTab === 'inject' && (
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <label style={{ display: 'block', color: '#94a3b8', fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>
+              <label style={{ display: 'block', color: 'var(--vf-text-muted)', fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>
                 {t("MQTT Topic")}
               </label>
               <input
@@ -322,10 +322,10 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
                 style={{
                   width: '100%',
                   padding: '8px',
-                  backgroundColor: 'var(--vf-surface-raised, #181a1e)',
-                  border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))',
+                  backgroundColor: 'var(--vf-surface-raised)',
+                  border: '1px solid var(--vf-border)',
                   borderRadius: '4px',
-                  color: '#f8fafc',
+                  color: 'var(--vf-text)',
                   fontFamily: 'monospace',
                   fontSize: '12px',
                 }}
@@ -333,7 +333,7 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
             </div>
 
             <div>
-              <label style={{ display: 'block', color: '#94a3b8', fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>
+              <label style={{ display: 'block', color: 'var(--vf-text-muted)', fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>
                 {t("Message Payload (JSON / String)")}
               </label>
               <textarea
@@ -343,10 +343,10 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
                 style={{
                   width: '100%',
                   padding: '8px',
-                  backgroundColor: 'var(--vf-surface-raised, #181a1e)',
-                  border: '1px solid var(--vf-border, rgba(255, 255, 255, 0.08))',
+                  backgroundColor: 'var(--vf-surface-raised)',
+                  border: '1px solid var(--vf-border)',
                   borderRadius: '4px',
-                  color: '#f8fafc',
+                  color: 'var(--vf-text)',
                   fontFamily: 'monospace',
                   fontSize: '12px',
                   resize: 'vertical',
@@ -362,8 +362,8 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
                 justifyContent: 'center',
                 gap: '6px',
                 padding: '8px 16px',
-                backgroundColor: '#0284c7',
-                color: '#ffffff',
+                backgroundColor: 'var(--vf-primary)',
+                color: 'var(--vf-on-primary)',
                 border: 'none',
                 borderRadius: '4px',
                 fontWeight: 600,

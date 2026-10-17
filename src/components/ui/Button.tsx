@@ -29,6 +29,7 @@ export function Button({
     <button
       className={cn('vf-button', `vf-button--${variant}`, `vf-button--${size}`, className)}
       disabled={disabled || isLoading}
+      aria-busy={isLoading || undefined}
       type={type}
       {...props}
     >

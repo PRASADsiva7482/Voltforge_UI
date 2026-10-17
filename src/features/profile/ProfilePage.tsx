@@ -160,7 +160,7 @@ export function ProfilePage() {
                         <Badge tone={project.isPublic ? 'success' : 'neutral'}>
                           {project.isPublic ? t("Public") : t("Private")}
                         </Badge>
-                        <span style={{ fontSize: 12, color: 'var(--vf-teal)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ fontSize: 12, color: 'var(--vf-primary)', display: 'flex', alignItems: 'center', gap: 4 }}>
                           {t("Open")} <ArrowRight size={13} />
                         </span>
                       </div>

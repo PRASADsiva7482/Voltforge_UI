@@ -289,11 +289,11 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
                   >
                     <div className="vf-alert-card__header">
                       {issue.severity === 'CRITICAL' ? (
-                        <AlertTriangle size={14} style={{ color: '#dc2626' }} />
+                        <AlertTriangle size={14} style={{ color: 'var(--vf-error)' }} />
                       ) : issue.severity === 'WARNING' ? (
-                        <AlertTriangle size={14} style={{ color: '#d97706' }} />
+                        <AlertTriangle size={14} style={{ color: 'var(--vf-warning)' }} />
                       ) : (
-                        <Info size={14} style={{ color: '#2563eb' }} />
+                        <Info size={14} style={{ color: 'var(--vf-accent)' }} />
                       )}
                       <span className="vf-alert-card__message">{issue.message}</span>
                     </div>
