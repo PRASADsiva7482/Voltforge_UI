@@ -11,12 +11,16 @@ type FieldShellProps = LabelHTMLAttributes<HTMLLabelElement> & {
   children: ReactNode
   hint?: ReactNode
   label: ReactNode
+  required?: boolean
 }
 
-export function FieldShell({ children, className, hint, label, ...props }: FieldShellProps) {
+export function FieldShell({ children, className, hint, label, required, ...props }: FieldShellProps) {
   return (
     <label className={cn('vf-field', className)} {...props}>
-      <span className="vf-field__label">{label}</span>
+      <span className="vf-field__label">
+        {label}
+        {required && <span className="vf-field__required" aria-hidden="true">*</span>}
+      </span>
       {children}
       {hint ? <span className="vf-field__hint">{hint}</span> : null}
     </label>

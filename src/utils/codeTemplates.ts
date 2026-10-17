@@ -33,6 +33,9 @@ function getDefaultBaud(boardType: BoardType): number {
  * Includes platform-specific hints for WiFi, Pico, Teensy, etc.
  */
 export function generateDefaultCode(boardType: BoardType, projectName: string): string {
+  // Names are user text, not C++ source. Keep comments on one line and escape strings.
+  const commentName = projectName.replace(/[\r\n\u2028\u2029]/g, ' ')
+  const greeting = JSON.stringify(`VoltForge — ${projectName}`)
   const profile = getBoardProfile(boardType)
   const boardLabel = profile?.name || boardType.replace(/_/g, ' ')
   const baud = getDefaultBaud(boardType)
@@ -63,12 +66,12 @@ export function generateDefaultCode(boardType: BoardType, projectName: string): 
   const hintBlock = hints.length > 0 ? hints.join('\n') : ''
 
   return [
-    `// ${projectName}`,
+    `// ${commentName}`,
     `// Board: ${boardLabel}`,
     '',
     'void setup() {',
     `  Serial.begin(${baud});`,
-    `  Serial.println("VoltForge — ${projectName}");`,
+    `  Serial.println(${greeting});`,
     hintBlock,
     '}',
     '',

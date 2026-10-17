@@ -278,6 +278,12 @@
   font-weight: 720;
 }
 
+.vf-field__required {
+  color: var(--vf-error, #ef4444);
+  font-weight: 700;
+  margin-left: 3px;
+}
+
 .vf-field__hint {
   color: var(--vf-text-muted);
   font-size: 12px;

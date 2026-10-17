@@ -18,6 +18,8 @@ import {
 import type { BoardType } from '../../types/domain'
 import { aiCoverageStatusClass, aiCoverageStatusLabel } from '../ai/aiHardwareCoverage'
 import { useToastStore } from '../../store/useToastStore'
+import { captureEditorDocument, hasEditsSince, isCurrentDocumentSession } from './editorDocumentSnapshots'
+import { validateProjectForm } from '../projects/projectConfiguration'
 
 interface Props {
   isOpen: boolean
@@ -93,16 +95,31 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
   )
 
   const updateMutation = useMutation({
-    mutationFn: () =>
-      projectApi.update(currentProject!.id, {
-        name,
-        description,
+    mutationFn: async () => {
+      const errors = validateProjectForm({ name, description, boardType, isPublic })
+      // An unchanged legacy target remains saveable.
+      if (boardType === currentProject!.boardType) delete errors.boardType
+      if (Object.keys(errors).length) throw new Error(Object.values(errors)[0])
+      const snapshot = captureEditorDocument()
+      if (!snapshot || snapshot.projectId !== currentProject!.id) throw new Error('Project changed. Reopen settings.')
+      const targetChanged = boardType !== currentProject!.boardType
+      if (targetChanged && !snapshot.payload.canvasLayout.nodes.some(node => node.type === boardType)) {
+        throw new Error('Add this board to the schematic first, then select it as the firmware target. Existing wiring will not be replaced automatically.')
+      }
+      const response = await projectApi.update(currentProject!.id, {
+        ...(targetChanged ? snapshot.payload : {}),
+        name: name.trim(),
+        description: description.trim(),
         isPublic,
         boardType,
         tags,
         expectedRevision: currentProject!.documentRevision,
-      }),
-    onSuccess: (res) => {
+      })
+      return { response, snapshot, targetChanged }
+    },
+    onSuccess: ({ response: res, snapshot, targetChanged }) => {
+      if (!isCurrentDocumentSession(snapshot)) return
+      if (targetChanged) useProjectStore.getState().setDirty(hasEditsSince(snapshot))
       mergeProjectMetadata(res.data.data)
       queryClient.invalidateQueries({ queryKey: ['project', currentProject?.id] })
       onClose()
@@ -169,25 +186,31 @@ export default function ProjectSettingsModal({ isOpen, onClose }: Props) {
         size="md"
       >
         <div className="vf-settings-form">
-          <FieldShell label={t('Project Name')}>
+          {updateMutation.isError && <p className="form-error" role="alert">{updateMutation.error instanceof Error ? updateMutation.error.message : 'Could not save project settings.'}</p>}
+          <FieldShell label={t('Project Name')} required>
             <TextInput
               id="settings-name"
               type="text"
               value={name}
+              maxLength={200}
+              required
               onChange={(e) => setName(e.target.value)}
             />
           </FieldShell>
 
-          <FieldShell label={t('Description')}>
+          <FieldShell label={t('Description')} required>
             <Textarea
               id="settings-desc"
               value={description}
+              maxLength={5000}
+              required
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
             />
           </FieldShell>
 
-          <FieldShell label={`${t('Board Platform')} (${filteredBoards.length})`}>
+          <FieldShell label={`${t('Board Platform')} (${filteredBoards.length})`} required>
+            <p className="vf-field__hint">The firmware target must be a board placed in this schematic. Changing the target preserves existing wiring and code.</p>
             {/* Search input */}
             <div className="vf-settings-board-search">
               <Search size={14} className="vf-settings-board-search__icon" />

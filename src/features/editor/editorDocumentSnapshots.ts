@@ -17,6 +17,7 @@ export function captureEditorDocument() {
     session: project.documentSession,
     revision: { canvas: canvas.localDocumentRevision, pcb: pcb.localDocumentRevision, code: project.codeRevision },
     payload: {
+      boardType: project.currentProject.boardType,
       canvasLayout: { nodes: canvas.documentNodes, wires: canvas.wires, viewport: canvas.viewport, routeCache: canvas.routeCache },
       componentConfig: { ...(project.currentProject.componentConfig || {}), pcbLayout: pcb.getLayout() },
       codeFiles: project.currentProject.codeFiles.map(({ content, filename, language, sortOrder }) => ({ content, filename, language, sortOrder })),

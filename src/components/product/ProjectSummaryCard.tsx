@@ -3,6 +3,7 @@ import { Cpu, Eye, GitFork, Lock, MoreHorizontal, Trash2, Unlock } from 'lucide-
 import { useTranslation } from 'react-i18next'
 import { Badge, Button, Card, IconButton, ConfirmDialog } from '../ui'
 import type { ProjectSummary } from '../../types/domain'
+import { getBoardProfile } from '../../features/canvas/boardCatalog'
 
 export type ProjectSummaryCardProps = {
   onOpen?: (project: ProjectSummary) => void
@@ -11,7 +12,7 @@ export type ProjectSummaryCardProps = {
 }
 
 function boardLabel(boardType: string) {
-  return boardType.replaceAll('_', ' ')
+  return getBoardProfile(boardType)?.name ?? boardType?.replaceAll('_', ' ') ?? 'Board not specified'
 }
 
 export function ProjectSummaryCard({ onOpen, onDelete, project }: ProjectSummaryCardProps) {

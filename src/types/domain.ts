@@ -209,7 +209,7 @@ export type DashboardStats = {
 }
 
 export type CreateProjectRequest = {
-  boardType?: BoardType
+  boardType: BoardType
   canvasLayout?: Record<string, unknown>
   codeFiles?: { content: string; filename: string; language?: string; sortOrder?: number }[]
   componentConfig?: Record<string, unknown>

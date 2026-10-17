@@ -64,7 +64,8 @@ import { useCollaboration } from '../../hooks/useCollaboration'
 import { useTranslation } from 'react-i18next'
 
 import { analyzeCircuitSafety } from '../canvas/pinRegistry'
-import { isBoardComponentType, supportsAvr8js } from '../canvas/boardCatalog'
+import { getBoardProfile, isBoardComponentType, supportsAvr8js } from '../canvas/boardCatalog'
+import { resolveProjectConfiguration } from '../projects/projectConfiguration'
 import { SimulationEngineLoadCancelledError, useDeferredSimulationEngine } from '../simulator/useDeferredSimulationEngine'
 
 import CircuitCanvas from '../canvas/CircuitCanvas'
@@ -250,6 +251,7 @@ export default function CircuitEditorPage() {
     return project ? {
       id: project.id,
       name: project.name,
+      boardType: project.boardType,
       ownerKeycloakId: project.owner?.keycloakId,
       forkedFromId: project.forkedFromId,
       forkedFromName: project.forkedFromName,
@@ -522,7 +524,7 @@ export default function CircuitEditorPage() {
   }, [projectId, isSandbox, resetCanvas, resetPcb, setCurrentProject, setDirty, cancelCanvasRouting, setSimulating, stopSimulationEngine])
 
   // ── Load project (zero network query for guest sandbox) ──
-  const { data: fetchedProject, isLoading } = useQuery({
+  const { data: fetchedProject, isLoading, isError: projectLoadError, refetch: reloadProject } = useQuery({
     queryKey: ['project', projectId] as const,
     queryFn: fetchEditorProject,
     enabled: !!projectId && !isPreset && !isSandbox,
@@ -554,14 +556,16 @@ export default function CircuitEditorPage() {
         }
       }
       hydratedVersionRef.current = { id: project.id, revision: project.documentRevision ?? project.updatedAt }
-      setCurrentProject(project as Project)
-      const layout = project.canvasLayout
+      const resolved = resolveProjectConfiguration(project as Project)
+      setCurrentProject(resolved.project)
+      if (resolved.notice) addToast(resolved.notice, 'info')
+      const layout = resolved.project.canvasLayout
       loadCanvas(layout?.nodes || [], layout?.wires || [], layout?.viewport, layout?.routeCache)
       const storedPcb = (project.componentConfig as { pcbLayout?: unknown } | undefined)?.pcbLayout
       loadPcb(storedPcb && typeof storedPcb === 'object' ? storedPcb as any : undefined)
       setDirty(false)
     }
-  }, [fetchedProject, projectId, isPreset, isSandbox, sandboxPreset, searchParams, setCurrentProject, loadCanvas, loadPcb, setDirty, mergeProjectMetadata])
+  }, [fetchedProject, projectId, isPreset, isSandbox, sandboxPreset, searchParams, setCurrentProject, loadCanvas, loadPcb, setDirty, mergeProjectMetadata, addToast])
 
   // Parse share parameters if available
   useEffect(() => {
@@ -939,6 +943,18 @@ export default function CircuitEditorPage() {
     const { nodes, wires } = useCanvasStore.getState()
     const { currentProject, activeCodeFile } = useProjectStore.getState()
     if (!isSimulating) {
+      if (!currentProject || !getBoardProfile(currentProject.boardType)) {
+        addToast('This saved board target is not supported by this editor. Choose a supported target in Project Settings.', 'error')
+        return
+      }
+      if (!nodes.some(node => node.type === currentProject.boardType)) {
+        addToast('Add the selected development board to the circuit before running firmware, or change the target in Project Settings.', 'error')
+        return
+      }
+      if (nodes.filter(node => isBoardComponentType(node.type)).length > 1) {
+        addToast('Firmware execution supports one development board per circuit. Keep the selected target board before running.', 'error')
+        return
+      }
       const requestId = ++simulationRequestRef.current
       setIsCompilingFirmware(true)
       setIsSimulating(true)
@@ -987,7 +1003,7 @@ export default function CircuitEditorPage() {
           if (requestId !== simulationRequestRef.current) return
           const result = compile.data.data
           const resultBoardType = result.boardType || selectedBoardType
-          const canRunCompiledHex = Boolean(result.success && result.hex && supportsAvr8js(resultBoardType))
+          const canRunCompiledHex = Boolean(result.success && result.hex && resultBoardType === selectedBoardType && supportsAvr8js(selectedBoardType))
           compiledHex = canRunCompiledHex ? result.hex : undefined
           if (canRunCompiledHex) {
             useSimulationStore.getState().setExecutionMode('avr8js');
@@ -1487,7 +1503,10 @@ export default function CircuitEditorPage() {
     )
   }
 
+  if (projectLoadError && !isSandbox && !isPreset) return <div className="vf-editor-loading" role="alert"><p>Could not load this project. It may be unavailable or you may not have access.</p><button className="vf-button" onClick={() => void reloadProject()}>Retry</button><button className="vf-button" onClick={() => navigate('/projects')}>Back to projects</button></div>
+
   const projectName = isSandbox ? 'VoltForge Live Sandbox' : (projectSummary?.name || 'Untitled Project')
+  const boardProfile = projectSummary?.boardType ? getBoardProfile(projectSummary.boardType) : undefined
 
   const exportDropdownItems = [
     { label: 'Export ZIP archive', icon: <FileArchive size={15} />, onClick: handleExportZip },
@@ -1515,6 +1534,10 @@ export default function CircuitEditorPage() {
 
   return (
     <div className="vf-editor">
+      <div className="vf-project-target" aria-label="Project development board">
+        <strong>{boardProfile?.name ?? projectSummary?.boardType ?? 'Loading board…'}</strong>
+        <span>{boardProfile ? supportsAvr8js(boardProfile.type) ? 'ATmega328P emulation · compiler required for firmware' : 'Source compatibility simulation · native processor emulation unavailable' : 'Legacy target · configuration preserved; execution unavailable'}</span>
+      </div>
       <EditorDocumentSync
         isOwner={isOwner}
         broadcastEnabled={isLiveSyncConnected && isOwner && !isPreset && regressionMode === null && !canvasRenderTraceRunning && !avrCompiledTraceRunning}

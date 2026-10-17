@@ -91,3 +91,7 @@
   .vf-pref-row { flex-wrap: wrap; gap: 12px; }
   .vf-profile-actions { flex-wrap: wrap; }
 }
+/* Project setup uses the same controls, including during an in-flight request. */
+.vf-project-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
+.vf-project-target { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 6px 16px; border-bottom: 1px solid var(--vf-border); background: var(--vf-surface); color: var(--vf-text-secondary); font-size: 11px; }
+.vf-project-target strong { color: var(--vf-text); }

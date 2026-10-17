@@ -73,7 +73,8 @@ try {
   })
   await check('Project validation, destructive dialog focus and cancellation', async () => {
     await visit('/projects/new'); await page.getByLabel('Project name', { exact: true }).fill('   ')
-    assert(await page.getByRole('button', { name: 'Create project', exact: true }).isDisabled())
+    await page.getByRole('button', { name: 'Create project', exact: true }).click()
+    assert.equal(await page.getByLabel('Project name', { exact: true }).getAttribute('aria-invalid'), 'true')
     await visit('/projects'); await page.getByRole('button', { name: 'Actions for project', exact: true }).first().click()
     await page.getByRole('button', { name: 'Delete project', exact: true }).click()
     const dialog = page.getByRole('dialog'); await dialog.waitFor()
