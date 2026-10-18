@@ -35,7 +35,9 @@ export default memo(EditorDocumentSync)
 
 export function EditorDirtyIndicator() {
   const isDirty = useProjectStore((state) => state.isDirty)
-  return isDirty ? <span className="vf-editor__dirty-dot" /> : null
+  const saving = useProjectStore((state) => state.isSaving)
+  const error = useProjectStore((state) => state.saveError)
+  return <span className={`vf-editor__save-state${error ? ' is-error' : ''}`} role="status" title={error || undefined}>{saving ? 'Saving…' : error ? 'Save failed' : isDirty ? 'Unsaved' : 'Saved'}</span>
 }
 
 export const EditorAutosave = memo(function EditorAutosave({ enabled, onSave }: {

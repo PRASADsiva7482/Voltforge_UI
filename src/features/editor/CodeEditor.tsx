@@ -8,11 +8,10 @@ import { useToastStore } from '../../store/useToastStore';
 import { Loader2, Maximize2, Minimize2, AlignLeft, Eye, EyeOff, Cpu, Upload, X } from 'lucide-react';
 import type { OnMount } from '@monaco-editor/react';
 import { getBoardPinNumber, getBoardProfile, isBoardComponentType, supportsAvr8js } from '../canvas/boardCatalog';
+import { parseAvrHex } from '../simulator/intelHex';
 
 const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => {
-  // 0.55.1 retains a detached stylesheet on every editor disposal. Pin the
-  // compatible release that removes it from Monaco's global stylesheet map.
-  m.loader.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.56.0/min/vs' } });
+  m.loader.config({ paths: { vs: import.meta.env.VITE_MONACO_BASE } });
   return { default: m.default };
 }));
 
@@ -132,6 +131,7 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFullCode, setShowFullCode] = useState(false);
+  const [editorReady, setEditorReady] = useState(false);
 
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
@@ -147,6 +147,7 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
     editorRef.current = editor;
     monacoRef.current = monaco;
     applyEditorTheme(monaco);
+    setEditorReady(true);
   };
   useEffect(() => { if (monacoRef.current) applyEditorTheme(monacoRef.current) }, [applyEditorTheme]);
 
@@ -167,28 +168,35 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
   const addToast = useToastStore((s) => s.addToast);
   const canRunCustomHex = supportsAvr8js(boardType || 'ARDUINO_UNO');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastBoard = useRef(boardType);
+  useEffect(() => {
+    if (lastBoard.current !== boardType) { setCustomHex(null); lastBoard.current = boardType; }
+  }, [boardType, setCustomHex]);
 
   const handleHexUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 256_000) { addToast('HEX file exceeds the ATmega328P firmware size limit', 'error'); e.target.value = ''; return; }
     const reader = new FileReader();
     reader.onload = (event) => {
       const content = event.target?.result as string;
-      if (content && content.includes(':')) {
+      try {
+        parseAvrHex(content);
         setCustomHex(content);
         const selectedBoard = boardType || 'ARDUINO_UNO';
         const boardLabel = getBoardProfile(selectedBoard)?.name || selectedBoard.replace(/_/g, ' ');
         const canRunInBrowser = supportsAvr8js(selectedBoard);
         addToast(
           canRunInBrowser
-            ? `Loaded Intel HEX (${file.name}, ${content.length} chars) into AVR8js engine`
-            : `Loaded Intel HEX for ${boardLabel}; browser execution will use source compatibility mode`,
+            ? `Intel HEX validated (${file.name}); press Run to start AVR emulation`
+            : `HEX execution is unavailable for ${boardLabel}`,
           canRunInBrowser ? 'success' : 'warning'
         );
-      } else {
-        addToast('Invalid Intel HEX file format (must start with :)', 'error');
+      } catch (error) {
+        addToast(error instanceof Error ? error.message : 'Invalid Intel HEX file', 'error');
       }
     };
+    reader.onerror = () => addToast('Could not read the firmware file. Try loading it again.', 'error');
     reader.readAsText(file);
     e.target.value = '';
   };
@@ -242,7 +250,7 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
                 title={t("Custom Intel HEX firmware; AVR8js execution is available only for Uno/Nano/ATmega328P boards")}
               >
                 <Cpu size={12} />
-                <span>{canRunCustomHex ? t('AVR8js: Custom HEX') : t('Custom HEX: Interpreter')}</span>
+                <span>{canRunCustomHex ? t('AVR8js: Custom HEX') : t('HEX execution unavailable')}</span>
                 <button
                   disabled={readOnly}
                   onClick={(e) => {
@@ -268,7 +276,7 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
               <button
                 className="vf-code-editor__action-btn"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={readOnly}
+                disabled={readOnly || !canRunCustomHex}
                 title={t("Upload compiled Intel HEX file; direct AVR8js execution is available only for Uno/Nano/ATmega328P boards")}
                 style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
               >
@@ -283,8 +291,9 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
             <button
               className="vf-code-editor__action-btn"
               onClick={handleFormatCode}
-              disabled={readOnly}
-              title={readOnly ? t("Format Code (Disabled in Read-only)") : t("Format Code (Auto-indent)")}
+              disabled={readOnly || !editorReady || !editorRef.current?.getAction('editor.action.formatDocument')?.isSupported()}
+              aria-label="Format code"
+              title={readOnly ? t("Format Code (Disabled in Read-only)") : !editorRef.current?.getAction('editor.action.formatDocument')?.isSupported() ? t("Formatting unavailable for this language") : t("Format Code (Auto-indent)")}
             >
               <AlignLeft size={13} />
             </button>
@@ -386,7 +395,7 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
             key={snip.label}
             type="button"
             className="vf-code-editor__snippet-chip"
-            disabled={readOnly || showFullCode}
+            disabled={readOnly || showFullCode || !editorReady}
             onClick={() => {
               if (readOnly || showFullCode || !editorRef.current) return;
               const editor = editorRef.current;
@@ -415,7 +424,7 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
             key={sym}
             type="button"
             className="vf-code-editor__symbol-btn"
-            disabled={readOnly || showFullCode}
+            disabled={readOnly || showFullCode || !editorReady}
             onClick={() => {
               if (readOnly || showFullCode || !editorRef.current) return;
               const editor = editorRef.current;

@@ -4,6 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test:execution-session": "node scripts/run-execution-session-tests.mjs",
+    "test:playground-browser": "node scripts/run-playground-audit-tests.mjs",
+    "test:firmware-validation": "node scripts/run-firmware-validation-tests.mjs",
+    "test:chat-browser": "node scripts/run-chat-browser-tests.mjs",
     "test:design-system": "node scripts/run-design-system-browser-tests.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build && npm run test:bundle-budget",

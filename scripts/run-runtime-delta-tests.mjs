@@ -32,6 +32,8 @@ try {
     const empty = useSimulationStore.getState().drainSerialInput();
     empty.push('consumer-owned');
     assert.deepEqual(useSimulationStore.getState().serialInputQueue, [], 'An empty drain still returns an independently owned array');
+    useSimulationStore.getState().setSimulating(true);
+    publications = 0;
     useSimulationStore.getState().sendSerialInput('first');
     useSimulationStore.getState().sendSerialInput('second');
     const queued = useSimulationStore.getState().serialInputQueue;
@@ -163,7 +165,8 @@ try {
   const values = id => pinMessages.filter(message => message.type === 'UPDATE_PIN' && message.elementId === id).map(message => message.voltage);
   const startAvr = async () => {
     useCanvasStore.getState().loadCanvas([avrBoard], [], { x: 0, y: 0, scale: 1 });
-    await avr.start('void setup() {}\nvoid loop() {}', useCanvasStore.getState().nodes, [], ':00000001FF', 'ARDUINO_UNO');
+    // Valid AVR RJMP-to-self firmware; an EOF-only file is not executable.
+    await avr.start('void setup() {}\nvoid loop() {}', useCanvasStore.getState().nodes, [], ':02000000FFCF30\n:00000001FF', 'ARDUINO_UNO');
     assert(avr.avrCpu && avr.mnaCircuit && avr.solverWorker, 'Real engine AVR and MNA lifecycle must initialize');
   };
   try {

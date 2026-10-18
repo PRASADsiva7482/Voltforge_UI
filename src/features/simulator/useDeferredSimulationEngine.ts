@@ -23,10 +23,10 @@ export function useDeferredSimulationEngine(callbacks: DeferredSimulationCallbac
     const lifecycle = lifecycleRef.current
     const loading = import('./deferredSimulationEngineFactory').then(({ createSimulationEngine }) => {
       const engine = createSimulationEngine({
-        onSerialOutput: (text, options) => callbacksRef.current.onSerialOutput(text, options),
-        onBaudRateChange: (baudRate) => callbacksRef.current.onBaudRateChange?.(baudRate),
-        onDebugSnapshot: (snapshot) => callbacksRef.current.onDebugSnapshot?.(snapshot),
-        onError: (error) => callbacksRef.current.onError(error),
+        onSerialOutput: (text, options) => { if (lifecycle === lifecycleRef.current) callbacksRef.current.onSerialOutput(text, options) },
+        onBaudRateChange: (baudRate) => { if (lifecycle === lifecycleRef.current) callbacksRef.current.onBaudRateChange?.(baudRate) },
+        onDebugSnapshot: (snapshot) => { if (lifecycle === lifecycleRef.current) callbacksRef.current.onDebugSnapshot?.(snapshot) },
+        onError: (error) => { if (lifecycle === lifecycleRef.current) callbacksRef.current.onError(error) },
       })
 
       if (lifecycle !== lifecycleRef.current) {
@@ -45,7 +45,10 @@ export function useDeferredSimulationEngine(callbacks: DeferredSimulationCallbac
   }, [])
 
   const stopSimulationEngine = useCallback(() => {
+    lifecycleRef.current += 1
     engineRef.current?.stop()
+    engineRef.current = null
+    loadingRef.current = null
   }, [])
 
   useEffect(() => () => {

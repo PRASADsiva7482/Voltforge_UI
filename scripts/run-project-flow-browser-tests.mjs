@@ -115,7 +115,8 @@ try {
   await page.getByRole('button', { name: /Start simulation/i }).first().click()
   await page.waitForTimeout(1000)
   assert.equal(compiles.at(-1)?.boardType, 'ESP32')
-  await page.getByRole('button', { name: /Stop simulation/i }).first().click()
+  assert.equal(await page.getByRole('button', { name: /Stop simulation/i }).count(), 0)
+  await page.getByRole('alert').filter({ hasText: 'Toolchain unavailable in test' }).waitFor()
   console.log('PASS compilation uses the saved target and reports unavailable compiler honestly')
 
   const legacy = { ...records.get('created-3'), id: 'legacy', boardType: 'ARDUINO_NANO', canvasLayout: undefined }

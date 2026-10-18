@@ -8,6 +8,7 @@ import { classifyCanvasModelChange } from '../../store/modelRevision';
 import { useSimulationStore, type MeterMeasurementMode } from '../../store/simulationStore';
 import { CPU, avrInstruction, AVRIOPort, AVRUSART, AVRTimer, portBConfig, portCConfig, portDConfig, timer0Config, timer1Config, timer2Config, usart0Config, PinState as AvrPinState, AVRTWI, twiConfig, AVRADC, adcConfig } from 'avr8js';
 import { buildMNACircuit } from './NetlistBuilder';
+import { parseAvrHex } from './intelHex';
 import type { MNACircuit, VirtualMeterConfiguration } from './NetlistBuilder';
 import { ledMaximumCurrent_mA, numericProperty, SIMULATION_MODELS } from './simulationModels';
 import { normalizePotentiometerPosition } from '../canvas/componentContracts';
@@ -105,7 +106,7 @@ import { getBoardLogicVoltage, getBoardPinNumber, getBoardPowerVoltage, isBoardC
 export type PinState = 'HIGH' | 'LOW' | 'INPUT' | 'OUTPUT' | 'PWM';
 
 export interface SimulationCallbacks {
-  onSerialOutput: (text: string, options?: { newline?: boolean }) => void;
+  onSerialOutput: (text: string, options?: { newline?: boolean; kind?: 'output' | 'diagnostic' }) => void;
   onBaudRateChange?: (baudRate: number) => void;
   onPinStateChange: (componentId: string, pinId: string, state: PinState, value?: number) => void;
   onDebugSnapshot?: (snapshot: { currentLine: number | null; variables: Record<string, number | string>; pins: Record<string, PinInfo>; isPaused: boolean; breakpoints: number[] }) => void;
@@ -326,6 +327,7 @@ export class SimulationEngine {
   private avrAnimationFrameId: number | null = null;
   private avrPorts: Record<string, AVRIOPort> = {};
   private avrUsart: AVRUSART | null = null;
+  private avrSerialInput: number[] = [];
   private avrAdc: AVRADC | null = null;
   private avrBudgetScheduler: AvrExecutionBudgetScheduler | null = null;
   private avrRuntimeTrace = new AvrRuntimeTraceCollector();
@@ -786,7 +788,7 @@ private scopeCaptureRevision = 0;
       }
 
       if (hex?.trim()) {
-        this.callbacks.onSerialOutput(`> HEX target ${runtimeBoardType} is not supported by the ATmega328P browser emulator; using source compatibility mode`);
+        throw new Error(`HEX target ${runtimeBoardType} is not supported by the ATmega328P browser emulator`);
       }
 
       this.callbacks.onSerialOutput('> Starting compatibility interpreter...');
@@ -795,7 +797,7 @@ private scopeCaptureRevision = 0;
 
       this.parseCode(code);
 
-      this.callbacks.onSerialOutput('> Compiled firmware not available; falling back to code-compatibility interpreter');
+      this.callbacks.onSerialOutput('> Source compatibility mode: limited Arduino API interpretation, not compiled firmware');
       await new Promise(resolve => setTimeout(resolve, 300));
       if (!this.isRunning || runGeneration !== this.runGeneration) return;
       this.callbacks.onSerialOutput('> Physics-based MNA solver active');
@@ -857,6 +859,7 @@ private scopeCaptureRevision = 0;
             await new Promise(resolve => setTimeout(resolve, 5));
           }
         } catch (err: any) {
+          this.stop();
           this.callbacks.onError(err.message || 'Interpreter Execution Error');
         }
       };
@@ -866,8 +869,8 @@ private scopeCaptureRevision = 0;
       this.startSensorAutoCycling();
 
     } catch (err: any) {
-      this.callbacks.onError(err.message || 'Simulation Error');
       this.stop();
+      throw err;
     }
   }
 
@@ -885,6 +888,9 @@ private scopeCaptureRevision = 0;
 
       for (const node of nodes) {
         const props = node.properties || {};
+        // Sensor values are user inputs, not measured motion. Synthetic stimulus
+        // must be explicitly requested by a test fixture or project setting.
+        if (props.autoStimulus !== true) continue;
         const nodeChanges: Record<string, any> = {};
         let changed = false;
 
@@ -1827,12 +1833,12 @@ private scopeCaptureRevision = 0;
   private writeSerial(text: string, newline: boolean) {
     if (!newline) {
       this.serialLineBuffer += text;
-      this.callbacks.onSerialOutput(text, { newline: false });
+      this.callbacks.onSerialOutput(text, { newline: false, kind: 'output' });
       return;
     }
 
     this.serialLineBuffer = '';
-    this.callbacks.onSerialOutput(text, { newline: true });
+    this.callbacks.onSerialOutput(text, { newline: true, kind: 'output' });
   }
 
   private propagatePinState(pin: string, state: PinState, nodes: CanvasNode[], wires: Wire[], value = 0) {
@@ -2363,11 +2369,12 @@ private scopeCaptureRevision = 0;
     new AVRTimer(this.avrCpu, timer1Config);
     new AVRTimer(this.avrCpu, timer2Config);
     this.avrUsart = new AVRUSART(this.avrCpu, usart0Config, 16_000_000);
-    this.avrUsart.onLineTransmit = (line) => this.callbacks.onSerialOutput(line);
+    this.avrSerialInput = [];
+    this.avrUsart.onRxComplete = () => this.flushAvrSerialInput();
     this.avrUsart.onByteTransmit = (value) => {
       this.avrRuntimeTrace.recordUartByte();
       const text = String.fromCharCode(value);
-      this.callbacks.onSerialOutput(text, { newline: text === '\n' });
+      this.callbacks.onSerialOutput(text, { newline: text === '\n', kind: 'output' });
     };
     this.avrUsart.onConfigurationChange = () => {
       if (this.avrUsart) this.callbacks.onBaudRateChange?.(this.avrUsart.baudRate);
@@ -2488,11 +2495,9 @@ private scopeCaptureRevision = 0;
           const frameResult = this.runBatched(() => {
             const inputs = useSimulationStore.getState().drainSerialInput();
             if (inputs.length > 0) {
-              const str = inputs.join('');
-              for (let i = 0; i < str.length; i += 1) {
-                this.avrUsart?.writeByte(str.charCodeAt(i));
-              }
+              this.avrSerialInput.push(...new TextEncoder().encode(inputs.join('')));
             }
+            this.flushAvrSerialInput();
 
             const currentNodes = useCanvasStore.getState().nodes;
             const mcuNode = currentNodes.find((node) => isBoardComponentType(node.type));
@@ -2545,22 +2550,7 @@ private scopeCaptureRevision = 0;
   }
 
   private hexToProgram(hex: string): Uint16Array {
-    const bytes: number[] = [];
-    for (const line of hex.split(/\r?\n/)) {
-      if (!line.startsWith(':')) continue;
-      const length = parseInt(line.slice(1, 3), 16);
-      const address = parseInt(line.slice(3, 7), 16);
-      const type = parseInt(line.slice(7, 9), 16);
-      if (type !== 0) continue;
-      for (let i = 0; i < length; i += 1) {
-        bytes[address + i] = parseInt(line.slice(9 + i * 2, 11 + i * 2), 16);
-      }
-    }
-    const words = new Uint16Array(Math.ceil(bytes.length / 2));
-    for (let i = 0; i < words.length; i += 1) {
-      words[i] = (bytes[i * 2] || 0) | ((bytes[i * 2 + 1] || 0) << 8);
-    }
-    return words;
+    return parseAvrHex(hex);
   }
 
   private avrPortToBoardPin(port: 'B' | 'C' | 'D', bit: number) {
@@ -2601,6 +2591,14 @@ private scopeCaptureRevision = 0;
       isPaused,
       breakpoints: Array.from(this.breakpoints),
     });
+  }
+
+  private flushAvrSerialInput() {
+    // AVRUSART rejects writes while a byte is in flight. Advance only after
+    // acceptance, then deliver the next byte on the emulated UART clock.
+    if (this.avrSerialInput.length && this.avrUsart?.writeByte(this.avrSerialInput[0])) {
+      this.avrSerialInput.shift();
+    }
   }
 
   private runBatched<T>(fn: () => T): T {
@@ -2666,6 +2664,7 @@ private scopeCaptureRevision = 0;
     this.avrCpu = null;
     this.avrBudgetScheduler = null;
     this.avrUsart = null;
+    this.avrSerialInput = [];
     this.avrPorts = {};
     this.avrAdc = null;
     this.avrRuntimeTrace.stop();

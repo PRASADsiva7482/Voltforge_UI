@@ -15,8 +15,10 @@ import './styles/pages.css'
 import './styles/editor.css'
 import './styles/workspace.css'
 import { ENABLE_ADMIN_NAV_MENU } from './config/navigation'
+import './components/routing/navigationGuardRegistry'
 
 const AdminPage = lazy(() => import('./features/admin/AdminPage').then((module) => ({ default: module.AdminPage })))
+const AiChatPage = lazy(() => import('./features/ai/AiChatPage'))
 const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage').then((module) => ({ default: module.DashboardPage })))
 const CircuitEditorPage = lazy(() => import('./features/editor/CircuitEditorPage'))
 const ExplorePage = lazy(() => import('./features/explore/ExplorePage').then((module) => ({ default: module.ExplorePage })))
@@ -70,6 +72,7 @@ function App() {
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
                 <Route element={lazyRoute('dashboard', <DashboardPage />)} path="/dashboard" />
+                <Route element={lazyRoute('AI workspace', <AiChatPage />)} path="/ai-chat" />
                 <Route element={lazyRoute('projects', <ProjectsPage />)} path="/projects" />
                 <Route element={lazyRoute('new project', <NewProjectPage />)} path="/projects/new" />
                 <Route element={lazyRoute('explore', <ExplorePage />)} path="/explore" />

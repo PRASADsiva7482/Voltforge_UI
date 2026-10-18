@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { BrandMark } from '../brand/BrandMark'
 import { useAuth } from '../../auth/useAuth'
@@ -11,9 +11,10 @@ export function AppLayout() {
   const auth = useAuth()
   const navItems = getNavItems(auth.user?.role)
   const { t } = useTranslation()
+  const isChatWorkspace = useLocation().pathname === '/ai-chat'
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell${isChatWorkspace ? ' app-shell--chat' : ''}`}>
       <a className="vf-skip-link" href="#workspace-content">{t('Skip to content')}</a>
       {/* Mobile-only Header */}
       <header className="app-mobile-topbar" aria-label={t("Mobile navigation header")}>

@@ -9,100 +9,34 @@ export interface SplitPaneProps {
   right: ReactNode
 }
 
-export function SplitPane({
-  className = '',
-  initialRatio = 50,
-  left,
-  maxRatio = 80,
-  minRatio = 20,
-  right,
-}: SplitPaneProps) {
+export function SplitPane({ className = '', initialRatio = 50, left, maxRatio = 80, minRatio = 20, right }: SplitPaneProps) {
   const [ratio, setRatio] = useState(initialRatio)
-  const isDragging = useRef(false)
+  const [size, setSize] = useState({ width: 800, height: 600 })
   const containerRef = useRef<HTMLDivElement>(null)
-
-  const startDrag = (e: React.MouseEvent) => {
-    isDragging.current = true
-    e.preventDefault()
-  }
-
-  const startTouchDrag = (e: React.TouchEvent) => {
-    isDragging.current = true
-    if (e.touches.length > 0) {
-      updateRatio(e.touches[0].clientX)
-    }
-  }
-
-  const updateRatio = (clientX: number) => {
-    if (!containerRef.current) return
-    const rect = containerRef.current.getBoundingClientRect()
-    let newRatio = ((clientX - rect.left) / rect.width) * 100
-    newRatio = Math.max(minRatio, Math.min(maxRatio, newRatio))
-    setRatio(newRatio)
-  }
-
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging.current) return
-      updateRatio(e.clientX)
-    }
-
-    const handleMouseUp = () => {
-      isDragging.current = false
-    }
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!isDragging.current || e.touches.length === 0) return
-      updateRatio(e.touches[0].clientX)
-    }
-
-    const handleTouchEnd = () => {
-      isDragging.current = false
-    }
-
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
-    window.addEventListener('touchmove', handleTouchMove, { passive: true })
-    window.addEventListener('touchend', handleTouchEnd)
-    window.addEventListener('touchcancel', handleTouchEnd)
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-      window.removeEventListener('touchmove', handleTouchMove)
-      window.removeEventListener('touchend', handleTouchEnd)
-      window.removeEventListener('touchcancel', handleTouchEnd)
-    }
-  }, [minRatio, maxRatio])
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowLeft') {
-      setRatio((prev) => Math.max(minRatio, prev - 5))
-    } else if (e.key === 'ArrowRight') {
-      setRatio((prev) => Math.min(maxRatio, prev + 5))
-    }
+    const element = containerRef.current
+    if (!element) return
+    const observer = new ResizeObserver(([entry]) => setSize({ width: entry.contentRect.width, height: entry.contentRect.height }))
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+  const stacked = size.width < 560
+  const extent = Math.max(1, (stacked ? size.height : size.width) - 6)
+  const minimum = Math.min(45, Math.max(minRatio, (stacked ? 100 : 240) / extent * 100))
+  const maximum = Math.max(55, Math.min(maxRatio, 100 - (stacked ? 100 : 240) / extent * 100))
+  const clamp = (value: number) => Math.max(minimum, Math.min(maximum, value))
+  const effective = clamp(ratio)
+  const resize = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId) || !containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    setRatio(clamp(((stacked ? event.clientY - rect.top : event.clientX - rect.left) / extent) * 100))
   }
-
-  return (
-    <div ref={containerRef} className={`vf-split-pane ${className}`}>
-      <div className="vf-split-pane__left" style={{ width: `${ratio}%` }}>
-        {left}
-      </div>
-      <div
-        className="vf-split-pane__handle"
-        onMouseDown={startDrag}
-        onTouchStart={startTouchDrag}
-        onKeyDown={handleKeyDown}
-        role="separator"
-        tabIndex={0}
-        aria-valuenow={Math.round(ratio)}
-        aria-valuemin={minRatio}
-        aria-valuemax={maxRatio}
-        aria-orientation="vertical"
-        aria-label="Resize panels"
-      />
-      <div className="vf-split-pane__right" style={{ width: `${100 - ratio}%` }}>
-        {right}
-      </div>
-    </div>
-  )
+  return <div ref={containerRef} className={`vf-split-pane ${stacked ? 'is-stacked' : ''} ${className}`}>
+    <div className="vf-split-pane__left" style={{ flex: `${effective} 1 0` }}>{left}</div>
+    <div className="vf-split-pane__handle" role="separator" tabIndex={0} aria-label="Resize panels" aria-orientation={stacked ? 'horizontal' : 'vertical'} aria-valuenow={Math.round(effective)} aria-valuemin={Math.round(minimum)} aria-valuemax={Math.round(maximum)}
+      onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault() }} onPointerMove={resize}
+      onPointerUp={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId) }}
+      onKeyDown={event => { const keys = stacked ? ['ArrowUp', 'ArrowDown'] : ['ArrowLeft', 'ArrowRight']; if (keys.includes(event.key)) { event.preventDefault(); setRatio(clamp(effective + (event.key === keys[0] ? -5 : 5))) } }} />
+    <div className="vf-split-pane__right" style={{ flex: `${100 - effective} 1 0` }}>{right}</div>
+  </div>
 }

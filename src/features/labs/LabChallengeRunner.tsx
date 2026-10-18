@@ -48,7 +48,7 @@ export function LabChallengeRunner() {
   } | null>(null);
   const { getSimulationEngine, stopSimulationEngine } = useDeferredSimulationEngine({
     onError: (error) => writeSerial(`[ERROR] ${error}`),
-    onSerialOutput: (text) => writeSerial(text),
+    onSerialOutput: (text, options) => writeSerial(text, options),
   });
 
   useEffect(() => {

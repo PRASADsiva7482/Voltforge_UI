@@ -6,6 +6,8 @@ interface ProjectState {
   activeCodeFile: CodeFile | null;
   isDirty: boolean;
   isSaving: boolean;
+  saveError: string | null;
+  setSaveError: (message: string | null) => void;
   documentSession: number;
   codeRevision: number;
 
@@ -23,6 +25,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
   activeCodeFile: null,
   isDirty: false,
   isSaving: false,
+  saveError: null,
+  setSaveError: (saveError) => set({ saveError }),
   documentSession: 0,
   codeRevision: 0,
 
@@ -32,6 +36,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       activeCodeFile: project?.codeFiles?.[0] || null,
       isDirty: false,
       isSaving: false,
+      saveError: null,
       documentSession: state.documentSession + 1,
       codeRevision: 0,
     })),

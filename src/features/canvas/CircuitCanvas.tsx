@@ -964,6 +964,7 @@ export default function CircuitCanvas({
         <button
           onClick={() => useSimulationStore.getState().setShowCurrentFlow(!useSimulationStore.getState().showCurrentFlow)}
           className={`vf-canvas-dock-btn ${showCurrentFlow ? 'is-active' : ''}`}
+          aria-pressed={showCurrentFlow}
           title={t('Toggle animated current flow particles on wires')}
         >
           <Zap size={12} />
@@ -973,9 +974,10 @@ export default function CircuitCanvas({
         <button
           onClick={() => useSimulationStore.getState().setThermalHeatmapEnabled(!useSimulationStore.getState().thermalHeatmapEnabled)}
           className={`vf-canvas-dock-btn ${thermalHeatmapEnabled ? 'is-active' : ''}`}
-          title={t('Toggle live component power and thermal stress heat map')}
+          aria-pressed={thermalHeatmapEnabled}
+          title={t('Show estimated power stress relative to component ratings; not a temperature calculation')}
         >
-          <span>{t('Thermal Map')}</span>
+          <span>{t('Power stress')}</span>
         </button>
 
         {viewMode === 'pcb' && (

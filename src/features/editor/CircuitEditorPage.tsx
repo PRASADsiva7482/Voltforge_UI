@@ -61,6 +61,8 @@ import { useThemeStore } from '../../store/themeStore'
 import { useToastStore } from '../../store/useToastStore'
 import { useAuth } from '../../auth/useAuth'
 import { useCollaboration } from '../../hooks/useCollaboration'
+import { EditorDock } from '../../components/ui/EditorDock'
+import { useUnsavedEditorGuard, confirmLeaveEditor } from './useUnsavedEditorGuard'
 import { useTranslation } from 'react-i18next'
 
 import { analyzeCircuitSafety } from '../canvas/pinRegistry'
@@ -72,6 +74,7 @@ import CircuitCanvas from '../canvas/CircuitCanvas'
 import ComponentPanel from './ComponentPanel'
 import PropertyEditor from './PropertyEditor'
 import SerialMonitor from './SerialMonitor'
+import type { ExecutionAttachment } from '../ai/executionContext'
 import EditorDocumentSync, { EditorAutosave, EditorDirtyIndicator } from './EditorDocumentSync'
 import { captureEditorDocument, exceedsProjectSaveBudget, hasEditsSince, isCurrentDocumentSession } from './editorDocumentSnapshots'
 import { EditorSimulationTime, EditorAvrWorkload } from './EditorSimulationStatus'
@@ -341,15 +344,20 @@ export default function CircuitEditorPage() {
     }
   }, [isMobile])
 
-  const [isSimulating, setIsSimulating] = useState(false)
+  const isSimulating = useSimulationStore(s => s.isSimulating)
+  const setIsSimulating = useSimulationStore(s => s.setSimulating)
   const [isSimulationPaused, setIsSimulationPaused] = useState(false)
-  const [isCompilingFirmware, setIsCompilingFirmware] = useState(false)
+  const execution = useSimulationStore(s => s.execution)
+  const isCompilingFirmware = ['preparing', 'compiling', 'starting'].includes(execution.phase)
+  const executionIssue = execution.diagnostic
+  const setExecutionIssue = useSimulationStore(s => s.setExecutionDiagnostic)
   const [canvasContainer, setCanvasContainer] = useState<HTMLDivElement | null>(null)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
   const hydratedVersionRef = useRef<{ id: string; revision: string } | null>(null)
   const sharedCanvasStateRef = useRef<string | null>(null)
   const sharedCodeStateRef = useRef<string | null>(null)
   const simulationRequestRef = useRef(0)
+  const compileAbortRef = useRef<AbortController | null>(null)
   const regressionTokenRef = useRef(0)
   const canvasRenderRegressionTokenRef = useRef(0)
   const avrCompiledTraceTokenRef = useRef(0)
@@ -359,7 +367,12 @@ export default function CircuitEditorPage() {
   // Migrated features panel open state
   const [showMultimeter, setShowMultimeter] = useState(false)
   const [showBom, setShowBom] = useState(false)
-  const [showAiChat, setShowAiChat] = useState(false)
+  const [showAiChat, setShowAiChat] = useState(() => new URLSearchParams(window.location.search).has('conversation'))
+  const [executionAttachment, setExecutionAttachment] = useState<ExecutionAttachment>()
+  const askAiAboutOutput = (attachment: ExecutionAttachment) => {
+    setExecutionAttachment(attachment)
+    setShowAiChat(true)
+  }
   const [showAiValidator, setShowAiValidator] = useState(false)
   const [showIotInspector, setShowIotInspector] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -384,7 +397,6 @@ export default function CircuitEditorPage() {
   const clearSerial = useSimulationStore((s) => s.clearSerial)
   const setBaudRate = useSimulationStore((s) => s.setBaudRate)
   const setDebugSnapshot = useSimulationStore((s) => s.setDebugSnapshot)
-  const setSerialPanelOpen = useSimulationStore((s) => s.setSerialPanelOpen)
   const setSimulating = useSimulationStore((s) => s.setSimulating)
   const fidelityMode = useSimulationStore((s) => s.fidelityMode)
   const setFidelityMode = useSimulationStore((s) => s.setFidelityMode)
@@ -401,7 +413,16 @@ export default function CircuitEditorPage() {
     onSerialOutput: (text, options) => writeSerial(text, options),
     onBaudRateChange: setBaudRate,
     onDebugSnapshot: setDebugSnapshot,
-    onError: (error) => writeSerial(`[ERROR] ${error}`),
+    onError: (error) => {
+      simulationRequestRef.current += 1
+      setIsSimulating(false)
+      setIsSimulationPaused(false)
+      setSimulating(false)
+      const run = useSimulationStore.getState().execution
+      if (run.id) useSimulationStore.getState().transitionExecution(run.id, 'runtime-error', error)
+      writeSerial(`[ERROR] ${error}`)
+      engineRef.current?.stop()
+    },
   })
 
   useEffect(() => {
@@ -499,6 +520,7 @@ export default function CircuitEditorPage() {
     // rejects the subscription and the reconnect loop makes the badge blink.
     useCollaboration(isPreset || isSandbox || !user ? '' : projectId || '')
 
+  useUnsavedEditorGuard(isOwner && !isSandbox && !isPreset)
   // Reset route-owned state before a new project query resolves. Zustand is a
   // singleton, so without this a project with no layout could display the
   // previous project's components and PCB footprints.
@@ -507,6 +529,12 @@ export default function CircuitEditorPage() {
     setIsSimulationPaused(false)
     setSimulating(false)
     resetCanvas()
+    useSimulationStore.getState().setCustomHex(null)
+    useSimulationStore.getState().drainSerialInput()
+    clearSerial()
+    setExecutionAttachment(undefined)
+    setExecutionIssue(null)
+    useSimulationStore.getState().resetExecution()
     resetPcb()
     setCurrentProject(null)
     hydratedVersionRef.current = null
@@ -517,11 +545,13 @@ export default function CircuitEditorPage() {
       // A compiler response can arrive after navigation, even before an engine
       // exists. Invalidate that request as well as stopping the active engine.
       simulationRequestRef.current += 1
+      compileAbortRef.current?.abort()
+      useSimulationStore.getState().resetExecution()
       stopSimulationEngine()
       setSimulating(false)
       cancelCanvasRouting()
     }
-  }, [projectId, isSandbox, resetCanvas, resetPcb, setCurrentProject, setDirty, cancelCanvasRouting, setSimulating, stopSimulationEngine])
+  }, [projectId, isSandbox, resetCanvas, resetPcb, setCurrentProject, setDirty, cancelCanvasRouting, setSimulating, setIsSimulating, setExecutionIssue, stopSimulationEngine, clearSerial])
 
   // ── Load project (zero network query for guest sandbox) ──
   const { data: fetchedProject, isLoading, isError: projectLoadError, refetch: reloadProject } = useQuery({
@@ -654,6 +684,7 @@ export default function CircuitEditorPage() {
     onSuccess: (project, snapshot) => {
       if (!isCurrentDocumentSession(snapshot)) return
       rejectedSaveRef.current = null
+      useProjectStore.getState().setSaveError(null)
       setSaving(false)
       if (!project) return
       setDirty(hasEditsSince(snapshot))
@@ -674,6 +705,7 @@ export default function CircuitEditorPage() {
           : response?.status === 400
             ? `Save rejected: ${Object.values(response.data?.data ?? {}).filter(value => typeof value === 'string')[0] || 'check the project fields'}. Your edits are still in this tab.`
             : 'Save could not be confirmed. Your edits are still in this tab. Retry shortly.'
+      useProjectStore.getState().setSaveError(message)
       addToast(message, 'error')
     },
   })
@@ -693,10 +725,11 @@ export default function CircuitEditorPage() {
     const snapshot = captureEditorDocument()
     if (snapshot && exceedsProjectSaveBudget(snapshot.payload)) {
       rejectedSaveRef.current = snapshot
+      useProjectStore.getState().setSaveError('Save exceeds the 4 MiB limit. Reduce the document size and save again.')
       addToast('Save exceeds the 4 MiB limit. Your edits are still in this tab. Reduce the document size and save again.', 'error')
       return
     }
-    if (snapshot) { setSaving(true); saveProject(snapshot) }
+    if (snapshot) { useProjectStore.getState().setSaveError(null); setSaving(true); saveProject(snapshot) }
   }, [isPreset, isSandbox, isOwner, projectId, user?.keycloakId, setSaving, saveProject, addToast])
 
   const handleAutosave = useCallback(() => handleSave(false), [handleSave])
@@ -926,148 +959,136 @@ export default function CircuitEditorPage() {
     [engineRef, isSimulating, updateNode]
   )
 
-  // ── Restart Simulation ──
-  const handleRestartSimulation = useCallback(() => {
+  const stopExecution = useCallback(() => {
     simulationRequestRef.current += 1
-    engineRef.current?.stop()
-    setIsSimulating(false)
+    compileAbortRef.current?.abort()
+    compileAbortRef.current = null
+    stopSimulationEngine()
+    const state = useSimulationStore.getState()
+    if (state.execution.id) state.transitionExecution(state.execution.id, 'stopped')
+    state.setSimulating(false)
     setIsSimulationPaused(false)
-    setSimulating(false)
-    setTimeout(() => {
-      toggleSimulation()
-    }, 80)
-  }, [isSimulating])
+    if (regressionMode !== null) regressionTokenRef.current += 1
+    useCanvasStore.getState().nodes.forEach(n => updateRuntimeNode(n.id, { properties: {
+      isLit: false, isSpinning: false, isBeeping: false, isActive: false,
+      escThrottle: 0, escRpm: 0, bldcRpm: 0, bldcRotation: 0,
+    } }))
+    if ((globalThis as any).__voltforgeBldcState) delete (globalThis as any).__voltforgeBldcState
+  }, [stopSimulationEngine, regressionMode, updateRuntimeNode])
 
-  // ── Simulation toggle ──
-  const toggleSimulation = async () => {
+  // The store owns the lifecycle. Every asynchronous continuation is bound to
+  // this run and project; cancelling also aborts the pending HTTP request.
+  const toggleSimulation = useCallback(async (compatibility: unknown = false) => {
+    const state = useSimulationStore.getState()
+    if (['preparing', 'compiling', 'starting', 'running'].includes(state.execution.phase)) {
+      stopExecution()
+      return
+    }
     const { nodes, wires } = useCanvasStore.getState()
     const { currentProject, activeCodeFile } = useProjectStore.getState()
-    if (!isSimulating) {
-      if (!currentProject || !getBoardProfile(currentProject.boardType)) {
-        addToast('This saved board target is not supported by this editor. Choose a supported target in Project Settings.', 'error')
-        return
-      }
-      if (!nodes.some(node => node.type === currentProject.boardType)) {
-        addToast('Add the selected development board to the circuit before running firmware, or change the target in Project Settings.', 'error')
-        return
-      }
-      if (nodes.filter(node => isBoardComponentType(node.type)).length > 1) {
-        addToast('Firmware execution supports one development board per circuit. Keep the selected target board before running.', 'error')
-        return
-      }
-      const requestId = ++simulationRequestRef.current
-      setIsCompilingFirmware(true)
-      setIsSimulating(true)
-      setIsSimulationPaused(false)
-      setSimulating(true)
-      clearSerial()
-      setSerialPanelOpen(true)
-      writeSerial(`> Simulation started at ${new Date().toLocaleTimeString()}`)
-
-      const safety = analyzeCircuitSafety(nodes, wires)
-      Object.entries(safety.nodeStates).forEach(([nodeId, properties]) => {
-        const node = nodes.find((n) => n.id === nodeId)
-        if (node) updateRuntimeNode(nodeId, { properties })
-      })
-      if (safety.issues.length > 0) {
-        safety.issues.forEach((issue) =>
-          writeSerial(`[${issue.severity}] ${issue.message} ${issue.suggestedFix}`)
-        )
-      }
-
-      const bundledCode = bundleCodeFiles(activeCodeFile, currentProject?.codeFiles || [])
-      const selectedBoardType = currentProject?.boardType || 'ARDUINO_UNO'
-      const customHex = useSimulationStore.getState().customHex;
-      let compiledHex: string | undefined = customHex && supportsAvr8js(selectedBoardType)
-        ? customHex
-        : undefined
-
-      if (customHex) {
-        if (supportsAvr8js(selectedBoardType)) {
-          writeSerial(`> Running custom Intel HEX on AVR8js ATmega328P emulator (${customHex.length} chars)`);
-          useSimulationStore.getState().setExecutionMode('avr8js');
-        } else {
-          writeSerial(`> HEX execution is unavailable for ${selectedBoardType}; using the source compatibility interpreter instead`);
-          useSimulationStore.getState().setExecutionMode('interpreter');
-        }
-      } else if (isSandbox || !user) {
-        useSimulationStore.getState().setExecutionMode('interpreter');
-        writeSerial(`> VoltForge Live Sandbox: Running client compatibility simulation engine for ${selectedBoardType}`);
-      } else {
-        try {
-          const compile = await simulationApi.compileFirmware({
-            source: bundledCode,
-            boardType: selectedBoardType,
-            sketchName: currentProject?.name || 'VoltForgeSketch',
-          })
-          if (requestId !== simulationRequestRef.current) return
-          const result = compile.data.data
-          const resultBoardType = result.boardType || selectedBoardType
-          const canRunCompiledHex = Boolean(result.success && result.hex && resultBoardType === selectedBoardType && supportsAvr8js(selectedBoardType))
-          compiledHex = canRunCompiledHex ? result.hex : undefined
-          if (canRunCompiledHex) {
-            useSimulationStore.getState().setExecutionMode('avr8js');
-          } else if (result.success && result.hex) {
-            useSimulationStore.getState().setExecutionMode('interpreter');
-            writeSerial(`> Firmware compiled for ${resultBoardType}, but browser execution supports only ATmega328P-compatible boards; using the source compatibility interpreter`)
-          } else {
-            useSimulationStore.getState().setExecutionMode('interpreter');
-          }
-          writeSerial(
-            result.success
-              ? `> Firmware compiled by ${result.compiler} (${result.hex?.length || 0} HEX chars)`
-              : `> Firmware compile failed: ${result.stderr || result.diagnostics?.[0] || 'unknown compiler error'}`
-          )
-        } catch (err: any) {
-          if (requestId !== simulationRequestRef.current) return
-          useSimulationStore.getState().setExecutionMode('interpreter');
-          writeSerial(`> Firmware compiler unavailable: ${err?.message || 'request failed'}`)
-        }
-      }
-
-      setIsCompilingFirmware(false)
-
-      // Stop can be clicked while a remote compiler request is pending. Do not
-      // start a worker after that stop has already invalidated this request.
-      if (requestId !== simulationRequestRef.current) return
-      try {
-        const engine = await getSimulationEngine()
-        if (requestId !== simulationRequestRef.current) return
-        await engine.start(bundledCode, nodes, wires, compiledHex, selectedBoardType)
-      } catch (error) {
-        setIsCompilingFirmware(false)
-        if (error instanceof SimulationEngineLoadCancelledError || requestId !== simulationRequestRef.current) return
-        setIsSimulating(false)
-        setIsSimulationPaused(false)
-        setSimulating(false)
-        writeSerial(`[ERROR] Unable to start simulation: ${error instanceof Error ? error.message : 'engine load failed'}`)
-      }
-    } else {
-      simulationRequestRef.current += 1
-      if (regressionMode !== null) regressionTokenRef.current += 1
-      setIsCompilingFirmware(false)
-      setIsSimulating(false)
-      setIsSimulationPaused(false)
-      setSimulating(false)
-      engineRef.current?.stop()
-      writeSerial('> Simulation stopped')
-      nodes.forEach((n) =>
-        updateRuntimeNode(n.id, {
-          properties: {
-            isLit: false,
-            isSpinning: false,
-            isBeeping: false,
-            isActive: false,
-            escThrottle: 0,
-            escRpm: 0,
-            bldcRpm: 0,
-            bldcRotation: 0,
-          },
-        })
-      )
-      if ((globalThis as any).__voltforgeBldcState) delete (globalThis as any).__voltforgeBldcState
+    if (!currentProject || !getBoardProfile(currentProject.boardType)) {
+      addToast('This saved board target is not supported. Choose a supported target in Project Settings.', 'error'); return
     }
-  }
+    if (!nodes.some(node => node.type === currentProject.boardType)) {
+      addToast('Add the selected development board to the circuit before running firmware, or change the target in Project Settings.', 'error'); return
+    }
+    if (nodes.filter(node => isBoardComponentType(node.type)).length > 1) {
+      addToast('Firmware execution supports one development board per circuit. Keep the selected target board before running.', 'error'); return
+    }
+    const bundledCode = bundleCodeFiles(activeCodeFile, currentProject.codeFiles || [])
+    const selectedBoardType = currentProject.boardType
+    const id = state.beginExecution(currentProject.id, selectedBoardType, bundledCode)
+    if (!id) return
+    const requestId = ++simulationRequestRef.current
+    const controller = new AbortController()
+    compileAbortRef.current = controller
+    const active = () => requestId === simulationRequestRef.current && !controller.signal.aborted && useSimulationStore.getState().execution.id === id
+    const transition = (phase: Parameters<typeof state.transitionExecution>[1], diagnostic?: string) => {
+      if (active()) state.transitionExecution(id, phase, diagnostic)
+    }
+    const log = (text: string) => { if (active()) state.writeSerial(text, { runId: id, kind: 'diagnostic' }) }
+    setIsSimulationPaused(false)
+    try {
+      const safety = analyzeCircuitSafety(nodes, wires)
+      Object.entries(safety.nodeStates).forEach(([nodeId, properties]) => updateRuntimeNode(nodeId, { properties }))
+      safety.issues.forEach(issue => log(`[${issue.severity}] ${issue.message} ${issue.suggestedFix}`))
+      const allowCompatibility = compatibility === true
+      const customHex = allowCompatibility ? null : state.customHex
+      let compiledHex: string | undefined
+      if (customHex) {
+        if (!supportsAvr8js(selectedBoardType)) {
+          transition('unavailable', `HEX execution is unavailable for ${selectedBoardType}`); return
+        }
+        compiledHex = customHex
+      } else if (!(allowCompatibility || isSandbox || !user)) {
+        transition('compiling')
+        const compile = await simulationApi.compileFirmware({ source: bundledCode, boardType: selectedBoardType, sketchName: currentProject.name }, controller.signal)
+        if (!active()) return
+        const result = compile.data.data
+        if (!result.success || !result.hex) {
+          transition('compilation-failed', result.stderr || result.diagnostics?.join('\n') || 'Compiler did not produce firmware'); return
+        }
+        if ((result.boardType || selectedBoardType) !== selectedBoardType) {
+          transition('compilation-failed', 'Compiler returned firmware for a different board'); return
+        }
+        if (!supportsAvr8js(selectedBoardType)) {
+          transition('unavailable', 'Compilation succeeded, but this board has no supported browser firmware emulator'); return
+        }
+        compiledHex = result.hex
+        log(`> Firmware compiled by ${result.compiler}`)
+      }
+      if (!active()) return
+      state.setExecutionMode(compiledHex ? 'avr8js' : 'interpreter')
+      transition('starting')
+      // Bound lazy-loading and engine initialization as well as compilation.
+      let timer: ReturnType<typeof setTimeout> | undefined
+      try {
+        await Promise.race([
+          (async () => {
+            const engine = await getSimulationEngine()
+            if (!active()) return
+            const latest = useCanvasStore.getState()
+            const boards = latest.nodes.filter(node => isBoardComponentType(node.type))
+            if (boards.length !== 1 || boards[0].type !== selectedBoardType) {
+              throw new Error('The circuit board changed during preparation. Restore the selected target and run again.')
+            }
+            await engine.start(bundledCode, latest.nodes, latest.wires, compiledHex, selectedBoardType)
+          })(),
+          new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Engine initialization timed out. Stop and retry.')), 15_000) }),
+        ])
+      } finally { clearTimeout(timer) }
+      if (!active()) return
+      transition('running')
+    } catch (error) {
+      if (!active() || error instanceof SimulationEngineLoadCancelledError) return
+      const compiling = useSimulationStore.getState().execution.phase === 'compiling'
+      const reason = `${compiling ? 'Firmware compiler unavailable' : 'Unable to start simulation'}: ${error instanceof Error ? error.message : 'request failed'}`
+      transition(compiling ? 'compilation-failed' : 'runtime-error', reason)
+      stopSimulationEngine()
+    } finally {
+      if (compileAbortRef.current === controller) compileAbortRef.current = null
+    }
+  }, [stopExecution, addToast, updateRuntimeNode, isSandbox, user, getSimulationEngine, stopSimulationEngine])
+
+  const handleRestartSimulation = useCallback(() => {
+    const compatibility = useSimulationStore.getState().executionMode === 'interpreter'
+    stopExecution()
+    void toggleSimulation(compatibility)
+  }, [stopExecution, toggleSimulation])
+
+  useEffect(() => useProjectStore.subscribe(projectState => {
+    const simulation = useSimulationStore.getState()
+    const run = simulation.execution
+    if (!run.id || !['preparing', 'compiling', 'starting', 'running'].includes(run.phase)) return
+    if (projectState.currentProject?.id !== run.projectId || projectState.currentProject.boardType !== run.boardType) {
+      simulationRequestRef.current += 1
+      compileAbortRef.current?.abort()
+      stopSimulationEngine()
+      simulation.transitionExecution(run.id, 'stopped', 'Project or board target changed. Run again to initialize the selected target.')
+      return
+    }
+    simulation.setRestartRequired(bundleCodeFiles(projectState.activeCodeFile, projectState.currentProject.codeFiles) !== run.firmwareSource)
+  }), [stopSimulationEngine])
 
   // ── Global Simulation Hotkeys (Wokwi Standard: Ctrl+Enter, '.', ',') ──
   useEffect(() => {
@@ -1093,7 +1114,7 @@ export default function CircuitEditorPage() {
         return
       }
 
-      if (e.key === '.' && isSimulating) {
+      if (e.key === '.' && (isSimulating || isCompilingFirmware)) {
         e.preventDefault()
         toggleSimulation()
         return
@@ -1114,7 +1135,7 @@ export default function CircuitEditorPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isSimulating, isSimulationPaused, isCompilingFirmware, handleRestartSimulation, toggleSimulation])
+  }, [isSimulating, isSimulationPaused, isCompilingFirmware, handleRestartSimulation, toggleSimulation, engineRef])
 
   const stopRegression = useCallback(() => {
     if (regressionMode === null) return
@@ -1123,7 +1144,7 @@ export default function CircuitEditorPage() {
     setIsSimulating(false)
     setIsSimulationPaused(false)
     setSimulating(false)
-  }, [regressionMode, setSimulating, stopSimulationEngine])
+  }, [regressionMode, setSimulating, setIsSimulating, stopSimulationEngine])
 
   const runRegression = useCallback(async () => {
     if (regressionMode !== null || canvasRenderTraceRunning || avrCompiledTraceRunning) return
@@ -1335,7 +1356,7 @@ export default function CircuitEditorPage() {
     setIsSimulating(false)
     setIsSimulationPaused(false)
     setSimulating(false)
-  }, [avrCompiledTraceRunning, engineRef, setSimulating, stopSimulationEngine])
+  }, [avrCompiledTraceRunning, engineRef, setSimulating, setIsSimulating, stopSimulationEngine])
 
   const runAvrCompiledFirmwareTrace = useCallback(async () => {
     if (avrCompiledTraceRunning || canvasRenderTraceRunning || regressionMode !== null) return
@@ -1534,10 +1555,6 @@ export default function CircuitEditorPage() {
 
   return (
     <div className="vf-editor">
-      <div className="vf-project-target" aria-label="Project development board">
-        <strong>{boardProfile?.name ?? projectSummary?.boardType ?? 'Loading board…'}</strong>
-        <span>{boardProfile ? supportsAvr8js(boardProfile.type) ? 'ATmega328P emulation · compiler required for firmware' : 'Source compatibility simulation · native processor emulation unavailable' : 'Legacy target · configuration preserved; execution unavailable'}</span>
-      </div>
       <EditorDocumentSync
         isOwner={isOwner}
         broadcastEnabled={isLiveSyncConnected && isOwner && !isPreset && regressionMode === null && !canvasRenderTraceRunning && !avrCompiledTraceRunning}
@@ -1550,13 +1567,14 @@ export default function CircuitEditorPage() {
           <div className="vf-editor-mobile-header__main">
             <button
               className="vf-editor__back"
-              onClick={() => navigate(isSandbox ? '/' : '/projects')}
+              onClick={() => { if (isSandbox || confirmLeaveEditor()) navigate(isSandbox ? '/' : '/projects') }}
               title={isSandbox ? 'Back to home' : 'Back to projects'}
             >
               <ArrowLeft size={16} />
             </button>
             <div className="vf-editor-mobile-header__title-wrap">
               <span className="vf-editor-mobile-header__title" title={projectName}>{projectName}</span>
+              <span className="vf-editor__board" aria-label="Project development board">{boardProfile?.name ?? projectSummary?.boardType}</span>
               {!isSandbox && <EditorDirtyIndicator />}
             </div>
             <div className="vf-editor-mobile-header__actions">
@@ -1631,7 +1649,7 @@ export default function CircuitEditorPage() {
           <div className="vf-editor__toolbar-left">
           <button
             className="vf-editor__back"
-            onClick={() => navigate(isSandbox ? '/' : '/projects')}
+            onClick={() => { if (isSandbox || confirmLeaveEditor()) navigate(isSandbox ? '/' : '/projects') }}
             title={isSandbox ? 'Back to home' : 'Back to projects'}
           >
             <ArrowLeft size={16} />
@@ -1639,11 +1657,12 @@ export default function CircuitEditorPage() {
           <div className="vf-editor__project-info">
             <div className="vf-editor__project-primary">
               <h1 className="vf-editor__project-name" title={projectName}>{projectName}</h1>
+              <span className="vf-editor__board" aria-label="Project development board" title={boardProfile && supportsAvr8js(boardProfile.type) ? 'ATmega328P emulation requires compiled firmware. Run checks the compiler.' : 'Native processor emulation unavailable. Source compatibility is a limited interpreter.'}>{boardProfile?.name ?? projectSummary?.boardType}</span>
               {!isSandbox && <EditorDirtyIndicator />}
               {!isSandbox && !isPreset && (
-                <span className="vf-status-badge" aria-hidden={!isLiveSyncConnected}>
+                <span className="vf-status-badge" data-connected={isLiveSyncConnected} title="Live canvas transport only. Saving to the database is shown separately.">
                   <span className="vf-status-badge__dot" />
-                  <span>{t("Live Sync")}</span>
+                  <span>{isLiveSyncConnected ? t("Live Sync") : t("Sync offline")}</span>
                 </span>
               )}
             </div>
@@ -1765,9 +1784,9 @@ export default function CircuitEditorPage() {
           <button
             className={`vf-editor__sim-btn ${isSimulating ? 'is-running' : ''}`}
             onClick={toggleSimulation}
-            disabled={regressionMode !== null || canvasRenderTraceRunning || avrCompiledTraceRunning || isCompilingFirmware}
+            disabled={regressionMode !== null || canvasRenderTraceRunning || avrCompiledTraceRunning}
             type="button"
-            aria-label={canvasRenderTraceRunning ? 'Canvas trace running' : avrCompiledTraceRunning ? 'AVR trace running' : isSimulating ? 'Stop simulation' : 'Start simulation'}
+            aria-label={canvasRenderTraceRunning ? 'Canvas trace running' : avrCompiledTraceRunning ? 'AVR trace running' : isCompilingFirmware ? 'Cancel execution preparation' : isSimulating ? 'Stop simulation' : 'Start simulation'}
             title={isSimulating ? 'Stop simulation (.)' : 'Start simulation (Ctrl+Enter)'}
           >
             {canvasRenderTraceRunning || avrCompiledTraceRunning ? (
@@ -1780,7 +1799,7 @@ export default function CircuitEditorPage() {
               <Play size={13} fill="currentColor" />
             )}
             <span className="vf-editor__action-label">
-              {canvasRenderTraceRunning ? 'Canvas trace' : avrCompiledTraceRunning ? 'AVR trace' : isCompilingFirmware ? t('Compiling...') : isSimulating ? t('Stop') : t('Run')}
+              {canvasRenderTraceRunning ? 'Canvas trace' : avrCompiledTraceRunning ? 'AVR trace' : isCompilingFirmware ? `${execution.phase === 'compiling' ? 'Compiling' : 'Starting'} · Cancel` : isSimulating ? t('Stop') : t('Run')}
             </span>
           </button>
 
@@ -2001,7 +2020,10 @@ export default function CircuitEditorPage() {
               <SecondaryToolButton
                 icon={<PanelLeftClose size={15} />}
                 label="Toggle component panel"
-                onClick={() => setLeftPanelOpen(!leftPanelOpen)}
+                onClick={() => {
+                  if (showAiChat && window.innerWidth <= 1280) { setShowAiChat(false); setLeftPanelOpen(true) }
+                  else setLeftPanelOpen(!leftPanelOpen)
+                }}
                 pressed={leftPanelOpen}
               />
               <SecondaryToolButton
@@ -2044,6 +2066,7 @@ export default function CircuitEditorPage() {
       )}
 
       {/* ── Main content ── */}
+      {executionIssue && <div className="vf-editor__execution-issue" role="alert"><span>{executionIssue}</span><button type="button" disabled={isSimulating || isCompilingFirmware} onClick={() => void toggleSimulation(true)}>Run source compatibility instead</button><button type="button" onClick={() => setExecutionIssue(null)} aria-label="Dismiss execution error">×</button></div>}
       <div className="vf-editor__body">
         {/* Left panel — Component library (Desktop only) */}
         {!isMobile && leftPanelOpen && viewMode !== 'code' && (
@@ -2101,8 +2124,7 @@ export default function CircuitEditorPage() {
                         type="button"
                         className={`vf-editor-mobile-stack__run-btn ${isSimulating ? 'is-running' : ''}`}
                         onClick={toggleSimulation}
-                        disabled={isCompilingFirmware}
-                        title={isSimulating ? 'Stop simulation' : 'Start simulation'}
+                        title={isCompilingFirmware ? 'Cancel execution preparation' : isSimulating ? 'Stop simulation' : 'Start simulation'}
                       >
                         {isCompilingFirmware ? (
                           <Loader2 size={12} className="animate-spin" />
@@ -2130,7 +2152,7 @@ export default function CircuitEditorPage() {
                       </EditorFeatureBoundary>
                     ) : (
                       <div className="vf-editor__mobile-console-pane">
-                        <SerialMonitor />
+                        <SerialMonitor onAskAi={!isSandbox && isOwner ? askAiAboutOutput : undefined} />
                       </div>
                     )}
                   </div>
@@ -2161,7 +2183,7 @@ export default function CircuitEditorPage() {
                   )}
                   {mobileTab === 'console' && (
                     <div className="vf-editor__mobile-console-pane">
-                      <SerialMonitor />
+                      <SerialMonitor onAskAi={!isSandbox && isOwner ? askAiAboutOutput : undefined} />
                     </div>
                   )}
                   {mobileTab === 'pcb' && (
@@ -2256,16 +2278,6 @@ export default function CircuitEditorPage() {
                 <BomPanel isOpen onClose={() => setShowBom(false)} />
               </EditorFeatureBoundary>
             )}
-            {!isSandbox && showAiChat && (
-              <EditorFeatureBoundary label="AI assistant">
-                <AiChatPanel
-                  isOpen
-                  onClose={() => setShowAiChat(false)}
-                  projectContext={projectName}
-                  readOnly={!isOwner}
-                />
-              </EditorFeatureBoundary>
-            )}
             {!isSandbox && showAiValidator && (
               <EditorFeatureBoundary label="AI validator">
                 <AiValidatorPanel isOpen readOnly={!isOwner} onClose={() => setShowAiValidator(false)} />
@@ -2309,7 +2321,7 @@ export default function CircuitEditorPage() {
           {/* Serial monitor / Oscilloscope Trace splits (Desktop only, mobile has dedicated console tab) */}
           {!isMobile && (
             <div className="vf-editor-bottom-pane">
-              <SerialMonitor />
+              <SerialMonitor onAskAi={!isSandbox && isOwner ? askAiAboutOutput : undefined} />
               {!isSandbox && oscilloscopePanelOpen && (
                 <EditorFeatureBoundary label="oscilloscope">
                   <OscilloscopePanel
@@ -2329,6 +2341,11 @@ export default function CircuitEditorPage() {
             </div>
           )}
         </div>
+        {!isSandbox && showAiChat && <EditorDock>
+          <EditorFeatureBoundary label="AI assistant">
+            <AiChatPanel isOpen executionAttachment={executionAttachment} onClose={() => setShowAiChat(false)} projectContext={projectName} readOnly={!isOwner} />
+          </EditorFeatureBoundary>
+        </EditorDock>}
       </div>
 
       {/* ── Mobile Floating Action Controls: Single Canvas Mode ── */}
@@ -2490,9 +2507,8 @@ export default function CircuitEditorPage() {
               type="button"
               className={`vf-editor-mobile-fab vf-editor-mobile-fab--sim ${isSimulating ? 'is-running' : ''}`}
               onClick={toggleSimulation}
-              disabled={isCompilingFirmware}
-              title={isSimulating ? 'Stop simulation' : 'Start simulation'}
-              aria-label={isSimulating ? 'Stop simulation' : 'Start simulation'}
+              title={isCompilingFirmware ? 'Cancel execution preparation' : isSimulating ? 'Stop simulation' : 'Start simulation'}
+              aria-label={isCompilingFirmware ? 'Cancel execution preparation' : isSimulating ? 'Stop simulation' : 'Start simulation'}
             >
               {isCompilingFirmware ? (
                 <Loader2 size={16} className="animate-spin" />

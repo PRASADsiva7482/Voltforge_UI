@@ -10,7 +10,7 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const phase = process.argv.includes('--before') ? 'before' : 'after'
 const origin = 'http://localhost:3103', output = path.join(root, 'docs/reports')
 const fixture = {
-  id: 'dirty-owned', name: 'Document dirty fixture', boardType: 'ARDUINO_UNO', isPublic: false,
+  id: 'dirty-owned', name: 'Document dirty fixture', boardType: 'ARDUINO_UNO', isPublic: false, documentRevision: '0',
   owner: { id: 'render-owner', keycloakId: 'render-owner', displayName: 'Render fixture' },
   canvasLayout: { nodes: Array.from({ length: 25 }, (_, index) => ({ id: `led-${index}`, componentId: 'led-standard', type: 'LED_STANDARD', name: `LED ${index}`, x: 60 + index % 5 * 85, y: 60 + Math.floor(index / 5) * 75, width: 40, height: 50, rotation: 0, properties: { isLit: false, ledColor: 'red' }, pins: [] })), wires: [], viewport: { x: 0, y: 0, scale: 1 } },
   componentConfig: {}, codeFiles: [{ id: 'dirty-code', filename: 'main.ino', content: 'void setup() {}\nvoid loop() { delay(100); }', language: 'cpp', sortOrder: 0 }],
@@ -70,7 +70,7 @@ try {
           saves.push(structuredClone(payload))
           if (delaySave) await new Promise(resolve => setTimeout(resolve, delaySave))
           if (failSave) return route.fulfill({ status: 409, json: { success: false, errorCode: 'PROJECT_REVISION_STALE' } })
-          savedProject = { ...savedProject, ...payload, codeFiles: payload.codeFiles.map(file => ({ ...savedProject.codeFiles.find(existing => existing.filename === file.filename), ...file })), updatedAt: `2026-01-01T00:00:${String(++revision).padStart(2,'0')}Z` }
+          savedProject = { ...savedProject, ...payload, codeFiles: payload.codeFiles.map(file => ({ ...savedProject.codeFiles.find(existing => existing.filename === file.filename), ...file })), documentRevision: String(revision + 1), updatedAt: `2026-01-01T00:00:${String(++revision).padStart(2,'0')}Z` }
         }
         return route.fulfill({ json: { success: true, data: savedProject } })
       }
@@ -87,8 +87,17 @@ try {
   await page.goto(origin + '/editor/dirty-owned')
   await page.getByRole('heading', { name: fixture.name, exact: true }).waitFor()
   await page.waitForFunction(() => window.__editorAudit.stores.canvas.getState().nodes.length === 25)
+  // Include the actual saved firmware target. Execution now rejects circuits
+  // without their selected board instead of pretending to start.
+  await page.evaluate(async () => {
+    const { createInitialProjectLayout } = await import('/src/features/projects/projectConfiguration.ts')
+    const canvas = window.__editorAudit.stores.canvas.getState()
+    canvas.loadCanvas([...canvas.documentNodes, ...createInitialProjectLayout('ARDUINO_UNO').nodes], canvas.wires)
+    window.__editorAudit.stores.project.getState().setDirty(false)
+  })
   await page.locator('.monaco-editor textarea').first().waitFor({ state: 'attached', timeout: 45000 })
   await page.getByRole('button', { name: 'Start simulation', exact: true }).click()
+  await page.getByRole('button', { name: 'Run source compatibility instead', exact: true }).click()
   await page.waitForTimeout(1500)
   if (phase === 'before') await page.evaluate(() => window.__editorAudit.stores.project.getState().setDirty(false))
   else await check('Starting simulation does not dirty a clean document', async () => {
@@ -190,7 +199,7 @@ try {
       assert.equal(saves.length,before+1,'Only one request may be in flight')
       const state=await page.evaluate(() => ({ x:window.__editorAudit.stores.canvas.getState().documentNodes[0].x,code:window.__editorAudit.stores.project.getState().activeCodeFile.content,dirty:window.__editorAudit.stores.project.getState().isDirty }))
       assert.equal(state.x,190); assert.equal(state.code,'// edit while saving'); assert.equal(state.dirty,true)
-      const expectedRevision=savedProject.updatedAt
+      const expectedRevision=savedProject.documentRevision
       await save()
       assert.equal(saves.at(-1).canvasLayout.nodes[0].x,190)
       assert.equal(saves.at(-1).codeFiles[0].content,'// edit while saving')

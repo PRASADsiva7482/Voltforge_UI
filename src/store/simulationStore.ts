@@ -14,8 +14,20 @@ import {
 export type MeterMeasurementMode = 'VOLTAGE' | 'CURRENT' | 'RESISTANCE';
 export type SolverResultConsumer = 'ai' | 'lab';
 
+export type ExecutionPhase = 'idle' | 'preparing' | 'compiling' | 'starting' | 'running' | 'stopped' | 'compilation-failed' | 'runtime-error' | 'unavailable';
+export interface ExecutionSession {
+  id: string | null;
+  projectId: string | null;
+  boardType: string | null;
+  phase: ExecutionPhase;
+  diagnostic: string | null;
+  firmwareSource: string | null;
+}
+export interface SerialEntry { text: string; kind: 'output' | 'diagnostic' | 'input'; timestamp: number; runId: string | null }
 interface SerialWriteOptions {
   newline?: boolean;
+  kind?: SerialEntry['kind'];
+  runId?: string;
 }
 
 export interface LiveMeterMeasurement {
@@ -49,6 +61,14 @@ export interface AvrWorkloadSnapshot {
 export type { SolverDiagnosticsSnapshot } from '../features/simulator/solverDiagnostics';
 
 interface SimulationState {
+  restartRequired: boolean;
+  setRestartRequired: (required: boolean) => void;
+  execution: ExecutionSession;
+  serialEntries: SerialEntry[];
+  beginExecution: (projectId: string, boardType: string, firmwareSource: string) => string | null;
+  transitionExecution: (id: string, phase: ExecutionPhase, diagnostic?: string | null) => void;
+  resetExecution: () => void;
+  setExecutionDiagnostic: (diagnostic: string | null) => void;
   isSimulating: boolean;
   serialLogs: string[];
   serialPanelOpen: boolean;
@@ -163,6 +183,26 @@ function clearCaptureBuffers() {
 }
 
 export const useSimulationStore = create<SimulationState>((set) => ({
+  restartRequired: false,
+  setRestartRequired: restartRequired => set({ restartRequired }),
+  execution: { id: null, projectId: null, boardType: null, phase: 'idle', diagnostic: null, firmwareSource: null },
+  serialEntries: [],
+  beginExecution: (projectId, boardType, firmwareSource) => {
+    let id: string | null = null;
+    set(state => {
+      if (['preparing', 'compiling', 'starting', 'running'].includes(state.execution.phase)) return state;
+      id = crypto.randomUUID();
+      return { execution: { id, projectId, boardType, firmwareSource, phase: 'preparing', diagnostic: null }, isSimulating: false, restartRequired: false,
+        serialLogs: [], serialEntries: [], isSerialLineOpen: false, serialInputQueue: [], baudRate: 9600, serialPanelOpen: true };
+    });
+    return id;
+  },
+  transitionExecution: (id, phase, diagnostic = null) => set(state => state.execution.id !== id ? state : ({
+    execution: { ...state.execution, phase, diagnostic }, isSimulating: phase === 'running',
+    ...(['stopped', 'runtime-error', 'compilation-failed', 'unavailable'].includes(phase) ? { serialInputQueue: [] } : {}),
+  })),
+  resetExecution: () => set({ execution: { id: null, projectId: null, boardType: null, firmwareSource: null, phase: 'idle', diagnostic: null }, isSimulating: false }),
+  setExecutionDiagnostic: diagnostic => set(state => ({ execution: { ...state.execution, diagnostic } })),
   isSimulating: false,
   serialLogs: [],
   serialPanelOpen: false,
@@ -211,31 +251,39 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   solverDiagnostics: null,
   solverDiagnosticsOpen: false,
 
-  setSimulating: (isSimulating) => set({ isSimulating }),
+  setSimulating: (isSimulating) => set(state => ({ isSimulating, execution: { ...state.execution,
+    phase: isSimulating ? 'running' : state.execution.phase === 'running' ? 'stopped' : state.execution.phase } })),
 
   writeSerial: (text, options) => {
     const newline = options?.newline ?? true;
     set((state) => {
+      if (options?.runId && options.runId !== state.execution.id) return state;
       const logs = [...state.serialLogs];
-      const incoming = text ?? '';
+      const entries = [...state.serialEntries];
+      const incoming = (text ?? '').slice(-16000);
+      const kind = options?.kind ?? 'diagnostic';
 
-      if (state.isSerialLineOpen && logs.length > 0) {
-        logs[logs.length - 1] = `${logs[logs.length - 1]}${incoming}`;
+      if (state.isSerialLineOpen && logs.length > 0 && entries.at(-1)?.kind === kind) {
+        logs[logs.length - 1] = `${logs[logs.length - 1]}${incoming}`.slice(-16000);
+        entries[entries.length - 1] = { ...entries[entries.length - 1], text: logs[logs.length - 1] };
       } else {
         logs.push(incoming);
+        entries.push({ text: incoming, kind, timestamp: Date.now(), runId: state.execution.id });
       }
 
       return {
         serialLogs: logs.slice(-300),
-        serialPanelOpen: true,
+        serialEntries: entries.slice(-300),
         isSerialLineOpen: !newline,
       };
     });
   },
 
-  sendSerialInput: (text) => set((state) => ({
+  sendSerialInput: (text) => set((state) => !state.isSimulating ? state : ({
     serialInputQueue: [...state.serialInputQueue, text],
     serialLogs: [...state.serialLogs, `> ${text}`].slice(-300),
+    serialEntries: [...state.serialEntries, { text: `> ${text}`, kind: 'input' as const, timestamp: Date.now(), runId: state.execution.id }].slice(-300),
+    isSerialLineOpen: false,
   })),
 
   drainSerialInput: () => {
@@ -257,7 +305,7 @@ export const useSimulationStore = create<SimulationState>((set) => ({
     debugSnapshot: { ...state.debugSnapshot, breakpoints },
   })),
 
-  clearSerial: () => set({ serialLogs: [], isSerialLineOpen: false }),
+  clearSerial: () => set({ serialLogs: [], serialEntries: [], isSerialLineOpen: false }),
 
   setSerialPanelOpen: (open) => set({ serialPanelOpen: open }),
 

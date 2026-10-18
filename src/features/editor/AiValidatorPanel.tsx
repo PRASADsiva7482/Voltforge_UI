@@ -259,7 +259,7 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
             })()}
 
             <div className="vf-validator__score">
-              <span className="vf-validator__score-label">{t("Safety Score")}</span>
+              <span className="vf-validator__score-label" title="A heuristic indicator, not a measured electrical safety rating">{t("Heuristic score")}</span>
               <span className={`vf-validator__score-value ${getScoreColorClass(validationResult.safetyScore)}`}>
                 {validationResult.safetyScore}/100
               </span>

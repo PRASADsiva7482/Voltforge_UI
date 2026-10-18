@@ -88,7 +88,9 @@ export function describeAiRun(state: AiRunState, metadata: AiRunMetadata = {}): 
     case 'streaming':
       return { label: 'Generating response', detail: fallbackDetail }
     case 'complete':
-      return { label: 'Response ready', detail: 'Review the evidence and proposed changes before using them.' }
+      return metadata.mode === 'unavailable'
+        ? { label: 'Local AI unavailable', detail: 'No model analysis was performed. Your conversation is preserved.' }
+        : { label: 'Response ready', detail: 'AI suggestions are not verified compiler or simulator results.' }
     case 'partial':
       return { label: 'Partial response', detail: 'The response stopped before completion. Review it before using it.' }
     case 'cancelled':
@@ -130,7 +132,7 @@ export function collectAiSources(metadata: AiRunMetadata = {}): AiSourceBadge[] 
     if (!sources.some((item) => item.kind === badge.kind)) sources.push(badge)
   }
 
-  if (metadata.mode === 'neural-quality-gated') {
+  if (metadata.mode === 'neural' || metadata.mode === 'neural-quality-gated') {
     add({ kind: 'local-model', label: 'VoltForge local model', detail: 'Private project-specific local inference.' })
   }
   if (metadata.mode === 'deterministic-fallback' || metadata.fallbackUsed) {

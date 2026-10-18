@@ -353,6 +353,9 @@ export type AiGenerateResponse = {
 }
 
 export type AiChatRequest = {
+  clientRequestId?: string
+  retry?: boolean
+  includeProjectContext?: boolean
   contractVersion?: '1.0.0'
   schemaVersion?: 1
   boardType?: BoardType | string
@@ -390,8 +393,8 @@ export type AiChatResponse = {
   internetRetrieval?: AiInternetRetrievalStatus
   localRetrieval?: AiLocalRetrievalStatus
   memory?: AiMemoryStatus
-  mode?: 'neural-quality-gated' | 'deterministic-fallback' | 'unavailable'
-  model?: 'voltforge-local-engine-v1'
+  mode?: 'neural' | 'neural-quality-gated' | 'deterministic-fallback' | 'unavailable'
+  model?: string
   projectRevision?: string
   readiness?: Record<string, unknown>
   requestId?: string
@@ -495,8 +498,8 @@ export type AiSseEvent = {
   artifact: AiArtifactIdentity
   contractVersion: '1.0.0'
   eventId: string
-  mode: 'neural-quality-gated' | 'deterministic-fallback' | 'unavailable'
-  model: 'voltforge-local-engine-v1'
+  mode: 'neural' | 'neural-quality-gated' | 'deterministic-fallback' | 'unavailable'
+  model: string
   payload: Record<string, unknown>
   projectRevision: string
   requestId: string

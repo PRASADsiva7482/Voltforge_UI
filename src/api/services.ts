@@ -71,7 +71,8 @@ export const aiApi = {
   getComponentCoverage: () => api.get<ApiResponse<AiComponentCoverageResponse>>('/ai/component-coverage'),
   getHardwareCoverage: () => api.get<ApiResponse<AiHardwareCoverageResponse>>('/ai/hardware-coverage'),
   /** SSE streaming chat — returns a raw fetch Response for ReadableStream consumption. */
-  chatStream: async (data: AiChatRequest, signal?: AbortSignal): Promise<Response> => {
+  chatStream: async (data: AiChatRequest, signal?: AbortSignal, conversationId?: string): Promise<Response> => {
+    if (keycloak.token) await keycloak.updateToken(30)
     const headers: Record<string, string> = {
       Accept: 'text/event-stream',
       'Content-Type': 'application/json',
@@ -79,7 +80,8 @@ export const aiApi = {
     if (keycloak.token) {
       headers['Authorization'] = `Bearer ${keycloak.token}`
     }
-    const response = await fetch(`${getStreamBaseURL()}/ai/chat/stream`, {
+    const path = conversationId ? `/ai/conversations/${encodeURIComponent(conversationId)}/messages/stream` : '/ai/chat/stream'
+    const response = await fetch(`${getStreamBaseURL()}${path}`, {
       method: 'POST',
       headers,
       body: JSON.stringify(data),
@@ -157,5 +159,7 @@ export const pcbManufacturingApi = {
 }
 
 export const simulationApi = {
-  compileFirmware: (data: FirmwareCompileRequest) => api.post<ApiResponse<FirmwareCompileResponse>>('/simulation/compile', data),
+  // The configured remote compiler can take 45 seconds. Keep a bounded client
+  // timeout above that deadline and let the workspace cancel preparation.
+  compileFirmware: (data: FirmwareCompileRequest, signal?: AbortSignal) => api.post<ApiResponse<FirmwareCompileResponse>>('/simulation/compile', data, { timeout: 60_000, signal }),
 }

@@ -5,6 +5,7 @@ import {
   Settings,
   ShieldCheck,
   FlaskConical,
+  MessagesSquare,
   type LucideIcon,
 } from 'lucide-react'
 import type { UserRole } from '../types/auth'
@@ -19,6 +20,7 @@ export type NavItem = {
 export const legacyNavItems: NavItem[] = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
   { icon: FolderOpen, label: 'My Projects', path: '/projects' },
+  { icon: MessagesSquare, label: 'AI Workspace', path: '/ai-chat' },
   { icon: Compass, label: 'Explore', path: '/explore' },
   { icon: FlaskConical, label: 'Challenge Labs', path: '/labs' },
   { icon: Settings, label: 'Settings', path: '/settings' },

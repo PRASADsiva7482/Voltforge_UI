@@ -1,11 +1,21 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bot, Brain, Send, Sparkles, User } from 'lucide-react'
+import { Bot, Brain, Send, Sparkles, User, PanelLeft, Maximize2, Plus } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../../auth/useAuth'
+import { useConversationHistory } from './useConversationHistory'
+import { ConversationSidebar } from './ConversationSidebar'
+import { NewConversationDialog } from './NewConversationDialog'
+import { conversationApi, type SavedMessage } from './conversationApi'
+import './chatWorkspace.css'
 import { useCanvasStore } from '../../store/canvasStore'
 import { useProjectStore } from '../../store/projectStore'
 import { useSimulationStore } from '../../store/simulationStore'
 import { useToastStore } from '../../store/useToastStore'
-import { aiApi } from '../../api/services'
+import type { ExecutionAttachment } from './executionContext'
+import { getBoardProfile, supportsAvr8js } from '../canvas/boardCatalog'
+import { useQuery } from '@tanstack/react-query'
+import { aiApi, projectApi } from '../../api/services'
 import { buildCircuitNetlist } from '../canvas/netlist'
 import { Textarea } from '../../components/ui/Field'
 import { SuggestionsList } from '../../components/ui/SuggestionsList'
@@ -33,6 +43,8 @@ import {
 } from './aiPresentation'
 
 interface Props {
+  executionAttachment?: ExecutionAttachment
+  workspace?: boolean
   isOpen: boolean
   readOnly?: boolean
   onClose: () => void
@@ -40,6 +52,9 @@ interface Props {
 }
 
 interface Message {
+  id?: string
+  clientRequestId?: string
+  savedStatus?: SavedMessage['status']
   additions?: AiAction[]
   citations?: AiCitation[]
   codeFixes?: AiCodeFix[]
@@ -83,10 +98,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function mergeAiRunMetadata(event: Record<string, unknown>, previous: AiRunMetadata = {}): AiRunMetadata {
   const next = { ...previous }
-  if (event.mode === 'neural-quality-gated' || event.mode === 'deterministic-fallback' || event.mode === 'unavailable') {
+  if (event.mode === 'neural' || event.mode === 'neural-quality-gated' || event.mode === 'deterministic-fallback' || event.mode === 'unavailable') {
     next.mode = event.mode
   }
-  if (event.model === 'voltforge-local-engine-v1') next.model = event.model
+  if (typeof event.model === 'string') next.model = event.model
   if (typeof event.projectRevision === 'string') next.projectRevision = event.projectRevision
   if (typeof event.fallbackReasonCode === 'string') next.fallbackReasonCode = event.fallbackReasonCode
   if (typeof event.fallbackUsed === 'boolean') next.fallbackUsed = event.fallbackUsed
@@ -120,6 +135,8 @@ export default function AiChatPanel({
   readOnly = false,
   onClose,
   projectContext,
+  workspace = false,
+  executionAttachment,
 }: Props) {
   const { t } = useTranslation()
   const [messages, setMessages] = useState<Message[]>([])
@@ -142,11 +159,72 @@ export default function AiChatPanel({
   const abortRef = useRef<AbortController | null>(null)
   const previousProjectIdRef = useRef<string | undefined>(undefined)
   const requestSequenceRef = useRef(0)
+  const sendLock = useRef(false)
+  const nearBottom = useRef(true)
+  const [showLatest, setShowLatest] = useState(false)
+  const [showHistory, setShowHistory] = useState(workspace)
+  const [showNewDialog, setShowNewDialog] = useState(false)
+  const [includeContext, setIncludeContext] = useState(false)
+  const [sendError, setSendError] = useState('')
+  const [retryRequest, setRetryRequest] = useState<{ id: string; content: string }>()
   
-  const { modelRevision, nodes, selectedNodeId, selectedWireId, viewport, wires } = useCanvasStore()
+  const { modelRevision, nodes, selectedNodeId, selectedWireId, wires } = useCanvasStore()
   const { currentProject, activeCodeFile, updateCodeFileContent } = useProjectStore()
   const addToast = useToastStore((s) => s.addToast)
   const setResultDataConsumer = useSimulationStore((s) => s.setResultDataConsumer)
+  const auth = useAuth()
+  const restoreMessages = useCallback((saved: SavedMessage[]) => {
+    setMessages(saved.map(message => ({
+      id: message.id, clientRequestId: message.clientRequestId, role: message.role, content: message.content,
+      savedStatus: message.status, isStreaming: false,
+      sourceMetadata: message.metadata as AiRunMetadata | undefined,
+      citations: message.metadata?.citations as AiCitation[] | undefined,
+      confidence: typeof message.metadata?.confidence === 'number' ? message.metadata.confidence : undefined,
+      grounding: message.metadata?.grounding as AiGroundingReport | undefined,
+      uncertainty: message.metadata?.uncertainty as AiUncertainty | undefined,
+      ...(message.role === 'assistant' && message.status !== 'completed' ? {
+        runState: 'partial' as const, runStatus: message.status === 'pending' ? 'Still generating' : 'Response incomplete',
+        runDetail: message.status === 'pending' ? 'Another request may still be running. Refresh or stop it before continuing.' : 'Your message is saved. Retry this response or continue the conversation.',
+      } : {}),
+    })))
+    setRunState('idle'); setRunMetadata({}); setRetryRequest(undefined); setSendError('')
+    setProposalSelections({}); setAppliedTransaction(undefined)
+  }, [])
+  const history = useConversationHistory(auth.user?.id, !workspace && !readOnly ? currentProject?.id : undefined, restoreMessages, isStreaming)
+  const activeConversationId = history.active?.id
+  const contextAvailable = workspace ? !!history.active?.projectId : !readOnly && !!currentProject?.id && (!history.active || history.active.projectId === currentProject.id)
+  const savedProjectContext = useQuery({
+    queryKey: ['chat-project-context', auth.user?.id, history.active?.projectId],
+    queryFn: async () => (await projectApi.getById(history.active!.projectId!)).data.data,
+    enabled: workspace && includeContext && !!history.active?.projectId,
+    staleTime: 0,
+  })
+  const relevantAttachment = executionAttachment?.projectId === currentProject?.id ? executionAttachment : undefined
+  const [attachmentVisible, setAttachmentVisible] = useState(true)
+  useEffect(() => {
+    if (!executionAttachment) return
+    setInput('Help me understand the serial output and execution diagnostics attached to this message.')
+    setAttachmentVisible(true)
+    setIncludeContext(false)
+  }, [executionAttachment])
+  const executionDiagnostic = useSimulationStore(s => s.execution.diagnostic)
+  const hasSerialOutput = useSimulationStore(s => s.serialEntries.some(entry => entry.kind === 'output'))
+  const pendingResponse = messages.some(message => message.savedStatus === 'pending')
+
+  useEffect(() => { setSessionId(activeConversationId); setIncludeContext(false) }, [activeConversationId])
+  useEffect(() => {
+    requestSequenceRef.current += 1
+    abortRef.current?.abort()
+    setIsStreaming(false)
+    sendLock.current = false
+  }, [auth.user?.id])
+
+  const newChat = async () => {
+    if (sendLock.current || history.loading) return
+    if (workspace) { setShowNewDialog(true); return }
+    await history.create()
+    setShowHistory(false)
+  }
 
   useEffect(() => {
     setResultDataConsumer('ai', isOpen)
@@ -184,6 +262,7 @@ export default function AiChatPanel({
     setMemoryLoadState('loading')
     try {
       const response = await aiApi.inspectMemory(currentProject.id, sessionId, currentProject.updatedAt)
+      if (response.data.data.status === 'unavailable') throw new Error('Project memory unavailable')
       setMemoryState(response.data.data)
       setMemoryLoadState('ready')
     } catch {
@@ -287,9 +366,13 @@ export default function AiChatPanel({
   }, [addToast, currentProject?.id, refreshMemory, sessionId])
 
   const buildPayload = useCallback(() => {
+    const contextProject = workspace ? savedProjectContext.data : currentProject
+    const contextNodes = workspace ? contextProject?.canvasLayout?.nodes || [] : nodes
+    const contextWires = workspace ? contextProject?.canvasLayout?.wires || [] : wires
+    const contextFile = workspace ? contextProject?.codeFiles?.[0] : activeCodeFile
     const simState = useSimulationStore.getState()
-    const netlist = buildCircuitNetlist(nodes, wires)
-    const components = nodes.map((n) => ({
+    const netlist = buildCircuitNetlist(contextNodes, contextWires)
+    const components = contextNodes.map((n) => ({
       height: n.height,
       id: n.id,
       name: n.name,
@@ -301,7 +384,7 @@ export default function AiChatPanel({
       x: n.x,
       y: n.y,
     }))
-    const serializedWires = wires.map((w) => ({
+    const serializedWires = contextWires.map((w) => ({
       color: w.color,
       id: w.id,
       fromComponent: w.fromNodeId,
@@ -317,9 +400,13 @@ export default function AiChatPanel({
       })),
       pinToNet: netlist.pinToNet,
     }
-    const code = activeCodeFile?.content || currentProject?.codeFiles?.[0]?.content || ''
-    const simulationState = {
+    const code = contextFile?.content || contextProject?.codeFiles?.[0]?.content || ''
+    const simulationState = workspace ? { status: 'No live runtime in AI Workspace; saved project configuration only' } : {
+      execution: simState.execution.projectId === contextProject?.id ? simState.execution : undefined,
+      baudRate: simState.baudRate,
       isSimulating: simState.isSimulating,
+      executionMode: simState.executionMode,
+      fidelityMode: simState.fidelityMode,
       solverConverged: simState.solverConverged,
       pinStates: simState.debugSnapshot.pins,
       debugSnapshot: simState.debugSnapshot,
@@ -332,16 +419,18 @@ export default function AiChatPanel({
           { latest: samples[samples.length - 1] ?? null, samples: samples.slice(-32) },
         ])
       ),
-      serialBuffer: simState.serialLogs.slice(-10),
+      serialBuffer: simState.serialEntries.filter(entry => entry.kind === 'output').slice(-40),
+      diagnostics: simState.serialEntries.filter(entry => entry.kind === 'diagnostic').slice(-10),
+      selectedOutput: attachmentVisible ? relevantAttachment : undefined,
     }
     const richContext = JSON.stringify({
-      projectName: currentProject?.name || projectContext,
-      boardType: currentProject?.boardType || 'ARDUINO_UNO',
-      selectedNodeId,
-      selectedWireId,
-      viewport,
-      activeFile: activeCodeFile
-        ? { filename: activeCodeFile.filename, language: activeCodeFile.language }
+      projectName: contextProject?.name || projectContext,
+      boardType: contextProject?.boardType,
+      boardCapabilities: { definition: getBoardProfile(contextProject?.boardType || ''), browserFirmwareEmulation: supportsAvr8js(contextProject?.boardType || '') },
+      selectedNodeId: workspace ? undefined : selectedNodeId,
+      selectedWireId: workspace ? undefined : selectedWireId,
+      activeFile: contextFile
+        ? { filename: contextFile.filename, language: contextFile.language }
         : null,
       components,
       wires: serializedWires,
@@ -350,7 +439,8 @@ export default function AiChatPanel({
       simulationState,
     })
     return {
-      boardType: currentProject?.boardType || 'ARDUINO_UNO',
+      boardType: contextProject?.boardType,
+      boardCapabilities: { definition: getBoardProfile(contextProject?.boardType || ''), browserFirmwareEmulation: supportsAvr8js(contextProject?.boardType || '') },
       components,
       wires: serializedWires,
       netlist: netlistPayload,
@@ -358,9 +448,9 @@ export default function AiChatPanel({
       canvasData: { components, wires: serializedWires, netlist: netlistPayload },
       simulationState,
       sessionId,
-      projectId: currentProject?.id,
-      projectRevision: currentProject?.updatedAt,
-      files: (currentProject?.codeFiles || []).slice(0, 5).map((file) => ({
+      projectId: contextProject?.id,
+      projectRevision: contextProject?.updatedAt,
+      files: (contextProject?.codeFiles || []).slice(0, 5).map((file) => ({
         content: file.content.slice(0, 60_000),
         filename: file.filename,
         language: file.language,
@@ -369,17 +459,28 @@ export default function AiChatPanel({
       canvasContext: richContext,
       history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })),
     }
-  }, [nodes, wires, activeCodeFile, currentProject, projectContext, selectedNodeId, selectedWireId, viewport, messages, sessionId])
+  }, [nodes, wires, activeCodeFile, currentProject, workspace, savedProjectContext.data, projectContext, selectedNodeId, selectedWireId, messages, sessionId, relevantAttachment, attachmentVisible])
 
-  const handleSendStream = useCallback(async (userMessage: string) => {
-    const payload = buildPayload()
+  const handleSendStream = async (userMessage: string, retryId?: string) => {
+    if (sendLock.current || history.loading || !auth.isAuthenticated) return
+    if (includeContext && workspace && (savedProjectContext.isFetching || savedProjectContext.isError || savedProjectContext.data?.id !== history.active?.projectId)) {
+      setSendError('Saved project context is not available. Retry loading it or turn off sharing.'); return
+    }
+    sendLock.current = true
+    const requestId = ++requestSequenceRef.current
+    const clientRequestId = retryId || crypto.randomUUID()
+    setSendError('')
+    const conversation = history.active || await history.create()
+    if (requestId !== requestSequenceRef.current) { sendLock.current = false; return }
+    if (!conversation) { sendLock.current = false; setInput(userMessage); return }
+    setRetryRequest({ id: clientRequestId, content: userMessage })
+    const payload = includeContext && contextAvailable ? buildPayload() : {}
     const sourceEditorRevision = calculateEditorRevision(nodes, wires, currentProject?.codeFiles || [], modelRevision)
-    const requestId = requestSequenceRef.current + 1
-    requestSequenceRef.current = requestId
     let requestMetadata: AiRunMetadata = {}
     let terminalState: AiRunState | undefined
     let contentCharacters = 0
     let sawDone = false
+    let accepted = false
 
     const updateMetadata = (event: Record<string, unknown>) => {
       if (requestId !== requestSequenceRef.current) return requestMetadata
@@ -401,12 +502,7 @@ export default function AiChatPanel({
       }))
     }
 
-    // Add user message and empty assistant placeholder
-    setMessages((prev) => [
-      ...prev,
-      { role: 'user', content: userMessage },
-      { role: 'assistant', content: '', isStreaming: true, runState: 'connecting', runStatus: 'Connecting' },
-    ])
+    // The accepted event confirms the user message committed before rendering it.
     setRunState('connecting')
     setRunMetadata({})
     setAppliedTransaction(undefined)
@@ -419,7 +515,10 @@ export default function AiChatPanel({
       const response = await aiApi.chatStream({
         message: userMessage,
         ...payload,
-      }, controller.signal)
+        clientRequestId,
+        retry: !!retryId,
+        includeProjectContext: includeContext && contextAvailable,
+      }, controller.signal, conversation.id)
 
       if (!response.body) {
         throw new Error('No response body')
@@ -456,7 +555,6 @@ export default function AiChatPanel({
 
           if (trimmed === '[DONE]') {
             sawDone = true
-            setIsStreaming(false)
             continue
           }
 
@@ -470,7 +568,29 @@ export default function AiChatPanel({
             const event = { ...envelope, ...canonicalPayload }
             const eventType = currentEventType || event.type || ''
 
-            if (eventType === 'start') {
+            if (eventType === 'accepted') {
+              accepted = true
+              const saved = event.data as SavedMessage
+              history.reconcile(saved)
+              setInput('')
+              setMessages(prev => [...prev.filter(m => m.clientRequestId !== clientRequestId),
+                { id: saved.id, clientRequestId, role: 'user', content: saved.content, savedStatus: saved.status },
+                { clientRequestId, role: 'assistant', content: '', isStreaming: true, runState: 'connecting' }])
+            } else if (eventType === 'saved') {
+              const saved = event.data as SavedMessage
+              history.reconcile(saved)
+              terminalState = saved.status === 'completed' ? 'complete' : 'partial'
+              sawDone = true
+              contentCharacters = saved.content.length
+              setRunState(terminalState)
+              setMessages(prev => patchLastAssistant(prev, {
+                id: saved.id, content: saved.content, savedStatus: saved.status, isStreaming: false,
+                runState: terminalState, runStatus: saved.status === 'completed' ? 'Saved' : 'Response incomplete',
+                runDetail: saved.status === 'completed' ? 'Response saved to your conversation.' : 'Your message is saved. Retry the response to continue.',
+              }))
+              setRetryRequest(undefined)
+              void history.refresh()
+            } else if (eventType === 'start') {
               const metadata = updateMetadata(event)
               if (event.sessionId) setSessionId(event.sessionId)
               const state = classifyAiStart(metadata.mode)
@@ -578,7 +698,6 @@ export default function AiChatPanel({
               const state = classifyAiTerminal('error', code, contentCharacters)
               const errorMessage = safeAiErrorMessage(code)
               terminalState = state
-              setIsStreaming(false)
               const presentation = describeAiRun(state, requestMetadata)
               setRunState(state)
               setMessages((prev) => {
@@ -599,7 +718,6 @@ export default function AiChatPanel({
               const metadata = updateMetadata(event)
               if (event.sessionId) setSessionId(event.sessionId)
               terminalState = classifyAiTerminal('complete', undefined, contentCharacters)
-              setIsStreaming(false)
               const completeContent = typeof event.reply === 'string' ? event.reply : ''
               if (completeContent) contentCharacters = Math.max(contentCharacters, completeContent.length)
               const presentation = describeAiRun('complete', metadata)
@@ -644,12 +762,13 @@ export default function AiChatPanel({
       }
 
 
-    } catch {
+    } catch (error) {
       if (!controller.signal.aborted && requestId === requestSequenceRef.current) {
+        setSendError(error instanceof Error ? error.message : 'The response could not be confirmed. Retry with the same request ID.')
         terminalState = 'offline'
         const presentation = describeAiRun('offline', requestMetadata)
         setRunState('offline')
-        setMessages((prev) => patchLastAssistant(prev, {
+        if (accepted) setMessages((prev) => patchLastAssistant(prev, {
           content: prev[prev.length - 1]?.content || safeAiErrorMessage(),
           isStreaming: false,
           runDetail: presentation.detail,
@@ -659,6 +778,7 @@ export default function AiChatPanel({
         }))
       }
     } finally {
+      sendLock.current = false
       if (requestId === requestSequenceRef.current) {
         const finalState: AiRunState = controller.signal.aborted
           ? (contentCharacters > 0 ? 'partial' : 'cancelled')
@@ -687,15 +807,16 @@ export default function AiChatPanel({
         )
       }
     }
-  }, [buildPayload, currentProject?.codeFiles, currentProject?.id, currentProject?.updatedAt, isMemoryOpen, modelRevision, nodes, refreshMemory, wires])
+  }
 
-  const cancelStream = useCallback(() => {
-    if (!abortRef.current) return
-    abortRef.current.abort()
+  const cancelStream = () => {
+    abortRef.current?.abort()
+    if (activeConversationId) void conversationApi.stop(activeConversationId).then(() => history.open(activeConversationId)).catch(() => setSendError('Could not confirm stop. Refresh the conversation before retrying.'))
     setRunState('cancelled')
-  }, [])
+  }
 
   const closePanel = useCallback(() => {
+    requestSequenceRef.current += 1
     abortRef.current?.abort()
     setIsStreaming(false)
     onClose()
@@ -703,27 +824,28 @@ export default function AiChatPanel({
 
   const handleSend = () => {
     const msg = input.trim()
-    if (!msg || isStreaming) return
-    setInput('')
-    handleSendStream(msg)
+    if (!msg || msg.length > 6000 || isStreaming || pendingResponse || history.loading || history.error) return
+    void handleSendStream(msg)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       handleSend()
     }
   }
 
   useEffect(() => {
-    if (scrollRef.current) {
+    if (scrollRef.current && nearBottom.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages, isStreaming])
 
   // Cleanup abort controller on unmount
   useEffect(() => {
+    const sequence = requestSequenceRef
     return () => {
+      sequence.current += 1
       abortRef.current?.abort()
     }
   }, [])
@@ -1040,7 +1162,9 @@ export default function AiChatPanel({
   if (!isOpen) return null
 
   return (
-    <div className="vf-ai-chat">
+    <div className={`vf-chat-workspace${workspace ? ' vf-chat-workspace--page' : ''}${showHistory ? ' has-history' : ''}`}>
+      {showHistory && <ConversationSidebar history={history} busy={isStreaming} onClose={() => setShowHistory(false)} onNew={() => void newChat()} />}
+      <div className="vf-ai-chat">
       {/* Header */}
       <header className="vf-ai-chat__header">
         <div className="vf-ai-chat__brand">
@@ -1048,12 +1172,16 @@ export default function AiChatPanel({
             <Sparkles size={14} />
           </div>
           <div>
-            <h3 className="vf-ai-chat__brand-name">VoltForge AI</h3>
-            <span className="vf-ai-chat__brand-sub">{t('Local project engineering assistant')}</span>
+            {workspace ? <h1 className="vf-ai-chat__brand-name">{history.active?.title || 'AI Workspace'}</h1> : <h3 className="vf-ai-chat__brand-name">{history.active?.title || 'VoltForge AI'}</h3>}
+            <span className="vf-ai-chat__brand-sub">Engineering advice · verify before applying</span>
           </div>
         </div>
         <div className="vf-ai-chat__header-actions">
-          <button
+          <button type="button" title="Conversation history" aria-label="Conversation history" aria-expanded={showHistory} onClick={() => setShowHistory(!showHistory)}><PanelLeft size={16} /></button>
+          {(!workspace || !showHistory) && <button type="button" className={workspace ? 'vf-chat-new-action' : undefined} title="New chat" aria-label="New chat" disabled={isStreaming || history.loading} onClick={() => void newChat()}><Plus size={16} />{workspace && <span>New chat</span>}</button>}
+          {!workspace && <Link to={activeConversationId ? `/ai-chat?conversation=${activeConversationId}` : '/ai-chat'} title="Open AI workspace" aria-label="Open AI workspace"><Maximize2 size={16} /></Link>}
+          {!workspace && <button
+            disabled={!currentProject}
             onClick={() => setIsMemoryOpen((value) => !value)}
             className={`vf-ai-chat__memory-toggle${isMemoryOpen ? ' is-active' : ''}`}
             type="button"
@@ -1062,25 +1190,29 @@ export default function AiChatPanel({
           >
             <Brain size={13} />
             <span>{memoryState?.enabled ? memoryState.entryCount : 0}</span>
-          </button>
-          <button
+          </button>}
+          {!workspace && <button
             onClick={closePanel}
             className="vf-ai-chat__close"
             type="button"
             aria-label="Close assistant"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-          </button>
+          </button>}
         </div>
       </header>
+      {!auth.isAuthenticated && <p className="vf-chat-notice">Sign in to use private, saved conversations. <button type="button" onClick={() => auth.login()}>Sign in</button></p>}
+      {history.active?.projectId && <Link className="vf-chat-project" to={`/editor/${history.active.projectId}?conversation=${history.active.id}`}>{!workspace && currentProject?.name ? `${currentProject.name} · Open project ↗` : savedProjectContext.data?.name ? `${savedProjectContext.data.name} · Open project ↗` : 'Open associated project ↗'}</Link>}
+      {history.error && <p className="vf-chat-notice" role="alert">{history.error} <button type="button" onClick={() => setShowHistory(true)}>Open history</button></p>}
+      {history.loading && <div className="vf-chat-skeleton" role="status">Loading saved conversation…</div>}
+      {sendError && <p className="vf-chat-notice" role="alert">{sendError} {retryRequest && <button type="button" disabled={isStreaming} onClick={() => void handleSendStream(retryRequest.content, retryRequest.id)}>Retry send</button>}{activeConversationId && <button type="button" disabled={isStreaming || history.loading} onClick={() => void history.open(activeConversationId)}>Refresh conversation</button>}</p>}
 
-      <div className={`vf-ai-chat__status vf-ai-chat__status--${runState}`} role="status" aria-live="polite" aria-atomic="true">
+      <div hidden={runState === 'idle'} className={`vf-ai-chat__status vf-ai-chat__status--${runState}`} role="status" aria-live="polite" aria-atomic="true">
         <span className="vf-ai-chat__status-indicator" aria-hidden="true" />
         <div className="vf-ai-chat__status-copy">
           <strong>{runPresentation.label}</strong>
           <span className="vf-ai-chat__status-detail">{runPresentation.detail}</span>
         </div>
-        {sessionId && <span className="vf-ai-chat__status-session">{t('Session active')}</span>}
         {isStreaming && (
           <button type="button" className="vf-ai-chat__cancel" onClick={cancelStream} aria-label={t('Cancel VoltForge AI response')}>
             {t('Stop')}
@@ -1098,7 +1230,7 @@ export default function AiChatPanel({
             <button
               type="button"
               className="vf-ai-chat__memory-action"
-              disabled={isMemoryBusy || !currentProject}
+              disabled={isMemoryBusy || !currentProject || memoryLoadState !== 'ready'}
               onClick={() => void setMemoryEnabled(!memoryState?.enabled)}
             >
               {memoryState?.enabled ? t('Disable') : t('Enable')}
@@ -1158,7 +1290,8 @@ export default function AiChatPanel({
       )}
 
       {/* Messages */}
-      <div ref={scrollRef} className="vf-ai-chat__messages">
+      <div ref={scrollRef} className="vf-ai-chat__messages" onScroll={() => { const el = scrollRef.current; if (el) { nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; setShowLatest(!nearBottom.current) } }}>
+        {history.older && <button type="button" disabled={history.loading || isStreaming} onClick={() => { nearBottom.current = false; void history.loadOlder() }}>Load older messages</button>}
         {messages.length === 0 && (
           <div className="vf-ai-chat__welcome">
             <div className="vf-ai-chat__welcome-icon">
@@ -1167,11 +1300,12 @@ export default function AiChatPanel({
             <h3>{t('VoltForge AI Assistant')}</h3>
             <p>{t('Ask me about circuits, components, Arduino code, or debugging')}</p>
             <SuggestionsList
-              suggestions={[
-                t('How do I connect an LED to Arduino?'),
-                t('Generate code for a temperature sensor'),
-                t('What resistor do I need for a 5V LED?'),
-              ]}
+              suggestions={contextAvailable && !workspace ? [
+                ...(nodes.length ? ['Explain this circuit.', 'Find possible wiring mistakes.'] : []),
+                ...(activeCodeFile?.content ? ['Review my firmware.'] : []),
+                ...(executionDiagnostic ? ['Explain the latest execution error.'] : []),
+                ...(hasSerialOutput ? ['Help me understand the serial output.'] : []),
+              ] : ['How do I select a resistor for an LED?', 'Explain pull-up and pull-down resistors.', 'Help me plan an electronics project.']}
               onSelect={(suggestion) => setInput(suggestion)}
             />
           </div>
@@ -1179,7 +1313,7 @@ export default function AiChatPanel({
 
         {messages.map((msg, idx) => (
           <div
-            key={idx}
+            key={msg.id || idx}
             className={`vf-ai-chat__msg ${
               msg.role === 'user' ? 'vf-ai-chat__msg--user' : 'vf-ai-chat__msg--assistant'
             }`}
@@ -1205,6 +1339,8 @@ export default function AiChatPanel({
 
               {/* Main response content */}
               {msg.content && renderMessageContent(msg.content)}
+              {msg.role === 'assistant' && idx === messages.length - 1 && ['failed', 'interrupted'].includes(msg.savedStatus || '') && <button type="button" disabled={isStreaming} onClick={() => void handleSendStream(messages[idx - 1].content, msg.clientRequestId)}>Retry response</button>}
+              {msg.savedStatus === 'pending' && !isStreaming && <div className="vf-chat-notice"><button type="button" onClick={() => activeConversationId && void history.open(activeConversationId)}>Refresh response</button><button type="button" onClick={cancelStream}>Stop response</button></div>}
               {msg.isStreaming && <span className="vf-ai-chat__cursor">|</span>}
 
               {/* Action buttons */}
@@ -1225,14 +1361,6 @@ export default function AiChatPanel({
                       {source.label}
                     </span>
                   ))}
-                </div>
-              )}
-
-              {/* Confidence badge */}
-              {msg.role === 'assistant' && !msg.isStreaming && typeof msg.confidence === 'number' && (
-                <div className="vf-ai-chat__meta">
-                  {t('Confidence')} {Math.round(msg.confidence * 100)}%
-                  {msg.confidence < 0.65 && <span className="vf-ai-chat__low-confidence">{t('Low confidence — verify before use.')}</span>}
                 </div>
               )}
 
@@ -1318,6 +1446,13 @@ export default function AiChatPanel({
 
       {/* Input */}
       <div className="vf-ai-chat__input-area">
+        {showLatest && <button type="button" onClick={() => { nearBottom.current = true; scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); setShowLatest(false) }}>Scroll to latest ↓</button>}
+        {relevantAttachment && attachmentVisible && <p className="vf-chat-notice">Serial snapshot: {relevantAttachment.output.length} output lines · {relevantAttachment.phase}. Enable context sharing to send it. <button type="button" onClick={() => setAttachmentVisible(false)}>Remove attachment</button></p>}
+        {contextAvailable && !includeContext && <small className="vf-chat-composer-help">Project details are not shared. Enable sharing for circuit, firmware or execution questions.</small>}
+        {workspace && history.active?.projectId && <small className="vf-chat-composer-help">Workspace sharing uses saved project data. Open the project to share unsaved edits or live execution output.</small>}
+        {workspace && includeContext && savedProjectContext.isFetching && <p className="vf-chat-notice" role="status">Loading saved project context…</p>}
+        {workspace && includeContext && savedProjectContext.isError && <p className="vf-chat-notice" role="alert">Could not load saved project context. <button onClick={() => void savedProjectContext.refetch()}>Retry context</button></p>}
+        {contextAvailable && <label className="vf-chat-context"><input type="checkbox" checked={includeContext} disabled={isStreaming} onChange={e => setIncludeContext(e.target.checked)} />Share this project’s circuit, code, simulation, and approved memory with AI</label>}
         <div className="vf-ai-chat__input-row">
           <Textarea
             value={input}
@@ -1326,18 +1461,24 @@ export default function AiChatPanel({
             placeholder={t('Ask VoltForge AI...')}
             aria-label="Ask VoltForge AI about the current project"
             rows={1}
+            maxLength={6000}
+            disabled={!auth.isAuthenticated || history.loading}
             className="vf-ai-chat__textarea"
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || isStreaming}
+            disabled={(workspace && includeContext && (savedProjectContext.isFetching || savedProjectContext.isError)) || !input.trim() || isStreaming || pendingResponse || history.loading || !!history.error || !auth.isAuthenticated}
+            aria-label="Send message"
             className="vf-ai-chat__send"
             type="button"
           >
             <Send size={14} />
           </button>
         </div>
+        <small className="vf-chat-composer-help">{input.length}/6000 · Shift+Enter for a new line · Verify engineering advice</small>
       </div>
+      </div>
+      {showNewDialog && <NewConversationDialog onClose={() => setShowNewDialog(false)} onCreate={async projectId => !!(await history.create(projectId))} />}
     </div>
   )
 }
