@@ -435,9 +435,9 @@ export default function AiChatPanel({
       components,
       wires: serializedWires,
       netlist: netlistPayload,
-      code,
+      codeSnippet: code ? code.slice(0, 2000) : '',
       simulationState,
-    })
+    }).slice(0, 48_000)
     return {
       boardType: contextProject?.boardType,
       boardCapabilities: { definition: getBoardProfile(contextProject?.boardType || ''), browserFirmwareEmulation: supportsAvr8js(contextProject?.boardType || '') },
