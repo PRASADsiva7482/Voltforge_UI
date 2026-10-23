@@ -126,6 +126,8 @@ export function safeAiErrorMessage(code?: string): string {
       return 'The AI service is busy. Your message is saved. Retry shortly.'
     case 'AI_GENERATION_TIMEOUT':
       return 'The AI response timed out. Your message is saved. Retry with a shorter question or less project context.'
+    case 'AI_RESPONSE_LIMIT':
+      return 'The response reached its length limit. The partial answer is saved. Ask a narrower question or continue from it.'
     case 'AI_CONTEXT_LIMIT':
       return 'This question and its context exceed the model’s capacity. Send a shorter question or reduce project context.'
     case 'AI_GENERATION_INTERRUPTED':

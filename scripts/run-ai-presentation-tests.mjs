@@ -36,6 +36,10 @@ try {
   assert.doesNotMatch(unavailable.runDetail, /Response incomplete/);
   assert.equal(describeSavedAiResponse('completed', 'Actual answer').runState, 'complete');
   assert.equal(describeSavedAiResponse('interrupted', 'Actual partial answer').runState, 'partial');
+  const limited = describeSavedAiResponse('failed', 'Saved partial answer', 'AI_RESPONSE_LIMIT');
+  assert.equal(limited.runState, 'partial');
+  assert.match(limited.runDetail, /length limit/);
+  assert.match(limited.runDetail, /partial answer is saved/);
   assert.match(describeSavedAiResponse('failed', '', 'AI_SERVICE_AUTH_FAILED').runDetail, /authenticate/);
 
   const fallback = describeAiRun('checking', { mode: 'deterministic-fallback' });
