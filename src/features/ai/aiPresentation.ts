@@ -106,6 +106,33 @@ export function describeAiRun(state: AiRunState, metadata: AiRunMetadata = {}): 
 
 export function safeAiErrorMessage(code?: string): string {
   switch (code) {
+    case 'WEB_NO_RESULTS': return 'No usable sources were found. Send a new message with a more specific public query.'
+    case 'WEB_RATE_LIMITED':
+    case 'WEB_BUSY': return 'Web research is busy or rate limited. Retry shortly.'
+    case 'WEB_PROVIDER_AUTH': return 'The search provider rejected its credentials or subscription. Your message is saved.'
+    case 'WEB_TIMEOUT':
+    case 'WEB_DEADLINE': return 'Web research timed out. Your message is saved; retry the response.'
+    case 'WEB_DISABLED':
+    case 'WEB_NOT_CONFIGURED':
+    case 'AI_WEB_UNAVAILABLE': return 'Web search is unavailable. Turn research off for a new ordinary chat message, or retry after configuration is restored.'
+    case 'AI_MODEL_UNAVAILABLE':
+      return 'The AI model could not load. Your message is saved. Retry once the AI service is ready.'
+    case 'AI_SERVICE_AUTH_FAILED':
+      return 'The backend could not authenticate with the AI service. Your message is saved; the service configuration needs attention.'
+    case 'AI_SERVICE_UNAVAILABLE':
+    case 'AI_GATEWAY_STREAM_FAILED':
+      return 'The backend could not reach the AI service. Your message is saved. Retry when the service is available.'
+    case 'AI_BUSY':
+      return 'The AI service is busy. Your message is saved. Retry shortly.'
+    case 'AI_GENERATION_TIMEOUT':
+      return 'The AI response timed out. Your message is saved. Retry with a shorter question or less project context.'
+    case 'AI_CONTEXT_LIMIT':
+      return 'This question and its context exceed the model’s capacity. Send a shorter question or reduce project context.'
+    case 'AI_GENERATION_INTERRUPTED':
+    case 'AI_STREAM_INTERRUPTED':
+      return 'Generation stopped before completion. Your message is saved. Retry the response to continue.'
+    case 'AI_EMPTY_RESPONSE':
+      return 'The model returned no answer. Your message is saved. Retry the response.'
     case 'AI_PROJECT_REVISION_STALE':
       return 'The project changed while this request was prepared. Refresh the project and try again.'
     case 'AI_PROJECT_ACCESS_DENIED':
@@ -123,6 +150,24 @@ export function safeAiErrorMessage(code?: string): string {
       return 'This AI request is too large. Reduce the selected context and try again.'
     default:
       return 'The local VoltForge AI response is temporarily unavailable. Your project was not changed.'
+  }
+}
+
+/** Use the same persisted failure reason while streaming and after reopening. */
+export function describeSavedAiResponse(status: string, content: string, errorCode?: string) {
+  const runState: AiRunState = status === 'completed' ? 'complete'
+    : status === 'pending' ? 'connecting'
+    : status === 'interrupted' ? (content ? 'partial' : 'cancelled')
+    : classifyAiTerminal('error', errorCode, content.length)
+  const presentation = describeAiRun(runState)
+  return {
+    runState,
+    runStatus: status === 'pending' ? 'Still generating' : presentation.label,
+    runDetail: status === 'pending' ? 'A response is still being generated. Refresh to check its progress.'
+      : status === 'completed' ? 'Response saved to your conversation.'
+      : status === 'interrupted' ? safeAiErrorMessage(errorCode || 'AI_STREAM_INTERRUPTED')
+      : safeAiErrorMessage(errorCode),
+    errorCode,
   }
 }
 

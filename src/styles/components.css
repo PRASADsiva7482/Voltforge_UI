@@ -3671,32 +3671,6 @@
   border-color: var(--vf-border);
 }
 
-:root.dark .vf-ai-chat {
-  background: var(--vf-surface);
-  border-color: var(--vf-border);
-}
-
-:root.dark .vf-ai-chat__header {
-  background: var(--vf-sidebar);
-  border-color: var(--vf-border);
-}
-
-:root.dark .vf-ai-chat__input-area {
-  background: var(--vf-sidebar);
-  border-color: var(--vf-border);
-}
-
-:root.dark .vf-ai-chat__textarea {
-  background: var(--vf-surface);
-  border-color: var(--vf-border);
-  color: var(--vf-text);
-}
-
-:root.dark .vf-ai-chat__msg--assistant .vf-ai-chat__msg-body {
-  background: var(--vf-sidebar);
-  border-color: var(--vf-border);
-}
-
 :root.dark .vf-ai-chat__thinking {
   background: var(--vf-primary-soft);
   border-color: var(--vf-border-strong);

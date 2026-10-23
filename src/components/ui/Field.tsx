@@ -2,6 +2,7 @@ import type {
   InputHTMLAttributes,
   LabelHTMLAttributes,
   ReactNode,
+  Ref,
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react'
@@ -40,7 +41,7 @@ export function TextInput({ className, leftSlot, ...props }: TextInputProps) {
   )
 }
 
-export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement> & { ref?: Ref<HTMLTextAreaElement> }) {
   return <textarea className={cn('vf-input vf-textarea', className)} {...props} />
 }
 

@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useEffect, useRef } from 'react'
 import { Sidebar } from './Sidebar'
 import { BrandMark } from '../brand/BrandMark'
 import { useAuth } from '../../auth/useAuth'
@@ -12,9 +13,24 @@ export function AppLayout() {
   const navItems = getNavItems(auth.user?.role)
   const { t } = useTranslation()
   const isChatWorkspace = useLocation().pathname === '/ai-chat'
+  const shellRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (!isChatWorkspace || !window.visualViewport) return
+    const viewport = window.visualViewport
+    const shell = shellRef.current
+    // The visual viewport shrinks when a mobile keyboard opens; keep the composer
+    // inside that space instead of allowing the keyboard to cover a 100vh shell.
+    const resize = () => {
+      if (window.innerWidth <= 820) shell?.style.setProperty('--vf-chat-viewport-height', `${viewport.height}px`)
+      else shell?.style.removeProperty('--vf-chat-viewport-height')
+    }
+    resize()
+    viewport.addEventListener('resize', resize)
+    return () => { viewport.removeEventListener('resize', resize); shell?.style.removeProperty('--vf-chat-viewport-height') }
+  }, [isChatWorkspace])
 
   return (
-    <main className={`app-shell${isChatWorkspace ? ' app-shell--chat' : ''}`}>
+    <main ref={shellRef} className={`app-shell${isChatWorkspace ? ' app-shell--chat' : ''}`}>
       <a className="vf-skip-link" href="#workspace-content">{t('Skip to content')}</a>
       {/* Mobile-only Header */}
       <header className="app-mobile-topbar" aria-label={t("Mobile navigation header")}>

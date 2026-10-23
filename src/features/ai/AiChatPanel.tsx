@@ -1,10 +1,16 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bot, Brain, Send, Sparkles, User, PanelLeft, Maximize2, Plus } from 'lucide-react'
+import { Send, Square, PanelLeft, Maximize2, Plus, MoreHorizontal } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { useConversationHistory } from './useConversationHistory'
 import { ConversationSidebar } from './ConversationSidebar'
+import { MessageCopyAction } from './MessageCopyAction'
+import { UserMemoryDialog } from './UserMemoryDialog'
+import { DocumentDialog } from './DocumentDialog'
+import { ResearchOptions } from './ResearchOptions'
+import { ResearchSources } from './ResearchSources'
+import type { ResearchRequest } from './research'
 import { NewConversationDialog } from './NewConversationDialog'
 import { conversationApi, type SavedMessage } from './conversationApi'
 import './chatWorkspace.css'
@@ -21,7 +27,7 @@ import { Textarea } from '../../components/ui/Field'
 import { SuggestionsList } from '../../components/ui/SuggestionsList'
 import { CodeBlock } from '../../components/ui/CodeBlock'
 import { sanitizeUrl } from '../../utils/security'
-import type { AiAction, AiArtifactIdentity, AiCitation, AiCodeFix, AiEngineeringAuthority, AiGroundingReport, AiInternetRetrievalStatus, AiLocalRetrievalStatus, AiMemoryState, AiWireSuggestion } from '../../types/domain'
+import type { AiAction, AiArtifactIdentity, AiCitation, AiCodeFix, AiEngineeringAuthority, AiGroundingReport, AiInternetRetrievalStatus, AiLocalRetrievalStatus, AiWireSuggestion } from '../../types/domain'
 import { AiProposalReview } from './AiProposalReview'
 import {
   buildAiProposal,
@@ -34,8 +40,8 @@ import { planAiProposalChanges } from './aiProposalTransaction'
 import {
   classifyAiStart,
   classifyAiTerminal,
-  collectAiSources,
   describeAiRun,
+  describeSavedAiResponse,
   safeAiErrorMessage,
   type AiRunMetadata,
   type AiRunState,
@@ -57,6 +63,7 @@ interface Message {
   savedStatus?: SavedMessage['status']
   additions?: AiAction[]
   citations?: AiCitation[]
+  research?: ResearchRequest
   codeFixes?: AiCodeFix[]
   content: string
   confidence?: number
@@ -83,13 +90,6 @@ interface AppliedAiTransaction {
   codeFileId?: string
   projectId?: string
   proposalId: string
-}
-
-const evidenceKindLabels: Record<NonNullable<AiCitation['evidenceKind']>, string> = {
-  deterministic: 'Deterministic check',
-  internet: 'Internet source',
-  local: 'Local knowledge',
-  project: 'Project evidence',
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -142,27 +142,70 @@ export default function AiChatPanel({
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
-  const [runState, setRunState] = useState<AiRunState>('idle')
-  const [runMetadata, setRunMetadata] = useState<AiRunMetadata>({})
+  const [, setRunState] = useState<AiRunState>('idle')
+  const [, setRunMetadata] = useState<AiRunMetadata>({})
   const [sessionId, setSessionId] = useState<string>()
   const [isMemoryOpen, setIsMemoryOpen] = useState(false)
-  const [memoryState, setMemoryState] = useState<AiMemoryState>()
-  const [memoryLoadState, setMemoryLoadState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle')
-  const [memoryDraft, setMemoryDraft] = useState('')
-  const [editingMemoryId, setEditingMemoryId] = useState<string>()
-  const [editingMemoryContent, setEditingMemoryContent] = useState('')
-  const [isMemoryBusy, setIsMemoryBusy] = useState(false)
+  const [isDocumentsOpen, setIsDocumentsOpen] = useState(false)
+  const [selectedDocuments, setSelectedDocuments] = useState<string[]>([])
   const [proposalSelections, setProposalSelections] = useState<Record<string, string[]>>({})
   const [appliedTransaction, setAppliedTransaction] = useState<AppliedAiTransaction>()
   const [isApplyingProposal, setIsApplyingProposal] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const historyToggleRef = useRef<HTMLButtonElement>(null)
+  const optionsRef = useRef<HTMLDetailsElement>(null)
+  useEffect(() => {
+    const dismiss = (event: PointerEvent) => {
+      if (optionsRef.current && !optionsRef.current.contains(event.target as Node)) optionsRef.current.open = false
+    }
+    document.addEventListener('pointerdown', dismiss)
+    return () => document.removeEventListener('pointerdown', dismiss)
+  }, [])
+  const historyRequestedRef = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
   const previousProjectIdRef = useRef<string | undefined>(undefined)
   const requestSequenceRef = useRef(0)
   const sendLock = useRef(false)
   const nearBottom = useRef(true)
+  const olderScroll = useRef<{ height: number; top: number } | undefined>(undefined)
   const [showLatest, setShowLatest] = useState(false)
-  const [showHistory, setShowHistory] = useState(workspace)
+  const [compact, setCompact] = useState(() => window.matchMedia('(max-width: 820px)').matches)
+  const [showHistory, setShowHistory] = useState(() => workspace && !window.matchMedia('(max-width: 820px)').matches)
+  const historyDrawer = compact || !workspace
+  const closeHistory = useCallback(() => {
+    setShowHistory(false)
+    requestAnimationFrame(() => historyToggleRef.current?.focus())
+  }, [])
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 820px)')
+    const update = () => { setCompact(media.matches); if (media.matches) setShowHistory(false) }
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+  useLayoutEffect(() => {
+    const input = inputRef.current
+    if (!input || !isOpen) return
+    const resize = () => {
+      input.style.height = '0px'
+      const maxHeight = Math.min(160, (window.visualViewport?.height ?? window.innerHeight) * .25)
+      input.style.height = `${Math.min(input.scrollHeight, maxHeight)}px`
+      input.style.overflowY = input.scrollHeight > maxHeight ? 'auto' : 'hidden'
+    }
+    resize()
+    let width = input.parentElement?.clientWidth
+    let frame = 0
+    const scheduleResize = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(resize) }
+    // Observe width only. Growing the textarea also changes the parent's height;
+    // reacting to that height in the observer would create a resize feedback loop.
+    const observer = new ResizeObserver(entries => {
+      const nextWidth = entries[0]?.contentRect.width
+      if (nextWidth !== width) { width = nextWidth; scheduleResize() }
+    })
+    if (input.parentElement) observer.observe(input.parentElement)
+    window.visualViewport?.addEventListener('resize', scheduleResize)
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); window.visualViewport?.removeEventListener('resize', scheduleResize) }
+  }, [input, isOpen])
   const [showNewDialog, setShowNewDialog] = useState(false)
   const [includeContext, setIncludeContext] = useState(false)
   const [sendError, setSendError] = useState('')
@@ -173,25 +216,40 @@ export default function AiChatPanel({
   const addToast = useToastStore((s) => s.addToast)
   const setResultDataConsumer = useSimulationStore((s) => s.setResultDataConsumer)
   const auth = useAuth()
+  const [researchMode, setResearchMode] = useState<'off' | 'on'>('off')
+  const [publicQuery, setPublicQuery] = useState('')
+  const [researchConsent, setResearchConsent] = useState(false)
+  const [researchStage, setResearchStage] = useState('')
+  useEffect(() => {
+    try { setResearchMode(localStorage.getItem(`vf-research-mode:${auth.user?.id}`) === 'on' ? 'on' : 'off') } catch { setResearchMode('off') }
+    setPublicQuery(''); setResearchConsent(false)
+  }, [auth.user?.id])
+  const openResearch = () => {
+    if (optionsRef.current) {
+      optionsRef.current.open = true
+      const detail = optionsRef.current.querySelector<HTMLDetailsElement>('.vf-research-options')
+      if (detail) detail.open = true
+    }
+  }
   const restoreMessages = useCallback((saved: SavedMessage[]) => {
     setMessages(saved.map(message => ({
       id: message.id, clientRequestId: message.clientRequestId, role: message.role, content: message.content,
       savedStatus: message.status, isStreaming: false,
       sourceMetadata: message.metadata as AiRunMetadata | undefined,
       citations: message.metadata?.citations as AiCitation[] | undefined,
+      research: message.metadata?.research as ResearchRequest | undefined,
       confidence: typeof message.metadata?.confidence === 'number' ? message.metadata.confidence : undefined,
       grounding: message.metadata?.grounding as AiGroundingReport | undefined,
       uncertainty: message.metadata?.uncertainty as AiUncertainty | undefined,
-      ...(message.role === 'assistant' && message.status !== 'completed' ? {
-        runState: 'partial' as const, runStatus: message.status === 'pending' ? 'Still generating' : 'Response incomplete',
-        runDetail: message.status === 'pending' ? 'Another request may still be running. Refresh or stop it before continuing.' : 'Your message is saved. Retry this response or continue the conversation.',
-      } : {}),
+      ...(message.role === 'assistant' ? describeSavedAiResponse(message.status, message.content,
+        typeof message.metadata?.errorCode === 'string' ? message.metadata.errorCode : undefined) : {}),
     })))
     setRunState('idle'); setRunMetadata({}); setRetryRequest(undefined); setSendError('')
     setProposalSelections({}); setAppliedTransaction(undefined)
   }, [])
   const history = useConversationHistory(auth.user?.id, !workspace && !readOnly ? currentProject?.id : undefined, restoreMessages, isStreaming)
   const activeConversationId = history.active?.id
+  useEffect(() => { setResearchConsent(false); setPublicQuery(''); setSelectedDocuments([]) }, [activeConversationId, auth.user?.id])
   const contextAvailable = workspace ? !!history.active?.projectId : !readOnly && !!currentProject?.id && (!history.active || history.active.projectId === currentProject.id)
   const savedProjectContext = useQuery({
     queryKey: ['chat-project-context', auth.user?.id, history.active?.projectId],
@@ -199,7 +257,7 @@ export default function AiChatPanel({
     enabled: workspace && includeContext && !!history.active?.projectId,
     staleTime: 0,
   })
-  const relevantAttachment = executionAttachment?.projectId === currentProject?.id ? executionAttachment : undefined
+  const relevantAttachment = !workspace && executionAttachment?.projectId === currentProject?.id ? executionAttachment : undefined
   const [attachmentVisible, setAttachmentVisible] = useState(true)
   useEffect(() => {
     if (!executionAttachment) return
@@ -211,7 +269,7 @@ export default function AiChatPanel({
   const hasSerialOutput = useSimulationStore(s => s.serialEntries.some(entry => entry.kind === 'output'))
   const pendingResponse = messages.some(message => message.savedStatus === 'pending')
 
-  useEffect(() => { setSessionId(activeConversationId); setIncludeContext(false) }, [activeConversationId])
+  useEffect(() => { setSessionId(activeConversationId); setIncludeContext(false); setIsMemoryOpen(false); olderScroll.current = undefined; nearBottom.current = true }, [activeConversationId])
   useEffect(() => {
     requestSequenceRef.current += 1
     abortRef.current?.abort()
@@ -232,6 +290,7 @@ export default function AiChatPanel({
   }, [isOpen, setResultDataConsumer])
 
   useEffect(() => {
+    if (workspace) return
     const projectId = currentProject?.id
     const previousProjectId = previousProjectIdRef.current
     if (previousProjectId !== undefined && previousProjectId !== projectId) {
@@ -242,128 +301,11 @@ export default function AiChatPanel({
       setIsStreaming(false)
       setRunState('idle')
       setRunMetadata({})
-      setMemoryState(undefined)
-      setMemoryLoadState('idle')
-      setMemoryDraft('')
-      setEditingMemoryId(undefined)
-      setEditingMemoryContent('')
       setProposalSelections({})
       setAppliedTransaction(undefined)
     }
     previousProjectIdRef.current = projectId
-  }, [currentProject?.id])
-
-  const refreshMemory = useCallback(async () => {
-    if (!currentProject?.id) {
-      setMemoryState(undefined)
-      setMemoryLoadState('unavailable')
-      return
-    }
-    setMemoryLoadState('loading')
-    try {
-      const response = await aiApi.inspectMemory(currentProject.id, sessionId, currentProject.updatedAt)
-      if (response.data.data.status === 'unavailable') throw new Error('Project memory unavailable')
-      setMemoryState(response.data.data)
-      setMemoryLoadState('ready')
-    } catch {
-      // Memory may be unavailable until private gateway authentication is configured.
-      setMemoryState(undefined)
-      setMemoryLoadState('unavailable')
-    }
-  }, [currentProject?.id, currentProject?.updatedAt, sessionId])
-
-  useEffect(() => {
-    if (isOpen && isMemoryOpen) void refreshMemory()
-  }, [isOpen, isMemoryOpen, refreshMemory])
-
-  const setMemoryEnabled = useCallback(async (enabled: boolean) => {
-    if (!currentProject?.id) return
-    setIsMemoryBusy(true)
-    try {
-      const response = await aiApi.setMemoryPreference(currentProject.id, enabled, sessionId)
-      setMemoryState(response.data.data)
-      addToast(enabled ? 'Project memory enabled.' : 'Project memory disabled.', 'success')
-    } catch {
-      addToast('Could not update project memory.', 'error')
-    } finally {
-      setIsMemoryBusy(false)
-    }
-  }, [addToast, currentProject?.id, sessionId])
-
-  const rememberFact = useCallback(async () => {
-    const content = memoryDraft.trim()
-    if (!currentProject?.id || !content) return
-    setIsMemoryBusy(true)
-    try {
-      const response = await aiApi.createMemoryEntry(currentProject.id, {
-        approved: true,
-        content,
-        kind: 'fact',
-        projectRevision: currentProject.updatedAt,
-        scope: 'project',
-      }, sessionId)
-      setMemoryState(response.data.data.memory)
-      setMemoryDraft('')
-      addToast('Approved project fact remembered.', 'success')
-    } catch {
-      addToast('This memory could not be stored. Check for secrets or instruction-like text.', 'error')
-    } finally {
-      setIsMemoryBusy(false)
-    }
-  }, [addToast, currentProject?.id, currentProject?.updatedAt, memoryDraft, sessionId])
-
-  const saveMemoryCorrection = useCallback(async () => {
-    const entry = memoryState?.entries.find((item) => item.memoryId === editingMemoryId)
-    const content = editingMemoryContent.trim()
-    if (!currentProject?.id || !entry || !content) return
-    setIsMemoryBusy(true)
-    try {
-      await aiApi.correctMemoryEntry(currentProject.id, entry.memoryId, {
-        approved: true,
-        content,
-        expectedVersion: entry.version,
-        projectRevision: currentProject.updatedAt,
-      }, sessionId)
-      setEditingMemoryId(undefined)
-      setEditingMemoryContent('')
-      await refreshMemory()
-      addToast('Memory corrected and rebound to the current project revision.', 'success')
-    } catch {
-      addToast('Memory changed or the correction was rejected. Inspect it again.', 'error')
-    } finally {
-      setIsMemoryBusy(false)
-    }
-  }, [addToast, currentProject?.id, currentProject?.updatedAt, editingMemoryContent, editingMemoryId, memoryState?.entries, refreshMemory, sessionId])
-
-  const deleteMemory = useCallback(async (memoryId: string) => {
-    if (!currentProject?.id) return
-    setIsMemoryBusy(true)
-    try {
-      await aiApi.deleteMemoryEntry(currentProject.id, memoryId, sessionId)
-      await refreshMemory()
-      addToast('Memory deleted.', 'success')
-    } catch {
-      addToast('Could not delete memory.', 'error')
-    } finally {
-      setIsMemoryBusy(false)
-    }
-  }, [addToast, currentProject?.id, refreshMemory, sessionId])
-
-  const clearMemory = useCallback(async (scope: 'project' | 'session') => {
-    if (!currentProject?.id) return
-    const label = scope === 'project' ? 'all project memory' : 'this session memory'
-    if (!window.confirm(`Clear ${label}? This cannot be undone.`)) return
-    setIsMemoryBusy(true)
-    try {
-      await aiApi.clearMemory(currentProject.id, scope, sessionId)
-      await refreshMemory()
-      addToast(`${scope === 'project' ? 'Project' : 'Session'} memory cleared.`, 'success')
-    } catch {
-      addToast('Could not clear memory.', 'error')
-    } finally {
-      setIsMemoryBusy(false)
-    }
-  }, [addToast, currentProject?.id, refreshMemory, sessionId])
+  }, [currentProject?.id, workspace])
 
   const buildPayload = useCallback(() => {
     const contextProject = workspace ? savedProjectContext.data : currentProject
@@ -463,6 +405,22 @@ export default function AiChatPanel({
 
   const handleSendStream = async (userMessage: string, retryId?: string) => {
     if (sendLock.current || history.loading || !auth.isAuthenticated) return
+    const originalResearch = retryId ? messages.find(m => m.role === 'user' && m.clientRequestId === retryId)?.research : undefined
+    if (retryId && JSON.stringify(originalResearch?.documentIds || []) !== JSON.stringify(selectedDocuments)) {
+      setSelectedDocuments(originalResearch?.documentIds || []); setIsDocumentsOpen(true)
+      setSendError('Review the original document selection, then retry. New documents require a new message.'); return
+    }
+    if (originalResearch?.mode === 'on' && (researchMode !== 'on' || publicQuery.trim() !== originalResearch.publicQuery)) {
+      setResearchMode('on'); setPublicQuery(originalResearch.publicQuery || ''); setResearchConsent(false); openResearch()
+      setSendError('Review and approve the original public query before retrying this response.'); return
+    }
+    if (researchMode === 'on' && (!researchConsent || !publicQuery.trim() || publicQuery.trim().split(/\s+/).length > 75)) {
+      openResearch(); setSendError('Review a public query (up to 75 words) and approve sending it before web research.'); return
+    }
+    const research: ResearchRequest = researchMode === 'on'
+      ? { mode: 'on', publicQuery: publicQuery.trim(), consentToExternalQuery: true, documentIds: selectedDocuments }
+      : { mode: 'off', consentToExternalQuery: false, documentIds: selectedDocuments }
+    setResearchStage('')
     if (includeContext && workspace && (savedProjectContext.isFetching || savedProjectContext.isError || savedProjectContext.data?.id !== history.active?.projectId)) {
       setSendError('Saved project context is not available. Retry loading it or turn off sharing.'); return
     }
@@ -518,6 +476,7 @@ export default function AiChatPanel({
         clientRequestId,
         retry: !!retryId,
         includeProjectContext: includeContext && contextAvailable,
+        research,
       }, controller.signal, conversation.id)
 
       if (!response.body) {
@@ -573,20 +532,23 @@ export default function AiChatPanel({
               const saved = event.data as SavedMessage
               history.reconcile(saved)
               setInput('')
+              setResearchConsent(false)
               setMessages(prev => [...prev.filter(m => m.clientRequestId !== clientRequestId),
-                { id: saved.id, clientRequestId, role: 'user', content: saved.content, savedStatus: saved.status },
+                { id: saved.id, clientRequestId, role: 'user', content: saved.content, savedStatus: saved.status, research },
                 { clientRequestId, role: 'assistant', content: '', isStreaming: true, runState: 'connecting' }])
             } else if (eventType === 'saved') {
               const saved = event.data as SavedMessage
               history.reconcile(saved)
-              terminalState = saved.status === 'completed' ? 'complete' : 'partial'
+              const savedPresentation = describeSavedAiResponse(saved.status, saved.content,
+                typeof saved.metadata?.errorCode === 'string' ? saved.metadata.errorCode : undefined)
+              terminalState = savedPresentation.runState
               sawDone = true
               contentCharacters = saved.content.length
               setRunState(terminalState)
               setMessages(prev => patchLastAssistant(prev, {
                 id: saved.id, content: saved.content, savedStatus: saved.status, isStreaming: false,
-                runState: terminalState, runStatus: saved.status === 'completed' ? 'Saved' : 'Response incomplete',
-                runDetail: saved.status === 'completed' ? 'Response saved to your conversation.' : 'Your message is saved. Retry the response to continue.',
+                citations: saved.metadata?.citations as AiCitation[] | undefined,
+                ...savedPresentation,
               }))
               setRetryRequest(undefined)
               void history.refresh()
@@ -603,6 +565,10 @@ export default function AiChatPanel({
                 sourceMetadata: metadata,
                 thought: `${presentation.detail}\n`,
               }))
+            } else if (eventType === 'sources') {
+              setMessages(prev => patchLastAssistant(prev, { citations: Array.isArray(event.citations) ? event.citations.slice(0, 5) : [] }))
+            } else if (eventType === 'status' && ['searching', 'generating'].includes(event.stage)) {
+              setResearchStage(event.stage === 'searching' ? 'Searching public sources…' : 'Writing from retrieved sources…')
             } else if (eventType === 'thought' || eventType === 'tool' || eventType === 'status') {
               const thoughtValue = event.summary || event.step || event.content
               const thoughtText = typeof thoughtValue === 'string' ? thoughtValue : ''
@@ -703,10 +669,10 @@ export default function AiChatPanel({
               setMessages((prev) => {
                 const last = prev[prev.length - 1]
                 return patchLastAssistant(prev, {
-                  content: last?.content ? `${last.content}\n\n${errorMessage}` : errorMessage,
+                  content: last?.content || '',
                   errorCode: code,
                   isStreaming: false,
-                  runDetail: presentation.detail,
+                  runDetail: errorMessage,
                   runState: state,
                   runStatus: presentation.label,
                   sourceMetadata: requestMetadata,
@@ -787,7 +753,6 @@ export default function AiChatPanel({
         setRunState(finalState)
         setIsStreaming(false)
         abortRef.current = null
-        if (isMemoryOpen) void refreshMemory()
         setMessages((prev) =>
           prev.map((m) => (m.isStreaming ? {
             ...m,
@@ -840,6 +805,14 @@ export default function AiChatPanel({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages, isStreaming])
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (olderScroll.current && el && !history.loading) {
+      el.scrollTop = olderScroll.current.top + el.scrollHeight - olderScroll.current.height
+      olderScroll.current = undefined
+    }
+  }, [messages, history.loading])
 
   // Cleanup abort controller on unmount
   useEffect(() => {
@@ -1157,40 +1130,45 @@ export default function AiChatPanel({
     )
   }
 
-  const runPresentation = describeAiRun(runState, runMetadata)
 
   if (!isOpen) return null
 
   return (
     <div className={`vf-chat-workspace${workspace ? ' vf-chat-workspace--page' : ''}${showHistory ? ' has-history' : ''}`}>
-      {showHistory && <ConversationSidebar history={history} busy={isStreaming} onClose={() => setShowHistory(false)} onNew={() => void newChat()} />}
-      <div className="vf-ai-chat">
+      {showHistory && historyDrawer && <div className="vf-chat-history-backdrop" aria-hidden="true" onClick={closeHistory} />}
+      {showHistory && <ConversationSidebar history={history} drawer={historyDrawer} focusOnMount={historyDrawer || historyRequestedRef.current} busy={isStreaming} onClose={closeHistory} onNew={() => { if (historyDrawer) setShowHistory(false); void newChat() }} />}
+      <div className="vf-ai-chat" inert={showHistory && historyDrawer ? true : undefined}>
       {/* Header */}
       <header className="vf-ai-chat__header">
         <div className="vf-ai-chat__brand">
-          <div className="vf-ai-chat__brand-icon">
-            <Sparkles size={14} />
-          </div>
+          {!showHistory && <button ref={historyToggleRef} className="vf-chat-history-toggle" type="button" title="Open conversation history" aria-label="Conversation history" aria-expanded={false} onClick={() => { historyRequestedRef.current = true; setShowHistory(true) }}><PanelLeft size={18} /></button>}
           <div>
             {workspace ? <h1 className="vf-ai-chat__brand-name">{history.active?.title || 'AI Workspace'}</h1> : <h3 className="vf-ai-chat__brand-name">{history.active?.title || 'VoltForge AI'}</h3>}
-            <span className="vf-ai-chat__brand-sub">Engineering advice · verify before applying</span>
+            {history.active?.projectId && <Link className="vf-chat-project" to={`/editor/${history.active.projectId}?conversation=${history.active.id}`}>{!workspace && currentProject?.name ? `${currentProject.name} · Open project ↗` : savedProjectContext.data?.name ? `${savedProjectContext.data.name} · Open project ↗` : 'Open associated project ↗'}</Link>}
           </div>
         </div>
         <div className="vf-ai-chat__header-actions">
-          <button type="button" title="Conversation history" aria-label="Conversation history" aria-expanded={showHistory} onClick={() => setShowHistory(!showHistory)}><PanelLeft size={16} /></button>
-          {(!workspace || !showHistory) && <button type="button" className={workspace ? 'vf-chat-new-action' : undefined} title="New chat" aria-label="New chat" disabled={isStreaming || history.loading} onClick={() => void newChat()}><Plus size={16} />{workspace && <span>New chat</span>}</button>}
+          {!showHistory && <button type="button" className="vf-chat-new-action" title="New chat" aria-label="New chat" disabled={isStreaming || history.loading} onClick={() => void newChat()}><Plus size={16} /><span>New chat</span></button>}
           {!workspace && <Link to={activeConversationId ? `/ai-chat?conversation=${activeConversationId}` : '/ai-chat'} title="Open AI workspace" aria-label="Open AI workspace"><Maximize2 size={16} /></Link>}
-          {!workspace && <button
-            disabled={!currentProject}
-            onClick={() => setIsMemoryOpen((value) => !value)}
-            className={`vf-ai-chat__memory-toggle${isMemoryOpen ? ' is-active' : ''}`}
-            type="button"
-            aria-label={`${isMemoryOpen ? 'Close' : 'Inspect'} project memory${memoryState?.enabled ? ` (${memoryState.entryCount} item${memoryState.entryCount === 1 ? '' : 's'})` : ''}`}
-            aria-expanded={isMemoryOpen}
-          >
-            <Brain size={13} />
-            <span>{memoryState?.enabled ? memoryState.entryCount : 0}</span>
-          </button>}
+          <details ref={optionsRef} className="vf-chat-options" onKeyDown={event => {
+            if (event.key === 'Escape') { event.preventDefault(); event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus() }
+          }}>
+            <summary aria-label="Chat options" title="Chat options"><MoreHorizontal size={18} /></summary>
+            <div className="vf-chat-options__panel">
+              <ResearchOptions enabled={auth.isAuthenticated} mode={researchMode} onMode={mode => {
+                setResearchMode(mode); setResearchConsent(false)
+                try { localStorage.setItem(`vf-research-mode:${auth.user?.id}`, mode) } catch { /* preference persistence unavailable */ }
+              }} query={publicQuery} onQuery={value => { setPublicQuery(value); setResearchConsent(false) }} consent={researchConsent} onConsent={setResearchConsent} busy={isStreaming} />
+              <button type="button" aria-label="Preference memory" onClick={() => {
+                if (optionsRef.current) { optionsRef.current.open = false; optionsRef.current.querySelector('summary')?.focus() }
+                setIsMemoryOpen(true)
+              }}>Manage memory</button>
+              <button type="button" disabled={isStreaming} onClick={() => { if (optionsRef.current) optionsRef.current.open = false; setIsDocumentsOpen(true) }}>Reference documents{selectedDocuments.length ? ` (${selectedDocuments.length})` : ''}</button>
+              <details><summary>Context and privacy</summary><p>{contextAvailable
+                ? workspace ? 'Project sharing sends the linked project’s saved board, components, wiring and firmware. Open the Playground to share unsaved changes or live execution output.' : 'Project sharing sends the current board, components, wiring, firmware and available execution diagnostics and serial output.'
+                : 'This is a general chat with no linked project. Only your messages, recent chat history and preferences you explicitly saved in Memory are used.'} Sharing turns off when switching conversations. Turning it off stops new project snapshots; information already written in this chat remains in its history. Memory is managed separately.</p></details>
+            </div>
+          </details>
           {!workspace && <button
             onClick={closePanel}
             className="vf-ai-chat__close"
@@ -1202,102 +1180,16 @@ export default function AiChatPanel({
         </div>
       </header>
       {!auth.isAuthenticated && <p className="vf-chat-notice">Sign in to use private, saved conversations. <button type="button" onClick={() => auth.login()}>Sign in</button></p>}
-      {history.active?.projectId && <Link className="vf-chat-project" to={`/editor/${history.active.projectId}?conversation=${history.active.id}`}>{!workspace && currentProject?.name ? `${currentProject.name} · Open project ↗` : savedProjectContext.data?.name ? `${savedProjectContext.data.name} · Open project ↗` : 'Open associated project ↗'}</Link>}
       {history.error && <p className="vf-chat-notice" role="alert">{history.error} <button type="button" onClick={() => setShowHistory(true)}>Open history</button></p>}
       {history.loading && <div className="vf-chat-skeleton" role="status">Loading saved conversation…</div>}
       {sendError && <p className="vf-chat-notice" role="alert">{sendError} {retryRequest && <button type="button" disabled={isStreaming} onClick={() => void handleSendStream(retryRequest.content, retryRequest.id)}>Retry send</button>}{activeConversationId && <button type="button" disabled={isStreaming || history.loading} onClick={() => void history.open(activeConversationId)}>Refresh conversation</button>}</p>}
 
-      <div hidden={runState === 'idle'} className={`vf-ai-chat__status vf-ai-chat__status--${runState}`} role="status" aria-live="polite" aria-atomic="true">
-        <span className="vf-ai-chat__status-indicator" aria-hidden="true" />
-        <div className="vf-ai-chat__status-copy">
-          <strong>{runPresentation.label}</strong>
-          <span className="vf-ai-chat__status-detail">{runPresentation.detail}</span>
-        </div>
-        {isStreaming && (
-          <button type="button" className="vf-ai-chat__cancel" onClick={cancelStream} aria-label={t('Cancel VoltForge AI response')}>
-            {t('Stop')}
-          </button>
-        )}
-      </div>
-
-      {isMemoryOpen && (
-        <section className="vf-ai-chat__memory" aria-labelledby="vf-ai-memory-heading">
-          <div className="vf-ai-chat__memory-heading">
-            <div>
-              <strong id="vf-ai-memory-heading">{t('Bounded project memory')}</strong>
-              <span>{memoryState?.enabled ? `${memoryState.entryCount} ${t('inspectable item(s)')}` : t('Disabled by default')}</span>
-            </div>
-            <button
-              type="button"
-              className="vf-ai-chat__memory-action"
-              disabled={isMemoryBusy || !currentProject || memoryLoadState !== 'ready'}
-              onClick={() => void setMemoryEnabled(!memoryState?.enabled)}
-            >
-              {memoryState?.enabled ? t('Disable') : t('Enable')}
-            </button>
-          </div>
-          <p className="vf-ai-chat__memory-note">
-            {t('User memory is revision-bound context, never engineering evidence or training data.')}
-          </p>
-          {memoryLoadState === 'loading' && <div className="vf-ai-chat__memory-status" role="status">{t('Loading project memory…')}</div>}
-          {memoryLoadState === 'unavailable' && (
-            <div className="vf-ai-chat__memory-status" role="status">
-              {t('Project memory is unavailable. Chat remains available and no memory was changed.')}
-            </div>
-          )}
-          {memoryState && (
-            <>
-              {memoryState.enabled && (
-                <div className="vf-ai-chat__memory-compose">
-                  <input
-                    aria-label="Fact to remember for this project"
-                    value={memoryDraft}
-                    onChange={(event) => setMemoryDraft(event.target.value)}
-                    maxLength={1200}
-                    placeholder={t('Fact to remember for this project')}
-                  />
-                  <button type="button" disabled={isMemoryBusy || !memoryDraft.trim()} onClick={() => void rememberFact()}>{t('Remember')}</button>
-                </div>
-              )}
-              <div className="vf-ai-chat__memory-list">
-                {memoryState.entries.map((entry) => (
-                  <div key={entry.memoryId} className="vf-ai-chat__memory-entry">
-                    <div className="vf-ai-chat__memory-entry-meta">
-                      <span>{entry.kind}</span>
-                      {entry.staleForProjectRevision && <span className="is-stale">{t('stale revision')}</span>}
-                    </div>
-                    {editingMemoryId === entry.memoryId ? (
-                      <div className="vf-ai-chat__memory-edit">
-                        <input aria-label={`Correct memory ${entry.memoryId}`} value={editingMemoryContent} maxLength={1200} onChange={(event) => setEditingMemoryContent(event.target.value)} />
-                        <button type="button" disabled={isMemoryBusy} aria-label={`Save correction for memory ${entry.memoryId}`} onClick={() => void saveMemoryCorrection()}>{t('Save')}</button>
-                      </div>
-                    ) : <p>{entry.content}</p>}
-                    <div className="vf-ai-chat__memory-entry-actions">
-                      <button type="button" disabled={isMemoryBusy} aria-label={`Correct memory ${entry.memoryId}`} onClick={() => { setEditingMemoryId(entry.memoryId); setEditingMemoryContent(entry.content) }}>{t('Correct')}</button>
-                      <button type="button" disabled={isMemoryBusy} aria-label={`Delete memory ${entry.memoryId}`} onClick={() => void deleteMemory(entry.memoryId)}>{t('Delete')}</button>
-                    </div>
-                  </div>
-                ))}
-                {memoryState.entries.length === 0 && <span className="vf-ai-chat__memory-empty">{t('No approved memory yet.')}</span>}
-              </div>
-              <div className="vf-ai-chat__memory-footer">
-                <button type="button" disabled={!sessionId || isMemoryBusy} onClick={() => void clearMemory('session')}>{t('Clear session')}</button>
-                <button type="button" disabled={isMemoryBusy} onClick={() => void clearMemory('project')}>{t('Clear project')}</button>
-              </div>
-            </>
-          )}
-        </section>
-      )}
-
       {/* Messages */}
       <div ref={scrollRef} className="vf-ai-chat__messages" onScroll={() => { const el = scrollRef.current; if (el) { nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; setShowLatest(!nearBottom.current) } }}>
-        {history.older && <button type="button" disabled={history.loading || isStreaming} onClick={() => { nearBottom.current = false; void history.loadOlder() }}>Load older messages</button>}
+        {history.older && <button type="button" disabled={history.loading || isStreaming} onClick={() => { nearBottom.current = false; const el = scrollRef.current; if (el) olderScroll.current = { height: el.scrollHeight, top: el.scrollTop }; void history.loadOlder() }}>Load older messages</button>}
         {messages.length === 0 && (
           <div className="vf-ai-chat__welcome">
-            <div className="vf-ai-chat__welcome-icon">
-              <Bot size={28} />
-            </div>
-            <h3>{t('VoltForge AI Assistant')}</h3>
+            <h3>What are you working on?</h3>
             <p>{t('Ask me about circuits, components, Arduino code, or debugging')}</p>
             <SuggestionsList
               suggestions={contextAvailable && !workspace ? [
@@ -1318,30 +1210,21 @@ export default function AiChatPanel({
               msg.role === 'user' ? 'vf-ai-chat__msg--user' : 'vf-ai-chat__msg--assistant'
             }`}
           >
-            <div className="vf-ai-chat__msg-avatar">
-              {msg.role === 'user' ? <User size={12} /> : <Bot size={12} />}
-            </div>
+            <div className="vf-ai-chat__msg-column">
             <div className="vf-ai-chat__msg-body">
-              {/* User-visible engineering status; hidden model reasoning is never displayed. */}
-              {msg.role === 'assistant' && msg.thought && (
-                <details className="vf-ai-chat__thinking" open={msg.isStreaming && !msg.content}>
-                  <summary className="vf-ai-chat__thinking-summary">
-                    <Brain size={12} />
-                    <span>{msg.isStreaming && !msg.content ? t('Running engineering checks...') : t('Engineering checks')}</span>
-                  </summary>
-                  <div className="vf-ai-chat__thinking-content">
-                    {msg.thought.split('\n').filter(Boolean).map((step, si) => (
-                      <div key={si} className="vf-ai-chat__thinking-step">{step}</div>
-                    ))}
-                  </div>
-                </details>
-              )}
-
               {/* Main response content */}
+              {msg.isStreaming && !msg.content && (
+                <div className="vf-ai-chat__typing" role="status" aria-label="Generating response">
+                  {researchStage && <span>{researchStage}</span>}
+                  <span className="vf-ai-chat__typing-dot" />
+                  <span className="vf-ai-chat__typing-dot" />
+                  <span className="vf-ai-chat__typing-dot" />
+                </div>
+              )}
               {msg.content && renderMessageContent(msg.content)}
-              {msg.role === 'assistant' && idx === messages.length - 1 && ['failed', 'interrupted'].includes(msg.savedStatus || '') && <button type="button" disabled={isStreaming} onClick={() => void handleSendStream(messages[idx - 1].content, msg.clientRequestId)}>Retry response</button>}
+              {msg.role === 'assistant' && <ResearchSources citations={msg.citations} />}
               {msg.savedStatus === 'pending' && !isStreaming && <div className="vf-chat-notice"><button type="button" onClick={() => activeConversationId && void history.open(activeConversationId)}>Refresh response</button><button type="button" onClick={cancelStream}>Stop response</button></div>}
-              {msg.isStreaming && <span className="vf-ai-chat__cursor">|</span>}
+              {msg.isStreaming && msg.content && <span className="vf-ai-chat__cursor" aria-hidden="true">|</span>}
 
               {/* Action buttons */}
               {renderMessageActions(msg)}
@@ -1352,132 +1235,58 @@ export default function AiChatPanel({
                   <span>{msg.runDetail}</span>
                 </div>
               )}
-
-              {msg.role === 'assistant' && msg.sourceMetadata && collectAiSources(msg.sourceMetadata).length > 0 && (
-                <div className="vf-ai-chat__sources" aria-label="Response source trail">
-                  <span className="vf-ai-chat__sources-label">{t('Source trail')}</span>
-                  {collectAiSources(msg.sourceMetadata).map((source) => (
-                    <span key={source.kind} className={`vf-ai-chat__source vf-ai-chat__source--${source.kind}`} title={source.detail}>
-                      {source.label}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {msg.role === 'assistant' && !msg.isStreaming && msg.uncertainty && (
-                <div className="vf-ai-chat__uncertainty" role="status">
-                  <strong>{t('Evidence uncertainty')}</strong>
-                  <span>{msg.uncertainty.reasonCode || 'Some supporting evidence is incomplete.'}</span>
-                  {msg.uncertainty.missingEvidence?.length ? (
-                    <span>Missing: {msg.uncertainty.missingEvidence.join(', ').replaceAll('_', ' ').toLowerCase()}</span>
-                  ) : null}
-                </div>
-              )}
-
-              {msg.role === 'assistant' && !msg.isStreaming && msg.grounding && ['uncertain', 'conflicted'].includes(msg.grounding.status) && (
-                <div className={`vf-ai-chat__grounding vf-ai-chat__grounding--${msg.grounding.status}`} role="status">
-                  <strong>{msg.grounding.status === 'conflicted' ? t('Evidence conflict') : t('Evidence unavailable')}</strong>
-                  <span>
-                    {msg.grounding.status === 'conflicted'
-                      ? t('Sources disagree, so VoltForge AI did not present the disputed claim as fact.')
-                      : t('An unsupported factual claim was replaced with explicit uncertainty.')}
-                  </span>
-                  {msg.grounding.uncertainty.missingEvidence.length > 0 && (
-                    <span>{msg.grounding.uncertainty.missingEvidence.join(', ').replaceAll('_', ' ').toLowerCase()}</span>
-                  )}
-                </div>
-              )}
-
-              {/* Exact bounded evidence, visibly separated by authority/source class. */}
-              {msg.role === 'assistant' && !msg.isStreaming && msg.citations && msg.citations.length > 0 && (
-                <div className="vf-ai-chat__citations" aria-label="Evidence and citations">
-                  {msg.citations.slice(0, 8).map((citation, citationIndex) => {
-                    const kind = citation.evidenceKind
-                    const content = (
-                      <>
-                        <span className={`vf-ai-chat__citation-kind vf-ai-chat__citation-kind--${kind || 'generic'}`}>
-                          {kind ? evidenceKindLabels[kind] : 'Evidence'}
-                        </span>
-                        <span>{citation.title || citation.citationId || 'Evidence item'}</span>
-                        {citation.supportStatus === 'conflicted' && <span className="vf-ai-chat__citation-state">{t('conflicted')}</span>}
-                        {citation.untrustedContent && <span className="vf-ai-chat__citation-state">{t('untrusted source')}</span>}
-                        {citation.snippet && <span className="vf-ai-chat__citation-snippet">{citation.snippet}</span>}
-                        {citation.locator && <span className="vf-ai-chat__citation-meta">{citation.locator}</span>}
-                      </>
-                    )
-                    const safeCitationUrl = citation.url ? sanitizeUrl(citation.url) : null
-                    return safeCitationUrl ? (
-                      <a
-                        key={citation.citationId || `${citation.url}-${citationIndex}`}
-                        href={safeCitationUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="vf-ai-chat__citation"
-                      >
-                        {content}
-                      </a>
-                    ) : (
-                      <div key={citation.citationId || `${citation.title}-${citationIndex}`} className="vf-ai-chat__citation">
-                        {content}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+            </div>
+            {!msg.isStreaming && (msg.content || msg.savedStatus === 'failed' || msg.savedStatus === 'interrupted') && <div className="vf-chat-message-actions">
+              {msg.content && <MessageCopyAction content={msg.content} role={msg.role} />}
+              {msg.role === 'assistant' && idx === messages.length - 1 && ['failed', 'interrupted'].includes(msg.savedStatus || '') && <button type="button" disabled={isStreaming} onClick={() => void handleSendStream(messages[idx - 1].content, msg.clientRequestId)}>Retry response</button>}
+            </div>}
             </div>
           </div>
         ))}
 
-        {isStreaming && messages.length > 0 && !messages[messages.length - 1]?.thought && !messages[messages.length - 1]?.content && (
-          <div className="vf-ai-chat__msg vf-ai-chat__msg--assistant">
-            <div className="vf-ai-chat__msg-avatar">
-              <Bot size={12} />
-            </div>
-            <div className="vf-ai-chat__msg-body">
-              <div className="vf-ai-chat__typing">
-                <span className="vf-ai-chat__typing-dot" />
-                <span className="vf-ai-chat__typing-dot" />
-                <span className="vf-ai-chat__typing-dot" />
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Input */}
       <div className="vf-ai-chat__input-area">
+        {researchMode === 'on' && <button type="button" onClick={openResearch}>Web research · {researchConsent ? 'Query approved' : 'Review query'}</button>}
+        {selectedDocuments.length > 0 && <button type="button" disabled={isStreaming} onClick={() => setIsDocumentsOpen(true)}>Documents · {selectedDocuments.length} selected</button>}
         {showLatest && <button type="button" onClick={() => { nearBottom.current = true; scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); setShowLatest(false) }}>Scroll to latest ↓</button>}
         {relevantAttachment && attachmentVisible && <p className="vf-chat-notice">Serial snapshot: {relevantAttachment.output.length} output lines · {relevantAttachment.phase}. Enable context sharing to send it. <button type="button" onClick={() => setAttachmentVisible(false)}>Remove attachment</button></p>}
-        {contextAvailable && !includeContext && <small className="vf-chat-composer-help">Project details are not shared. Enable sharing for circuit, firmware or execution questions.</small>}
-        {workspace && history.active?.projectId && <small className="vf-chat-composer-help">Workspace sharing uses saved project data. Open the project to share unsaved edits or live execution output.</small>}
+        {contextAvailable && <div className="vf-chat-context-toolbar">
+          <label className="vf-chat-context"><input type="checkbox" checked={includeContext} disabled={isStreaming || history.loading} onChange={e => setIncludeContext(e.target.checked)} aria-label="Share this project context" />{includeContext ? 'Project sharing on' : 'Project sharing off'}</label>
+        </div>}
         {workspace && includeContext && savedProjectContext.isFetching && <p className="vf-chat-notice" role="status">Loading saved project context…</p>}
         {workspace && includeContext && savedProjectContext.isError && <p className="vf-chat-notice" role="alert">Could not load saved project context. <button onClick={() => void savedProjectContext.refetch()}>Retry context</button></p>}
-        {contextAvailable && <label className="vf-chat-context"><input type="checkbox" checked={includeContext} disabled={isStreaming} onChange={e => setIncludeContext(e.target.checked)} />Share this project’s circuit, code, simulation, and approved memory with AI</label>}
         <div className="vf-ai-chat__input-row">
           <Textarea
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t('Ask VoltForge AI...')}
-            aria-label="Ask VoltForge AI about the current project"
+            aria-label="Ask VoltForge AI"
             rows={1}
             maxLength={6000}
             disabled={!auth.isAuthenticated || history.loading}
             className="vf-ai-chat__textarea"
           />
-          <button
+          {isStreaming ? <button key="stop" type="button" className="vf-ai-chat__send vf-ai-chat__stop" title="Stop generation" aria-label="Stop response" onClick={cancelStream}><Square size={16} fill="currentColor" /></button> : <button
+            key="send"
             onClick={handleSend}
             disabled={(workspace && includeContext && (savedProjectContext.isFetching || savedProjectContext.isError)) || !input.trim() || isStreaming || pendingResponse || history.loading || !!history.error || !auth.isAuthenticated}
             aria-label="Send message"
+            title="Send message"
             className="vf-ai-chat__send"
             type="button"
           >
-            <Send size={14} />
-          </button>
+            <Send size={18} />
+          </button>}
         </div>
-        <small className="vf-chat-composer-help">{input.length}/6000 · Shift+Enter for a new line · Verify engineering advice</small>
+        <small className={`vf-chat-composer-help${input ? ' has-draft' : ''}`}>{input.length}/6000 · Shift+Enter for a new line</small>
       </div>
       </div>
+      {isMemoryOpen && <UserMemoryDialog onClose={() => setIsMemoryOpen(false)} />}
+      {isDocumentsOpen && <DocumentDialog projectId={history.active?.projectId} selected={selectedDocuments} onSelect={setSelectedDocuments} onClose={() => setIsDocumentsOpen(false)} />}
       {showNewDialog && <NewConversationDialog onClose={() => setShowNewDialog(false)} onCreate={async projectId => !!(await history.create(projectId))} />}
     </div>
   )

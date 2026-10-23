@@ -1,4 +1,5 @@
 import api, { getBaseURL } from './client'
+import type { ResearchCapabilities } from '../features/ai/research'
 import keycloak from '../auth/keycloak'
 import type {
   AiChatRequest,
@@ -67,6 +68,7 @@ export const componentApi = {
 }
 
 export const aiApi = {
+  getResearchCapabilities: () => api.get<ApiResponse<ResearchCapabilities>>('/ai/research/capabilities'),
   chat: (data: AiChatRequest) => api.post<ApiResponse<AiChatResponse>>('/ai/chat', data),
   getComponentCoverage: () => api.get<ApiResponse<AiComponentCoverageResponse>>('/ai/component-coverage'),
   getHardwareCoverage: () => api.get<ApiResponse<AiHardwareCoverageResponse>>('/ai/hardware-coverage'),

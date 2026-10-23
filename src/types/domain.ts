@@ -266,7 +266,10 @@ export type AiCitation = {
   citationId?: string
   claimIds?: string[]
   contentSha256?: string
-  evidenceKind?: 'project' | 'deterministic' | 'local' | 'internet'
+  evidenceKind?: 'project' | 'deterministic' | 'local' | 'internet' | 'document'
+  documentId?: string
+  versionId?: string
+  page?: number
   evidenceRefs?: string[]
   exactModelEvidence?: true
   locator?: string
@@ -353,6 +356,7 @@ export type AiGenerateResponse = {
 }
 
 export type AiChatRequest = {
+  research?: import('../features/ai/research').ResearchRequest
   clientRequestId?: string
   retry?: boolean
   includeProjectContext?: boolean

@@ -39,16 +39,19 @@ export function useConversationHistory(userId: string | undefined, projectId: st
     finally { if (version === listGeneration.current) setListLoading(false) }
   }, [userId, query, projectId])
 
-  const open = useCallback(async (id: string) => {
+  const open = useCallback(async (id: string, preserveView = false) => {
     const version = ++generation.current
-    setLoading(true); setError(''); setActive(undefined); onMessages([])
+    setLoading(true); setError('')
+    if (!preserveView) { setActive(undefined); onMessages([]) }
     try {
       const [conversation, history] = await Promise.all([conversationApi.get(id), conversationApi.messages(id)])
       if (version !== generation.current) return
       if (projectId && conversation.projectId !== projectId) throw new Error('scope')
       setActive(conversation); persist(id)
-      messagePage.current = 0; savedMessages.current = mergeSavedMessages([], history.content)
-      setOlder(!history.last); onMessages(savedMessages.current)
+      if (!preserveView) messagePage.current = 0
+      savedMessages.current = mergeSavedMessages(preserveView ? savedMessages.current : [], history.content)
+      if (!preserveView || messagePage.current === 0) setOlder(!history.last)
+      onMessages(savedMessages.current)
     } catch { if (version === generation.current) setError('This conversation could not be opened. Retry from history or start a new chat.') }
     finally { if (version === generation.current) setLoading(false) }
   }, [onMessages, persist, projectId])
@@ -66,7 +69,7 @@ export function useConversationHistory(userId: string | undefined, projectId: st
 
   // Refresh summaries and the active transcript after returning from another tab.
   useEffect(() => {
-    const focus = () => { if (!busy) { void refresh(); if (active) void open(active.id) } }
+    const focus = () => { if (!busy) { void refresh(); if (active) void open(active.id, true) } }
     window.addEventListener('focus', focus)
     return () => window.removeEventListener('focus', focus)
   }, [active, busy, refresh, open])

@@ -70,7 +70,7 @@ try {
         assert(center.x + center.width <= dock.x + 1, `AI never obscures canvas/code at ${width}`)
       }
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `No viewport overflow at ${width}`)
-      const input = page.getByRole('textbox', { name: 'Ask VoltForge AI about the current project' })
+      const input = page.getByRole('textbox', { name: 'Ask VoltForge AI', exact: true })
       assert(await input.isVisible())
       const scroll = page.locator('.vf-ai-chat__messages')
       await scroll.evaluate(el => { el.scrollTop = el.scrollHeight })

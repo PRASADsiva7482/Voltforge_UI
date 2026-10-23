@@ -1,12 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Pencil, Plus, Trash2, PanelLeftClose } from 'lucide-react'
 import { Modal } from '../../components/ui/Modal'
 import { Button } from '../../components/ui/Button'
 import type { useConversationHistory } from './useConversationHistory'
 import type { Conversation } from './conversationApi'
 
-type Props = { history: ReturnType<typeof useConversationHistory>; busy: boolean; onClose: () => void; onNew: () => void }
-export function ConversationSidebar({ history, busy, onClose, onNew }: Props) {
+type Props = { history: ReturnType<typeof useConversationHistory>; drawer: boolean; focusOnMount: boolean; busy: boolean; onClose: () => void; onNew: () => void }
+export function ConversationSidebar({ history, drawer, focusOnMount, busy, onClose, onNew }: Props) {
+  const closeRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => { if (focusOnMount) closeRef.current?.focus() }, [focusOnMount])
   const [dialog, setDialog] = useState<{ conversation: Conversation; action: 'rename' | 'delete' }>()
   const [title, setTitle] = useState('')
   const [working, setWorking] = useState(false)
@@ -27,8 +29,17 @@ export function ConversationSidebar({ history, busy, onClose, onNew }: Props) {
     const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
     return day === yesterday.toDateString() ? 'Yesterday' : 'Earlier'
   }
-  return <aside className="vf-chat-history" aria-label="Conversation history">
-    <div className="vf-chat-history__heading"><strong>Your conversations</strong><button type="button" onClick={onClose} aria-label="Hide conversation history" title="Collapse conversation history"><PanelLeftClose size={16} /></button></div>
+  return <aside className={`vf-chat-history${drawer ? ' vf-chat-history--drawer' : ''}`} role={drawer ? 'dialog' : undefined} aria-modal={drawer ? true : undefined} aria-label="Conversation history" onKeyDown={event => {
+    if (dialog) return // The existing modal manages its own focus and Escape handling.
+    if (event.key === 'Escape') { event.preventDefault(); onClose() }
+    if (drawer && event.key === 'Tab') {
+      const items = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), a[href]')].filter(el => el.getClientRects().length)
+      const first = items[0], last = items.at(-1)
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+    }
+  }}>
+    <div className="vf-chat-history__heading"><strong>Conversations</strong><button ref={closeRef} type="button" onClick={onClose} aria-label="Hide conversation history" title="Collapse conversation history"><PanelLeftClose size={18} /></button></div>
     <Button variant="primary" icon={<Plus size={16} />} onClick={onNew} disabled={busy || history.loading}>New chat</Button>
     <input aria-label="Search conversations" placeholder="Search titles…" maxLength={120} value={history.query} onChange={e => history.setQuery(e.target.value)} />
     <div className="vf-chat-history__list" aria-busy={history.listLoading}>
@@ -38,7 +49,7 @@ export function ConversationSidebar({ history, busy, onClose, onNew }: Props) {
       {history.items.map((item, index) => <div key={item.id}>
         {(index === 0 || group(item.updatedAt) !== group(history.items[index - 1].updatedAt)) && <h4>{group(item.updatedAt)}</h4>}
         <div className={`vf-chat-history__item${history.active?.id === item.id ? ' is-active' : ''}`}>
-          <button type="button" disabled={busy || history.loading} aria-current={history.active?.id === item.id ? 'true' : undefined} onClick={() => { void history.open(item.id); if (window.innerWidth < 760) onClose() }}>
+          <button type="button" disabled={busy || history.loading} title={item.title} aria-current={history.active?.id === item.id ? 'true' : undefined} onClick={() => { void history.open(item.id); if (drawer) onClose() }}>
             <span>{item.title}</span><time dateTime={item.updatedAt}>{new Date(item.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</time>
           </button>
           <button type="button" disabled={busy} title="Rename conversation" aria-label={`Rename ${item.title}`} onClick={() => { setDialog({ conversation: item, action: 'rename' }); setTitle(item.title); setError('') }}><Pencil size={14} /></button>
@@ -47,7 +58,6 @@ export function ConversationSidebar({ history, busy, onClose, onNew }: Props) {
       </div>)}
       {history.hasMore && <Button variant="secondary" disabled={history.listLoading} onClick={() => void history.more()}>Load more conversations</Button>}
     </div>
-    <small>Private to your account · Saved on VoltForge</small>
     <Modal isOpen={!!dialog} title={dialog?.action === 'rename' ? 'Rename conversation' : 'Delete conversation?'} onClose={() => { if (!working) setDialog(undefined) }} size="sm" footer={<><Button variant="secondary" disabled={working} onClick={() => setDialog(undefined)}>Cancel</Button><Button variant={dialog?.action === 'delete' ? 'danger' : 'primary'} disabled={working || (dialog?.action === 'rename' && !title.trim())} onClick={() => void confirm()}>{working ? 'Saving…' : dialog?.action === 'delete' ? 'Delete conversation' : 'Save title'}</Button></>}>
       {dialog?.action === 'rename' ? <label>Conversation title<input value={title} maxLength={200} onChange={e => setTitle(e.target.value)} /></label> : <p>This permanently deletes this conversation and its messages. Your project is kept.</p>}
       {error && <p role="alert">{error}</p>}

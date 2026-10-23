@@ -7,6 +7,7 @@ const vite = await createServer({
   appType: 'custom',
   logLevel: 'error',
   root,
+  optimizeDeps: { noDiscovery: true, include: [] },
   server: { middlewareMode: true },
 });
 
@@ -18,6 +19,7 @@ try {
     collectAiSources,
     describeAiRun,
     safeAiErrorMessage,
+    describeSavedAiResponse,
   } = presentation;
 
   assert.equal(classifyAiStart('neural-quality-gated'), 'streaming');
@@ -28,6 +30,13 @@ try {
   assert.equal(classifyAiTerminal('error', 'REQUEST_TIMEOUT', 17), 'partial');
   assert.equal(classifyAiTerminal('error', 'AI_GATEWAY_UNAVAILABLE', 0), 'offline');
   assert.equal(classifyAiTerminal('error', 'UNKNOWN', 0), 'error');
+  const unavailable = describeSavedAiResponse('failed', '', 'AI_MODEL_UNAVAILABLE');
+  assert.equal(unavailable.runState, 'offline');
+  assert.match(unavailable.runDetail, /model could not load/);
+  assert.doesNotMatch(unavailable.runDetail, /Response incomplete/);
+  assert.equal(describeSavedAiResponse('completed', 'Actual answer').runState, 'complete');
+  assert.equal(describeSavedAiResponse('interrupted', 'Actual partial answer').runState, 'partial');
+  assert.match(describeSavedAiResponse('failed', '', 'AI_SERVICE_AUTH_FAILED').runDetail, /authenticate/);
 
   const fallback = describeAiRun('checking', { mode: 'deterministic-fallback' });
   assert.equal(fallback.label, 'Running engineering checks');
