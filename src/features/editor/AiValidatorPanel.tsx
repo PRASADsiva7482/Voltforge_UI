@@ -59,7 +59,7 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
     setProposalSelections([])
     setAppliedTransaction(undefined)
     const sourceEditorRevision = calculateEditorRevision(nodes, wires, currentProject?.codeFiles || [], modelRevision)
-    const sourceProjectRevision = currentProject?.updatedAt
+    const sourceProjectRevision = currentProject?.documentRevision
     try {
       const netlist = buildCircuitNetlist(nodes, wires)
       const res = await aiApi.validateCircuit({
@@ -135,7 +135,7 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
     if (!isAiProposalCurrent(proposal, {
       editorRevision: currentEditorRevision,
       projectId: projectState.currentProject?.id,
-      projectRevision: projectState.currentProject?.updatedAt,
+      projectRevision: projectState.currentProject?.documentRevision,
     })) {
       addToast('This validation proposal is stale. Re-validate the current project.', 'error')
       return
@@ -312,7 +312,7 @@ export default function AiValidatorPanel({ isOpen, readOnly = false, onClose }: 
                 isStale={!isAiProposalCurrent(proposal, {
                   editorRevision: calculateEditorRevision(nodes, wires, currentProject?.codeFiles || [], modelRevision),
                   projectId: currentProject?.id,
-                  projectRevision: currentProject?.updatedAt,
+                  projectRevision: currentProject?.documentRevision,
                 })}
                 isWorking={isApplyingProposal}
                 onApply={applyProposal}

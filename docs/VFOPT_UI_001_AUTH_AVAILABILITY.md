@@ -17,10 +17,10 @@ its store selector allocated a fresh empty array when no project was loaded.
 The fallback now sits outside the subscribed snapshot, keeping failed/denied
 project loads from crashing the recovery path.
 
-Session discovery has a 3.5-second application deadline. Account synchronization
+Session discovery has an 8-second application deadline. Account synchronization
 has a separate 5-second abort deadline. A response arriving after the discovery
 deadline cannot install a usable session. Login and signup check provider
-availability through the backend with a 3.5-second abort deadline so offline failures leave
+availability through the backend with an 8-second abort deadline so offline failures leave
 the current page and retry controls available. A provider that goes down after
 that check can still fail during the subsequent explicit login navigation.
 
@@ -47,7 +47,7 @@ identity endpoint check. Synthetic tokens remain inside test contexts and are
 never submitted to a real backend. Tests assert private-route gating, deep-link
 return, public shares, failed account sync, delayed tokens and refresh failures.
 
-The runner writes machine-readable results and screenshots under `docs/reports/`
+The runner writes machine-readable results and screenshots under `test-results/auth-availability/`
 while it runs. These generated artifacts are temporary; remove them after review.
 They distinguish real-endpoint availability from simulated authenticated flows.
 A development-mode check can be run with `-- --dev "Explicit login"`.
@@ -96,7 +96,7 @@ the configured realm, and only then lets the Keycloak adapter start interactive
 authorization. The browser regression verifies callback, account sync, and
 return to the requested private route. Public startup no longer falls back from
 silent SSO to a full-page redirect. Session discovery and explicit availability
-checks are bounded at 3.5 seconds; account sync is bounded at 5 seconds. The
+checks were bounded at 3.5 seconds; account sync was bounded at 5 seconds. The
 runtime selects PKCE S256 whenever browser Web Crypto is available.
 
 Validation on 2026-09-26: production build and bundle budget passed; all 20
@@ -109,3 +109,21 @@ Dashboard return and editor access then succeeded using the previously
 authorized local test account. Credentials are not recorded here. The sign-in
 availability gate remains active and checks both backend availability and
 issuer equality before redirecting.
+
+## Sign-in availability recovery, 2026-10-25
+
+The next AIR-07 session check reproduced a sign-in regression in Chromium: a health response identifying another host with the same realm still triggered authorization navigation. AuthProvider swallowed every availability error, session.ts accepted HTML as a successful probe, and its issuer check accepted a matching realm suffix on another host.
+
+The existing login/signup flow now awaits a successful JSON availability response with the exact configured issuer. Failed, malformed, timed-out or mismatched responses retain the current page and retry action. This is a navigation/readiness guard; backend JWT validation remains the authentication boundary. No token storage, silent-SSO redirect fallback or database change was introduced.
+
+The existing browser suite was refreshed for current landing-page labels, runtime-configured origins and the existing eight-second session deadline. Added regressions cover same-realm/different-host rejection, HTML and malformed JSON, private deep-link restoration on reload, recovery after a failed probe and duplicate-click suppression. Reports now use ignored test-results/auth-availability rather than docs/reports.
+
+Validation:
+- Before the fix, the same-realm/different-host browser case failed because the page navigated to authorization instead of showing the retryable error.
+- Production Chromium suite: **25/25 passed**, including all existing public/anonymous, callback/PKCE, sync failure/timeout, late-token, refresh and invalid-state cases.
+- Development-mode targeted same-realm rejection and retry/recovery cases passed.
+- UI build, TypeScript and bundle budget passed; lint passed with 13 existing warnings; runner syntax and chat-live report guards passed.
+- BL IdentityAvailabilityServiceTest and IdentityHealthSecurityTest: **10 passed**, using the existing controlled HTTP/security fixtures.
+- No AI runtime change or shared-database DDL/DML. No new report/test source files; existing scripts were extended and disposable outputs removed after review.
+
+The authentication browser successes use the real installed adapter with controlled identity/token/API responses. The configured-endpoint scenario only verifies public-page availability. These results do **not** establish real-account seamless SSO through the current ngrok iframe interstitial; that deployment gate remains open.

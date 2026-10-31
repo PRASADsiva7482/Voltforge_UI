@@ -99,6 +99,10 @@ export const aiApi = {
       }
       throw new Error(detail)
     }
+    if (response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'text/event-stream') {
+      await response.body?.cancel()
+      throw new Error('The response could not be confirmed. Refresh the conversation before retrying.')
+    }
     return response
   },
   inspectMemory: (projectId: string, sessionId?: string, projectRevision?: string) =>

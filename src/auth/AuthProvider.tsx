@@ -77,11 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void (async () => {
       try {
         await checkSession()
-        try {
-          await checkSignInAvailability()
-        } catch (healthErr) {
-          console.warn('Identity health pre-check notice:', healthErr)
-        }
+        await checkSignInAvailability()
         const options = { redirectUri: loginRedirectUri() }
         if (signup) await keycloak.register(options)
         else await keycloak.login(options)

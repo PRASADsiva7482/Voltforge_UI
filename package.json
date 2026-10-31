@@ -4,15 +4,19 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test:chat-live": "node scripts/run-chat-live-tests.mjs",
+    "test:chat-live-report": "node scripts/run-chat-live-report-tests.mjs",
+    "test:chat-live-service": "node scripts/run-owned-live-service-tests.mjs",
     "test:execution-session": "node scripts/run-execution-session-tests.mjs",
     "test:playground-browser": "node scripts/run-playground-audit-tests.mjs",
     "test:firmware-validation": "node scripts/run-firmware-validation-tests.mjs",
     "test:chat-browser": "node scripts/run-chat-browser-tests.mjs",
+    "test:chat-perf": "node scripts/run-chat-browser-tests.mjs --perf-report",
     "test:design-system": "node scripts/run-design-system-browser-tests.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build && npm run test:bundle-budget",
     "lint": "oxlint",
-    "test": "tsc -b && oxlint && npm run test:security && npm run test:worker-protocol && npm run test:result-subscription && npm run test:runtime-delta && npm run test:model-revision && npm run test:ai-presentation && npm run test:ai-hardware-coverage && npm run test:board-geometry && npm run test:ai-proposal && npm run test:mna-incremental && npm run test:scope-capture && npm run test:canvas-render && npm run test:avr-budget && npm run test:document-revision && npm run test:palette-index && npm run test:routing-contract && npm run test:drag-contract && npm run test:pcb-sync-contract && npm run test:ratline-contract && npm run test:pcb-scene-contract && npm run test:component-scene-contract && npm run test:render-isolation-contract && npm run test:ic-package-sync && npm run test:project-configuration",
+    "test": "tsc -b && oxlint && npm run test:security && npm run test:worker-protocol && npm run test:result-subscription && npm run test:runtime-delta && npm run test:model-revision && npm run test:ai-presentation && npm run test:chat-stream && npm run test:ai-hardware-coverage && npm run test:board-geometry && npm run test:ai-proposal && npm run test:mna-incremental && npm run test:scope-capture && npm run test:canvas-render && npm run test:avr-budget && npm run test:document-revision && npm run test:palette-index && npm run test:routing-contract && npm run test:drag-contract && npm run test:pcb-sync-contract && npm run test:ratline-contract && npm run test:pcb-scene-contract && npm run test:component-scene-contract && npm run test:render-isolation-contract && npm run test:ic-package-sync && npm run test:project-configuration",
     "test:ic-package-sync": "node scripts/run-ic-package-sync-tests.mjs",
     "test:security": "node scripts/run-security-contract-tests.mjs",
     "test:worker-protocol": "node scripts/run-worker-backpressure-tests.mjs",
@@ -54,7 +58,8 @@
     "test:pcb-scene-development": "node scripts/run-pcb-scene-browser-tests.mjs",
     "preview": "vite preview",
     "test:project-configuration": "node scripts/run-project-configuration-tests.mjs",
-    "test:project-flow-browser": "node scripts/run-project-flow-browser-tests.mjs"
+    "test:project-flow-browser": "node scripts/run-project-flow-browser-tests.mjs",
+    "test:chat-stream": "node scripts/run-chat-stream-tests.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

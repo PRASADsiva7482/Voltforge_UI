@@ -3,8 +3,9 @@ import { createServer } from 'vite'
 import { chromium } from '@playwright/test'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 const root = fileURLToPath(new URL('..', import.meta.url))
+const perfReport = process.argv.includes('--perf-report')
 const user = { id: 'chat-user', keycloakId: 'chat-user', username: 'engineer', displayName: 'Test Engineer', role: 'USER' }
 let liveStream
 const server = await createServer({ root, cacheDir: 'node_modules/.cache/chat-tests-vite', server: { host: 'localhost', port: 3124, strictPort: true }, plugins: [{ name: 'chat-test-auth', enforce: 'pre', configureServer(vite) {
@@ -20,8 +21,9 @@ const server = await createServer({ root, cacheDir: 'node_modules/.cache/chat-te
       response.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' })
       response.flushHeaders()
       const write = event => response.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
-      write({ type: 'accepted', data: first }); write({ type: 'start', mode: 'neural' })
+      write({ type: 'accepted', attemptId: 'live-attempt', data: first }); write({ type: 'start', mode: 'neural' })
       liveStream = {
+        raw(text) { response.write(text) },
         token(delta) { assistant.content += delta; write({ type: 'token', delta }) },
         finish() { assistant.status = 'completed'; write({ type: 'complete', reply: assistant.content }); write({ type: 'saved', data: assistant }); response.end() },
         close() { response.end() },
@@ -72,7 +74,7 @@ try {
       return ok(preferences)
     }
     if (path.endsWith('/projects')) return ok(paged([{ id: 'project-1', name: 'Sensor laboratory' }]))
-    if (path.endsWith('/projects/project-1')) return ok({ id: 'project-1', owner: user, name: 'Sensor laboratory', boardType: 'ARDUINO_NANO', updatedAt: 'saved-revision', canvasLayout: { nodes: [], wires: [] }, codeFiles: [{ id: 'firmware', filename: 'main.ino', content: 'saved private firmware', language: 'cpp' }] })
+    if (path.endsWith('/projects/project-1')) return ok({ id: 'project-1', owner: user, name: 'Sensor laboratory', boardType: 'ARDUINO_NANO', documentRevision: '7', updatedAt: '2026-10-24T12:00:00.1234', canvasLayout: { nodes: [], wires: [] }, codeFiles: [{ id: 'firmware', filename: 'main.ino', content: 'saved private firmware', language: 'cpp' }] })
     if (path.endsWith('/ai/conversations')) {
       if (method === 'POST') {
         const data = request.postDataJSON(), id = `chat-${conversations.size + 1}`, now = new Date().toISOString()
@@ -263,7 +265,7 @@ try {
   assert.equal(sends.at(-1).projectId, 'project-1')
   assert.equal(sends.at(-1).boardType, 'ARDUINO_NANO')
   assert.equal(sends.at(-1).code, 'saved private firmware')
-  assert.equal(sends.at(-1).projectRevision, 'saved-revision')
+  assert.equal(sends.at(-1).projectRevision, '7', 'use the saved revision token, not a formatted timestamp')
   assert.equal(sends.at(-1).simulationState.serialBuffer, undefined, 'Workspace must never borrow another editor run')
   await page.getByRole('checkbox', { name: /Share this project/ }).uncheck()
   await input.fill('General electronics question'); await send.click()
@@ -403,6 +405,11 @@ try {
   assert.deepEqual(errors, [])
   console.log('PASS actual model-unavailable error survives saved event and reload; recovery retries the same message and clears failure')
 
+  const readTimings = () => page.evaluate(async () => {
+    const { chatTiming } = await import('/src/features/ai/chatTiming.ts')
+    return chatTiming.snapshot()
+  })
+
   conversations.set('live-chat', { id: 'live-chat', title: 'Live streaming test', createdAt: now, updatedAt: now })
   transcripts.set('live-chat', [])
   await page.goto('http://localhost:3124/ai-chat?conversation=live-chat')
@@ -425,6 +432,12 @@ try {
   liveStream.finish()
   await page.getByRole('button', { name: 'Copy assistant message', exact: true }).waitFor()
   assert.equal(await page.locator('.vf-ai-chat__msg').count(), 2)
+  const deliveredTimings = await readTimings()
+  assert.equal(deliveredTimings.outcomes.completed, 1)
+  for (const stage of ['accepted', 'firstText', 'saved', 'total']) assert.equal(deliveredTimings.latencyMs[stage].count, 1)
+  assert(deliveredTimings.latencyMs.accepted.maxMs <= deliveredTimings.latencyMs.firstText.maxMs)
+  assert(deliveredTimings.latencyMs.firstText.maxMs <= deliveredTimings.latencyMs.saved.maxMs)
+  assert(!JSON.stringify(deliveredTimings).includes('Progressive text'))
   await page.reload()
   await page.getByText('Progressive text arrives before completion.', { exact: true }).waitFor()
   assert.equal(await page.locator('.vf-ai-chat__msg').count(), 2)
@@ -439,11 +452,44 @@ try {
   await page.getByRole('button', { name: 'Stop response', exact: true }).click()
   await page.getByRole('button', { name: 'Retry response', exact: true }).waitFor()
   assert.equal(transcripts.get('live-chat').at(-1).status, 'interrupted')
+  assert.equal((await readTimings()).outcomes.cancelled, 1)
   await page.reload()
   await page.getByText('Partial output before stop', { exact: true }).waitFor()
   assert.equal(await page.locator('.vf-ai-chat__msg').count(), 4)
   assert.deepEqual(errors, [])
   console.log('PASS stop during real streaming preserves partial text and restores an interrupted response')
+
+  for (const ending of ['event: complete\ndata: {"type":"complete","reply":"Kept partial"}\n\ndata: [DONE]\n\n',
+                         'event: token\ndata: {broken-json}\n\n',
+                         'event: future\ndata: {"type":"future","reply":"invented completion"}\n\n']) {
+    transcripts.set('live-chat', []); liveStream = undefined
+    await page.goto('http://localhost:3124/ai-chat?conversation=live-chat')
+    await input.fill('Terminal contract probe'); await send.click()
+    await page.getByRole('status', { name: 'Generating response', exact: true }).waitFor()
+    liveStream.token('Kept partial')
+    await page.getByText('Kept partial', { exact: true }).waitFor()
+    liveStream.raw(ending); liveStream.close()
+    await page.getByRole('alert').filter({ hasText: 'response could not be confirmed' }).waitFor()
+    assert.equal(await page.getByText('invented completion', { exact: true }).count(), 0)
+    assert.equal(transcripts.get('live-chat').at(-1).status, 'pending')
+    assert(await page.getByText('Kept partial', { exact: true }).isVisible())
+    const unconfirmedTimings = await readTimings()
+    assert.equal(unconfirmedTimings.outcomes.unconfirmed, 1)
+    assert.equal(unconfirmedTimings.latencyMs.saved.count, 0)
+  }
+  console.log('PASS missing saved acknowledgement, malformed JSON and unknown reply events preserve partial text without fabricated success')
+
+  transcripts.set('live-chat', []); liveStream = undefined
+  await page.goto('http://localhost:3124/ai-chat?conversation=live-chat')
+  await input.fill('Stale source probe'); await send.click()
+  await page.getByRole('status', { name: 'Generating response', exact: true }).waitFor()
+  liveStream.raw('event: sources\ndata: {"type":"sources","attemptId":"old-attempt","citations":[{"citationId":"S9","title":"Stale reference","url":"https://example.invalid"}]}\n\n')
+  liveStream.raw('event: token\r\ndata: {"type":"token",\r\ndata: "delta":"220 Ω 😀"}\r\n\r\n')
+  await page.getByText('220 Ω 😀', { exact: true }).waitFor()
+  assert.equal(await page.getByText('Stale reference', { exact: false }).count(), 0)
+  liveStream.finish()
+  await page.getByRole('button', { name: 'Stop response', exact: true }).waitFor({ state: 'hidden' })
+  console.log('PASS multiline CRLF event renders Unicode and stale attempt sources are ignored')
 
   researchAvailable = true
   conversations.set('research-chat', { id: 'research-chat', title: 'Research consent test', createdAt: now, updatedAt: now })
@@ -527,6 +573,63 @@ try {
   assert.equal(transcripts.get('document-chat').length, 2, 'Document deletion preserves the chat')
   assert.deepEqual(errors, [])
   console.log('PASS multipart document upload, explicit selection with web off, source restore/read, safe text, version replacement and confirmed deletion')
+  if (perfReport) {
+    const percentile = (values, fraction) => {
+      const ordered = [...values].sort((left, right) => left - right)
+      return ordered[Math.floor((ordered.length - 1) * fraction)]
+    }
+    const samples = []
+    const chunksPerRun = 32
+    const chunkBytes = 256
+    await page.setViewportSize({ width: 1440, height: 1000 })
+    for (let run = 0; run < 5; run++) {
+      transcripts.set('live-chat', [])
+      liveStream = undefined
+      await page.goto('http://localhost:3124/ai-chat?conversation=live-chat')
+      await input.fill(`Performance stream fixture ${run + 1}`)
+      await send.click()
+      await page.getByRole('status', { name: 'Generating response', exact: true }).waitFor()
+      for (let attempt = 0; !liveStream && attempt < 100; attempt++) await page.waitForTimeout(20)
+      assert(liveStream, 'Performance stream fixture connected')
+      let expected = ''
+      const deliveryToTwoFramesMs = []
+      for (let chunk = 0; chunk < chunksPerRun; chunk++) {
+        const delta = `${String(chunk).padStart(2, '0')}:${'x'.repeat(chunkBytes - 3)}`
+        expected += delta
+        const startedAt = await page.evaluate(() => performance.now())
+        liveStream.token(delta)
+        await page.waitForFunction(text => {
+          const messages = document.querySelectorAll('.vf-ai-chat__msg--assistant')
+          const message = messages[messages.length - 1]
+          return message?.textContent?.includes(text)
+        }, expected, { timeout: 2_000 })
+        deliveryToTwoFramesMs.push(await page.evaluate(start => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(performance.now() - start)))), startedAt))
+      }
+      liveStream.finish()
+      await page.getByRole('button', { name: 'Copy assistant message', exact: true }).waitFor()
+      samples.push({ run: run + 1, chunks: chunksPerRun, chunkBytes, deliveryToTwoFramesMs })
+    }
+    const values = samples.flatMap(sample => sample.deliveryToTwoFramesMs)
+    const report = {
+      task: 'PERF-001',
+      capturedAt: new Date().toISOString(),
+      status: 'passed',
+      samples: values.length,
+      latencyMs: { p50: percentile(values, .5), p95: percentile(values, .95), max: Math.max(...values) },
+      conditions: {
+        browser: 'Installed headless Chrome',
+        viewport: '1440x1000',
+        runs: 5,
+        chunksPerRun,
+        chunkBytes,
+        measurement: 'Test-fixture SSE token delivery to visible assistant DOM content, then two requestAnimationFrame callbacks.',
+        exclusions: 'No network, server, retrieval, model generation, production identity, or pixel-paint/input-latency measurement. Test-controller scheduling is included.'
+      }
+    }
+    await mkdir(new URL('../docs/reports/', import.meta.url), { recursive: true })
+    await writeFile(new URL('../docs/reports/perf-001-chat-delta.json', import.meta.url), JSON.stringify(report, null, 2) + '\n')
+    console.log(`PERF-001 chat delta: p50 ${report.latencyMs.p50.toFixed(1)} ms, p95 ${report.latencyMs.p95.toFixed(1)} ms, max ${report.latencyMs.max.toFixed(1)} ms across ${report.samples} chunks`)
+  }
 } catch (error) {
   const failedPage = browser?.contexts()[0]?.pages()[0]
   if (failedPage) await failedPage.screenshot({ path: 'test-results/chat/failure.png' }).catch(() => {})

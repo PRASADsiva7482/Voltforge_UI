@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "backlogType": "simulation-optimization-follow-up",
   "createdOn": "2026-08-27",
-  "relatedItems": ["OPT-001", "OPT-002", "OPT-003", "OPT-004", "OPT-005", "OPT-006", "OPT-007", "OPT-008", "OPT-009"],
+  "relatedItems": ["OPT-001", "OPT-002", "OPT-003", "OPT-004", "OPT-005", "OPT-006", "OPT-007", "OPT-008", "OPT-009", "PERF-001"],
   "purpose": "Work discovered while implementing optimization items that needs a separate validation or feature pass.",
   "items": [
     {
@@ -300,6 +300,25 @@
         ],
         "remainingValidation": "Capture authenticated editor screenshots in light and dark themes at 1366 px, 1080 px, 860 px, and the minimum supported width, with the tray both collapsed and expanded. The isolated headless browser remained at the authentication preparation gate, so visual sign-off is intentionally left pending."
       }
+    },
+    {
+      "id": "OPT-FB-012",
+      "priority": "P0",
+      "status": "planned",
+      "title": "Restore editor runtime isolation and simulation lifecycle browser acceptance",
+      "reason": "PERF-001 measured a CircuitEditorPage commit for every one of 60 runtime feedback updates and found timeouts in the simulation lifecycle and unmount cleanup checks. The current 25-node fixture remains under the provisional timing guideline, but page-wide work and incomplete cleanup scale poorly and are not an optimization acceptance state.",
+      "work": "Trace the CircuitEditorPage runtime-store subscriptions, isolate rendered state with stable selectors, and repair start/pause/step/resume/stop plus route-unmount cleanup without weakening simulation, autosave, ownership, or saved-document assertions.",
+      "definitionOfDone": [
+        "Sixty runtime-only updates commit neither CircuitEditorPage nor unrelated editor panels while visible runtime feedback remains current.",
+        "The full editor browser suite passes its runtime-isolation, simulation lifecycle, and unmount cleanup checks without increasing the recorded frame-scheduling baseline.",
+        "Simulation cancellation, worker cleanup, autosave, document revision, ownership changes, and route navigation retain their existing behavior.",
+        "Before/after artifacts use the same fixture, browser, viewport, sample count, and explicit timing interpretation."
+      ],
+      "evidence": [
+        "../../Voltforge_AI/docs/PERF-001_BASELINE.md",
+        "docs/reports/perf-001-render-before.json",
+        "docs/reports/perf-001-after.png"
+      ]
     }
   ]
 }

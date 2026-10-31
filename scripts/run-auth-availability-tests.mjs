@@ -8,22 +8,10 @@ import { chromium } from '@playwright/test'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const origin = 'http://localhost:3101'
-const outputDir = path.join(root, 'docs/reports')
+const outputDir = path.join(root, 'test-results/auth-availability')
 const results = []
 const development = process.argv.includes('--dev')
 const liveLoginProbe = process.argv.includes('--live-login')
-function configuredUrl(name, fallback) {
-  if (process.env[name]) return process.env[name]
-  for (const file of ['.env.local', '.env.development.local', '.env.development', '.env']) {
-    const envPath = path.join(root, file)
-    if (!fs.existsSync(envPath)) continue
-    const line = fs.readFileSync(envPath, 'utf8').split(/\r?\n/).find(entry => entry.trim().startsWith(`${name}=`))
-    if (line) return line.slice(line.indexOf('=') + 1).trim().replace(/^(['"])(.*)\1$/, '$2')
-  }
-  return fallback
-}
-const developmentApiOrigin = new URL(configuredUrl('VITE_API_BASE_URL', 'http://localhost:2001/voltForge-app/api/v1')).origin
-const developmentKeycloakOrigin = new URL(configuredUrl('VITE_KEYCLOAK_URL', 'http://localhost:8080')).origin
 const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', ...(development ? [] : ['preview']), '--host', 'localhost', '--port', '3101', '--strictPort'], {
   cwd: root, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
 })
@@ -81,7 +69,17 @@ async function makePage(options = {}) {
         if (options.realIdentity) return route.continue()
         if (options.networkFailure || options.http404) return route.fulfill({ status: 503, json: { success: false } })
         if (options.discoveryStalls || options.probeStalls) return
-        return route.fulfill({ json: { success: true, data: { available: true, issuer: options.mismatchedIssuer ? 'https://wrong.invalid/realms/test' : 'http://localhost:8080/realms/voltforge-realm' } } })
+        if (options.healthDelay) await wait(options.healthDelay)
+        const identity = await page.evaluate(() => ({
+          url: window.config.baseUrls.KEYCLOAK || window.config.keycloak.url,
+          realm: window.config.keycloak.realm,
+        }))
+        const issuer = identity.url.replace(/\/+$/, '') + '/realms/' + encodeURIComponent(identity.realm)
+        if (options.htmlHealth) return route.fulfill({ contentType: 'text/html', body: '<h1>Gateway warning</h1>' })
+        if (options.invalidHealth) return route.fulfill({ contentType: 'application/json', body: '{' })
+        return route.fulfill({ json: { success: true, data: { available: true,
+          issuer: options.mismatchedIssuer ? 'https://wrong.invalid/realms/test'
+            : options.sameRealmWrongHost ? 'https://wrong.invalid/realms/' + identity.realm : issuer } } })
       }
       if (apiPath === '/auth/sync') {
         if (options.syncStalls) return // cancelled by the application's sync deadline
@@ -122,7 +120,7 @@ async function makePage(options = {}) {
       assert.ok(body.get('code_verifier'), 'Real adapter must send a PKCE verifier')
       const nonce = codes.get(body.get('code'))
       assert.ok(nonce, 'Callback must correspond to a fixture-issued code')
-      if (options.lateToken) await wait(4300)
+      if (options.lateToken) await wait(9000)
       const now = Math.floor(Date.now() / 1000)
       const payload = { sub: 'fixture-user', preferred_username: 'fixture', name: 'Auth fixture user', iat: now, exp: now + (options.expiringToken ? 10 : 300), realm_access: { roles: ['user'] } }
       return route.fulfill({ headers: cors, json: { access_token: token(payload), refresh_token: token({ ...payload, exp: now + 600 }), id_token: token({ ...payload, nonce }), expires_in: 300, token_type: 'Bearer' } })
@@ -171,10 +169,10 @@ async function run(name, options, check) {
 async function home(page) {
   const started = Date.now()
   await page.goto(origin, { waitUntil: 'domcontentloaded' })
-  await page.getByRole('heading', { name: 'Build, simulate, ship circuits.' }).waitFor({ timeout: 5000 })
+  await page.getByRole('heading', { name: 'Build, simulate, and ship circuits.' }).waitFor({ timeout: 5000 })
   return Date.now() - started
 }
-async function settledOnOrigin(page, milliseconds = 3900) {
+async function settledOnOrigin(page, milliseconds = 8500) {
   await page.waitForTimeout(milliseconds)
   assert.equal(new URL(page.url()).origin, origin)
 }
@@ -208,9 +206,9 @@ try {
     await page.getByRole('button', { name: 'Toggle theme' }).click()
     assert.notEqual(await page.locator('html').getAttribute('class'), before)
     if (liveLoginProbe) {
-      await page.getByRole('button', { name: 'Login', exact: true }).first().click()
+      await page.getByRole('button', { name: 'Sign In', exact: true }).first().click()
       await page.getByText('Sign-in is unavailable right now. Please try again in a moment.', { exact: true }).first().waitFor({ timeout: 12000 })
-      assert(record.api.some(request => request.path === '/auth/identity-health' && request.origin === developmentApiOrigin), 'Live sign-in preflight must reach the configured backend')
+      assert(record.api.some(request => request.path === '/auth/identity-health'), 'Live sign-in preflight must reach the configured backend')
       assert.equal(record.authorizationSequence, null, 'Unavailable backend provider must block interactive authorization')
       assert.equal(record.topLevelExternalNavigations, 0, 'Unavailable identity provider must not redirect away')
     }
@@ -234,7 +232,7 @@ try {
   await run('Offline explicit login and signup retain retry controls', { networkFailure: true }, async ({ page, record }) => {
     await home(page)
     await settledOnOrigin(page)
-    for (const name of ['Login', 'Sign up']) {
+    for (const name of ['Sign In', 'Sign Up']) {
       await page.getByRole('button', { name, exact: true }).first().click()
       await page.getByText('Sign-in is unavailable right now. Please try again in a moment.', { exact: true }).first().waitFor()
       await page.waitForFunction(() => !document.querySelector('.landing-nav button:disabled'))
@@ -247,13 +245,13 @@ try {
     assert.equal(record.api.length, 0, 'Private content must not fetch data before authentication')
     await page.screenshot({ path: path.join(outputDir, 'vfopt-ui-001-private-gate.png'), fullPage: true })
     await page.getByRole('link', { name: 'Back to home' }).click()
-    await page.getByRole('heading', { name: 'Build, simulate, ship circuits.' }).waitFor()
+    await page.getByRole('heading', { name: 'Build, simulate, and ship circuits.' }).waitFor()
   })
-  for (const [name, options] of [['Mismatched issuer', { mismatchedIssuer: true }], ['Stalled availability probe', { probeStalls: true }]]) {
+  for (const [name, options] of [['Mismatched issuer', { mismatchedIssuer: true }], ['Same realm on another host', { sameRealmWrongHost: true }], ['HTML availability response', { htmlHealth: true }], ['Invalid availability JSON', { invalidHealth: true }], ['Stalled availability probe', { probeStalls: true }]]) {
     await run(name + ': explicit sign-in stays bounded and retryable', options, async ({ page, record }) => {
       await home(page)
       await settledOnOrigin(page)
-      await page.getByRole('button', { name: 'Login', exact: true }).first().click()
+      await page.getByRole('button', { name: 'Sign In', exact: true }).first().click()
       await page.getByText('Sign-in is unavailable right now. Please try again in a moment.', { exact: true }).first().waitFor()
       await page.waitForFunction(() => !document.querySelector('.landing-nav button:disabled'))
       assert.equal(record.topLevelExternalNavigations, 0)
@@ -262,15 +260,17 @@ try {
   }
   await run('Explicit login preserves deep link and processes real adapter callback', {}, async ({ page, record }) => {
     await privateGate(page)
+    const configured = await page.evaluate(() => ({
+      apiOrigin: new URL(window.config.baseUrls.BL, location.origin).origin,
+      identityOrigin: new URL(window.config.baseUrls.KEYCLOAK || window.config.keycloak.url).origin,
+    }))
     await page.getByRole('button', { name: 'Sign in', exact: true }).click()
     await page.getByRole('heading', { name: 'Fixture sign-in page' }).waitFor()
     assert(record.availabilitySequence !== null, 'Login button must check backend identity availability')
     assert(record.authorizationSequence !== null, 'Available identity provider must receive interactive authorization')
     assert(record.availabilitySequence < record.authorizationSequence, 'Backend availability must pass before interactive Keycloak authorization')
-    if (development) {
-      assert(record.api.some(request => request.path === '/auth/identity-health' && request.origin === developmentApiOrigin), 'Development availability check must use the configured backend API origin')
-      assert(record.identityProviderOrigins.includes(developmentKeycloakOrigin), 'Development Keycloak requests must use the configured identity-provider origin')
-    }
+    assert(record.api.some(request => request.path === '/auth/identity-health' && request.origin === configured.apiOrigin), 'Availability must use the runtime-configured backend')
+    assert(record.identityProviderOrigins.includes(configured.identityOrigin), 'Authorization must use the runtime-configured identity provider')
     assert.equal(record.signInRedirect, origin + '/projects?sort=recent')
     await page.goto(record.completeLoginUrl)
     await page.waitForFunction(() => Boolean(document.querySelector('.app-shell')))
@@ -284,6 +284,36 @@ try {
     await page.getByRole('button', { name: 'Dashboard', exact: true }).waitFor()
     assert.equal(record.tokenExchanges, 1)
     assert.equal(record.topLevelExternalNavigations, 0)
+  })
+  await run('Silent SSO restores a private deep link after reload', { signedIn: true }, async ({ page, record }) => {
+    await page.goto(origin + '/projects?sort=recent')
+    await page.getByText('No projects found', { exact: true }).waitFor()
+    await page.reload()
+    await page.getByText('No projects found', { exact: true }).waitFor()
+    assert.equal(page.url(), origin + '/projects?sort=recent')
+    assert.equal(record.tokenExchanges, 2)
+    assert.equal(record.topLevelExternalNavigations, 0)
+    assert.equal(record.api.filter(r => r.path === '/auth/sync').length, 2)
+  })
+  const retryOptions = { sameRealmWrongHost: true, healthDelay: 300 }
+  await run('Failed availability can retry once after configuration recovers', retryOptions, async ({ page, record }) => {
+    await privateGate(page)
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+    await page.getByText('Sign-in is unavailable right now. Please try again in a moment.', { exact: true }).first().waitFor()
+    assert.equal(record.authorizationSequence, null)
+    retryOptions.sameRealmWrongHost = false
+    // Synchronous repeated actions exercise the ref guard, before React renders disabled.
+    await page.getByRole('button', { name: 'Sign in', exact: true }).evaluate(button => {
+      button.click()
+      button.click()
+    })
+    await page.getByRole('heading', { name: 'Fixture sign-in page' }).waitFor()
+    assert.equal(record.api.filter(r => r.path === '/auth/identity-health').length, 2)
+    assert.equal(record.topLevelExternalNavigations, 1)
+    assert.equal(record.signInRedirect, origin + '/projects?sort=recent')
+    await page.goto(record.completeLoginUrl)
+    await page.getByText('No projects found', { exact: true }).waitFor()
+    assert.equal(record.tokenExchanges, 1)
   })
   await run('Public encoded share loads without identity or bearer token', { networkFailure: true }, async ({ page, record }) => {
     const state = Buffer.from(JSON.stringify({ ...publicProject.canvasLayout, name: publicProject.name, codeFiles: [] })).toString('base64')
@@ -332,7 +362,7 @@ try {
     await home(page)
     await page.getByRole('button', { name: 'Dashboard', exact: true }).waitFor()
     await page.clock.fastForward(51_000)
-    await page.getByRole('button', { name: 'Login', exact: true }).first().waitFor()
+    await page.getByRole('button', { name: 'Sign In', exact: true }).first().waitFor()
     assert.equal(record.refreshes, 1)
     assert.equal(record.topLevelExternalNavigations, 0)
     assert.equal(new URL(page.url()).origin, origin)
@@ -345,7 +375,7 @@ try {
 } finally {
   const report = {
     task: 'VFOPT-UI-001', capturedAt: new Date().toISOString(), browser: browser ? await browser.version() : null,
-    fullSuite: !process.argv.slice(2).some(arg => !['--dev', '--live-login'].includes(arg)), liveLoginProbe, expectedFullSuiteScenarios: 20,
+    fullSuite: !process.argv.slice(2).some(arg => !['--dev', '--live-login'].includes(arg)), liveLoginProbe, expectedFullSuiteScenarios: 25,
     buildMode: development ? 'development' : 'production-preview', viewport: { width: 1366, height: 768 },
     methodology: 'Real Chromium and installed Keycloak adapter. Network/protocol responses are fixtures except the explicitly labeled configured-endpoint scenario. Synthetic tokens are test-only and never accepted by a real backend. No real account sign-in or live backend authorization claim.',
     passed: results.filter(r => r.passed).length, failed: results.filter(r => !r.passed).length, results,

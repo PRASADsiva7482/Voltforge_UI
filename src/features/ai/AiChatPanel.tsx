@@ -4,6 +4,8 @@ import { Send, Square, PanelLeft, Maximize2, Plus, MoreHorizontal } from 'lucide
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { useConversationHistory } from './useConversationHistory'
+import { ChatStreamError, ConversationStreamContract, readChatFrames } from './chatStream'
+import { chatTiming } from './chatTiming'
 import { ConversationSidebar } from './ConversationSidebar'
 import { MessageCopyAction } from './MessageCopyAction'
 import { UserMemoryDialog } from './UserMemoryDialog'
@@ -391,7 +393,7 @@ export default function AiChatPanel({
       simulationState,
       sessionId,
       projectId: contextProject?.id,
-      projectRevision: contextProject?.updatedAt,
+      projectRevision: contextProject?.documentRevision,
       files: (contextProject?.codeFiles || []).slice(0, 5).map((file) => ({
         content: file.content.slice(0, 60_000),
         filename: file.filename,
@@ -468,6 +470,7 @@ export default function AiChatPanel({
 
     const controller = new AbortController()
     abortRef.current = controller
+    const timing = chatTiming.start()
 
     try {
       const response = await aiApi.chatStream({
@@ -483,51 +486,23 @@ export default function AiChatPanel({
         throw new Error('No response body')
       }
 
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      let currentEventType = ''
-
-      while (true) {
-
-        const { done, value } = await reader.read()
-        if (done) break
+      const contract = new ConversationStreamContract(conversation.id, clientRequestId)
+      for await (const frame of readChatFrames(response.body)) {
         if (controller.signal.aborted || requestId !== requestSequenceRef.current) break
-
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || '' // Retain only incomplete trailing chunk
-
-        for (const line of lines) {
-          if (requestId !== requestSequenceRef.current) break
-          let trimmed = line.trim()
-          if (!trimmed) continue
-
-          if (trimmed.startsWith('event:')) {
-            currentEventType = trimmed.replace(/^event:\s*/, '').trim()
-            continue
-          }
-
-          if (trimmed.startsWith('data:')) {
-            trimmed = trimmed.replace(/^data:\s*/, '').trim()
-          }
-
-          if (trimmed === '[DONE]') {
-            sawDone = true
-            continue
-          }
-
+        if (frame.data === '[DONE]') continue
           try {
-            const envelope = JSON.parse(trimmed)
+            const envelope = JSON.parse(frame.data)
             const canonicalPayload = envelope.payload && typeof envelope.payload === 'object'
               ? envelope.payload
               : {}
             // VFAI-026 reads the canonical typed payload while retaining
             // compatibility with pre-contract flat SSE events.
             const event = { ...envelope, ...canonicalPayload }
-            const eventType = currentEventType || event.type || ''
+            const eventType = frame.event || event.type || ''
+            if (!contract.accept(eventType, envelope)) continue
 
             if (eventType === 'accepted') {
+              timing.accepted()
               accepted = true
               const saved = event.data as SavedMessage
               history.reconcile(saved)
@@ -538,6 +513,7 @@ export default function AiChatPanel({
                 { clientRequestId, role: 'assistant', content: '', isStreaming: true, runState: 'connecting' }])
             } else if (eventType === 'saved') {
               const saved = event.data as SavedMessage
+              timing.saved(saved.status)
               history.reconcile(saved)
               const savedPresentation = describeSavedAiResponse(saved.status, saved.content,
                 typeof saved.metadata?.errorCode === 'string' ? saved.metadata.errorCode : undefined)
@@ -621,6 +597,7 @@ export default function AiChatPanel({
               const tokenValue = event.delta ?? event.token ?? event.content
               const tokenText = typeof tokenValue === 'string' ? tokenValue : ''
               if (tokenText) {
+                timing.firstText()
                 contentCharacters += tokenText.length
                 setRunState('streaming')
                 setMessages((prev) => {
@@ -647,7 +624,7 @@ export default function AiChatPanel({
                 projectId: currentProject?.id,
                 removals: Array.isArray(event.removals) ? event.removals as AiAction[] : [],
                 sourceEditorRevision,
-                sourceProjectRevision: requestMetadata.projectRevision || currentProject?.updatedAt,
+                sourceProjectRevision: requestMetadata.projectRevision || currentProject?.documentRevision,
                 valueChanges: Array.isArray(event.valueChanges) ? event.valueChanges as AiAction[] : [],
                 wireSuggestions: Array.isArray(event.wireSuggestions) ? event.wireSuggestions as AiWireSuggestion[] : [],
               })
@@ -680,7 +657,7 @@ export default function AiChatPanel({
               })
             } else if (eventType === 'metadata') {
               updateMetadata(event)
-            } else if (eventType === 'done' || eventType === 'complete' || event.reply) {
+            } else if (eventType === 'done' || eventType === 'complete') {
               const metadata = updateMetadata(event)
               if (event.sessionId) setSessionId(event.sessionId)
               terminalState = classifyAiTerminal('complete', undefined, contentCharacters)
@@ -694,7 +671,7 @@ export default function AiChatPanel({
                 projectId: currentProject?.id,
                 removals: Array.isArray(event.removals) ? event.removals as AiAction[] : [],
                 sourceEditorRevision,
-                sourceProjectRevision: metadata.projectRevision || currentProject?.updatedAt,
+                sourceProjectRevision: metadata.projectRevision || currentProject?.documentRevision,
                 valueChanges: Array.isArray(event.valueChanges) ? event.valueChanges as AiAction[] : [],
                 wireSuggestions: Array.isArray(event.wireSuggestions) ? event.wireSuggestions as AiWireSuggestion[] : [],
               })
@@ -720,12 +697,12 @@ export default function AiChatPanel({
                 })
               })
             }
-            currentEventType = ''
           } catch {
-            // Non-JSON line or partial chunk — ignore
+            throw new ChatStreamError()
           }
-        }
+        if (contract.settled) break
       }
+      if (!controller.signal.aborted && requestId === requestSequenceRef.current) contract.finish()
 
 
     } catch (error) {
@@ -744,6 +721,7 @@ export default function AiChatPanel({
         }))
       }
     } finally {
+      timing.finish(controller.signal.aborted || requestId !== requestSequenceRef.current)
       sendLock.current = false
       if (requestId === requestSequenceRef.current) {
         const finalState: AiRunState = controller.signal.aborted
@@ -853,7 +831,7 @@ export default function AiChatPanel({
     if (!isAiProposalCurrent(proposal, {
       editorRevision: currentEditorRevision,
       projectId: currentProjectState.currentProject?.id,
-      projectRevision: currentProjectState.currentProject?.updatedAt,
+      projectRevision: currentProjectState.currentProject?.documentRevision,
     })) {
       addToast('This AI proposal is stale. Regenerate it against the current project revision.', 'error')
       return
@@ -1110,7 +1088,7 @@ export default function AiChatPanel({
     const isStale = !isAiProposalCurrent(msg.proposal, {
       editorRevision: currentRevision,
       projectId: currentProject?.id,
-      projectRevision: currentProject?.updatedAt,
+      projectRevision: currentProject?.documentRevision,
     })
     const undoAvailable = Boolean(
       appliedTransaction?.proposalId === msg.proposal.id

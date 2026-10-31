@@ -108,14 +108,13 @@ export async function checkSignInAvailability() {
     if (!response.ok) throw new Error('Sign-in service unavailable.')
     const contentType = response.headers.get('content-type') || ''
     if (!contentType.includes('application/json')) {
-      console.warn('Identity health check returned non-JSON response:', contentType)
-      return
+      throw new Error('Sign-in service returned an invalid availability response.')
     }
     const configuration = await response.json() as { success?: boolean; data?: { issuer?: string; available?: boolean } }
-    const realmSuffix = `/realms/${encodeURIComponent(realm)}`
-    const isMatchingIssuer = configuration.data?.issuer === issuer
-      || (Boolean(configuration.data?.issuer?.endsWith(realmSuffix)) && issuer.endsWith(realmSuffix))
-    if (configuration.success !== true || configuration.data?.available !== true
+    // A realm name is not an issuer identity: a different host, port or path
+    // can serve an unrelated realm with the same name.
+    const isMatchingIssuer = configuration?.data?.issuer === issuer
+    if (configuration?.success !== true || configuration.data?.available !== true
       || !isMatchingIssuer) throw new Error('Sign-in provider is unavailable or does not match the app configuration.')
   } finally {
     window.clearTimeout(timer)
