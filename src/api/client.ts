@@ -1,5 +1,6 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios'
 import keycloak from '../auth/keycloak'
+import { clearStoredAuthTokens, setStoredAuthTokens } from '../auth/tokenStorage'
 
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean
@@ -40,10 +41,16 @@ api.interceptors.response.use(
       try {
         const refreshed = await keycloak.updateToken(30)
         if (refreshed && keycloak.token) {
+          setStoredAuthTokens({
+            token: keycloak.token,
+            refreshToken: keycloak.refreshToken,
+            idToken: keycloak.idToken,
+          })
           originalRequest.headers.Authorization = `Bearer ${keycloak.token}`
           return api(originalRequest)
         }
       } catch {
+        clearStoredAuthTokens()
         keycloak.clearToken()
       }
     }

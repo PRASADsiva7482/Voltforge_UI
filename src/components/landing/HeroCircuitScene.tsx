@@ -8,6 +8,7 @@ import {
   Code2,
   Cpu,
   Gauge,
+  LogIn,
   PackageCheck,
   Play,
   Radio,
@@ -63,6 +64,15 @@ export function HeroCircuitScene() {
                 trailingIcon={<ArrowRight size={16} />}
               >
                 {t("Sign Up")}
+              </Button>
+              <Button
+                onClick={auth.login}
+                disabled={auth.isRedirecting}
+                size="lg"
+                variant="secondary"
+                icon={<LogIn size={16} />}
+              >
+                {t("Sign In")}
               </Button>
               <Button
                 onClick={() => navigate('/editor/share')}

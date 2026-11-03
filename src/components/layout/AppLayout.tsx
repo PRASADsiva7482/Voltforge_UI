@@ -5,7 +5,7 @@ import { BrandMark } from '../brand/BrandMark'
 import { useAuth } from '../../auth/useAuth'
 import { getNavItems } from '../../config/navigation'
 import { useTranslation } from 'react-i18next'
-import { User, LogOut } from 'lucide-react'
+import { User, LogIn, LogOut } from 'lucide-react'
 import { IconButton } from '../ui'
 
 export function AppLayout() {
@@ -36,20 +36,31 @@ export function AppLayout() {
       <header className="app-mobile-topbar" aria-label={t("Mobile navigation header")}>
         <BrandMark />
         <div className="app-mobile-topbar__actions">
-          <NavLink
-            to="/profile"
-            className={({ isActive }) => `app-mobile-topbar__user ${isActive ? 'is-active' : ''}`}
-            title={auth.user?.displayName ?? t("View Profile")}
-            aria-label={t("View Profile")}
-          >
-            <User size={18} />
-          </NavLink>
-          <IconButton
-            icon={<LogOut size={16} />}
-            label={t("Logout")}
-            onClick={auth.logout}
-            size="sm"
-          />
+          {auth.isAuthenticated ? (
+            <>
+              <NavLink
+                to="/profile"
+                className={({ isActive }) => `app-mobile-topbar__user ${isActive ? 'is-active' : ''}`}
+                title={auth.user?.displayName ?? t("View Profile")}
+                aria-label={t("View Profile")}
+              >
+                <User size={18} />
+              </NavLink>
+              <IconButton
+                icon={<LogOut size={16} />}
+                label={t("Logout")}
+                onClick={auth.logout}
+                size="sm"
+              />
+            </>
+          ) : (
+            <IconButton
+              icon={<LogIn size={16} />}
+              label={t("Sign In")}
+              onClick={auth.login}
+              size="sm"
+            />
+          )}
         </div>
       </header>
 

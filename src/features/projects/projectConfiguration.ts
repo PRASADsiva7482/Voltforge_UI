@@ -33,10 +33,8 @@ export function validateProjectForm(values: ProjectFormValues): ProjectFormError
     errors.name = 'Use 200 characters or fewer.'
   }
 
-  const description = values.description.trim()
-  if (!description) {
-    errors.description = 'Enter a project description.'
-  } else if (description.length > 5000) {
+  const description = values.description ? values.description.trim() : ''
+  if (description && description.length > 5000) {
     errors.description = 'Use 5000 characters or fewer.'
   }
 
@@ -58,7 +56,7 @@ export function createProjectPayload(values: ProjectFormValues): CreateProjectRe
   if (Object.keys(validateProjectForm(values)).length) throw new Error('Invalid project configuration')
   const name = values.name.trim(), boardType = values.boardType as BoardType
   return {
-    name, description: values.description.trim(), boardType, isPublic: values.isPublic,
+    name, description: values.description ? values.description.trim() : '', boardType, isPublic: values.isPublic,
     canvasLayout: createInitialProjectLayout(boardType),
     codeFiles: [{ filename: 'main.ino', language: 'cpp', sortOrder: 0, content: generateDefaultCode(boardType, name) }],
   }

@@ -5,6 +5,7 @@ import type { AppUser } from '../types/auth'
 import { AuthContext, type AuthContextValue } from './AuthContext'
 import { checkSession, checkSignInAvailability, loginRedirectUri, USER_SYNC_TIMEOUT_MS } from './session'
 import { useToastStore } from '../store/useToastStore'
+import { clearStoredAuthTokens, setStoredAuthTokens } from './tokenStorage'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setAuthenticated] = useState(false)
@@ -20,6 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let syncTimer: ReturnType<typeof setTimeout> | undefined
     const sessionEnded = () => {
       if (!active) return
+      clearStoredAuthTokens()
       syncController.abort()
       setAuthenticated(false)
       setUser(null)
@@ -27,6 +29,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError('Your session has ended. Sign in again to continue.')
     }
     keycloak.onAuthLogout = sessionEnded
+    keycloak.onAuthRefreshSuccess = () => {
+      if (keycloak.token) {
+        setStoredAuthTokens({
+          token: keycloak.token,
+          refreshToken: keycloak.refreshToken,
+          idToken: keycloak.idToken,
+        })
+      }
+    }
+    keycloak.onAuthRefreshError = () => {
+      clearStoredAuthTokens()
+    }
 
     void (async () => {
       try {
@@ -37,10 +51,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         syncTimer = setTimeout(() => syncController.abort(), USER_SYNC_TIMEOUT_MS)
         const synced = await syncUser(syncController.signal)
         if (!active || syncController.signal.aborted || !keycloak.authenticated || !keycloak.token) return
+        setStoredAuthTokens({
+          token: keycloak.token,
+          refreshToken: keycloak.refreshToken,
+          idToken: keycloak.idToken,
+        })
         setUser(synced)
         setAuthenticated(Boolean(synced))
       } catch {
         if (active) {
+          clearStoredAuthTokens()
           keycloak.clearToken()
           setUser(null)
           setAuthenticated(false)
@@ -57,6 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(syncTimer)
       syncController.abort()
       if (keycloak.onAuthLogout === sessionEnded) keycloak.onAuthLogout = undefined
+      keycloak.onAuthRefreshSuccess = undefined
+      keycloak.onAuthRefreshError = undefined
     }
   }, [])
 
@@ -64,7 +86,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isAuthenticated) return
     const interval = window.setInterval(() => {
       // Expiration changes auth state; only a user's login action navigates.
-      void keycloak.updateToken(60).catch(() => keycloak.clearToken())
+      void keycloak.updateToken(60).then((refreshed) => {
+        if (refreshed && keycloak.token) {
+          setStoredAuthTokens({
+            token: keycloak.token,
+            refreshToken: keycloak.refreshToken,
+            idToken: keycloak.idToken,
+          })
+        }
+      }).catch(() => {
+        clearStoredAuthTokens()
+        keycloak.clearToken()
+      })
     }, 50_000)
     return () => window.clearInterval(interval)
   }, [isAuthenticated])
@@ -95,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(() => beginSignIn(), [beginSignIn])
   const signup = useCallback(() => beginSignIn(true), [beginSignIn])
   const logout = useCallback(() => {
+    clearStoredAuthTokens()
     const url = keycloak.createLogoutUrl({ redirectUri: window.location.origin })
     keycloak.clearToken()
     window.location.assign(url)

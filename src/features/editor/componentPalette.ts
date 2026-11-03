@@ -22,10 +22,24 @@ export function buildPaletteIndex(components: readonly ElectronicComponent[]): P
     || a.sortOrder - b.sortOrder
     || a.name.localeCompare(b.name)
     || a.id.localeCompare(b.id)
-  ).map(component => ({
-    component,
-    searchText: [component.name, component.type, component.type.replace(/_/g, ' '), component.description || ''].join('\n').toLowerCase(),
-  }));
+  ).map(component => {
+    const rawTags = component.tags
+    const tagList = Array.isArray(rawTags)
+      ? rawTags
+      : typeof rawTags === 'string'
+      ? rawTags.split(',').map((t) => t.trim())
+      : []
+    return {
+      component,
+      searchText: [
+        component.name,
+        component.type,
+        component.type.replace(/_/g, ' '),
+        component.description || '',
+        ...tagList,
+      ].join('\n').toLowerCase(),
+    }
+  });
 }
 
 export function filterPaletteIndex(index: PaletteEntry[], normalizedSearch: string, category = ''): PaletteEntry[] {

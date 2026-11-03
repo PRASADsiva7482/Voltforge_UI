@@ -233,13 +233,34 @@ export default function IotInspectorPanel({ isOpen, onClose }: Props) {
           <div style={{ padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', backgroundColor: 'var(--vf-surface-raised)', borderRadius: '6px', border: '1px solid var(--vf-border)' }}>
               {mqttStatus.connected ? <CheckCircle2 color="var(--vf-success)" size={20} /> : <XCircle color="var(--vf-error)" size={20} />}
-              <div>
-                <div style={{ fontWeight: 600, color: 'var(--vf-text)' }}>
-                  {mqttStatus.connected ? t("Broker Connected") : t("Broker Disconnected")}
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--vf-text)' }}>
+                    {mqttStatus.connected ? t("Broker Connected") : t("Broker Disconnected")}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      padding: '1px 6px',
+                      borderRadius: '4px',
+                      backgroundColor: mqttStatus.isExternal ? 'var(--vf-primary-soft)' : 'var(--vf-surface)',
+                      color: mqttStatus.isExternal ? 'var(--vf-primary)' : 'var(--vf-text-muted)',
+                      border: '1px solid var(--vf-border)',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {mqttStatus.isExternal ? t("WebSocket External") : t("Virtual In-Memory Loopback")}
+                  </span>
                 </div>
-                <div style={{ color: 'var(--vf-text-muted)', fontSize: '11px' }}>
-                  {mqttStatus.broker}:{mqttStatus.port} (Client ID: {mqttStatus.clientId})
+                <div style={{ color: 'var(--vf-text-muted)', fontSize: '11px', marginTop: '2px' }}>
+                  {mqttStatus.modeDescription} · Client ID: {mqttStatus.clientId}
                 </div>
+                {!mqttStatus.isExternal && (
+                  <div style={{ color: 'var(--vf-text-soft)', fontSize: '10px', marginTop: '4px', fontStyle: 'italic' }}>
+                    {t("Simulated PubSubClient packets are routed entirely within your browser session; no external network packets are transmitted.")}
+                  </div>
+                )}
               </div>
             </div>
 

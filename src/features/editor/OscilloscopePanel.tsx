@@ -27,8 +27,8 @@ export default function OscilloscopePanel({ className = '', onPause, onResume, o
   const baudRate = useSimulationStore((s) => s.baudRate)
   const oscilloscopePanelOpen = useSimulationStore((s) => s.oscilloscopePanelOpen)
   const setOscilloscopePanelOpen = useSimulationStore((s) => s.setOscilloscopePanelOpen)
-
-  const [mode, setMode] = useState<ScopeMode>('oscilloscope')
+  const mode = useSimulationStore((s) => s.oscilloscopeMode)
+  const setMode = useSimulationStore((s) => s.setOscilloscopeMode)
   const [expanded, setExpanded] = useState(false)
   const [paused, setPaused] = useState(false)
   const [voltsPerDiv, setVoltsPerDiv] = useState(1.0)

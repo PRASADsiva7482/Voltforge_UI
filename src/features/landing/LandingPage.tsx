@@ -7,6 +7,7 @@ import {
   Cpu,
   FileOutput,
   Gauge,
+  LogIn,
   GraduationCap,
   PackageCheck,
   Play,
@@ -166,13 +167,23 @@ export function LandingPage() {
               {t("Launch Simulator Sandbox")}
             </Button>
             {!auth.isAuthenticated && (
-              <Button
-                onClick={auth.signup}
-                size="lg"
-                variant="secondary"
-              >
-                {t("Sign Up")}
-              </Button>
+              <>
+                <Button
+                  onClick={auth.signup}
+                  size="lg"
+                  variant="secondary"
+                >
+                  {t("Sign Up")}
+                </Button>
+                <Button
+                  onClick={auth.login}
+                  size="lg"
+                  variant="secondary"
+                  icon={<LogIn size={16} />}
+                >
+                  {t("Sign In")}
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -201,7 +212,7 @@ export function LandingPage() {
                 <Link to="/editor/share">{t("Circuit Canvas Sandbox")}</Link>
               </li>
               <li>
-                <a href="#capabilities">{t("Firmware Studio")}</a>
+                <Link to="/docs#firmware">{t("Firmware Studio")}</Link>
               </li>
               <li>
                 <Link to="/labs">{t("Challenge Labs")}</Link>
@@ -210,7 +221,7 @@ export function LandingPage() {
                 <Link to="/explore">{t("Public Circuit Gallery")}</Link>
               </li>
               <li>
-                <a href="#workflow">{t("BOM & Netlist Export")}</a>
+                <Link to="/docs#export">{t("BOM & Netlist Export")}</Link>
               </li>
             </ul>
           </div>
@@ -226,7 +237,7 @@ export function LandingPage() {
                 <Link to="/labs">{t("Microcontroller Tutorials")}</Link>
               </li>
               <li>
-                <a href="#workflow">{t("Documentation")}</a>
+                <Link to="/docs">{t("Documentation")}</Link>
               </li>
             </ul>
           </div>

@@ -88,6 +88,7 @@ interface SimulationState {
   oscilloscopeSamplePeriodMs: number;
   oscilloscopeTimePerDivMs: number;
   oscilloscopePanelOpen: boolean;
+  oscilloscopeMode: 'oscilloscope' | 'logic_analyzer' | 'dual';
   thermalHeatmapEnabled: boolean;
   solverConverged: boolean;
   /** Monotonic physical time reported by the MNA worker, in seconds. */
@@ -149,6 +150,7 @@ interface SimulationState {
   setOscilloscopeTimePerDiv: (timePerDivMs: number) => void;
   clearOscilloscopeData: () => void;
   setOscilloscopePanelOpen: (open: boolean) => void;
+  setOscilloscopeMode: (mode: 'oscilloscope' | 'logic_analyzer' | 'dual') => void;
   setThermalHeatmapEnabled: (enabled: boolean) => void;
 }
 
@@ -180,6 +182,16 @@ const oscilloscopeCapture = new OscilloscopeCaptureAccumulator(
 
 function clearCaptureBuffers() {
   oscilloscopeCapture.clear();
+}
+
+function getInitialFidelityMode(): SimulationFidelityMode {
+  if (typeof window === 'undefined' || !window.localStorage) return 'adaptive';
+  try {
+    const pref = window.localStorage.getItem('vf-pref-fidelity');
+    if (pref === 'full-fidelity' || pref === 'high') return 'full-fidelity';
+    if (pref === 'adaptive') return 'adaptive';
+  } catch {}
+  return 'adaptive';
 }
 
 export const useSimulationStore = create<SimulationState>((set) => ({
@@ -221,6 +233,7 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   oscilloscopeSamplePeriodMs: 1,
   oscilloscopeTimePerDivMs: 1,
   oscilloscopePanelOpen: false,
+  oscilloscopeMode: 'oscilloscope',
   thermalHeatmapEnabled: false,
   solverConverged: true,
   simulationTime: 0,
@@ -245,7 +258,7 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   currentFlowQualityMode: 'adaptive',
   customHex: null,
   executionMode: 'interpreter',
-  fidelityMode: 'adaptive',
+  fidelityMode: getInitialFidelityMode(),
   resultDataConsumers: { ai: false, lab: false },
   avrWorkload: idleAvrWorkload(),
   solverDiagnostics: null,
@@ -324,7 +337,12 @@ export const useSimulationStore = create<SimulationState>((set) => ({
     ...(executionMode === 'avr8js' ? {} : { avrWorkload: idleAvrWorkload() }),
   }),
 
-  setFidelityMode: (fidelityMode) => set({ fidelityMode }),
+  setFidelityMode: (fidelityMode) => {
+    try {
+      window?.localStorage?.setItem('vf-pref-fidelity', fidelityMode);
+    } catch {}
+    set({ fidelityMode });
+  },
 
   setResultDataConsumer: (consumer, enabled) => set((state) => ({
     resultDataConsumers: { ...state.resultDataConsumers, [consumer]: enabled },
@@ -414,6 +432,7 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   },
 
   setOscilloscopePanelOpen: (open) => set({ oscilloscopePanelOpen: open }),
+  setOscilloscopeMode: (oscilloscopeMode) => set({ oscilloscopeMode }),
   setThermalHeatmapEnabled: (thermalHeatmapEnabled) => set({ thermalHeatmapEnabled }),
 }));
 

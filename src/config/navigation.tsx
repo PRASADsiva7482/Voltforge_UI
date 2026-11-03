@@ -31,7 +31,7 @@ export const legacyNavItems: NavItem[] = [
  * Admin navigation menu flag.
  * Temporarily disabled per requirement; will be re-enabled later with granular function control.
  */
-export const ENABLE_ADMIN_NAV_MENU = false
+export const ENABLE_ADMIN_NAV_MENU = true
 
 export function getNavItems(role: UserRole = 'USER') {
   return legacyNavItems.filter((item) => {

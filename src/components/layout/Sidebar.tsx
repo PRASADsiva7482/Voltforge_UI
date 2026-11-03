@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LogOut } from 'lucide-react'
+import { LogIn, LogOut } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { BrandMark } from '../brand/BrandMark'
 import { Badge, Box, IconButton } from '../ui'
@@ -29,18 +29,30 @@ export function Sidebar() {
       <Box className="app-sidebar__account" tone="raised">
         <p className="vf-eyebrow">{t("Session")}</p>
         <NavLink
-          to="/profile"
+          to={auth.isAuthenticated ? "/profile" : "#"}
+          onClick={(e) => {
+            if (!auth.isAuthenticated) {
+              e.preventDefault()
+              auth.login()
+            }
+          }}
           style={{ textDecoration: 'none', color: 'inherit', display: 'block', marginBottom: '8px' }}
-          title={t("View Profile")}
+          title={auth.isAuthenticated ? t("View Profile") : t("Sign In")}
         >
-          <strong>{auth.user?.displayName ?? t("Voltforge user")}</strong>
-          <span className="app-sidebar__note" style={{ display: 'block' }}>{auth.user?.email ?? auth.user?.username}</span>
+          <strong>{auth.user?.displayName ?? (auth.isAuthenticated ? t("Voltforge user") : t("Guest Engineer"))}</strong>
+          <span className="app-sidebar__note" style={{ display: 'block' }}>
+            {auth.user?.email ?? auth.user?.username ?? t("Browse Mode")}
+          </span>
         </NavLink>
         <div className="app-sidebar__session">
-          <Badge dot tone="success">
-            {t("Active")}
+          <Badge dot tone={auth.isAuthenticated ? "success" : "neutral"}>
+            {auth.isAuthenticated ? t("Active") : t("Guest")}
           </Badge>
-          <IconButton icon={<LogOut size={16} />} label={t("Logout")} onClick={auth.logout} size="sm" />
+          {auth.isAuthenticated ? (
+            <IconButton icon={<LogOut size={16} />} label={t("Logout")} onClick={auth.logout} size="sm" />
+          ) : (
+            <IconButton icon={<LogIn size={16} />} label={t("Sign In")} onClick={auth.login} size="sm" />
+          )}
         </div>
       </Box>
     </aside>

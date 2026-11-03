@@ -29,6 +29,7 @@ const SettingsPage = lazy(() => import('./features/settings/SettingsPage').then(
 const ProfilePage = lazy(() => import('./features/profile/ProfilePage').then((module) => ({ default: module.ProfilePage })))
 const LabExplorerPage = lazy(() => import('./features/labs/LabExplorerPage').then((module) => ({ default: module.LabExplorerPage })))
 const LabChallengeRunner = lazy(() => import('./features/labs/LabChallengeRunner').then((module) => ({ default: module.LabChallengeRunner })))
+const DocsPage = lazy(() => import('./features/docs/DocsPage').then((module) => ({ default: module.DocsPage })))
 
 function lazyRoute(label: string, page: ReactNode) {
   return <LazyRouteBoundary label={label}>{page}</LazyRouteBoundary>
@@ -69,18 +70,23 @@ function App() {
                 protected by the backend project access check. */}
             <Route element={lazyRoute('public project', <CircuitEditorPage />)} path="/public-project/:projectId" />
 
+            {/* Public catalog, docs, and peer profiles inside AppLayout */}
+            <Route element={<AppLayout />}>
+              <Route element={lazyRoute('explore', <ExplorePage />)} path="/explore" />
+              <Route element={lazyRoute('labs', <LabExplorerPage />)} path="/labs" />
+              <Route element={lazyRoute('docs', <DocsPage />)} path="/docs" />
+              <Route element={lazyRoute('user profile', <ProfilePage />)} path="/profile/:userId" />
+            </Route>
+
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
                 <Route element={lazyRoute('dashboard', <DashboardPage />)} path="/dashboard" />
                 <Route element={lazyRoute('AI workspace', <AiChatPage />)} path="/ai-chat" />
                 <Route element={lazyRoute('projects', <ProjectsPage />)} path="/projects" />
                 <Route element={lazyRoute('new project', <NewProjectPage />)} path="/projects/new" />
-                <Route element={lazyRoute('explore', <ExplorePage />)} path="/explore" />
-                <Route element={lazyRoute('labs', <LabExplorerPage />)} path="/labs" />
                 <Route element={lazyRoute('profile', <ProfilePage />)} path="/profile" />
-                <Route element={lazyRoute('user profile', <ProfilePage />)} path="/profile/:userId" />
                 <Route element={lazyRoute('settings', <SettingsPage />)} path="/settings" />
-                <Route element={ENABLE_ADMIN_NAV_MENU ? lazyRoute('admin', <AdminPage />) : <Navigate replace to="/dashboard" />} path="/admin" />
+                <Route element={lazyRoute('admin', <AdminPage />)} path="/admin" />
               </Route>
               {/* Full-screen editors */}
               <Route element={lazyRoute('circuit editor', <CircuitEditorPage />)} path="/editor/:projectId" />

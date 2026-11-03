@@ -125,6 +125,7 @@ export function LandingNav() {
               {t("Sign In")}
             </Button>
             <Button
+              className="landing-nav__signup-btn"
               onClick={auth.signup}
               disabled={auth.isRedirecting}
               variant="primary"

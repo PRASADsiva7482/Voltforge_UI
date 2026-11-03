@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Gauge, Volume2, VolumeX } from 'lucide-react'
+import { Gauge, Volume2, VolumeX, AlertTriangle } from 'lucide-react'
 import { FloatingPanel } from '../../components/ui/FloatingPanel'
 import { Tabs } from '../../components/ui/Tabs'
 import { useTranslation } from 'react-i18next'
@@ -183,13 +183,37 @@ export default function MultimeterPanel({
             fontSize: '28px',
             fontFamily: 'monospace',
             fontWeight: 700,
-            color: isContinuityShort ? 'var(--vf-success)' : 'var(--vf-accent)',
+            color: resistanceUnsafe && (mode === 'OHM' || mode === 'CONT')
+              ? 'var(--vf-danger, #ef4444)'
+              : isContinuityShort ? 'var(--vf-success)' : 'var(--vf-accent)',
             letterSpacing: '1px',
             marginTop: '4px'
           }}>
             {displayString}
           </div>
         </div>
+
+        {resistanceUnsafe && (mode === 'OHM' || mode === 'CONT') && (
+          <div
+            role="alert"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              marginTop: '6px',
+              padding: '6px 8px',
+              borderRadius: '4px',
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid var(--vf-danger, #ef4444)',
+              color: 'var(--vf-danger, #ef4444)',
+              fontSize: '10px',
+              fontWeight: 600,
+            }}
+          >
+            <AlertTriangle size={12} />
+            <span>{t("POWER OFF — De-energize circuit to measure resistance")}</span>
+          </div>
+        )}
 
         {/* Rotary Function Selector Tabs */}
         <div style={{ marginTop: '10px' }}>

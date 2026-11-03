@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Search, Sun, Moon, User, Plus } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Search, Sun, Moon, User, Plus, FolderOpen, Globe } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button, IconButton, TextInput } from '../ui'
 import { useThemeStore } from '../../store/themeStore'
@@ -10,25 +10,38 @@ import { useClickOutside } from '../../hooks/useClickOutside'
 export type TopbarProps = { eyebrow?: string; title: string }
 export function Topbar({ eyebrow = 'Voltforge workspace', title }: TopbarProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const { theme, toggleTheme } = useThemeStore()
   const { t, i18n } = useTranslation()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
   useClickOutside([searchRef], () => setOpen(false))
-  const destinations = getNavItems().filter(item => t(item.label).toLowerCase().includes(query.trim().toLowerCase()))
-  const searchPath = `/explore?query=${encodeURIComponent(query.trim())}`
+
+  const cleanQuery = query.trim()
+  const destinations = getNavItems().filter(item => t(item.label).toLowerCase().includes(cleanQuery.toLowerCase()))
+  const searchProjectsPath = `/projects?query=${encodeURIComponent(cleanQuery)}`
+  const searchExplorePath = `/explore?query=${encodeURIComponent(cleanQuery)}`
+  const defaultSearchPath = location.pathname.startsWith('/explore') ? searchExplorePath : searchProjectsPath
+
   return <header className="app-topbar">
     <div><p className="vf-eyebrow">{t(eyebrow)}</p><h1>{title}</h1></div>
     <div className="app-topbar__actions">
       <div ref={searchRef} className="app-topbar__search" onKeyDown={e => { if (e.key === 'Escape') setOpen(false) }} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false) }}>
-        <TextInput aria-label={t('Search public circuits or navigate')} leftSlot={<Search size={16} />} placeholder={t('Find circuits or pages')} value={query}
+        <TextInput aria-label={t('Search projects or circuits')} leftSlot={<Search size={16} />} placeholder={t('Find circuits or pages')} value={query}
           onFocus={() => setOpen(true)} onChange={e => { setQuery(e.target.value); setOpen(true) }}
-          onKeyDown={e => { if (e.key === 'Enter') { navigate(searchPath); setOpen(false) } }} />
+          onKeyDown={e => { if (e.key === 'Enter' && cleanQuery) { navigate(defaultSearchPath); setOpen(false) } }} />
         {open && <div className="app-topbar__search-results" aria-label={t('Search suggestions')}>
-          {query.trim() && <Link to={searchPath} onClick={() => setOpen(false)}>{t('Search public circuits')}: “{query.trim()}”</Link>}
+          {cleanQuery && <>
+            <Link to={searchProjectsPath} onClick={() => setOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <FolderOpen size={14} /> <span>{t('Search my projects')}: “<strong>{cleanQuery}</strong>”</span>
+            </Link>
+            <Link to={searchExplorePath} onClick={() => setOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Globe size={14} /> <span>{t('Search public circuits')}: “<strong>{cleanQuery}</strong>”</span>
+            </Link>
+          </>}
           {destinations.map(item => <Link key={item.path} to={item.path} onClick={() => setOpen(false)}>{t(item.label)}</Link>)}
-          {!destinations.length && <p>{t('No matching pages. Press Enter to search public circuits.')}</p>}
+          {!cleanQuery && !destinations.length && <p>{t('Type to search projects, circuits or pages.')}</p>}
         </div>}
       </div>
       <select className="vf-input vf-language-select" aria-label={t('Change language')} value={i18n.language?.split('-')[0] || 'en'} onChange={e => void i18n.changeLanguage(e.target.value)}>

@@ -77,7 +77,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   setSaving: (isSaving) => set({ isSaving }),
 }));
 
-import { boardPinRegistry } from '../features/canvas/pinRegistry';
+import { getPinsForComponent } from '../features/canvas/pinRegistry';
 
 export const SMART_DEVICE_PRESET: Project = {
   id: 'preset-smart-device',
@@ -163,7 +163,7 @@ void loop() {
         height: 150,
         rotation: 0,
         properties: { usbConnected: 'Yes', boardPowered: true },
-        pins: boardPinRegistry['ARDUINO_UNO'] || [],
+        pins: getPinsForComponent('ARDUINO_UNO'),
       },
       {
         id: 'node_bb',
@@ -176,7 +176,7 @@ void loop() {
         height: 120,
         rotation: 0,
         properties: {},
-        pins: boardPinRegistry['BREADBOARD'] || [],
+        pins: getPinsForComponent('BREADBOARD'),
       },
       {
         id: 'node_ldr',
@@ -189,7 +189,7 @@ void loop() {
         height: 40,
         rotation: 0,
         properties: { lightLevel: 20, resistanceDark: 100000, resistanceLight: 1000 },
-        pins: boardPinRegistry['SENSOR_LDR'] || [],
+        pins: getPinsForComponent('SENSOR_LDR'),
       },
       {
         id: 'node_res',
@@ -202,7 +202,7 @@ void loop() {
         height: 24,
         rotation: 0,
         properties: { resistance: 10000 },
-        pins: boardPinRegistry['RESISTOR'] || [],
+        pins: getPinsForComponent('RESISTOR'),
       },
       {
         id: 'node_lcd',
@@ -215,7 +215,7 @@ void loop() {
         height: 60,
         rotation: 0,
         properties: { backlight: 'On', address: '0x27', line1: 'Initializing...', line2: '' },
-        pins: boardPinRegistry['DISPLAY_LCD_I2C'] || [],
+        pins: getPinsForComponent('DISPLAY_LCD_I2C'),
       },
       {
         id: 'node_relay',
@@ -228,7 +228,7 @@ void loop() {
         height: 50,
         rotation: 0,
         properties: { isActive: false },
-        pins: boardPinRegistry['RELAY_SPDT'] || [],
+        pins: getPinsForComponent('RELAY_SPDT'),
       },
       {
         id: 'node_motor',
@@ -241,7 +241,7 @@ void loop() {
         height: 50,
         rotation: 0,
         properties: { resistance: 10 },
-        pins: boardPinRegistry['MOTOR_DC'] || [],
+        pins: getPinsForComponent('MOTOR_DC'),
       }
     ],
     wires: [
@@ -439,7 +439,7 @@ void loop() {
         height: 150,
         rotation: 0,
         properties: { usbConnected: 'Yes', boardPowered: true },
-        pins: boardPinRegistry['ARDUINO_UNO'] || [],
+        pins: getPinsForComponent('ARDUINO_UNO'),
       },
       {
         id: 'node_res',
@@ -452,7 +452,7 @@ void loop() {
         height: 24,
         rotation: 0,
         properties: { resistance: 220 },
-        pins: boardPinRegistry['RESISTOR'] || [],
+        pins: getPinsForComponent('RESISTOR'),
       },
       {
         id: 'node_led',
@@ -465,7 +465,7 @@ void loop() {
         height: 80,
         rotation: 0,
         properties: { color: '#ef4444' },
-        pins: boardPinRegistry['LED_RED'] || [],
+        pins: getPinsForComponent('LED_RED'),
       },
       {
         id: 'node_btn',
@@ -478,7 +478,7 @@ void loop() {
         height: 40,
         rotation: 0,
         properties: { isPressed: false, buttonType: 'Latching', color: 'red' },
-        pins: boardPinRegistry['PUSH_BUTTON'] || [],
+        pins: getPinsForComponent('PUSH_BUTTON'),
       }
     ],
     wires: [

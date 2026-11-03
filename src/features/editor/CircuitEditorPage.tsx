@@ -46,6 +46,8 @@ import {
   Scan,
   Minus,
   Copy,
+  Binary,
+  AlertTriangle,
 } from 'lucide-react'
 
 import { createCanvasNodeFromComponent } from '../canvas/componentFactory'
@@ -78,6 +80,7 @@ import type { ExecutionAttachment } from '../ai/executionContext'
 import EditorDocumentSync, { EditorAutosave, EditorDirtyIndicator } from './EditorDocumentSync'
 import { captureEditorDocument, exceedsProjectSaveBudget, hasEditsSince, isCurrentDocumentSession } from './editorDocumentSnapshots'
 import { EditorSimulationTime, EditorAvrWorkload } from './EditorSimulationStatus'
+import { ConflictResolutionModal } from './ConflictResolutionModal'
 
 import { ContextMenu } from '../../components/ui/ContextMenu'
 import { SplitPane } from '../../components/ui/SplitPane'
@@ -242,7 +245,7 @@ export default function CircuitEditorPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   const queryClient = useQueryClient()
-  const { user } = useAuth()
+  const { user, isAuthenticated, login } = useAuth()
   const addToast = useToastStore((s) => s.addToast)
 
   // Project state
@@ -335,8 +338,24 @@ export default function CircuitEditorPage() {
     useCanvasStore.getState().setViewport({ x: 20, y: 20, scale: 1 })
   }, [])
 
-  const [viewMode, setViewMode] = useState<ViewMode>('split')
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const pref = window.localStorage.getItem('vf-pref-view')
+        if (pref === 'split' || pref === 'canvas' || pref === 'code' || pref === 'pcb') {
+          return pref as ViewMode
+        }
+      } catch {}
+    }
+    return 'split'
+  })
   const [leftPanelOpen, setLeftPanelOpen] = useState(true)
+
+  useEffect(() => {
+    try {
+      window?.localStorage?.setItem('vf-pref-view', viewMode)
+    } catch {}
+  }, [viewMode])
 
   useEffect(() => {
     if (isMobile) {
@@ -406,6 +425,8 @@ export default function CircuitEditorPage() {
   const toggleMeterProbe = useSimulationStore((s) => s.toggleMeterProbe)
   const oscilloscopePanelOpen = useSimulationStore((s) => s.oscilloscopePanelOpen)
   const setOscilloscopePanelOpen = useSimulationStore((s) => s.setOscilloscopePanelOpen)
+  const oscilloscopeMode = useSimulationStore((s) => s.oscilloscopeMode)
+  const setOscilloscopeMode = useSimulationStore((s) => s.setOscilloscopeMode)
   const { theme, toggleTheme } = useThemeStore()
   const updateNode = useCanvasStore((s) => s.updateNode)
   const updateRuntimeNode = useCanvasStore((s) => s.updateRuntimeNode)
@@ -672,6 +693,94 @@ export default function CircuitEditorPage() {
   // A real edit or an explicit Save can retry; the local document stays dirty.
   const rejectedSaveRef = useRef<ReturnType<typeof captureEditorDocument>>(null)
 
+  // ── Multi-Tab Concurrency State & Conflict Handling ──
+  const [conflictModalOpen, setConflictModalOpen] = useState(false)
+  const [remoteConflictRevision, setRemoteConflictRevision] = useState<string | undefined>(undefined)
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window) || !projectId) return
+    const channel = new BroadcastChannel('vf-project-concurrency')
+    channel.onmessage = (event) => {
+      if (event.data?.type === 'PROJECT_SAVED' && event.data?.projectId === projectId) {
+        const isDirtyNow = useProjectStore.getState().isDirty
+        if (!isDirtyNow) {
+          projectApi.getById(projectId).then((res) => {
+            const latest = res.data.data
+            if (latest) {
+              mergeProjectMetadata(latest)
+              queryClient.setQueryData(['project', latest.id], latest)
+            }
+          }).catch(() => {})
+        } else {
+          setRemoteConflictRevision(event.data.revision ? String(event.data.revision) : undefined)
+          addToast(t('Project modified in another tab. Save will prompt conflict resolution.'), 'info')
+        }
+      }
+    }
+    return () => {
+      channel.close()
+    }
+  }, [projectId, mergeProjectMetadata, queryClient, addToast, t])
+
+  const handleSaveAsCopy = useCallback(async () => {
+    const { currentProject } = useProjectStore.getState()
+    if (!currentProject) return
+    const snapshot = captureEditorDocument()
+    if (!snapshot) return
+    const copyName = `${currentProject.name} (Copy)`
+    const res = await projectApi.create({
+      name: copyName,
+      boardType: currentProject.boardType,
+      description: currentProject.description,
+      canvasLayout: snapshot.payload.canvasLayout as Record<string, unknown> | undefined,
+      componentConfig: snapshot.payload.componentConfig,
+      codeFiles: snapshot.payload.codeFiles,
+      isPublic: false,
+      tags: currentProject.tags,
+    })
+    const newProj = res.data.data
+    addToast(t('Saved as new project copy'), 'success')
+    setRemoteConflictRevision(undefined)
+    setConflictModalOpen(false)
+    navigate(`/editor/${newProj.id}`)
+  }, [navigate, addToast, t])
+
+  const handleForceOverwrite = useCallback(async () => {
+    const { currentProject } = useProjectStore.getState()
+    if (!currentProject) return
+    const latestRes = await projectApi.getById(currentProject.id)
+    const latest = latestRes.data.data
+    const snapshot = captureEditorDocument()
+    if (!snapshot) return
+    const overwritePayload = {
+      ...snapshot.payload,
+      expectedRevision: latest.documentRevision,
+    }
+    const updateRes = await projectApi.update(currentProject.id, overwritePayload)
+    const saved = updateRes.data.data
+    mergeProjectMetadata(saved)
+    queryClient.setQueryData(['project', saved.id], saved)
+    setDirty(false)
+    setRemoteConflictRevision(undefined)
+    setConflictModalOpen(false)
+    addToast(t('Remote version overwritten with local edits'), 'success')
+  }, [mergeProjectMetadata, queryClient, setDirty, addToast, t])
+
+  const handleReloadRemote = useCallback(async () => {
+    const { currentProject } = useProjectStore.getState()
+    if (!currentProject) return
+    const latestRes = await projectApi.getById(currentProject.id)
+    const latest = latestRes.data.data
+    if (latest) {
+      mergeProjectMetadata(latest)
+      queryClient.setQueryData(['project', latest.id], latest)
+      setDirty(false)
+      setRemoteConflictRevision(undefined)
+      setConflictModalOpen(false)
+      window.location.reload()
+    }
+  }, [mergeProjectMetadata, queryClient, setDirty])
+
   // ── Save mutation ──
   const { mutate: saveProject } = useMutation({
     mutationFn: async (snapshot: NonNullable<ReturnType<typeof captureEditorDocument>>) => {
@@ -691,13 +800,34 @@ export default function CircuitEditorPage() {
       mergeProjectMetadata(project)
       hydratedVersionRef.current = { id: project.id, revision: project.documentRevision ?? project.updatedAt }
       queryClient.setQueryData(['project', project.id], project)
+      setRemoteConflictRevision(undefined)
       addToast('Project saved successfully', 'success')
+
+      // Broadcast to other tabs
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        try {
+          const channel = new BroadcastChannel('vf-project-concurrency')
+          channel.postMessage({
+            type: 'PROJECT_SAVED',
+            projectId: project.id,
+            revision: project.documentRevision,
+            timestamp: Date.now(),
+          })
+          channel.close()
+        } catch {
+          // ignore
+        }
+      }
     },
     onError: (error, snapshot) => {
       if (!isCurrentDocumentSession(snapshot)) return
       setSaving(false)
       const response = (error as { response?: { status?: number; data?: { errorCode?: string; data?: Record<string, string> } } })?.response
       if (response?.status === 400 || response?.status === 409 || response?.status === 413) rejectedSaveRef.current = snapshot
+      if (response?.data?.errorCode === 'PROJECT_REVISION_STALE') {
+        setConflictModalOpen(true)
+        setRemoteConflictRevision(response.data?.data?.currentRevision || 'newer')
+      }
       const message = response?.data?.errorCode === 'PROJECT_REVISION_STALE'
         ? 'Project changed elsewhere. Keep a copy of your local edits before reloading.'
         : response?.status === 413
@@ -717,6 +847,10 @@ export default function CircuitEditorPage() {
       }
       return
     }
+    if (manual && remoteConflictRevision) {
+      setConflictModalOpen(true)
+      return
+    }
     const project = useProjectStore.getState()
     if (isPreset || !isOwner || project.isSaving || project.currentProject?.id !== projectId
       || project.currentProject?.owner?.keycloakId !== user?.keycloakId) return
@@ -730,7 +864,7 @@ export default function CircuitEditorPage() {
       return
     }
     if (snapshot) { useProjectStore.getState().setSaveError(null); setSaving(true); saveProject(snapshot) }
-  }, [isPreset, isSandbox, isOwner, projectId, user?.keycloakId, setSaving, saveProject, addToast])
+  }, [isPreset, isSandbox, isOwner, projectId, user?.keycloakId, setSaving, saveProject, addToast, remoteConflictRevision])
 
   const handleAutosave = useCallback(() => handleSave(false), [handleSave])
 
@@ -750,8 +884,13 @@ export default function CircuitEditorPage() {
         navigate(`/editor/${forked.id}`)
       }
     },
-    onError: () => {
+    onError: (error: any) => {
       setSaving(false)
+      if (error?.response?.status === 401) {
+        addToast('Please sign in to fork this circuit to your workspace.', 'info')
+        login()
+        return
+      }
       addToast('Failed to fork project', 'error')
     },
   })
@@ -1576,6 +1715,17 @@ export default function CircuitEditorPage() {
               <span className="vf-editor-mobile-header__title" title={projectName}>{projectName}</span>
               <span className="vf-editor__board" aria-label="Project development board">{boardProfile?.name ?? projectSummary?.boardType}</span>
               {!isSandbox && <EditorDirtyIndicator />}
+              {!isSandbox && remoteConflictRevision && (
+                <button
+                  type="button"
+                  className="vf-editor__conflict-badge"
+                  onClick={() => setConflictModalOpen(true)}
+                  title={t('Remote edit detected in another tab. Click to resolve.')}
+                >
+                  <AlertTriangle size={11} />
+                  {t('Conflict')}
+                </button>
+              )}
             </div>
             <div className="vf-editor-mobile-header__actions">
               <button
@@ -1659,6 +1809,17 @@ export default function CircuitEditorPage() {
               <h1 className="vf-editor__project-name" title={projectName}>{projectName}</h1>
               <span className="vf-editor__board" aria-label="Project development board" title={boardProfile && supportsAvr8js(boardProfile.type) ? 'ATmega328P emulation requires compiled firmware. Run checks the compiler.' : 'Native processor emulation unavailable. Source compatibility is a limited interpreter.'}>{boardProfile?.name ?? projectSummary?.boardType}</span>
               {!isSandbox && <EditorDirtyIndicator />}
+              {!isSandbox && remoteConflictRevision && (
+                <button
+                  type="button"
+                  className="vf-editor__conflict-badge"
+                  onClick={() => setConflictModalOpen(true)}
+                  title={t('Remote edit detected in another tab. Click to resolve.')}
+                >
+                  <AlertTriangle size={11} />
+                  {t('Conflict Detected')}
+                </button>
+              )}
               {!isSandbox && !isPreset && (
                 <span className="vf-status-badge" data-connected={isLiveSyncConnected} title="Live canvas transport only. Saving to the database is shown separately.">
                   <span className="vf-status-badge__dot" />
@@ -1933,7 +2094,14 @@ export default function CircuitEditorPage() {
                     color: 'var(--vf-primary-text)',
                     borderColor: 'var(--vf-accent)',
                   }}
-                  onClick={() => forkMutation.mutate()}
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      addToast('Please sign in to fork this circuit to your workspace.', 'info')
+                      login()
+                      return
+                    }
+                    forkMutation.mutate()
+                  }}
                   disabled={forkMutation.isPending}
                   type="button"
                   aria-label={forkMutation.isPending ? 'Forking project' : 'Fork project to edit'}
@@ -1967,8 +2135,28 @@ export default function CircuitEditorPage() {
               <SecondaryToolButton
                 icon={<Activity size={15} />}
                 label="Oscilloscope"
-                onClick={() => setOscilloscopePanelOpen(!oscilloscopePanelOpen)}
-                pressed={oscilloscopePanelOpen}
+                onClick={() => {
+                  if (oscilloscopePanelOpen && oscilloscopeMode === 'oscilloscope') {
+                    setOscilloscopePanelOpen(false)
+                  } else {
+                    setOscilloscopeMode('oscilloscope')
+                    setOscilloscopePanelOpen(true)
+                  }
+                }}
+                pressed={oscilloscopePanelOpen && oscilloscopeMode === 'oscilloscope'}
+              />
+              <SecondaryToolButton
+                icon={<Binary size={15} />}
+                label="Logic Analyzer"
+                onClick={() => {
+                  if (oscilloscopePanelOpen && oscilloscopeMode === 'logic_analyzer') {
+                    setOscilloscopePanelOpen(false)
+                  } else {
+                    setOscilloscopeMode('logic_analyzer')
+                    setOscilloscopePanelOpen(true)
+                  }
+                }}
+                pressed={oscilloscopePanelOpen && oscilloscopeMode === 'logic_analyzer'}
               />
               <SecondaryToolButton
                 icon={<Package size={15} />}
@@ -2322,7 +2510,7 @@ export default function CircuitEditorPage() {
           {!isMobile && (
             <div className="vf-editor-bottom-pane">
               <SerialMonitor onAskAi={!isSandbox && isOwner ? askAiAboutOutput : undefined} />
-              {!isSandbox && oscilloscopePanelOpen && (
+              {oscilloscopePanelOpen && (
                 <EditorFeatureBoundary label="oscilloscope">
                   <OscilloscopePanel
                     simulationPaused={isSimulationPaused}
@@ -2856,6 +3044,17 @@ export default function CircuitEditorPage() {
         y={contextMenu.y}
         items={contextMenuItems}
         onClose={() => setContextMenu({ ...contextMenu, isOpen: false })}
+      />
+
+      {/* Multi-Tab Conflict Resolution Modal */}
+      <ConflictResolutionModal
+        isOpen={conflictModalOpen}
+        projectName={projectName}
+        remoteRevision={remoteConflictRevision}
+        onClose={() => setConflictModalOpen(false)}
+        onSaveAsCopy={handleSaveAsCopy}
+        onOverwrite={handleForceOverwrite}
+        onReload={handleReloadRemote}
       />
     </div>
   )

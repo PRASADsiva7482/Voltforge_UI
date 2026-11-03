@@ -81,15 +81,24 @@ export function LabChallengeRunner() {
     const host = canvasHostRef.current;
     if (!host) return;
 
-    const resize = () => {
-      setCanvasSize({
-        height: Math.max(320, host.clientHeight),
-        width: Math.max(420, host.clientWidth),
-      });
-    };
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const width = Math.round(entry.contentRect.width);
+        const height = Math.round(entry.contentRect.height);
+        if (width > 50 && height > 50) {
+          setCanvasSize({ width, height });
+        }
+      }
+    });
 
-    resize();
-    const observer = new ResizeObserver(resize);
+    const rect = host.getBoundingClientRect();
+    if (rect.width > 50 && rect.height > 50) {
+      setCanvasSize({
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      });
+    }
+
     observer.observe(host);
     return () => observer.disconnect();
   }, []);

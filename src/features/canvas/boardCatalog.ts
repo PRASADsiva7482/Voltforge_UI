@@ -169,6 +169,104 @@ export function supportsAvr8js(type?: string): boolean {
     || type === 'ATMEL_AVR_ATMEGA328P';
 }
 
+export type ExecutionCapabilityState =
+  | 'COMPILED_AND_INTERPRETER'
+  | 'COMPILATION_ONLY_NO_EMULATOR'
+  | 'INTERPRETER_ONLY'
+  | 'HARDWARE_TARGETED_NO_VIRTUAL_EMULATOR'
+  | 'UNSUPPORTED';
+
+export interface BoardExecutionCapability {
+  boardType: string;
+  mcuArchitecture: 'AVR' | 'Xtensa' | 'ARM-Cortex-M' | 'RISC-V' | 'Linux-ARM' | 'Unknown';
+  binaryFormat: 'Intel-HEX' | 'ELF/BIN' | 'UF2' | 'None';
+  compilerSupport: boolean;
+  virtualEmulator: 'avr8js' | 'none';
+  executionCapability: ExecutionCapabilityState;
+  supportedExecutionModes: Array<'avr8js' | 'interpreter'>;
+  statusMessage: string;
+}
+
+export function getBoardExecutionCapability(boardType?: string): BoardExecutionCapability {
+  const type = boardType || 'ARDUINO_UNO';
+  if (supportsAvr8js(type)) {
+    return {
+      boardType: type,
+      mcuArchitecture: 'AVR',
+      binaryFormat: 'Intel-HEX',
+      compilerSupport: true,
+      virtualEmulator: 'avr8js',
+      executionCapability: 'COMPILED_AND_INTERPRETER',
+      supportedExecutionModes: ['avr8js', 'interpreter'],
+      statusMessage: 'Full virtual emulation supported via AVR8js ATmega328P cycle-accurate core.',
+    };
+  }
+
+  if (type.startsWith('ESP32') || type.startsWith('ESP8266')) {
+    const isRiscV = type.includes('C3') || type.includes('C6');
+    return {
+      boardType: type,
+      mcuArchitecture: isRiscV ? 'RISC-V' : 'Xtensa',
+      binaryFormat: 'ELF/BIN',
+      compilerSupport: true,
+      virtualEmulator: 'none',
+      executionCapability: 'COMPILATION_ONLY_NO_EMULATOR',
+      supportedExecutionModes: ['interpreter'],
+      statusMessage: 'Virtual CPU emulation unavailable for ESP32/Xtensa. Server compilation is supported; virtual circuit execution uses basic source interpretation.',
+    };
+  }
+
+  if (type.startsWith('RASPBERRY_PI_PICO')) {
+    return {
+      boardType: type,
+      mcuArchitecture: 'ARM-Cortex-M',
+      binaryFormat: 'UF2',
+      compilerSupport: true,
+      virtualEmulator: 'none',
+      executionCapability: 'COMPILATION_ONLY_NO_EMULATOR',
+      supportedExecutionModes: ['interpreter'],
+      statusMessage: 'Virtual CPU emulation unavailable for RP2040/ARM. Server compilation is supported; virtual circuit execution uses basic source interpretation.',
+    };
+  }
+
+  if (type.startsWith('STM32')) {
+    return {
+      boardType: type,
+      mcuArchitecture: 'ARM-Cortex-M',
+      binaryFormat: 'ELF/BIN',
+      compilerSupport: true,
+      virtualEmulator: 'none',
+      executionCapability: 'COMPILATION_ONLY_NO_EMULATOR',
+      supportedExecutionModes: ['interpreter'],
+      statusMessage: 'Virtual CPU emulation unavailable for STM32/ARM Cortex-M. Virtual circuit execution uses basic source interpretation.',
+    };
+  }
+
+  if (isLinuxBoardType(type)) {
+    return {
+      boardType: type,
+      mcuArchitecture: 'Linux-ARM',
+      binaryFormat: 'ELF/BIN',
+      compilerSupport: false,
+      virtualEmulator: 'none',
+      executionCapability: 'UNSUPPORTED',
+      supportedExecutionModes: [],
+      statusMessage: 'Single-board Linux computers do not have virtual browser microcontrollers.',
+    };
+  }
+
+  return {
+    boardType: type,
+    mcuArchitecture: 'Unknown',
+    binaryFormat: 'None',
+    compilerSupport: false,
+    virtualEmulator: 'none',
+    executionCapability: 'HARDWARE_TARGETED_NO_VIRTUAL_EMULATOR',
+    supportedExecutionModes: ['interpreter'],
+    statusMessage: 'Hardware-targeted board without virtual browser emulator. Schematic simulation operates in source compatibility mode.',
+  };
+}
+
 export function isBoardComponentType(type: string): boolean {
   return BOARD_TYPE_SET.has(type) || BOARD_FAMILY_PREFIXES.some((prefix) => type.startsWith(prefix));
 }

@@ -1126,14 +1126,29 @@
   gap: 8px;
   font-size: 12px;
   font-weight: 500;
-  color: var(--vf-error);
+  color: var(--vf-text);
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
 }
 
 .vf-project-card__dropdown-btn:hover {
+  background: var(--vf-surface-hover, rgba(255, 255, 255, 0.06));
+}
+
+.vf-project-card__dropdown-btn--danger {
+  color: var(--vf-error);
+}
+
+.vf-project-card__dropdown-btn--danger:hover {
   background: var(--vf-error-soft);
+}
+
+.vf-project-card__dropdown-divider {
+  height: 1px;
+  background: var(--vf-border);
+  margin: 4px 0;
 }
 
 @keyframes fadeIn {

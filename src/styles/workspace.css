@@ -117,6 +117,8 @@
 .vf-editor__project-info { max-width: 310px; }
 .vf-editor__save-state { color: var(--vf-text-secondary); font-size: 10px; white-space: nowrap; }
 .vf-editor__save-state.is-error { color: var(--vf-error); }
+.vf-editor__conflict-badge { display: inline-flex; align-items: center; gap: 4px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid #f59e0b; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 600; cursor: pointer; }
+.vf-editor__conflict-badge:hover { background: rgba(245, 158, 11, 0.25); }
 .vf-status-badge[data-connected=false] { color: var(--vf-text-secondary); background: var(--vf-surface-raised); }
 .vf-status-badge[data-connected=false] .vf-status-badge__dot { background: var(--vf-text-secondary); }
 .vf-editor__execution-issue { display: flex; align-items: center; gap: 12px; padding: 8px 16px; color: var(--vf-error); background: var(--vf-surface); border-bottom: 1px solid var(--vf-border); font-size: 12px; flex-shrink: 0; }

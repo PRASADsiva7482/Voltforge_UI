@@ -101,7 +101,7 @@ function meterDisplayValue(mode: MeterMeasurementMode, value: number, resistance
 import { LogicRegistry } from './logic/LogicRegistry';
 import { evaluateNumericExpression } from './ExpressionEvaluator';
 import { AudioEngine } from './AudioEngine';
-import { getBoardLogicVoltage, getBoardPinNumber, getBoardPowerVoltage, isBoardComponentType, supportsAvr8js } from '../canvas/boardCatalog';
+import { getBoardExecutionCapability, getBoardLogicVoltage, getBoardPinNumber, getBoardPowerVoltage, isBoardComponentType, supportsAvr8js } from '../canvas/boardCatalog';
 
 export type PinState = 'HIGH' | 'LOW' | 'INPUT' | 'OUTPUT' | 'PWM';
 
@@ -779,7 +779,9 @@ private scopeCaptureRevision = 0;
       this.originalCodeLines = code.split('\n');
 
       const runtimeBoardType = boardType || initializedNodes.find((node) => isBoardComponentType(node.type))?.type || 'ARDUINO_UNO';
-      if (hex?.trim() && supportsAvr8js(runtimeBoardType)) {
+      const capability = getBoardExecutionCapability(runtimeBoardType);
+
+      if (hex?.trim() && capability.virtualEmulator === 'avr8js' && supportsAvr8js(runtimeBoardType)) {
         this.callbacks.onSerialOutput('> Starting AVR8js ATmega328P emulator...');
         this.parseCode(code);
         this.startMNASolver(initializedNodes, wires);
@@ -788,7 +790,9 @@ private scopeCaptureRevision = 0;
       }
 
       if (hex?.trim()) {
-        throw new Error(`HEX target ${runtimeBoardType} is not supported by the ATmega328P browser emulator`);
+        this.callbacks.onSerialOutput(`> [Notice] Target MCU ${capability.mcuArchitecture} (${runtimeBoardType}) has no browser virtual CPU emulator.`);
+        this.callbacks.onSerialOutput(`> Preserving compiled binary artifact (${hex.length} bytes).`);
+        this.callbacks.onSerialOutput(`> Virtual execution running in source compatibility mode; MNA physics solver active.`);
       }
 
       this.callbacks.onSerialOutput('> Starting compatibility interpreter...');
@@ -3582,14 +3586,17 @@ private scopeCaptureRevision = 0;
       const voltage = (result.nodeVoltages[positiveNode] ?? 0) - (result.nodeVoltages[negativeNode] ?? 0);
       const mode = meterState.meterMode;
       const hasResistanceTest = circuit.elements.some((element) => element.id === 'r_vm_ohm_virtual');
-      const resistanceUnsafe = mode === 'RESISTANCE' && meterProbes.length === 2 && !hasResistanceTest;
+      const hasActivePotential = Math.abs(voltage) > 0.05;
+      const resistanceUnsafe = mode === 'RESISTANCE' && meterProbes.length === 2 && (!hasResistanceTest || hasActivePotential);
       const testCurrent = result.branchCurrents.r_vm_ohm_virtual ?? 0;
-      const rawResistance = hasResistanceTest && Math.abs(testCurrent) > 1e-12
+      const rawResistance = hasResistanceTest && !resistanceUnsafe && Math.abs(testCurrent) > 1e-12
         ? Math.abs(voltage / testCurrent)
         : Number.POSITIVE_INFINITY;
-      const resistance = rawResistance > SIMULATION_MODELS.meter.maximumResistance_ohm
+      const resistance = resistanceUnsafe
         ? Number.POSITIVE_INFINITY
-        : rawResistance;
+        : rawResistance > SIMULATION_MODELS.meter.maximumResistance_ohm
+          ? Number.POSITIVE_INFINITY
+          : rawResistance;
       const currentA = result.branchCurrents.mm_virtual ?? 0;
       useSimulationStore.getState().setLiveMeter({
         voltage,

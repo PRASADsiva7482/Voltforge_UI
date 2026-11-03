@@ -1,5 +1,6 @@
 /* VoltForge / Graphite + Signal. Shared by every route and overlay. */
-:root {
+:root,
+html.light {
   color-scheme: light;
   --vf-bg: #F4F1E8;
   --vf-sidebar: #EAE6DB;
@@ -7,8 +8,8 @@
   --vf-surface-raised: #E7E2D6;
   --vf-surface-inset: #EAE6DB;
   --vf-hover: #DDD7C9;
-  --vf-border: #D8D2C5;
-  --vf-border-strong: #958E80;
+  --vf-border: #cbd5e1;
+  --vf-border-strong: #94a3b8;
   --vf-text: #25251F;
   --vf-text-strong: #25251F;
   --vf-text-muted: #5F5F54;

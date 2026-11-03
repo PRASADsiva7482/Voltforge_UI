@@ -453,12 +453,12 @@ export const builtinCanvasComponents: ElectronicComponent[] = [
     sortOrder: 20 + index,
   })),
   ...([
-    ['PIR_SENSOR', 'PIR Motion Sensor', 'SENSOR', { motionDetected: false }],
-    ['SENSOR_PIR', 'PIR Motion Sensor', 'SENSOR', { motionDetected: false }],
-    ['LDR', 'Photoresistor', 'SENSOR', { lightLevel: 50 }],
-    ['SENSOR_LDR', 'Light Sensor', 'SENSOR', { lightLevel: 50 }],
-    ['SOIL_MOISTURE', 'Soil Moisture Sensor', 'SENSOR', { moistureLevel: SIMULATION_MODELS.sensors.soilMoisture_percent }],
-  ] as const).map(([type, name, category, defaultProperties], index) => makeComponent({
+    ['PIR_SENSOR', 'PIR Motion Sensor', 'SENSOR', { motionDetected: false }, ['motion', 'movement', 'infrared', 'presence', 'sensor']],
+    ['SENSOR_PIR', 'PIR Motion Sensor', 'SENSOR', { motionDetected: false }, ['motion', 'movement', 'infrared', 'presence', 'sensor']],
+    ['LDR', 'Photoresistor', 'SENSOR', { lightLevel: 50 }, ['light', 'photocell', 'photoresistor', 'lux', 'sensor', 'ldr']],
+    ['SENSOR_LDR', 'Light Sensor', 'SENSOR', { lightLevel: 50 }, ['light', 'photocell', 'photoresistor', 'lux', 'sensor', 'ldr']],
+    ['SOIL_MOISTURE', 'Soil Moisture Sensor', 'SENSOR', { moistureLevel: SIMULATION_MODELS.sensors.soilMoisture_percent }, ['soil', 'moisture', 'humidity', 'water', 'sensor']],
+  ] as const).map(([type, name, category, defaultProperties, tags], index) => makeComponent({
     id: `catalog_${type.toLowerCase()}`,
     name,
     type,
@@ -466,15 +466,16 @@ export const builtinCanvasComponents: ElectronicComponent[] = [
     description: `${name} with user-controlled environmental stimulus properties`,
     defaultProperties,
     pinConfig: { pinProfile: type },
+    tags: [...tags],
     sortOrder: 40 + index,
   })),
   ...([
-    ['LCD_16X2', 'LCD 16x2', 'DISPLAY'],
-    ['DISPLAY_LCD_I2C', 'I2C LCD 16x2', 'DISPLAY'],
-    ['OLED_DISPLAY', 'OLED Display', 'DISPLAY'],
-    ['DISPLAY_OLED', 'I2C OLED Display', 'DISPLAY'],
-    ['DISPLAY_7SEG', '7-Segment Display', 'DISPLAY'],
-  ] as const).map(([type, name, category], index) => makeComponent({
+    ['LCD_16X2', 'LCD 16x2', 'DISPLAY', ['screen', 'display', 'lcd', 'text', 'monitor', 'hd44780']],
+    ['DISPLAY_LCD_I2C', 'I2C LCD 16x2', 'DISPLAY', ['screen', 'display', 'lcd', 'text', 'monitor', 'i2c', 'pcf8574']],
+    ['OLED_DISPLAY', 'OLED Display', 'DISPLAY', ['screen', 'display', 'oled', 'graphics', 'ssd1306', 'i2c']],
+    ['DISPLAY_OLED', 'I2C OLED Display', 'DISPLAY', ['screen', 'display', 'oled', 'graphics', 'ssd1306', 'i2c']],
+    ['DISPLAY_7SEG', '7-Segment Display', 'DISPLAY', ['screen', 'display', 'segment', 'led', 'digits', 'numbers']],
+  ] as const).map(([type, name, category, tags], index) => makeComponent({
     id: `catalog_${type.toLowerCase()}`,
     name,
     type,
@@ -482,6 +483,7 @@ export const builtinCanvasComponents: ElectronicComponent[] = [
     description: `${name} with power-aware visual output`,
     defaultProperties: {},
     pinConfig: { pinProfile: type },
+    tags: [...tags],
     sortOrder: 60 + index,
   })),
   makeComponent({

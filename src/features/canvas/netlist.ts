@@ -82,7 +82,7 @@ function isBoard(type: string) {
   return isBoardComponentType(type);
 }
 
-function isGroundLabel(pin: { pinName?: string; name?: string; pinId?: string; id?: string }) {
+export function isGroundLabel(pin: { pinName?: string; name?: string; pinId?: string; id?: string }) {
   return /(^|\W)(GND|GROUND)(\W|$)/i.test(`${pin.pinId || pin.id || ''} ${pin.pinName || pin.name || ''}`);
 }
 

@@ -49,8 +49,9 @@ try {
     state = sync.reconcile(nodes, wires, state.footprints, [])
     const before = state, changed = [wire('replacement', 'n0', 'n5'), ...wires.slice(1)]
     const next = sync.reconcile(nodes, changed, state.footprints, [])
-    assert.equal(next.footprints.filter((fp, i) => fp !== before.footprints[i]).length, 3)
+    assert.equal(next.footprints.filter((fp, i) => fp !== before.footprints[i]).length, 4)
     assert.equal(next.footprints[1].pads[0].netId, undefined); assert.equal(next.footprints[5].pads[0].netId, 'replacement')
+    assert.equal(next.footprints[2].pads[0].netId, 'replacement')
     assert.equal(next.footprints[0].pads[1], before.footprints[0].pads[1]); equivalent(nodes, changed, next)
   })
   await check('Reordering wire membership preserves first-incident net IDs and branching output', () => {

@@ -50,7 +50,8 @@ export const projectApi = {
   getById: (id: string) => api.get<ApiResponse<Project>>(`/projects/${id}`),
   getPublic: (page = 0, size = 20) => api.get<ApiResponse<PagedResponse<ProjectSummary>>>('/projects/public', { params: { page, size } }),
   getTemplates: (page = 0, size = 20) => api.get<ApiResponse<PagedResponse<ProjectSummary>>>('/projects/templates', { params: { page, size } }),
-  getUserProjects: (page = 0, size = 20) => api.get<ApiResponse<PagedResponse<ProjectSummary>>>('/projects', { params: { page, size } }),
+  getUserProjects: (page = 0, size = 20, params?: { isPublic?: boolean; query?: string; sort?: string }) =>
+    api.get<ApiResponse<PagedResponse<ProjectSummary>>>('/projects', { params: { page, size, ...params } }),
   searchPublic: (query: string, page = 0, size = 20) =>
     api.get<ApiResponse<PagedResponse<ProjectSummary>>>('/projects/public/search', { params: { page, query, size } }),
   update: (id: string, data: UpdateProjectRequest) => api.put<ApiResponse<Project>>(`/projects/${id}`, data),

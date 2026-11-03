@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import type { PinPosition } from '../../types/domain';
-import { BOARD_CATALOG, createBoardPins } from './boardCatalog';
+import { BOARD_CATALOG, createBoardPins, getBoardProfile } from './boardCatalog';
 
 type PinType = PinPosition['type'];
 
@@ -745,13 +745,20 @@ const RELAY_SSR_PINS: PinPosition[] = [
 ];
 
 // ── Registry ──
+export const ARDUINO_UNO_PINS: PinPosition[] = createBoardPins('uno', 'ARDUINO_UNO');
+
 const catalogBoardPinRegistry = Object.fromEntries(
-  BOARD_CATALOG.map((boardItem) => [boardItem.type, createBoardPins(boardItem.footprint, boardItem.type)]),
+  BOARD_CATALOG.flatMap((boardItem) => [
+    [boardItem.type, createBoardPins(boardItem.footprint, boardItem.type)],
+    [boardItem.type.toLowerCase(), createBoardPins(boardItem.footprint, boardItem.type)],
+  ]),
 );
 
 export const boardPinRegistry: Record<string, PinPosition[]> = {
   ...catalogBoardPinRegistry,
 
+  ARDUINO_UNO: ARDUINO_UNO_PINS,
+  arduino_uno: ARDUINO_UNO_PINS,
   ARDUINO_NANO: ARDUINO_NANO_PINS,
   ESP32: ESP32_PINS,
   ESP32_S3: ESP32_PINS,
@@ -912,6 +919,21 @@ export function getPinsForComponent(type: string, pinConfig?: Record<string, unk
   // Use registry if available — preserve original pin IDs so wires can reference them
   if (boardPinRegistry[type]) {
     return boardPinRegistry[type].map((p) => ({ ...p }));
+  }
+
+  // Check uppercase or normalized key in registry
+  const upperType = type.toUpperCase();
+  if (boardPinRegistry[upperType]) {
+    return boardPinRegistry[upperType].map((p) => ({ ...p }));
+  }
+
+  // Check board catalog if it is a known development board
+  const boardProfile = getBoardProfile(type) || getBoardProfile(upperType);
+  if (boardProfile) {
+    const generated = createBoardPins(boardProfile.footprint, boardProfile.type);
+    boardPinRegistry[type] = generated;
+    boardPinRegistry[upperType] = generated;
+    return generated.map((p) => ({ ...p }));
   }
 
   const configuredPins = pinConfig?.pins;

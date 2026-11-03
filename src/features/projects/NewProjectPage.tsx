@@ -70,8 +70,8 @@ export function NewProjectPage() {
               <TextInput id="project-name" aria-label={t('Project name')} required maxLength={200} aria-invalid={!!errors.name} aria-describedby={errors.name ? 'project-name-error' : undefined} value={values.name} onChange={event => change('name', event.target.value)} />
               {errors.name && <span id="project-name-error" className="form-error">{t(errors.name)}</span>}
             </FieldShell>
-            <FieldShell htmlFor="project-description" label={t('Description')} required>
-              <Textarea id="project-description" aria-label={t('Description')} required maxLength={5000} rows={3} aria-invalid={!!errors.description} aria-describedby={errors.description ? 'project-description-error' : undefined} value={values.description} onChange={event => change('description', event.target.value)} />
+            <FieldShell htmlFor="project-description" label={t('Description')}>
+              <Textarea id="project-description" aria-label={t('Description')} maxLength={5000} rows={3} aria-invalid={!!errors.description} aria-describedby={errors.description ? 'project-description-error' : undefined} value={values.description} onChange={event => change('description', event.target.value)} />
               {errors.description && <span id="project-description-error" className="form-error">{t(errors.description)}</span>}
             </FieldShell>
             <FieldShell htmlFor="project-boardType" label={t('Development board')} required>

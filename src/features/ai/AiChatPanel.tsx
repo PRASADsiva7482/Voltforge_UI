@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Send, Square, PanelLeft, Maximize2, Plus, MoreHorizontal } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { useConversationHistory } from './useConversationHistory'
 import { ChatStreamError, ConversationStreamContract, readChatFrames } from './chatStream'
@@ -24,12 +24,14 @@ import type { ExecutionAttachment } from './executionContext'
 import { getBoardProfile, supportsAvr8js } from '../canvas/boardCatalog'
 import { useQuery } from '@tanstack/react-query'
 import { aiApi, projectApi } from '../../api/services'
+import { createInitialProjectLayout } from '../projects/projectConfiguration'
+import { generateDefaultCode } from '../../utils/codeTemplates'
 import { buildCircuitNetlist } from '../canvas/netlist'
 import { Textarea } from '../../components/ui/Field'
 import { SuggestionsList } from '../../components/ui/SuggestionsList'
 import { CodeBlock } from '../../components/ui/CodeBlock'
 import { sanitizeUrl } from '../../utils/security'
-import type { AiAction, AiArtifactIdentity, AiCitation, AiCodeFix, AiEngineeringAuthority, AiGroundingReport, AiInternetRetrievalStatus, AiLocalRetrievalStatus, AiWireSuggestion } from '../../types/domain'
+import type { AiAction, AiArtifactIdentity, AiCitation, AiCodeFix, AiEngineeringAuthority, AiGroundingReport, AiInternetRetrievalStatus, AiLocalRetrievalStatus, AiWireSuggestion, CreateProjectRequest } from '../../types/domain'
 import { AiProposalReview } from './AiProposalReview'
 import {
   buildAiProposal,
@@ -141,6 +143,7 @@ export default function AiChatPanel({
   executionAttachment,
 }: Props) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
@@ -256,7 +259,7 @@ export default function AiChatPanel({
   const savedProjectContext = useQuery({
     queryKey: ['chat-project-context', auth.user?.id, history.active?.projectId],
     queryFn: async () => (await projectApi.getById(history.active!.projectId!)).data.data,
-    enabled: workspace && includeContext && !!history.active?.projectId,
+    enabled: workspace && !!history.active?.projectId,
     staleTime: 0,
   })
   const relevantAttachment = !workspace && executionAttachment?.projectId === currentProject?.id ? executionAttachment : undefined
@@ -435,7 +438,13 @@ export default function AiChatPanel({
     if (!conversation) { sendLock.current = false; setInput(userMessage); return }
     setRetryRequest({ id: clientRequestId, content: userMessage })
     const payload = includeContext && contextAvailable ? buildPayload() : {}
-    const sourceEditorRevision = calculateEditorRevision(nodes, wires, currentProject?.codeFiles || [], modelRevision)
+    const contextProject = workspace ? savedProjectContext.data : currentProject
+    const sourceEditorRevision = calculateEditorRevision(
+      workspace ? (savedProjectContext.data?.canvasLayout?.nodes || []) : nodes,
+      workspace ? (savedProjectContext.data?.canvasLayout?.wires || []) : wires,
+      contextProject?.codeFiles || [],
+      workspace ? 0 : modelRevision,
+    )
     let requestMetadata: AiRunMetadata = {}
     let terminalState: AiRunState | undefined
     let contentCharacters = 0
@@ -617,14 +626,15 @@ export default function AiChatPanel({
                 })
               }
             } else if (eventType === 'proposal') {
+              const targetProjectId = currentProject?.id || (workspace ? history.active?.projectId : undefined)
               const proposal = buildAiProposal({
                 additions: Array.isArray(event.additions) ? event.additions as AiAction[] : [],
                 codeFixes: Array.isArray(event.codeFixes) ? event.codeFixes as AiCodeFix[] : [],
                 id: typeof event.eventId === 'string' ? event.eventId : `ai-${requestId}-proposal`,
-                projectId: currentProject?.id,
+                projectId: targetProjectId,
                 removals: Array.isArray(event.removals) ? event.removals as AiAction[] : [],
                 sourceEditorRevision,
-                sourceProjectRevision: requestMetadata.projectRevision || currentProject?.documentRevision,
+                sourceProjectRevision: requestMetadata.projectRevision || (workspace ? savedProjectContext.data?.documentRevision : currentProject?.documentRevision),
                 valueChanges: Array.isArray(event.valueChanges) ? event.valueChanges as AiAction[] : [],
                 wireSuggestions: Array.isArray(event.wireSuggestions) ? event.wireSuggestions as AiWireSuggestion[] : [],
               })
@@ -664,14 +674,15 @@ export default function AiChatPanel({
               const completeContent = typeof event.reply === 'string' ? event.reply : ''
               if (completeContent) contentCharacters = Math.max(contentCharacters, completeContent.length)
               const presentation = describeAiRun('complete', metadata)
+              const targetProjectId = currentProject?.id || (workspace ? history.active?.projectId : undefined)
               const proposalFromEvent = buildAiProposal({
                 additions: Array.isArray(event.additions) ? event.additions as AiAction[] : [],
                 codeFixes: Array.isArray(event.codeFixes) ? event.codeFixes as AiCodeFix[] : [],
                 id: typeof event.eventId === 'string' ? event.eventId : `ai-${requestId}-complete`,
-                projectId: currentProject?.id,
+                projectId: targetProjectId,
                 removals: Array.isArray(event.removals) ? event.removals as AiAction[] : [],
                 sourceEditorRevision,
-                sourceProjectRevision: metadata.projectRevision || currentProject?.documentRevision,
+                sourceProjectRevision: metadata.projectRevision || (workspace ? savedProjectContext.data?.documentRevision : currentProject?.documentRevision),
                 valueChanges: Array.isArray(event.valueChanges) ? event.valueChanges as AiAction[] : [],
                 wireSuggestions: Array.isArray(event.wireSuggestions) ? event.wireSuggestions as AiWireSuggestion[] : [],
               })
@@ -813,29 +824,8 @@ export default function AiChatPanel({
     })
   }
 
-  const applyProposal = (proposal: AiProposal, selectedIds: string[]) => {
+  const applyProposal = async (proposal: AiProposal, selectedIds: string[]) => {
     if (readOnly || isApplyingProposal) return
-    if (!currentProject?.id) {
-      addToast('No project is loaded for this proposal.', 'error')
-      return
-    }
-
-    const currentProjectState = useProjectStore.getState()
-    const currentCanvasState = useCanvasStore.getState()
-    const currentEditorRevision = calculateEditorRevision(
-      currentCanvasState.nodes,
-      currentCanvasState.wires,
-      currentProjectState.currentProject?.codeFiles || [],
-      currentCanvasState.modelRevision,
-    )
-    if (!isAiProposalCurrent(proposal, {
-      editorRevision: currentEditorRevision,
-      projectId: currentProjectState.currentProject?.id,
-      projectRevision: currentProjectState.currentProject?.documentRevision,
-    })) {
-      addToast('This AI proposal is stale. Regenerate it against the current project revision.', 'error')
-      return
-    }
 
     const selected = proposal.items.filter((item) => selectedIds.includes(item.id))
     if (selected.length === 0) {
@@ -843,49 +833,204 @@ export default function AiChatPanel({
       return
     }
 
+    const isWorkspaceMode = Boolean(workspace)
+    let targetProject = isWorkspaceMode ? savedProjectContext.data : currentProject
+
+    // If in workspace mode and an active conversation projectId exists but savedProjectContext hasn't cached it
+    if (isWorkspaceMode && !targetProject && history.active?.projectId) {
+      try {
+        const res = await projectApi.getById(history.active.projectId)
+        targetProject = res.data.data
+      } catch {
+        addToast('Could not load the associated project for this proposal.', 'error')
+        return
+      }
+    }
+
+    // Case A: Inside Editor view (currentProject exists in Zustand store)
+    if (!isWorkspaceMode && currentProject?.id) {
+      const currentProjectState = useProjectStore.getState()
+      const currentCanvasState = useCanvasStore.getState()
+      const currentEditorRevision = calculateEditorRevision(
+        currentCanvasState.nodes,
+        currentCanvasState.wires,
+        currentProjectState.currentProject?.codeFiles || [],
+        currentCanvasState.modelRevision,
+      )
+      if (!isAiProposalCurrent(proposal, {
+        editorRevision: currentEditorRevision,
+        projectId: currentProjectState.currentProject?.id,
+        projectRevision: currentProjectState.currentProject?.documentRevision,
+      })) {
+        addToast('This AI proposal is stale. Regenerate it against the current project revision.', 'error')
+        return
+      }
+
+      setIsApplyingProposal(true)
+      const plan = planAiProposalChanges(proposal, selectedIds, {
+        activeCodeFile: currentProjectState.activeCodeFile,
+        nodes: currentCanvasState.nodes,
+        wires: currentCanvasState.wires,
+      })
+
+      if (plan.errors.length > 0) {
+        setIsApplyingProposal(false)
+        addToast(`Proposal rejected: ${plan.errors[0]}`, 'error')
+        return
+      }
+
+      const { beforeCode, canvasChanged, codeChanged, nextCode, nextNodes, nextWires } = plan
+      if (!canvasChanged && !codeChanged) {
+        setIsApplyingProposal(false)
+        addToast('The selected proposal does not change the current project.', 'info')
+        return
+      }
+
+      if (canvasChanged) useCanvasStore.getState().commitCanvasSnapshot(nextNodes, nextWires)
+      if (codeChanged && currentProjectState.activeCodeFile && typeof nextCode === 'string') {
+        updateCodeFileContent(currentProjectState.activeCodeFile.id, nextCode)
+      }
+
+      const afterProjectState = useProjectStore.getState()
+      const afterCanvasState = useCanvasStore.getState()
+      const afterEditorRevision = calculateEditorRevision(
+        afterCanvasState.nodes,
+        afterCanvasState.wires,
+        afterProjectState.currentProject?.codeFiles || [],
+        afterCanvasState.modelRevision,
+      )
+      setAppliedTransaction({
+        afterEditorRevision,
+        beforeCode: codeChanged ? beforeCode : undefined,
+        canvasChanged,
+        codeFileId: codeChanged ? currentProjectState.activeCodeFile?.id : undefined,
+        projectId: currentProjectState.currentProject?.id,
+        proposalId: proposal.id,
+      })
+      setIsApplyingProposal(false)
+      addToast(`${selected.length} AI change${selected.length === 1 ? '' : 's'} applied as one reviewable transaction.`, 'success')
+      return
+    }
+
+    // Case B: In Workspace mode with an associated project
+    if (isWorkspaceMode && targetProject?.id) {
+      const currentEditorRevision = calculateEditorRevision(
+        targetProject.canvasLayout?.nodes || [],
+        targetProject.canvasLayout?.wires || [],
+        targetProject.codeFiles || [],
+        0,
+      )
+      if (proposal.projectId === targetProject.id && !isAiProposalCurrent(proposal, {
+        editorRevision: currentEditorRevision,
+        projectId: targetProject.id,
+        projectRevision: targetProject.documentRevision,
+      })) {
+        addToast('This AI proposal is stale. Regenerate it against the current project revision.', 'error')
+        return
+      }
+
+      setIsApplyingProposal(true)
+      try {
+        const activeFile = targetProject.codeFiles?.[0]
+        const plan = planAiProposalChanges(proposal, selectedIds, {
+          activeCodeFile: activeFile,
+          nodes: targetProject.canvasLayout?.nodes || [],
+          wires: targetProject.canvasLayout?.wires || [],
+        })
+
+        if (plan.errors.length > 0) {
+          setIsApplyingProposal(false)
+          addToast(`Proposal rejected: ${plan.errors[0]}`, 'error')
+          return
+        }
+
+        const { canvasChanged, codeChanged, nextCode, nextNodes, nextWires } = plan
+        if (!canvasChanged && !codeChanged) {
+          setIsApplyingProposal(false)
+          addToast('The selected proposal does not change the project.', 'info')
+          return
+        }
+
+        const updatedLayout = {
+          ...(targetProject.canvasLayout || { viewport: { x: 0, y: 0, scale: 1 } }),
+          nodes: nextNodes,
+          wires: nextWires,
+        }
+        const updatedCodeFiles = targetProject.codeFiles?.map((file) =>
+          file.id === activeFile?.id && codeChanged && typeof nextCode === 'string'
+            ? { ...file, content: nextCode }
+            : file,
+        ) || []
+
+        await projectApi.update(targetProject.id, {
+          ...targetProject,
+          canvasLayout: updatedLayout,
+          codeFiles: updatedCodeFiles,
+        })
+
+        await savedProjectContext.refetch()
+        addToast(`${selected.length} AI change${selected.length === 1 ? '' : 's'} applied to ${targetProject.name}!`, 'success')
+      } catch {
+        addToast('Failed to apply proposal to project.', 'error')
+      } finally {
+        setIsApplyingProposal(false)
+      }
+      return
+    }
+
+    // Case C: In Workspace mode without an associated project (general chat)
+    // Create a new project initialized with the proposal changes
     setIsApplyingProposal(true)
-    const plan = planAiProposalChanges(proposal, selectedIds, {
-      activeCodeFile: currentProjectState.activeCodeFile,
-      nodes: currentCanvasState.nodes,
-      wires: currentCanvasState.wires,
-    })
+    try {
+      const boardType = 'ARDUINO_UNO'
+      const initialLayout = createInitialProjectLayout(boardType)
+      const defaultCode = generateDefaultCode(boardType, 'AI Circuit Project')
+      const initialCodeFile = { id: 'main.ino', filename: 'main.ino', content: defaultCode, language: 'cpp', sortOrder: 0 }
 
-    if (plan.errors.length > 0) {
+      const plan = planAiProposalChanges(proposal, selectedIds, {
+        activeCodeFile: initialCodeFile,
+        nodes: initialLayout.nodes,
+        wires: initialLayout.wires,
+      })
+
+      if (plan.errors.length > 0) {
+        setIsApplyingProposal(false)
+        addToast(`Could not apply to new project: ${plan.errors[0]}`, 'error')
+        return
+      }
+
+      const projectName = `AI Circuit - ${new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+      const createPayload: CreateProjectRequest = {
+        name: projectName,
+        description: 'Project created from AI circuit proposal',
+        boardType,
+        isPublic: false,
+        canvasLayout: {
+          nodes: plan.nextNodes,
+          wires: plan.nextWires,
+          viewport: { x: 0, y: 0, scale: 1 },
+        },
+        codeFiles: [{
+          filename: 'main.ino',
+          language: 'cpp',
+          sortOrder: 0,
+          content: plan.nextCode || defaultCode,
+        }],
+      }
+
+      const createRes = await projectApi.create(createPayload)
+      if (createRes.data.data?.id) {
+        const created = createRes.data.data
+        addToast('New project created with AI proposal! Navigating to editor...', 'success')
+        navigate(`/editor/${created.id}`)
+      } else {
+        throw new Error('Project creation failed')
+      }
+    } catch {
+      addToast('Could not create new project from proposal.', 'error')
+    } finally {
       setIsApplyingProposal(false)
-      addToast(`Proposal rejected: ${plan.errors[0]}`, 'error')
-      return
     }
-
-    const { beforeCode, canvasChanged, codeChanged, nextCode, nextNodes, nextWires } = plan
-    if (!canvasChanged && !codeChanged) {
-      setIsApplyingProposal(false)
-      addToast('The selected proposal does not change the current project.', 'info')
-      return
-    }
-
-    if (canvasChanged) useCanvasStore.getState().commitCanvasSnapshot(nextNodes, nextWires)
-    if (codeChanged && currentProjectState.activeCodeFile && typeof nextCode === 'string') {
-      updateCodeFileContent(currentProjectState.activeCodeFile.id, nextCode)
-    }
-
-    const afterProjectState = useProjectStore.getState()
-    const afterCanvasState = useCanvasStore.getState()
-    const afterEditorRevision = calculateEditorRevision(
-      afterCanvasState.nodes,
-      afterCanvasState.wires,
-      afterProjectState.currentProject?.codeFiles || [],
-      afterCanvasState.modelRevision,
-    )
-    setAppliedTransaction({
-      afterEditorRevision,
-      beforeCode: codeChanged ? beforeCode : undefined,
-      canvasChanged,
-      codeFileId: codeChanged ? currentProjectState.activeCodeFile?.id : undefined,
-      projectId: currentProjectState.currentProject?.id,
-      proposalId: proposal.id,
-    })
-    setIsApplyingProposal(false)
-    addToast(`${selected.length} AI change${selected.length === 1 ? '' : 's'} applied as one reviewable transaction.`, 'success')
   }
 
   const undoAppliedProposal = (proposal: AiProposal) => {
@@ -1084,12 +1229,18 @@ export default function AiChatPanel({
   const renderMessageActions = (msg: Message) => {
     if (msg.role !== 'assistant' || msg.isStreaming || !msg.proposal) return null
     const selectedIds = proposalSelections[msg.proposal.id] || defaultAiProposalSelection(msg.proposal)
-    const currentRevision = calculateEditorRevision(nodes, wires, currentProject?.codeFiles || [], modelRevision)
-    const isStale = !isAiProposalCurrent(msg.proposal, {
+    const contextProject = workspace ? savedProjectContext.data : currentProject
+    const currentRevision = calculateEditorRevision(
+      workspace ? (savedProjectContext.data?.canvasLayout?.nodes || []) : nodes,
+      workspace ? (savedProjectContext.data?.canvasLayout?.wires || []) : wires,
+      contextProject?.codeFiles || [],
+      workspace ? 0 : modelRevision,
+    )
+    const isStale = contextProject ? !isAiProposalCurrent(msg.proposal, {
       editorRevision: currentRevision,
-      projectId: currentProject?.id,
-      projectRevision: currentProject?.documentRevision,
-    })
+      projectId: contextProject.id,
+      projectRevision: contextProject.documentRevision,
+    }) : false
     const undoAvailable = Boolean(
       appliedTransaction?.proposalId === msg.proposal.id
       && appliedTransaction.afterEditorRevision === currentRevision,
@@ -1098,7 +1249,7 @@ export default function AiChatPanel({
       <AiProposalReview
         isStale={isStale}
         isWorking={isApplyingProposal}
-        onApply={() => applyProposal(msg.proposal!, selectedIds)}
+        onApply={() => void applyProposal(msg.proposal!, selectedIds)}
         onToggle={(itemId) => toggleProposalItem(msg.proposal!, itemId)}
         onUndo={() => undoAppliedProposal(msg.proposal!)}
         proposal={msg.proposal}

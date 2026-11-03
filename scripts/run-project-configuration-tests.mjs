@@ -15,12 +15,12 @@ try {
   for (const name of ['', '   ', 'x'.repeat(201), ...DISALLOWED_PROJECT_NAMES, 'UNTITLED CIRCUIT', '  Untitled Circuit  ']) {
     assert(validateProjectForm({ ...values, name }).name)
   }
-  for (const description of ['', '   ', 'x'.repeat(5001)]) {
-    assert(validateProjectForm({ ...values, description }).description)
-  }
+  assert.equal(validateProjectForm({ ...values, description: '' }).description, undefined)
+  assert.equal(validateProjectForm({ ...values, description: '   ' }).description, undefined)
+  assert(validateProjectForm({ ...values, description: 'x'.repeat(5001) }).description)
   for (const boardType of ['', 'INVALID', 'Arduino Uno R3', 'RASPBERRY_PI_5']) assert(validateProjectForm({ ...values, boardType }).boardType)
   assert.deepEqual(validateProjectForm(values), {})
-  assert.throws(() => createProjectPayload({ ...values, description: '   ' }), /Invalid project configuration/)
+  assert.equal(createProjectPayload({ ...values, description: '   ' }).description, '')
   assert.throws(() => createProjectPayload({ ...values, name: 'Untitled circuit' }), /Invalid project configuration/)
   assert.equal(createProjectPayload(values).description, 'description')
   for (const board of BOARD_CATALOG) {

@@ -2825,6 +2825,8 @@ html.light .vf-editor__solver-control select option,
   flex: 1;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .vf-lab-runner__canvas {

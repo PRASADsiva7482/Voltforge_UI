@@ -1,5 +1,6 @@
 import keycloak, { getKeycloakConfig } from './keycloak'
 import { getBaseURL } from '../api/client'
+import { clearStoredAuthTokens, getStoredAuthTokens, setStoredAuthTokens } from './tokenStorage'
 
 export const SESSION_CHECK_TIMEOUT_MS = 8000
 export const USER_SYNC_TIMEOUT_MS = 5000
@@ -49,6 +50,51 @@ export function checkSession(): Promise<SessionCheck> {
     }, SESSION_CHECK_TIMEOUT_MS)
 
     const kcConfig = getKeycloakConfig()
+    const stored = !hasLoginCallback() ? getStoredAuthTokens() : null
+
+    if (stored?.token && stored?.refreshToken) {
+      void keycloak.init({
+        token: stored.token,
+        refreshToken: stored.refreshToken,
+        idToken: stored.idToken,
+        pkceMethod: kcConfig.pkceMethod,
+        checkLoginIframe: false,
+        messageReceiveTimeout: SESSION_CHECK_TIMEOUT_MS,
+      }).then(async (authenticated) => {
+        if (settled) {
+          if (authenticated) keycloak.clearToken()
+          return
+        }
+        if (authenticated && keycloak.token) {
+          try {
+            await keycloak.updateToken(30)
+            setStoredAuthTokens({
+              token: keycloak.token,
+              refreshToken: keycloak.refreshToken,
+              idToken: keycloak.idToken,
+            })
+            finish({ authenticated: true, error: null })
+          } catch {
+            clearStoredAuthTokens()
+            keycloak.clearToken()
+            finish({ authenticated: false, error: null })
+          }
+        } else {
+          clearStoredAuthTokens()
+          finish({ authenticated: false, error: null })
+        }
+      }).catch((err) => {
+        console.warn('Keycloak session rehydration notice:', err)
+        clearStoredAuthTokens()
+        keycloak.clearToken()
+        finish({
+          authenticated: false,
+          error: null,
+        })
+      })
+      return
+    }
+
     void keycloak.init({
       checkLoginIframe: false,
       pkceMethod: kcConfig.pkceMethod,
@@ -68,9 +114,17 @@ export function checkSession(): Promise<SessionCheck> {
         if (authenticated) keycloak.clearToken()
         return
       }
+      if (authenticated && keycloak.token) {
+        setStoredAuthTokens({
+          token: keycloak.token,
+          refreshToken: keycloak.refreshToken,
+          idToken: keycloak.idToken,
+        })
+      }
       finish({ authenticated, error: null })
     }).catch((err) => {
       console.warn('Keycloak session check notice:', err)
+      clearStoredAuthTokens()
       finish({
         authenticated: false,
         error: hasLoginCallback() ? 'Sign-in failed. Please try signing in again.' : null,

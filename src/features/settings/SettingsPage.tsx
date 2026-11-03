@@ -462,6 +462,13 @@ export function SettingsPage() {
                   >
                     {t("Code Only")}
                   </button>
+                  <button
+                    type="button"
+                    className={`vf-pill-btn ${defaultView === 'pcb' ? 'is-active' : ''}`}
+                    onClick={() => setDefaultView('pcb')}
+                  >
+                    {t("PCB View")}
+                  </button>
                 </div>
               </div>
 

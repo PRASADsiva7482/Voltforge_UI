@@ -195,6 +195,7 @@ export type ElectronicComponent = {
   pinConfig?: Record<string, unknown>
   sortOrder: number
   svgData?: string
+  tags?: string[] | string
   type: string
 }
 
