@@ -25,6 +25,8 @@ import { ErrorState, LoadingState } from '../../components/data'
 import { Topbar } from '../../components/layout'
 import { Badge, Button, FieldShell, Tabs, TextInput } from '../../components/ui'
 import { useToastStore } from '../../store/useToastStore'
+import { useSimulationStore } from '../../store/simulationStore'
+import type { SimulationFidelityMode } from '../simulator/simulationModels'
 import { useThemeStore } from '../../store/themeStore'
 import './SettingsPage.css'
 
@@ -128,6 +130,7 @@ export function SettingsPage() {
     localStorage.setItem('vf-pref-fidelity', defaultFidelity)
     localStorage.setItem('vf-pref-autosave', String(autoSave))
     localStorage.setItem('vf-pref-gridsnap', String(gridSnap))
+    useSimulationStore.getState().setFidelityMode(defaultFidelity as SimulationFidelityMode)
     useToastStore.getState().addToast(t('Preferences saved successfully!'), 'success')
   }
 

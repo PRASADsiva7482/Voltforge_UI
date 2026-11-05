@@ -1485,9 +1485,18 @@ html.dark .landing-footer__bottom {
 @media (max-width: 768px) {
 
   .landing-nav__links,
-  .landing-nav__sandbox-btn,
-  .landing-nav__signup-btn {
+  .landing-nav__sandbox-btn {
     display: none;
+  }
+
+  .landing-nav__auth-group {
+    display: flex;
+    gap: 6px;
+  }
+
+  .landing-nav__signup-btn,
+  .landing-nav__signin-btn {
+    display: inline-flex;
   }
 
   .landing-nav__mobile-toggle {

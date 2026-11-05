@@ -75,6 +75,11 @@ export default defineConfig({
         target: 'http://localhost:2001/voltForge-app',
         ws: true,
       },
+      '/voltForge-app': {
+        target: 'http://localhost:2001',
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 })

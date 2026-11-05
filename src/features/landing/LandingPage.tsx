@@ -234,7 +234,7 @@ export function LandingPage() {
                 <a href="#preview">{t("Interactive Tour")}</a>
               </li>
               <li>
-                <Link to="/labs">{t("Microcontroller Tutorials")}</Link>
+                <Link to="/docs#tutorials">{t("Microcontroller Tutorials")}</Link>
               </li>
               <li>
                 <Link to="/docs">{t("Documentation")}</Link>

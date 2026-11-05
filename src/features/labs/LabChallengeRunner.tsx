@@ -87,6 +87,12 @@ export function LabChallengeRunner() {
         const height = Math.round(entry.contentRect.height);
         if (width > 50 && height > 50) {
           setCanvasSize({ width, height });
+          const currentViewport = useCanvasStore.getState().viewport;
+          if (width < 700 && currentViewport.scale > 0.85) {
+            useCanvasStore.getState().setViewport({ ...currentViewport, scale: 0.8 });
+          } else if (width >= 700 && currentViewport.scale < 0.95 && currentViewport.scale > 0.75) {
+            useCanvasStore.getState().setViewport({ ...currentViewport, scale: 1.0 });
+          }
         }
       }
     });

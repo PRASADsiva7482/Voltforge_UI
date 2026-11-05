@@ -18,6 +18,7 @@ export function ProjectsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const urlQuery = searchParams.get('query') || ''
   const [query, setQuery] = useState(urlQuery)
+  const [debouncedQuery, setDebouncedQuery] = useState(urlQuery)
   const [page, setPage] = useState(0)
   const [sort, setSort] = useState('recent')
   const [visibility, setVisibility] = useState('all')
@@ -44,17 +45,25 @@ export function ProjectsPage() {
 
   useEffect(() => {
     setQuery(urlQuery)
+    setDebouncedQuery(urlQuery)
   }, [urlQuery])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedQuery(query)
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [query])
 
   const isPublicParam = visibility === 'public' ? true : visibility === 'private' ? false : undefined
 
   const projectsQuery = useQuery({
     queryFn: () => projectApi.getUserProjects(page, 24, {
       isPublic: isPublicParam,
-      query: query.trim() || undefined,
+      query: debouncedQuery.trim() || undefined,
       sort,
     }).then((res) => res.data.data),
-    queryKey: ['projects', 'mine', page, query.trim(), visibility, sort],
+    queryKey: ['projects', 'mine', page, debouncedQuery.trim(), visibility, sort],
   })
 
   const deleteMutation = useMutation({

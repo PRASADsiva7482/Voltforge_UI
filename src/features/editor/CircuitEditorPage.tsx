@@ -64,6 +64,7 @@ import { useToastStore } from '../../store/useToastStore'
 import { useAuth } from '../../auth/useAuth'
 import { useCollaboration } from '../../hooks/useCollaboration'
 import { EditorDock } from '../../components/ui/EditorDock'
+import { Modal, Button } from '../../components/ui'
 import { useUnsavedEditorGuard, confirmLeaveEditor } from './useUnsavedEditorGuard'
 import { useTranslation } from 'react-i18next'
 
@@ -472,7 +473,7 @@ export default function CircuitEditorPage() {
 
   const isPreset = projectId === 'preset-smart-device'
   const isSharedSnapshot = !projectId && Boolean(searchParams.get('state'))
-  const isSandbox = (!projectId && !searchParams.get('state')) || location.pathname === '/sandbox' || location.pathname === '/editor/sandbox'
+  const isSandbox = (!projectId && !searchParams.get('state')) || location.pathname === '/sandbox' || location.pathname === '/editor/sandbox' || location.pathname === '/editor/share'
   const isSharedView = !projectId
   const isOwner = isPreset || Boolean(
     projectId &&
@@ -695,6 +696,7 @@ export default function CircuitEditorPage() {
 
   // ── Multi-Tab Concurrency State & Conflict Handling ──
   const [conflictModalOpen, setConflictModalOpen] = useState(false)
+  const [sandboxSaveModalOpen, setSandboxSaveModalOpen] = useState(false)
   const [remoteConflictRevision, setRemoteConflictRevision] = useState<string | undefined>(undefined)
 
   useEffect(() => {
@@ -843,7 +845,7 @@ export default function CircuitEditorPage() {
   const handleSave = useCallback((manual = true) => {
     if (isSandbox) {
       if (manual) {
-        addToast('VoltForge Live Sandbox is ephemeral. Use Copy Share Link or Export to preserve circuits.', 'info')
+        setSandboxSaveModalOpen(true)
       }
       return
     }
@@ -989,7 +991,7 @@ export default function CircuitEditorPage() {
         if (e.key === 's') {
           e.preventDefault()
           if (isSandbox) {
-            addToast('VoltForge Live Sandbox is ephemeral. Use Copy Share Link or Export to preserve circuits.', 'info')
+            setSandboxSaveModalOpen(true)
           } else {
             handleSave()
           }
@@ -2023,6 +2025,19 @@ export default function CircuitEditorPage() {
 
               <span className="vf-editor__divider" />
 
+              {/* In sandbox mode for guest, show Save button that prompts sign in */}
+              {isSandbox && (
+                <button
+                  className="vf-editor__save-btn"
+                  onClick={() => setSandboxSaveModalOpen(true)}
+                  type="button"
+                  aria-label="Save project"
+                >
+                  <Save size={14} />
+                  <span className="vf-editor__action-label">{t("Save")}</span>
+                </button>
+              )}
+
               {/* Login CTA button */}
               <button
                 className="vf-editor__save-btn vf-editor__login-btn"
@@ -2059,8 +2074,8 @@ export default function CircuitEditorPage() {
 
               <span className="vf-editor__divider" />
 
-              {/* Fork button if editing non-owned project, save button if owner */}
-              {isOwner ? (
+              {/* Fork button if editing non-owned project, save button if owner or sandbox */}
+              {isOwner || isSandbox ? (
                 <button
                   className="vf-editor__save-btn"
                   onClick={() => handleSave()}
@@ -2994,7 +3009,7 @@ export default function CircuitEditorPage() {
               </div>
 
               <div className="vf-mobile-menu-footer">
-                {isOwner ? (
+                {isOwner || isSandbox ? (
                   <button
                     type="button"
                     className="vf-mobile-menu-primary-btn"
@@ -3056,6 +3071,38 @@ export default function CircuitEditorPage() {
         onOverwrite={handleForceOverwrite}
         onReload={handleReloadRemote}
       />
+
+      {/* Sandbox Ephemeral Save Modal */}
+      {sandboxSaveModalOpen && (
+        <div className="vf-modal-backdrop" onClick={() => setSandboxSaveModalOpen(false)}>
+          <div className="vf-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <div className="vf-modal__header">
+              <h3>Save Circuit - Sign in required</h3>
+              <button
+                type="button"
+                className="vf-modal__close"
+                onClick={() => setSandboxSaveModalOpen(false)}
+                aria-label="Close"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="vf-modal__body">
+              <p style={{ color: 'var(--vf-text-muted)', lineHeight: 1.5, margin: '8px 0 20px' }}>
+                VoltForge Live Sandbox is an ephemeral workspace. Sign in or create a free account to save your circuit, share it with teammates, and track revision history.
+              </p>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <Button variant="secondary" onClick={() => setSandboxSaveModalOpen(false)}>
+                  Keep Exploring
+                </Button>
+                <Button variant="primary" onClick={() => login()}>
+                  Sign In / Sign Up
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

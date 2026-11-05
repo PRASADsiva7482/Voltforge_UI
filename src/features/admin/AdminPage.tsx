@@ -1,14 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
 import { ShieldAlert, Users } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { adminApi } from '../../api/services'
 import { useAuth } from '../../auth/useAuth'
 import { ErrorState, LoadingState } from '../../components/data'
 import { Topbar } from '../../components/layout'
-import { Box, MetricCard } from '../../components/ui'
+import { Box, Button, MetricCard } from '../../components/ui'
 
 export function AdminPage() {
   const auth = useAuth()
+  const navigate = useNavigate()
   const { t } = useTranslation()
   const stats = useQuery({
     enabled: auth.user?.role === 'ADMIN',
@@ -20,10 +22,13 @@ export function AdminPage() {
     return (
       <>
         <Topbar eyebrow={t("Admin")} title={t("Admin")} />
-        <Box className="access-panel" tone="raised">
-          <ShieldAlert size={32} />
-          <h2>{t("Admin access required")}</h2>
-          <p className="vf-muted">{t("Your account roles do not include administrator privileges.")}</p>
+        <Box className="access-panel" tone="raised" style={{ textAlign: 'center', padding: '48px 24px' }}>
+          <ShieldAlert size={48} style={{ color: 'var(--vf-danger, #ef4444)', margin: '0 auto 16px' }} />
+          <h2>{t("Access Denied (403)")}</h2>
+          <p className="vf-muted" style={{ margin: '8px 0 24px' }}>{t("Your account roles do not include administrator privileges.")}</p>
+          <Button variant="primary" onClick={() => navigate('/dashboard')}>
+            {t("Return to Dashboard")}
+          </Button>
         </Box>
       </>
     )

@@ -40,11 +40,8 @@ export function checkSession(): Promise<SessionCheck> {
         error: hasLoginCallback() ? 'The sign-in service did not respond. Please try signing in again.' : null,
       })
       keycloak.clearToken()
-      // No retry loop: explicit login starts a fresh page/session instead.
       document.querySelectorAll('iframe[title="keycloak-3p-check-iframe"], iframe[title="keycloak-silent-check-sso"]')
         .forEach((frame) => {
-          // The adapter owns removal after a callback's token exchange. Avoid
-          // removing its frame twice if that exchange finishes after timeout.
           if (!callbackInFlight || frame.getAttribute('title') !== 'keycloak-silent-check-sso') frame.remove()
         })
     }, SESSION_CHECK_TIMEOUT_MS)
@@ -65,26 +62,52 @@ export function checkSession(): Promise<SessionCheck> {
           if (authenticated) keycloak.clearToken()
           return
         }
-        if (authenticated && keycloak.token) {
-          try {
-            await keycloak.updateToken(30)
+        try {
+          // Rehydrate token; updateToken(30) refreshes access token if within 30s of expiry
+          await keycloak.updateToken(30)
+          if (keycloak.token) {
             setStoredAuthTokens({
               token: keycloak.token,
               refreshToken: keycloak.refreshToken,
               idToken: keycloak.idToken,
             })
             finish({ authenticated: true, error: null })
-          } catch {
-            clearStoredAuthTokens()
-            keycloak.clearToken()
-            finish({ authenticated: false, error: null })
+            return
           }
-        } else {
-          clearStoredAuthTokens()
-          finish({ authenticated: false, error: null })
+        } catch (refreshErr) {
+          console.warn('[VoltForge Auth] Refresh token expired, attempting full refresh:', refreshErr)
+          try {
+            await keycloak.updateToken(-1)
+            if (keycloak.token) {
+              setStoredAuthTokens({
+                token: keycloak.token,
+                refreshToken: keycloak.refreshToken,
+                idToken: keycloak.idToken,
+              })
+              finish({ authenticated: true, error: null })
+              return
+            }
+          } catch {}
         }
-      }).catch((err) => {
+        clearStoredAuthTokens()
+        keycloak.clearToken()
+        finish({ authenticated: false, error: null })
+      }).catch(async (err) => {
         console.warn('Keycloak session rehydration notice:', err)
+        if (stored.refreshToken) {
+          try {
+            await keycloak.updateToken(-1)
+            if (keycloak.token) {
+              setStoredAuthTokens({
+                token: keycloak.token,
+                refreshToken: keycloak.refreshToken,
+                idToken: keycloak.idToken,
+              })
+              finish({ authenticated: true, error: null })
+              return
+            }
+          } catch {}
+        }
         clearStoredAuthTokens()
         keycloak.clearToken()
         finish({
@@ -98,19 +121,9 @@ export function checkSession(): Promise<SessionCheck> {
     void keycloak.init({
       checkLoginIframe: false,
       pkceMethod: kcConfig.pkceMethod,
-      messageReceiveTimeout: SESSION_CHECK_TIMEOUT_MS,
-      // An explicit callback needs code exchange, not another cookie probe.
-      // Public share URLs containing only ?state= are not login callbacks.
-      ...(hasLoginCallback() ? {} : {
-        onLoad: 'check-sso' as const,
-        silentCheckSsoRedirectUri: new URL('silent-check-sso.html', window.location.origin).href,
-        // Public startup must never turn an unavailable silent check into a
-        // top-level identity-provider navigation. Explicit login owns redirects.
-        silentCheckSsoFallback: false,
-      }),
+      messageReceiveTimeout: 2000,
     }).then((authenticated) => {
       if (settled) {
-        // Reject late tokens after reporting that session discovery failed.
         if (authenticated) keycloak.clearToken()
         return
       }
@@ -136,7 +149,6 @@ export function checkSession(): Promise<SessionCheck> {
 
 export function loginRedirectUri() {
   const { origin, pathname, search, hash } = window.location
-  // Only the current same-origin location is used, never an untrusted return URL.
   return pathname === '/' ? `${origin}/dashboard` : `${origin}${pathname}${search}${hash}`
 }
 
@@ -148,8 +160,6 @@ export async function checkSignInAvailability() {
     const base = (keycloak.authServerUrl || config.url)?.replace(/\/$/, '')
     const realm = keycloak.realm || config.realm
     if (!base || !realm) throw new Error('Sign-in is not configured.')
-    // Discovery endpoints can be reachable while browser CORS rejects them.
-    // The backend probes only its configured issuer with a bounded timeout.
     const issuer = `${base}/realms/${encodeURIComponent(realm)}`
     const headers = new Headers()
     headers.set('ngrok-skip-browser-warning', 'true')
@@ -165,8 +175,6 @@ export async function checkSignInAvailability() {
       throw new Error('Sign-in service returned an invalid availability response.')
     }
     const configuration = await response.json() as { success?: boolean; data?: { issuer?: string; available?: boolean } }
-    // A realm name is not an issuer identity: a different host, port or path
-    // can serve an unrelated realm with the same name.
     const isMatchingIssuer = configuration?.data?.issuer === issuer
     if (configuration?.success !== true || configuration.data?.available !== true
       || !isMatchingIssuer) throw new Error('Sign-in provider is unavailable or does not match the app configuration.')
@@ -174,4 +182,3 @@ export async function checkSignInAvailability() {
     window.clearTimeout(timer)
   }
 }
-
