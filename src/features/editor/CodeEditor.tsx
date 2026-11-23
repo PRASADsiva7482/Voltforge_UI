@@ -5,7 +5,7 @@ import { useProjectStore } from '../../store/projectStore';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useSimulationStore } from '../../store/simulationStore';
 import { useToastStore } from '../../store/useToastStore';
-import { Loader2, Maximize2, Minimize2, AlignLeft, Eye, EyeOff, Cpu, Upload, X } from 'lucide-react';
+import { Loader2, Maximize2, Minimize2, AlignLeft, Eye, EyeOff, Cpu, Upload, X, Code } from 'lucide-react';
 import type { OnMount } from '@monaco-editor/react';
 import { getBoardPinNumber, getBoardProfile, isBoardComponentType, supportsAvr8js } from '../canvas/boardCatalog';
 import { parseAvrHex } from '../simulator/intelHex';
@@ -236,7 +236,7 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
               <div
                 className="vf-code-editor__action-btn"
                 style={{
-                    backgroundColor: canRunCustomHex ? 'var(--vf-accent-soft)' : 'var(--vf-warning-soft)',
+                  backgroundColor: canRunCustomHex ? 'var(--vf-accent-soft)' : 'var(--vf-warning-soft)',
                   borderColor: 'var(--vf-accent)',
                   color: 'var(--vf-accent)',
                   display: 'flex',
@@ -247,16 +247,16 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
                   fontSize: '11px',
                   fontWeight: 600,
                 }}
-                title={t("Custom Intel HEX firmware; AVR8js execution is available only for Uno/Nano/ATmega328P boards")}
+                title={t("Custom Intel HEX firmware; AVR8js 16MHz execution active")}
               >
                 <Cpu size={12} />
-                <span>{canRunCustomHex ? t('AVR8js: Custom HEX') : t('HEX execution unavailable')}</span>
+                <span>{canRunCustomHex ? t('Mode: AVR8js 16MHz (HEX)') : t('HEX execution unavailable')}</span>
                 <button
                   disabled={readOnly}
                   onClick={(e) => {
                     e.stopPropagation();
                     setCustomHex(null);
-                    addToast(t('Cleared custom HEX, using source compiler/interpreter'), 'info');
+                    addToast(t('Cleared custom HEX, returned to Source Compatibility mode'), 'info');
                   }}
                   style={{
                     background: 'none',
@@ -273,16 +273,37 @@ function CodeEditor({ readOnly }: { readOnly?: boolean }) {
                 </button>
               </div>
             ) : (
-              <button
-                className="vf-code-editor__action-btn"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={readOnly || !canRunCustomHex}
-                title={t("Upload compiled Intel HEX file; direct AVR8js execution is available only for Uno/Nano/ATmega328P boards")}
-                style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-              >
-                <Upload size={12} />
-                <span>{t('Load .hex')}</span>
-              </button>
+              <>
+                <div
+                  className="vf-code-editor__action-btn"
+                  style={{
+                    backgroundColor: 'var(--vf-surface-container, rgba(255,255,255,0.05))',
+                    borderColor: 'var(--vf-border-subtle, rgba(255,255,255,0.12))',
+                    color: 'var(--vf-text-muted, #94a3b8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                  }}
+                  title={t("Source compatibility mode: C++ sketches are parsed and executed in-browser via regex/AST interpretation. Upload a compiled Intel HEX binary to run cycle-accurate AVR8js 16MHz emulation.")}
+                >
+                  <Code size={12} />
+                  <span>{t('Mode: Source (Interpreted)')}</span>
+                </div>
+                <button
+                  className="vf-code-editor__action-btn"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={readOnly || !canRunCustomHex}
+                  title={t("Upload compiled Intel HEX file; direct AVR8js execution is available only for Uno/Nano/ATmega328P boards")}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Upload size={12} />
+                  <span>{t('Load .hex')}</span>
+                </button>
+              </>
             )}
 
             <span className="vf-code-editor__lang-badge">{lang}</span>

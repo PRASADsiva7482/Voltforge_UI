@@ -1570,7 +1570,7 @@ const ComponentNode = ({
                   fill={isClosed ? activeDarkColor : '#090d16'}
                   stroke={isClosed ? activeStroke : '#334155'}
                   strokeWidth={0.8 * sMin}
-                  listening={false}
+                  listening={true}
                 />
                 {/* Tactile rectangular slider knob */}
                 <Rect
@@ -1583,7 +1583,7 @@ const ComponentNode = ({
                   shadowColor={isClosed ? activeColor : 'rgba(0,0,0,0.5)'}
                   shadowBlur={isClosed ? 5 : 3}
                   shadowOffsetY={1}
-                  listening={false}
+                  listening={true}
                 />
                 {/* Tactile grip ridges on slider */}
                 <Line

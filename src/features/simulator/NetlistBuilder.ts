@@ -726,6 +726,62 @@ export function buildMNACircuit(
         });
         elementToComponent.set(swId, node.id);
       }
+
+      if (node.type === 'RASPBERRY_PI_PICO' || node.type.startsWith('RASPBERRY_PI_PICO')) {
+        // Raspberry Pi Pico onboard circuitry:
+        // RP2040 chip GPIO25 -> Board R3 (470 Ω) -> Green LED (D1) -> Board Ground
+        const internalSrcNode = nextExtraNode++;
+        const internalPadNode = nextExtraNode++;
+        const internalAnodeNode = nextExtraNode++;
+
+        const isLedHigh = pinStates['25'] !== undefined ? pinStates['25'] > 1.5 : Boolean(node.properties?.builtInLedLit);
+        const ledVoltage = isLedHigh ? logicVoltage : 0.0;
+
+        const srcId = `vs_mcu_${node.id}_d25_src`;
+        elements.push({
+          id: srcId,
+          type: 'VOLTAGE_SOURCE',
+          nodeA: internalSrcNode,
+          nodeB: boardGroundNode,
+          value: isPowered ? ledVoltage : 0.0,
+        });
+        elementToComponent.set(srcId, node.id);
+        vsCounter++;
+
+        const swId = `r_mcu_pin_${node.id}_d25`;
+        elements.push({
+          id: swId,
+          type: 'RESISTOR',
+          nodeA: internalSrcNode,
+          nodeB: internalPadNode,
+          value: isPowered ? 50 : 1e8,
+        });
+        elementToComponent.set(swId, node.id);
+
+        const r3Id = `r_pico_board_r3_${node.id}`;
+        elements.push({
+          id: r3Id,
+          type: 'RESISTOR',
+          nodeA: internalPadNode,
+          nodeB: internalAnodeNode,
+          value: 470, // 470 Ω Raspberry Pi Pico onboard resistor R3
+        });
+        elementToComponent.set(r3Id, node.id);
+
+        const ledId = `d_pico_board_led_${node.id}`;
+        elements.push({
+          id: ledId,
+          type: 'DIODE',
+          nodeA: internalAnodeNode,
+          nodeB: boardGroundNode,
+          value: 2.0,
+          forwardVoltage: 2.0, // Green LED forward voltage ~2.0V
+          seriesResistance: 15,
+          reverseResistance: SIMULATION_MODELS.diode.reverseResistance,
+          maxCurrent: 0.020, // 20 mA max current
+        });
+        elementToComponent.set(ledId, node.id);
+      }
       continue;
     }
 

@@ -7,6 +7,8 @@
 
 import { applyMnaElementValueUpdates } from './mnaIncremental';
 
+export type MNAIntegrationMethod = 'TRAPEZOIDAL' | 'BACKWARD_EULER';
+
 export type MNAElementType =
   | 'RESISTOR'
   | 'VOLTAGE_SOURCE'
@@ -78,6 +80,7 @@ export interface MNAElement {
   turnsRatio?: number;
   coupling?: number;
   prevSecondaryCurrent?: number;
+  prevSecondaryVoltage?: number;
 
   // Op-amp parameters: nodeA/nodeB are output terminals, controlNode is the
   // non-inverting input, and controlNode2 is the inverting input.
@@ -179,6 +182,7 @@ export class MNASolver {
   private elements: MNAElement[] = [];
   private voltageSources: MNAElement[] = []; // Subset that need branch current vars
   private dt: number;                       // Time step for transient (seconds)
+  private integrationMethod: MNAIntegrationMethod = 'TRAPEZOIDAL';
 
   constructor(numNodes: number, dt = 0.0001) {
     this.numNodes = numNodes;
@@ -191,6 +195,14 @@ export class MNASolver {
 
   public getTimeStep(): number {
     return this.dt;
+  }
+
+  public setIntegrationMethod(method: MNAIntegrationMethod) {
+    this.integrationMethod = method;
+  }
+
+  public getIntegrationMethod(): MNAIntegrationMethod {
+    return this.integrationMethod;
   }
 
   public setElements(elements: MNAElement[]) {
@@ -410,16 +422,23 @@ export class MNASolver {
   }
 
   private stampCapacitor(A: number[][], b: number[], elem: MNAElement) {
-    // Trapezoidal companion model:
-    // The capacitor is replaced by a conductance Geq = 2C/dt in parallel with
-    // a current source Ieq = Geq * V_prev + I_prev
     const C = Math.max(elem.value, 1e-15);
-    const geq = (2 * C) / this.dt;
     const vPrev = elem.prevVoltage ?? 0;
     const iPrev = elem.prevCurrent ?? 0;
-    const ieq = geq * vPrev + iPrev;
-
     const { nodeA, nodeB } = elem;
+
+    let geq: number;
+    let ieq: number;
+
+    if (this.integrationMethod === 'BACKWARD_EULER') {
+      // Backward-Euler companion model: i = (C/dt)*(v - vPrev)
+      geq = C / this.dt;
+      ieq = geq * vPrev;
+    } else {
+      // Trapezoidal companion model: i = (2C/dt)*(v - vPrev) - iPrev
+      geq = (2 * C) / this.dt;
+      ieq = geq * vPrev + iPrev;
+    }
 
     // Stamp conductance (same as resistor with g = geq)
     if (nodeA > 0) A[nodeA - 1][nodeA - 1] += geq;
@@ -429,20 +448,34 @@ export class MNASolver {
       A[nodeB - 1][nodeA - 1] -= geq;
     }
 
-    // Stamp companion current source
+    // Stamp companion current source:
+    // Flowing from nodeA to nodeB, entering RHS as:
+    // KCL at nodeA: geq*(va - vb) - ieq + ... = 0 => geq*(va - vb) = +ieq
     if (nodeA > 0) b[nodeA - 1] += ieq;
     if (nodeB > 0) b[nodeB - 1] -= ieq;
   }
 
   private stampInductor(A: number[][], b: number[], elem: MNAElement) {
-    // Backward-Euler companion model:
-    //   i = i(previous) + (dt/L) * v
-    // This is deliberately dissipative and therefore stable when a user
-    // pauses, steps, or reconnects a circuit while the transient is running.
     const inductance = Math.max(elem.value, 1e-15);
-    const conductance = this.dt / inductance;
     const previousCurrent = elem.prevCurrent ?? 0;
+    const previousVoltage = elem.prevVoltage ?? 0;
     const { nodeA, nodeB } = elem;
+
+    let conductance: number;
+    let historyCurrent: number;
+
+    if (this.integrationMethod === 'TRAPEZOIDAL') {
+      // Trapezoidal companion model:
+      // i = previousCurrent + (dt / 2L) * (v + previousVoltage)
+      // i = (dt / 2L) * v + [previousCurrent + (dt / 2L) * previousVoltage]
+      conductance = this.dt / (2 * inductance);
+      historyCurrent = previousCurrent + conductance * previousVoltage;
+    } else {
+      // Backward-Euler companion model (default for inductive stability):
+      // i = previousCurrent + (dt / L) * v
+      conductance = this.dt / inductance;
+      historyCurrent = previousCurrent;
+    }
 
     if (nodeA > 0) A[nodeA - 1][nodeA - 1] += conductance;
     if (nodeB > 0) A[nodeB - 1][nodeB - 1] += conductance;
@@ -450,8 +483,13 @@ export class MNASolver {
       A[nodeA - 1][nodeB - 1] -= conductance;
       A[nodeB - 1][nodeA - 1] -= conductance;
     }
-    if (nodeA > 0) b[nodeA - 1] += previousCurrent;
-    if (nodeB > 0) b[nodeB - 1] -= previousCurrent;
+
+    // Norton companion current source flows from nodeA to nodeB:
+    // KCL at nodeA (sum I_leaving = 0):
+    // G_L * (va - vb) + historyCurrent + ... = 0 => G_L * (va - vb) = -historyCurrent
+    // Therefore RHS at nodeA subtracts historyCurrent, and nodeB adds it.
+    if (nodeA > 0) b[nodeA - 1] -= historyCurrent;
+    if (nodeB > 0) b[nodeB - 1] += historyCurrent;
   }
 
   private stampControlledConductance(
@@ -482,31 +520,57 @@ export class MNASolver {
       elem.secondaryInductance ?? primaryInductance * turnsRatio * turnsRatio,
       1e-12,
     );
-    const coupling = Math.max(0.5, Math.min(0.9999, elem.coupling ?? 0.999));
+    const coupling = Math.max(0.0, Math.min(0.9999, elem.coupling ?? 0.999));
     const mutualInductance = coupling * Math.sqrt(primaryInductance * secondaryInductance);
     const determinant = Math.max(
       primaryInductance * secondaryInductance - mutualInductance * mutualInductance,
       primaryInductance * secondaryInductance * 1e-6,
     );
-    const scale = this.dt / determinant;
-    const g11 = scale * secondaryInductance;
-    const g12 = -scale * mutualInductance;
-    const g21 = g12;
-    const g22 = scale * primaryInductance;
 
-    this.stampControlledConductance(A, elem.nodeA, elem.nodeB, elem.nodeA, elem.nodeB, g11);
-    this.stampControlledConductance(A, elem.nodeA, elem.nodeB, secondaryA, secondaryB, g12);
-    this.stampControlledConductance(A, secondaryA, secondaryB, elem.nodeA, elem.nodeB, g21);
-    this.stampControlledConductance(A, secondaryA, secondaryB, secondaryA, secondaryB, g22);
+    let scale: number;
+    let primaryHistory: number;
+    let secondaryHistory: number;
 
-    // The stored currents are the Norton history sources of the coupled
-    // backward-Euler companion model.
-    const primaryHistory = elem.prevCurrent ?? 0;
-    const secondaryHistory = elem.prevSecondaryCurrent ?? 0;
-    if (elem.nodeA > 0) b[elem.nodeA - 1] += primaryHistory;
-    if (elem.nodeB > 0) b[elem.nodeB - 1] -= primaryHistory;
-    if (secondaryA > 0) b[secondaryA - 1] += secondaryHistory;
-    if (secondaryB > 0) b[secondaryB - 1] -= secondaryHistory;
+    if (this.integrationMethod === 'TRAPEZOIDAL') {
+      // Trapezoidal companion model for coupled inductors:
+      // i = (dt / 2) * L^-1 * v + [i(prev) + (dt / 2) * L^-1 * v(prev)]
+      scale = this.dt / (2 * determinant);
+      const g11 = scale * secondaryInductance;
+      const g12 = -scale * mutualInductance;
+      const g21 = g12;
+      const g22 = scale * primaryInductance;
+
+      const v1Prev = elem.prevVoltage ?? 0;
+      const v2Prev = elem.prevSecondaryVoltage ?? 0;
+      primaryHistory = (elem.prevCurrent ?? 0) + g11 * v1Prev + g12 * v2Prev;
+      secondaryHistory = (elem.prevSecondaryCurrent ?? 0) + g21 * v1Prev + g22 * v2Prev;
+
+      this.stampControlledConductance(A, elem.nodeA, elem.nodeB, elem.nodeA, elem.nodeB, g11);
+      this.stampControlledConductance(A, elem.nodeA, elem.nodeB, secondaryA, secondaryB, g12);
+      this.stampControlledConductance(A, secondaryA, secondaryB, elem.nodeA, elem.nodeB, g21);
+      this.stampControlledConductance(A, secondaryA, secondaryB, secondaryA, secondaryB, g22);
+    } else {
+      // Backward-Euler companion model:
+      // i = dt * L^-1 * v + i(prev)
+      scale = this.dt / determinant;
+      const g11 = scale * secondaryInductance;
+      const g12 = -scale * mutualInductance;
+      const g21 = g12;
+      const g22 = scale * primaryInductance;
+
+      primaryHistory = elem.prevCurrent ?? 0;
+      secondaryHistory = elem.prevSecondaryCurrent ?? 0;
+
+      this.stampControlledConductance(A, elem.nodeA, elem.nodeB, elem.nodeA, elem.nodeB, g11);
+      this.stampControlledConductance(A, elem.nodeA, elem.nodeB, secondaryA, secondaryB, g12);
+      this.stampControlledConductance(A, secondaryA, secondaryB, elem.nodeA, elem.nodeB, g21);
+      this.stampControlledConductance(A, secondaryA, secondaryB, secondaryA, secondaryB, g22);
+    }
+
+    if (elem.nodeA > 0) b[elem.nodeA - 1] -= primaryHistory;
+    if (elem.nodeB > 0) b[elem.nodeB - 1] += primaryHistory;
+    if (secondaryA > 0) b[secondaryA - 1] -= secondaryHistory;
+    if (secondaryB > 0) b[secondaryB - 1] += secondaryHistory;
   }
 
   private stampMotor(
@@ -818,10 +882,36 @@ export class MNASolver {
         const current = Math.min(maxCurrent, Math.max(-Is, beta * Is * (Math.exp(junctionVoltage / (elem.thermalVoltage ?? 0.02585)) - 1)));
         branchCurrents.set(elem.id, elem.pnp ? -current : current);
       }
+      if (elem.type === 'CAPACITOR') {
+        const va = elem.nodeA > 0 ? nodeVoltages[elem.nodeA] : 0;
+        const vb = elem.nodeB > 0 ? nodeVoltages[elem.nodeB] : 0;
+        const vNow = va - vb;
+        const C = Math.max(elem.value, 1e-15);
+        let current: number;
+        if (this.integrationMethod === 'BACKWARD_EULER') {
+          const geq = C / this.dt;
+          current = geq * (vNow - (elem.prevVoltage ?? 0));
+        } else {
+          const geq = (2 * C) / this.dt;
+          current = geq * vNow - (geq * (elem.prevVoltage ?? 0) + (elem.prevCurrent ?? 0));
+        }
+        branchCurrents.set(elem.id, current);
+      }
       if (elem.type === 'INDUCTOR') {
         const va = elem.nodeA > 0 ? nodeVoltages[elem.nodeA] : 0;
         const vb = elem.nodeB > 0 ? nodeVoltages[elem.nodeB] : 0;
-        branchCurrents.set(elem.id, (elem.prevCurrent ?? 0) + (this.dt / Math.max(elem.value, 1e-15)) * (va - vb));
+        const vNow = va - vb;
+        const inductance = Math.max(elem.value, 1e-15);
+        let current: number;
+        if (this.integrationMethod === 'TRAPEZOIDAL') {
+          current = (elem.prevCurrent ?? 0) + (this.dt / (2 * inductance)) * (vNow + (elem.prevVoltage ?? 0));
+        } else {
+          current = (elem.prevCurrent ?? 0) + (this.dt / inductance) * vNow;
+        }
+        branchCurrents.set(elem.id, current);
+      }
+      if (elem.type === 'CURRENT_SOURCE') {
+        branchCurrents.set(elem.id, elem.value);
       }
       if (elem.type === 'TRANSFORMER') {
         const secondaryA = elem.controlNode ?? 0;
@@ -833,11 +923,23 @@ export class MNASolver {
         const primaryInductance = Math.max(elem.value, 1e-12);
         const ratio = Math.max(elem.turnsRatio ?? 1, 1e-6);
         const secondaryInductance = Math.max(elem.secondaryInductance ?? primaryInductance * ratio * ratio, 1e-12);
-        const coupling = Math.max(0.5, Math.min(0.9999, elem.coupling ?? 0.999));
+        const coupling = Math.max(0.0, Math.min(0.9999, elem.coupling ?? 0.999));
         const mutual = coupling * Math.sqrt(primaryInductance * secondaryInductance);
         const determinant = Math.max(primaryInductance * secondaryInductance - mutual * mutual, primaryInductance * secondaryInductance * 1e-6);
-        const scale = this.dt / determinant;
-        const primaryCurrent = (elem.prevCurrent ?? 0) + scale * (secondaryInductance * primaryVoltage - mutual * secondaryVoltage);
+
+        let primaryCurrent: number;
+        if (this.integrationMethod === 'TRAPEZOIDAL') {
+          const scale = this.dt / (2 * determinant);
+          const g11 = scale * secondaryInductance;
+          const g12 = -scale * mutual;
+          const v1Prev = elem.prevVoltage ?? 0;
+          const v2Prev = elem.prevSecondaryVoltage ?? 0;
+          const histP = (elem.prevCurrent ?? 0) + g11 * v1Prev + g12 * v2Prev;
+          primaryCurrent = histP + g11 * primaryVoltage + g12 * secondaryVoltage;
+        } else {
+          const scale = this.dt / determinant;
+          primaryCurrent = (elem.prevCurrent ?? 0) + scale * (secondaryInductance * primaryVoltage - mutual * secondaryVoltage);
+        }
         branchCurrents.set(elem.id, primaryCurrent);
       }
       if (elem.type === 'MOSFET') {
@@ -876,18 +978,32 @@ export class MNASolver {
         const vb = elem.nodeB > 0 ? solution.nodeVoltages[elem.nodeB] : 0;
         const vNow = va - vb;
         const C = Math.max(elem.value, 1e-15);
-        const geq = (2 * C) / this.dt;
-        const iNow = geq * vNow - (geq * (elem.prevVoltage ?? 0) + (elem.prevCurrent ?? 0));
+        let iNow: number;
+        if (this.integrationMethod === 'BACKWARD_EULER') {
+          const geq = C / this.dt;
+          iNow = geq * (vNow - (elem.prevVoltage ?? 0));
+        } else {
+          const geq = (2 * C) / this.dt;
+          iNow = geq * vNow - (geq * (elem.prevVoltage ?? 0) + (elem.prevCurrent ?? 0));
+        }
         elem.prevVoltage = vNow;
         elem.prevCurrent = iNow;
       }
       if (elem.type === 'INDUCTOR') {
         const va = elem.nodeA > 0 ? solution.nodeVoltages[elem.nodeA] : 0;
         const vb = elem.nodeB > 0 ? solution.nodeVoltages[elem.nodeB] : 0;
-        const current = (elem.prevCurrent ?? 0)
-          + (this.dt / Math.max(elem.value, 1e-15)) * (va - vb);
+        const vNow = va - vb;
+        const inductance = Math.max(elem.value, 1e-15);
+        let current: number;
+        if (this.integrationMethod === 'TRAPEZOIDAL') {
+          current = (elem.prevCurrent ?? 0)
+            + (this.dt / (2 * inductance)) * (vNow + (elem.prevVoltage ?? 0));
+        } else {
+          current = (elem.prevCurrent ?? 0)
+            + (this.dt / inductance) * vNow;
+        }
         elem.prevCurrent = current;
-        elem.prevVoltage = va - vb;
+        elem.prevVoltage = vNow;
       }
       if (elem.type === 'TRANSFORMER') {
         const secondaryA = elem.controlNode ?? 0;
@@ -899,13 +1015,35 @@ export class MNASolver {
         const primaryInductance = Math.max(elem.value, 1e-12);
         const ratio = Math.max(elem.turnsRatio ?? 1, 1e-6);
         const secondaryInductance = Math.max(elem.secondaryInductance ?? primaryInductance * ratio * ratio, 1e-12);
-        const coupling = Math.max(0.5, Math.min(0.9999, elem.coupling ?? 0.999));
+        const coupling = Math.max(0.0, Math.min(0.9999, elem.coupling ?? 0.999));
         const mutual = coupling * Math.sqrt(primaryInductance * secondaryInductance);
         const determinant = Math.max(primaryInductance * secondaryInductance - mutual * mutual, primaryInductance * secondaryInductance * 1e-6);
-        const scale = this.dt / determinant;
-        elem.prevCurrent = (elem.prevCurrent ?? 0) + scale * (secondaryInductance * primaryVoltage - mutual * secondaryVoltage);
-        elem.prevSecondaryCurrent = (elem.prevSecondaryCurrent ?? 0) + scale * (-mutual * primaryVoltage + primaryInductance * secondaryVoltage);
+
+        let i1: number;
+        let i2: number;
+
+        if (this.integrationMethod === 'TRAPEZOIDAL') {
+          const scale = this.dt / (2 * determinant);
+          const g11 = scale * secondaryInductance;
+          const g12 = -scale * mutual;
+          const g21 = g12;
+          const g22 = scale * primaryInductance;
+          const v1Prev = elem.prevVoltage ?? 0;
+          const v2Prev = elem.prevSecondaryVoltage ?? 0;
+          const histP = (elem.prevCurrent ?? 0) + g11 * v1Prev + g12 * v2Prev;
+          const histS = (elem.prevSecondaryCurrent ?? 0) + g21 * v1Prev + g22 * v2Prev;
+          i1 = histP + g11 * primaryVoltage + g12 * secondaryVoltage;
+          i2 = histS + g21 * primaryVoltage + g22 * secondaryVoltage;
+        } else {
+          const scale = this.dt / determinant;
+          i1 = (elem.prevCurrent ?? 0) + scale * (secondaryInductance * primaryVoltage - mutual * secondaryVoltage);
+          i2 = (elem.prevSecondaryCurrent ?? 0) + scale * (-mutual * primaryVoltage + primaryInductance * secondaryVoltage);
+        }
+
+        elem.prevCurrent = i1;
+        elem.prevSecondaryCurrent = i2;
         elem.prevVoltage = primaryVoltage;
+        elem.prevSecondaryVoltage = secondaryVoltage;
       }
     }
   }

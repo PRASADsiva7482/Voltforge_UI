@@ -12,7 +12,7 @@ const isLocalDev = typeof window !== 'undefined' && (
 const origin = typeof window !== 'undefined' ? window.location.origin : '';
 const host = typeof window !== 'undefined' ? window.location.host : '';
 const wsProto = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const ngrokKeycloakUrl = 'https://copious-opposite-mangle.ngrok-free.dev';
+const localKeycloakUrl = 'http://localhost:8080';
 
 window.config = {
   // ── Base Service URLs ──────────────────────────────────────────────────────
@@ -20,12 +20,12 @@ window.config = {
     BL: isLocalDev ? 'http://localhost:2001/voltForge-app/api/v1' : `${origin}/voltForge-app/api/v1`,
     WS: isLocalDev ? 'ws://localhost:2001/voltForge-app/ws-native' : `${wsProto}//${host}/voltForge-app/ws-native`,
     AI: isLocalDev ? 'http://localhost:2002/voltForge-ai' : `${origin}/voltForge-ai`,
-    KEYCLOAK: ngrokKeycloakUrl,
+    KEYCLOAK: isLocalDev ? localKeycloakUrl : `${origin}/auth`,
   },
 
   // ── Keycloak Client Settings ───────────────────────────────────────────────
   keycloak: {
-    url: ngrokKeycloakUrl,
+    url: isLocalDev ? localKeycloakUrl : `${origin}/auth`,
     realm: 'voltforge-realm',
     clientId: 'VOLT-UI',
   },

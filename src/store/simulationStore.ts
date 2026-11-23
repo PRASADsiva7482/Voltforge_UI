@@ -5,6 +5,8 @@ import type { LogicCaptureFrame } from '../features/simulator/logic/protocolAnal
 import type { SimulationFidelityMode } from '../features/simulator/simulationModels';
 import type { CurrentFlowQualityMode } from '../features/canvas/renderBudget';
 import type { SolverDiagnosticsSnapshot } from '../features/simulator/solverDiagnostics';
+import type { PwmDiagnostics } from '../features/simulator/rp2040Pwm';
+import type { Rp2040ExecutionSnapshot } from '../features/simulator/rp2040Telemetry';
 import { normalizeScopeTimePerDivisionMs } from '../features/simulator/scopeCapture';
 import {
   OscilloscopeCaptureAccumulator,
@@ -59,6 +61,15 @@ export interface AvrWorkloadSnapshot {
 }
 
 export type { SolverDiagnosticsSnapshot } from '../features/simulator/solverDiagnostics';
+export type { PwmDiagnostics } from '../features/simulator/rp2040Pwm';
+export type {
+  Rp2040ExecutionSnapshot,
+  Rp2040CoreSnapshot,
+  CoreLifecycleState,
+  Rp2040FifoTelemetry,
+  Rp2040SpinlockTelemetry,
+  Rp2040BootRomTelemetry,
+} from '../features/simulator/rp2040Telemetry';
 
 interface SimulationState {
   restartRequired: boolean;
@@ -73,6 +84,7 @@ interface SimulationState {
   serialLogs: string[];
   serialPanelOpen: boolean;
   baudRate: number;
+  activeUartPort: 0 | 1;
   isSerialLineOpen: boolean;
   serialInputQueue: string[];
   debugSnapshot: DebugSnapshot;
@@ -83,6 +95,7 @@ interface SimulationState {
   wireCurrents: Record<string, number>;
   branchCurrents: Record<string, number>;
   componentPower: Record<string, number>;
+  componentApparentPower: Record<string, number>;
   oscilloscopeData: Record<string, number[]>;
   logicCapture: LogicCaptureFrame[];
   oscilloscopeSamplePeriodMs: number;
@@ -109,6 +122,14 @@ interface SimulationState {
   /** Opt-in worker instrumentation state; null means no sample has arrived. */
   solverDiagnostics: SolverDiagnosticsSnapshot | null;
   solverDiagnosticsOpen: boolean;
+  pwmDiagnostics: PwmDiagnostics | null;
+  pwmInspectorOpen: boolean;
+
+  // ── RP2040 CPU Telemetry & Observability State ──
+  expectedGenerationId: number;
+  lastSequenceId: number;
+  rp2040Snapshot: Rp2040ExecutionSnapshot | null;
+  rp2040InspectorOpen: boolean;
 
   writeSerial: (text: string, options?: SerialWriteOptions) => void;
   setSimulating: (isSimulating: boolean) => void;
@@ -119,6 +140,7 @@ interface SimulationState {
   clearSerial: () => void;
   setSerialPanelOpen: (open: boolean) => void;
   setBaudRate: (baudRate: number) => void;
+  setActiveUartPort: (port: 0 | 1) => void;
   setShowCurrentFlow: (show: boolean) => void;
   setCurrentFlowDirection: (dir: 'conventional' | 'electron') => void;
   setCurrentFlowQualityMode: (mode: CurrentFlowQualityMode) => void;
@@ -131,6 +153,13 @@ interface SimulationState {
   setSolverDiagnosticsOpen: (open: boolean) => void;
   setSolverDiagnostics: (snapshot: SolverDiagnosticsSnapshot) => void;
   clearSolverDiagnostics: () => void;
+  setPwmInspectorOpen: (open: boolean) => void;
+  setPwmDiagnostics: (diagnostics: PwmDiagnostics | null) => void;
+  clearPwmDiagnostics: () => void;
+  setRp2040Snapshot: (snapshot: Rp2040ExecutionSnapshot) => boolean;
+  invalidateTelemetry: (newExpectedGen: number) => void;
+  setRp2040InspectorOpen: (open: boolean) => void;
+  toggleRp2040Inspector: () => void;
   resetSimulationTime: () => void;
 
   // ── MNA Solver Actions ──
@@ -141,6 +170,7 @@ interface SimulationState {
     power: Record<string, number>,
     converged: boolean,
     simulationTime?: number,
+    apparentPower?: Record<string, number>,
   ) => void;
   setLiveMeter: (measurement: Partial<LiveMeterMeasurement>) => void;
   setMeterMode: (mode: MeterMeasurementMode) => void;
@@ -219,6 +249,7 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   serialLogs: [],
   serialPanelOpen: false,
   baudRate: 9600,
+  activeUartPort: 0,
   isSerialLineOpen: false,
   serialInputQueue: [],
   debugSnapshot: { currentLine: null, variables: {}, pins: {}, isPaused: false, breakpoints: [] },
@@ -228,6 +259,7 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   wireCurrents: {},
   branchCurrents: {},
   componentPower: {},
+  componentApparentPower: {},
   oscilloscopeData: {},
   logicCapture: [],
   oscilloscopeSamplePeriodMs: 1,
@@ -263,6 +295,12 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   avrWorkload: idleAvrWorkload(),
   solverDiagnostics: null,
   solverDiagnosticsOpen: false,
+  pwmDiagnostics: null,
+  pwmInspectorOpen: false,
+  expectedGenerationId: 1,
+  lastSequenceId: 0,
+  rp2040Snapshot: null,
+  rp2040InspectorOpen: false,
 
   setSimulating: (isSimulating) => set(state => ({ isSimulating, execution: { ...state.execution,
     phase: isSimulating ? 'running' : state.execution.phase === 'running' ? 'stopped' : state.execution.phase } })),
@@ -323,6 +361,7 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   setSerialPanelOpen: (open) => set({ serialPanelOpen: open }),
 
   setBaudRate: (baudRate) => set({ baudRate }),
+  setActiveUartPort: (activeUartPort) => set({ activeUartPort }),
 
   setShowCurrentFlow: (showCurrentFlow) => set({ showCurrentFlow }),
 
@@ -359,15 +398,51 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   setSolverDiagnostics: (solverDiagnostics) => set({ solverDiagnostics }),
 
   clearSolverDiagnostics: () => set({ solverDiagnostics: null }),
+  setPwmInspectorOpen: (pwmInspectorOpen) => set({ pwmInspectorOpen }),
+  setPwmDiagnostics: (pwmDiagnostics) => set({ pwmDiagnostics }),
+  clearPwmDiagnostics: () => set({ pwmDiagnostics: null }),
+
+  setRp2040Snapshot: (snapshot) => {
+    let accepted = false;
+    set((state) => {
+      // 1. Generation Validation: snapshot.generationId === expectedGenerationId
+      // Rejects older generations (<) and future/unauthorized generations (>)
+      if (snapshot.generationId !== state.expectedGenerationId) {
+        return state;
+      }
+      // 2. Sequence Validation: sequenceId > lastSequenceId within current generation
+      // Rejects duplicate (==) and out-of-order (<) sequence IDs
+      if (snapshot.sequenceId <= state.lastSequenceId) {
+        return state;
+      }
+      accepted = true;
+      return {
+        rp2040Snapshot: snapshot,
+        lastSequenceId: snapshot.sequenceId,
+      };
+    });
+    return accepted;
+  },
+
+  invalidateTelemetry: (newExpectedGen) => set({
+    expectedGenerationId: newExpectedGen,
+    lastSequenceId: 0,
+    rp2040Snapshot: null,
+  }),
+
+  setRp2040InspectorOpen: (rp2040InspectorOpen) => set({ rp2040InspectorOpen }),
+
+  toggleRp2040Inspector: () => set((state) => ({ rp2040InspectorOpen: !state.rp2040InspectorOpen })),
 
   resetSimulationTime: () => set({ simulationTime: 0 }),
 
   // ── MNA Solver Actions ──
-  setCircuitState: (voltages, wireCurrents, currents, power, converged, simulationTime) => set((state) => ({
+  setCircuitState: (voltages, wireCurrents, currents, power, converged, simulationTime, apparentPower) => set((state) => ({
     nodeVoltages: voltages,
     wireCurrents,
     branchCurrents: currents,
     componentPower: power,
+    componentApparentPower: apparentPower ?? state.componentApparentPower,
     solverConverged: converged,
     // Result delivery can be deferred by the UI throttle. Never let a late
     // result move the user-visible physical clock backwards.

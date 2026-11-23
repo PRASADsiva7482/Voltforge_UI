@@ -6,7 +6,7 @@ import type { CanvasNode, Wire } from '../../types/domain';
 import { useCanvasStore } from '../../store/canvasStore';
 import { classifyCanvasModelChange } from '../../store/modelRevision';
 import { useSimulationStore, type MeterMeasurementMode } from '../../store/simulationStore';
-import { CPU, avrInstruction, AVRIOPort, AVRUSART, AVRTimer, portBConfig, portCConfig, portDConfig, timer0Config, timer1Config, timer2Config, usart0Config, PinState as AvrPinState, AVRTWI, twiConfig, AVRADC, adcConfig } from 'avr8js';
+import { CPU, avrInstruction, AVRIOPort, AVRUSART, AVRTimer, portBConfig, portCConfig, portDConfig, timer0Config, timer1Config, timer2Config, usart0Config, PinState as AvrPinState, AVRTWI, twiConfig, AVRADC, adcConfig, AVRSPI, spiConfig } from 'avr8js';
 import { buildMNACircuit } from './NetlistBuilder';
 import { parseAvrHex } from './intelHex';
 import type { MNACircuit, VirtualMeterConfiguration } from './NetlistBuilder';
@@ -25,6 +25,8 @@ import type {
   WorkerResultMessage,
   WorkerResultSubscription,
   WorkerOscilloscopeMessage,
+  WorkerSerialOutputMessage,
+  WorkerRp2040SnapshotMessage,
 } from './SimulationWorker';
 import { buildResultSubscription, materializeResultBuffers } from './resultSubscription';
 import { RuntimeDeltaCollector, RuntimeReconciliationIndex } from './runtimeDelta';
@@ -121,11 +123,12 @@ interface PinInfo {
 
 type MaterializedSolverResult = Omit<
   WorkerResultMessage,
-  'nodeIndices' | 'nodeVoltages' | 'branchCurrentElementIds' | 'branchCurrents' | 'powerElementIds' | 'componentPower'
+  'nodeIndices' | 'nodeVoltages' | 'branchCurrentElementIds' | 'branchCurrents' | 'powerElementIds' | 'componentPower' | 'componentApparentPower'
 > & {
   nodeVoltages: number[];
   branchCurrents: Record<string, number>;
   componentPower: Record<string, number>;
+  componentApparentPower?: Record<string, number>;
 };
 
 interface ParsedStatement {
@@ -305,6 +308,8 @@ class LcdTWIEventHandler {
 export class SimulationEngine {
   private isRunning = false;
   private runGeneration = 0;
+  private telemetryGenerationId = 1;
+  private telemetryInitialized = false;
   private isPaused = false;
   private simulationSpeed = 1;
   private isBatching = false;
@@ -329,6 +334,7 @@ export class SimulationEngine {
   private avrUsart: AVRUSART | null = null;
   private avrSerialInput: number[] = [];
   private avrAdc: AVRADC | null = null;
+  private avrSpi: AVRSPI | null = null;
   private avrBudgetScheduler: AvrExecutionBudgetScheduler | null = null;
   private avrRuntimeTrace = new AvrRuntimeTraceCollector();
   // For toggling state with delay patterns (e.g., blink)
@@ -2362,7 +2368,7 @@ private scopeCaptureRevision = 0;
 
   private startAvr(hex: string, nodes: CanvasNode[], wires: Wire[]) {
     const program = this.hexToProgram(hex);
-    this.avrCpu = new CPU(program);
+    this.avrCpu = new CPU(program, 2048);
     const cpu = this.avrCpu;
     this.avrPorts = {
       B: new AVRIOPort(this.avrCpu, portBConfig),
@@ -2398,6 +2404,12 @@ private scopeCaptureRevision = 0;
       this.callbacks,
       (kind) => this.avrRuntimeTrace.recordI2cEvent(kind),
     );
+
+    this.avrSpi = new AVRSPI(this.avrCpu, spiConfig, 16_000_000);
+    this.avrSpi.onByte = (value) => {
+      const reply = this.spiBus.transfer(String(this.globals.SPI_CS || 'CS'), value);
+      this.avrSpi?.completeTransfer(reply);
+    };
 
     const handlePort = (portName: 'B' | 'C' | 'D', _value: number) => {
       for (let bit = 0; bit < 8; bit += 1) {
@@ -2671,6 +2683,7 @@ private scopeCaptureRevision = 0;
     this.avrSerialInput = [];
     this.avrPorts = {};
     this.avrAdc = null;
+    this.avrSpi = null;
     this.avrRuntimeTrace.stop();
     useSimulationStore.getState().resetAvrWorkload();
     this.stopMNASolver();
@@ -2826,6 +2839,7 @@ private scopeCaptureRevision = 0;
       resultDataConsumers: state.resultDataConsumers,
       virtualMeter: this.getVirtualMeterConfiguration(),
       diagnosticsEnabled: state.solverDiagnosticsOpen,
+      rp2040TelemetryEnabled: state.rp2040InspectorOpen,
     });
   }
 
@@ -2865,7 +2879,8 @@ private scopeCaptureRevision = 0;
         state.showCurrentFlow !== previous.showCurrentFlow ||
         state.thermalHeatmapEnabled !== previous.thermalHeatmapEnabled ||
         state.resultDataConsumers !== previous.resultDataConsumers ||
-        state.solverDiagnosticsOpen !== previous.solverDiagnosticsOpen;
+        state.solverDiagnosticsOpen !== previous.solverDiagnosticsOpen ||
+        state.rp2040InspectorOpen !== previous.rp2040InspectorOpen;
       const scopeCaptureChanged = state.oscilloscopeTimePerDivMs !== previous.oscilloscopeTimePerDivMs;
       if (!meterChanged && !resultDemandChanged && !scopeCaptureChanged) return;
 
@@ -2875,7 +2890,13 @@ private scopeCaptureRevision = 0;
         this.sendResultSubscription();
       }
       if (scopeCaptureChanged) this.sendScopeCaptureConfig();
-      if (this.isPaused) this.requestSolverResult(true, true);
+      if (this.isPaused) {
+        if (state.rp2040InspectorOpen && !previous.rp2040InspectorOpen) {
+          this.requestRp2040Snapshot();
+        } else {
+          this.requestSolverResult(true, true);
+        }
+      }
     });
   }
 
@@ -2955,6 +2976,24 @@ private scopeCaptureRevision = 0;
           this.scheduleSolverResultRequest();
         } else if (msg.type === 'OSCILLOSCOPE') {
           this.handleOscilloscopeData(msg as WorkerOscilloscopeMessage);
+        } else if (msg.type === 'RP2040_SNAPSHOT') {
+          const snapMsg = msg as WorkerRp2040SnapshotMessage;
+          if (snapMsg.snapshot) {
+            useSimulationStore.getState().setRp2040Snapshot(snapMsg.snapshot);
+          }
+        } else if (msg.type === 'RP2040_RESET_COMPLETE' || msg.type === 'RP2040_LOAD_RESULT') {
+          if (useSimulationStore.getState().rp2040InspectorOpen) {
+            this.requestRp2040Snapshot();
+          }
+        } else if (msg.type === 'SERIAL_OUTPUT') {
+          const serialMsg = msg as WorkerSerialOutputMessage;
+          this.callbacks.onSerialOutput(serialMsg.text, {
+            newline: serialMsg.text === '\n',
+            kind: 'output',
+          });
+          if (serialMsg.baudRate && this.callbacks.onBaudRateChange) {
+            this.callbacks.onBaudRateChange(serialMsg.baudRate);
+          }
         }
       };
 
@@ -2962,6 +3001,14 @@ private scopeCaptureRevision = 0;
         if (this.solverWorker !== worker || !this.solverWorkerLifecycle.accepts(workerGeneration)) return;
         console.warn('[VoltForge MNA] Solver worker error:', err.message);
       };
+
+      // Authoritative main-thread telemetry generation management:
+      if (this.telemetryInitialized) {
+        this.telemetryGenerationId += 1;
+      } else {
+        this.telemetryInitialized = true;
+      }
+      useSimulationStore.getState().invalidateTelemetry(this.telemetryGenerationId);
 
       // Initialize the worker with circuit data
       this.scopeCaptureRevision = nextScopeCaptureRevision(this.scopeCaptureRevision);
@@ -2975,13 +3022,17 @@ private scopeCaptureRevision = 0;
         scopeChannels: this.mnaCircuit.scopeChannels,
         scopeSampleInterval_s: this.scopeSampleIntervalSeconds(),
         scopeCaptureRevision: this.scopeCaptureRevision,
+        telemetryGenerationId: this.telemetryGenerationId,
       };
       this.rebuildSimulationNodeIndex(nodes, this.mnaCircuit);
       this.solverWorker.postMessage(initMsg);
       this.watchResultDemand();
 
       // Start the solver loop
-      const startMsg: WorkerInMessage = { type: 'START' };
+      const startMsg: WorkerInMessage = {
+        type: 'START',
+        telemetryGenerationId: this.telemetryGenerationId,
+      };
       this.solverWorker.postMessage(startMsg);
       this.requestSolverResult(true);
 
@@ -3028,6 +3079,17 @@ private scopeCaptureRevision = 0;
   /** Schedule the next result only after the current result was consumed. */
   private scheduleSolverResultRequest() {
     this.clearSolverResultSchedule();
+    if (this.solverWorker) {
+      const inputs = useSimulationStore.getState().drainSerialInput();
+      if (inputs.length) {
+        const activePort = useSimulationStore.getState().activeUartPort ?? 0;
+        this.solverWorker.postMessage({
+          type: 'SERIAL_INPUT',
+          text: inputs.join(''),
+          uartIndex: activePort,
+        });
+      }
+    }
     if (!this.isPaused) this.requestSolverResult();
   }
 
@@ -3075,6 +3137,7 @@ private scopeCaptureRevision = 0;
     useSimulationStore.getState().setCircuitState({}, {}, {}, {}, true);
     useSimulationStore.getState().resetSimulationTime();
     useSimulationStore.getState().clearOscilloscopeData();
+    useSimulationStore.getState().clearPwmDiagnostics();
     useSimulationStore.getState().setLiveMeter({
       voltage: 0,
       acVoltage: 0,
@@ -3211,6 +3274,58 @@ private scopeCaptureRevision = 0;
     this.solverWorker?.postMessage({
       type: 'SET_SPEED',
       speed: this.simulationSpeed,
+    } as WorkerInMessage);
+  }
+
+  /** Return the authoritative next expected telemetry generation ID. */
+  public getTelemetryGenerationId(): number {
+    return this.telemetryGenerationId;
+  }
+
+  /**
+   * Authoritatively reload RP2040 firmware.
+   * Increments generation, invalidates store pre-dispatch, and dispatches to worker.
+   */
+  public loadRp2040Firmware(options: {
+    firmwareBuffer: ArrayBuffer | Uint8Array;
+    boardConfig?: any;
+    clockFrequency_Hz?: number;
+    boardComponentId?: string;
+    vddIo?: number;
+  }): void {
+    this.telemetryGenerationId += 1;
+    useSimulationStore.getState().invalidateTelemetry(this.telemetryGenerationId);
+    this.solverWorker?.postMessage({
+      type: 'LOAD_RP2040_FIRMWARE',
+      firmwareBuffer: options.firmwareBuffer,
+      boardConfig: options.boardConfig,
+      clockFrequency_Hz: options.clockFrequency_Hz,
+      boardComponentId: options.boardComponentId,
+      vddIo: options.vddIo,
+      telemetryGenerationId: this.telemetryGenerationId,
+    } as WorkerInMessage);
+  }
+
+  /**
+   * Authoritatively reset the RP2040 controller.
+   * Increments generation, invalidates store pre-dispatch, and dispatches to worker.
+   */
+  public resetRp2040(): void {
+    this.telemetryGenerationId += 1;
+    useSimulationStore.getState().invalidateTelemetry(this.telemetryGenerationId);
+    this.solverWorker?.postMessage({
+      type: 'RP2040_RESET',
+      telemetryGenerationId: this.telemetryGenerationId,
+    } as WorkerInMessage);
+  }
+
+  /**
+   * Request an on-demand snapshot while paused or refreshed.
+   * Preserves the active generation without store invalidation or sequence advance.
+   */
+  public requestRp2040Snapshot(): void {
+    this.solverWorker?.postMessage({
+      type: 'RP2040_GET_SNAPSHOT',
     } as WorkerInMessage);
   }
 
@@ -3480,7 +3595,7 @@ private scopeCaptureRevision = 0;
   }
 
   private materializeSolverResult(wireResult: WorkerResultMessage): MaterializedSolverResult {
-    const { nodeVoltages, branchCurrents, componentPower } = materializeResultBuffers(
+    const { nodeVoltages, branchCurrents, componentPower, componentApparentPower } = materializeResultBuffers(
       wireResult,
       this.mnaCircuit?.numNodes ?? 0,
     );
@@ -3492,6 +3607,7 @@ private scopeCaptureRevision = 0;
       branchCurrents: _wireBranchCurrents,
       powerElementIds: _powerElementIds,
       componentPower: _wireComponentPower,
+      componentApparentPower: _wireComponentApparentPower,
       ...metadata
     } = wireResult;
 
@@ -3500,6 +3616,7 @@ private scopeCaptureRevision = 0;
       nodeVoltages,
       branchCurrents,
       componentPower,
+      componentApparentPower,
     };
   }
 
@@ -3520,6 +3637,12 @@ private scopeCaptureRevision = 0;
     if (wireResult.diagnostics) {
       useSimulationStore.getState().setSolverDiagnostics(wireResult.diagnostics);
     }
+    if (wireResult.pwmDiagnostics !== undefined) {
+      useSimulationStore.getState().setPwmDiagnostics(wireResult.pwmDiagnostics);
+    }
+    if (wireResult.rp2040Snapshot) {
+      useSimulationStore.getState().setRp2040Snapshot(wireResult.rp2040Snapshot);
+    }
 
     this.runBatched(() => {
       const { elementToComponent } = circuit;
@@ -3529,6 +3652,7 @@ private scopeCaptureRevision = 0;
     // Build component-level voltage and current maps
     const componentCurrents: Record<string, number> = {};
     const componentPower: Record<string, number> = {};
+    const componentApparentPower: Record<string, number> = {};
 
     // Map MNA node voltages to a string-keyed record for the store
     const nodeVoltageMap: Record<string, number> = {};
@@ -3547,6 +3671,14 @@ private scopeCaptureRevision = 0;
       const componentId = elementToComponent.get(elemId);
       if (!componentId) continue;
       componentPower[componentId] = (componentPower[componentId] || 0) + power;
+    }
+
+    if (result.componentApparentPower) {
+      for (const [elemId, appPower] of Object.entries(result.componentApparentPower)) {
+        const componentId = elementToComponent.get(elemId);
+        if (!componentId) continue;
+        componentApparentPower[componentId] = (componentApparentPower[componentId] || 0) + appPower;
+      }
     }
 
     // Map the solved MNA voltages to pin key identifiers globally for diagnostic tooltips
@@ -3570,6 +3702,7 @@ private scopeCaptureRevision = 0;
       componentPower,
       result.converged,
       result.timestamp,
+      componentApparentPower,
     );
 
     // Floating probe meter uses the same MNA elements as the on-canvas DMM:
@@ -3723,6 +3856,23 @@ private scopeCaptureRevision = 0;
             useCanvasStore.getState().updateRuntimeNode(mcuNode.id, {
               properties: {
                 ...mcuNode.properties,
+                builtInLedLit: isHigh,
+                boardPowered: true,
+              }
+            });
+          }
+        }
+      }
+
+      if (wireResult.rp2040GpioStates) {
+        const pin25 = wireResult.rp2040GpioStates.find(p => p.gpioIndex === 25);
+        if (pin25) {
+          const isHigh = pin25.logicalOutput;
+          const picoNode = nodes.find(n => n.type.startsWith('RASPBERRY_PI_PICO'));
+          if (picoNode && picoNode.properties?.builtInLedLit !== isHigh) {
+            useCanvasStore.getState().updateRuntimeNode(picoNode.id, {
+              properties: {
+                ...picoNode.properties,
                 builtInLedLit: isHigh,
                 boardPowered: true,
               }

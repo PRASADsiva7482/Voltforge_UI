@@ -20,6 +20,10 @@ import { resultTransferables, type ResultSubscription } from './resultSubscripti
 import { WorkerBackpressureGate } from './workerBackpressure';
 import { replaceMnaElementsPreservingTransientState } from './mnaIncremental';
 import { ScopeCaptureBuffer, scopeBatchTransferables } from './scopeCapture';
+import { RP2040Controller, type Rp2040ExecutionSnapshot, type Rp2040StepResult } from './rp2040Controller';
+import type { Rp2040BoardConfig, Rp2040VectorTable } from './uf2Parser';
+import type { Rp2040PinDriverState } from './rp2040GpioBridge';
+import type { PwmDiagnostics } from './rp2040Pwm';
 
 // ── Message types ───────────────────────────────────────────────────────
 
@@ -40,6 +44,7 @@ export interface WorkerInitMessage {
   scopeChannels?: Record<string, number>;
   scopeSampleInterval_s?: number;
   scopeCaptureRevision?: number;
+  telemetryGenerationId?: number;
 }
 
 export interface WorkerUpdatePinMessage {
@@ -81,6 +86,7 @@ export interface WorkerSetScopeConfigMessage {
 
 export interface WorkerStartMessage {
   type: 'START';
+  telemetryGenerationId?: number;
 }
 
 export interface WorkerStopMessage {
@@ -107,6 +113,62 @@ export interface WorkerRequestResultMessage {
   type: 'REQUEST_RESULT';
 }
 
+export interface WorkerLoadRp2040FirmwareMessage {
+  type: 'LOAD_RP2040_FIRMWARE';
+  firmwareBuffer: ArrayBuffer;
+  boardConfig?: Rp2040BoardConfig;
+  clockFrequency_Hz?: number;
+  boardComponentId?: string;
+  vddIo?: number;
+  telemetryGenerationId?: number;
+}
+
+export interface WorkerRp2040StepMessage {
+  type: 'RP2040_STEP';
+  instructions?: number;
+  cycles?: number;
+}
+
+export interface WorkerRp2040ResetMessage {
+  type: 'RP2040_RESET';
+  telemetryGenerationId?: number;
+}
+
+export interface WorkerRp2040GetSnapshotMessage {
+  type: 'RP2040_GET_SNAPSHOT';
+}
+
+export interface WorkerRp2040LoadResultMessage {
+  type: 'RP2040_LOAD_RESULT';
+  success: boolean;
+  vectorTable: Rp2040VectorTable | null;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface WorkerRp2040StepResultMessage extends Rp2040StepResult {
+  type: 'RP2040_STEP_RESULT';
+}
+
+export interface WorkerRp2040SnapshotMessage {
+  type: 'RP2040_SNAPSHOT';
+  snapshot: Rp2040ExecutionSnapshot;
+}
+
+export interface WorkerSerialOutputMessage {
+  type: 'SERIAL_OUTPUT';
+  text: string;
+  simulatedTime_s: number;
+  uartIndex: number;
+  baudRate: number;
+}
+
+export interface WorkerSerialInputMessage {
+  type: 'SERIAL_INPUT';
+  text: string;
+  uartIndex?: number;
+}
+
 export type WorkerInMessage =
   | WorkerInitMessage
   | WorkerUpdatePinMessage
@@ -123,7 +185,16 @@ export type WorkerInMessage =
   | WorkerSetSpeedMessage
   | WorkerSetTimeStepMessage
   | WorkerRequestResultMessage
-  | WorkerSetResultSubscriptionMessage;
+  | WorkerSetResultSubscriptionMessage
+  | WorkerLoadRp2040FirmwareMessage
+  | WorkerRp2040StepMessage
+  | WorkerRp2040ResetMessage
+  | WorkerRp2040GetSnapshotMessage
+  | WorkerSerialInputMessage;
+
+export function isValidTelemetryGenerationId(gen: unknown): gen is number {
+  return typeof gen === 'number' && Number.isInteger(gen) && gen > 0;
+}
 
 export interface WorkerResultMessage {
   type: 'RESULT';
@@ -133,6 +204,7 @@ export interface WorkerResultMessage {
   branchCurrents?: Float64Array;
   powerElementIds?: string[];
   componentPower?: Float64Array;
+  componentApparentPower?: Float64Array;
   converged: boolean;
   timestamp: number;
   timeStep: number;
@@ -140,6 +212,9 @@ export interface WorkerResultMessage {
   fidelityMode: SimulationFidelityMode;
   behavioralStates?: Record<string, boolean>;
   diagnostics?: SolverDiagnosticsSnapshot;
+  rp2040GpioStates?: Rp2040PinDriverState[];
+  pwmDiagnostics?: PwmDiagnostics;
+  rp2040Snapshot?: Rp2040ExecutionSnapshot;
 }
 
 export interface WorkerOscilloscopeMessage {
@@ -153,7 +228,15 @@ export interface WorkerOscilloscopeMessage {
   timestamp: number;
 }
 
-export type WorkerOutMessage = WorkerResultMessage | WorkerOscilloscopeMessage;
+export type WorkerOutMessage =
+  | WorkerResultMessage
+  | WorkerOscilloscopeMessage
+  | WorkerRp2040LoadResultMessage
+  | WorkerRp2040StepResultMessage
+  | WorkerRp2040SnapshotMessage
+  | WorkerSerialOutputMessage
+  | { type: 'RP2040_RESET_COMPLETE'; telemetryGenerationId?: number }
+  | { type: 'RP2040_RESET_ERROR'; error: string };
 
 // ── Worker Logic ────────────────────────────────────────────────────────
 
@@ -169,6 +252,7 @@ let requestedTimeStep: number = SIMULATION_MODELS.clock.defaultTimeStep_s;
 let fidelityMode: SimulationFidelityMode = 'adaptive';
 let lastBehavioralStates: Record<string, boolean> = {};
 let latestResult: ReturnType<MNASolver['solve']> | null = null;
+let rp2040Controller: RP2040Controller | null = null;
 let resultSubscription: WorkerResultSubscription | null = null;
 const backpressureGate = new WorkerBackpressureGate();
 let completedSteps = 0;
@@ -178,6 +262,9 @@ let diagnosticsWindowWallTimeMs = 0;
 let diagnosticsWindowFrames = 0;
 let diagnosticsWindowBudgetLimited = false;
 let latestDiagnostics: SolverDiagnosticsSnapshot | null = null;
+let currentTelemetryGenerationId = 1;
+let lastTelemetryPostTime_ms = 0;
+const TELEMETRY_INTERVAL_MS = 100;
 
 // Scope channels are named by the canvas instrument, not by anonymous MNA
 // node indexes. This keeps CH1/CH2 stable when the netlist is rebuilt.
@@ -234,6 +321,7 @@ function setResultSubscription(subscription?: WorkerResultSubscription) {
         branchCurrentElementIds: [...new Set(subscription.branchCurrentElementIds)],
         powerElementIds: [...new Set(subscription.powerElementIds)],
         diagnosticsEnabled: subscription.diagnosticsEnabled === true,
+        rp2040TelemetryEnabled: subscription.rp2040TelemetryEnabled === true,
       }
     : null;
 
@@ -365,6 +453,56 @@ function update555Behavior(result: ReturnType<MNASolver['solve']>): Record<strin
 function solveStep(forceScopeCapture = false): ReturnType<MNASolver['solve']> | null {
   if (!solver || !running) return null;
 
+  // Event-driven substepping for RP2040 ARM Cortex-M0+ CPU execution:
+  // Preserves sub-millisecond GPIO transitions (PWM, pulses down to sub-microsecond)
+  // by breaking cycle execution at exact GPIO transition boundaries, solving MNA, and capturing scope samples.
+  if (rp2040Controller && rp2040Controller.getState() === 'RUNNING') {
+    const bridge = rp2040Controller.getGpioBridge();
+    const dt = solver.getTimeStep();
+    const freq = rp2040Controller.getClockFrequency_Hz();
+    const totalTargetCycles = Math.round(dt * freq);
+
+    let cyclesRemaining = totalTargetCycles;
+    let latestSolveResult: ReturnType<MNASolver['solve']> | null = null;
+
+    while (cyclesRemaining > 0) {
+      const stepRes = rp2040Controller.stepCyclesWithEventBreak(cyclesRemaining);
+      cyclesRemaining -= stepRes.cyclesExecuted;
+
+      updateWaveformSources();
+      solver.setElements(elements);
+      const result = solver.solve();
+      lastBehavioralStates = update555Behavior(result);
+      latestResult = result;
+      latestSolveResult = result;
+
+      if (bridge) {
+        const gpioToNodeMap = new Map<number, number>();
+        for (let i = 0; i < 30; i++) {
+          const resId = bridge.getMnaResistorId(i);
+          const resElem = elements.find((e) => e.id === resId);
+          if (resElem) {
+            gpioToNodeMap.set(i, resElem.nodeB);
+          }
+        }
+        bridge.updateFromMnaResult(result.nodeVoltages, gpioToNodeMap);
+      }
+
+      // When a GPIO transition occurs inside the step, capture a scope sample at the transition boundary!
+      if (stepRes.eventOccurred) {
+        captureScopeSample(result, true);
+        bridge?.clearTransitionEvents();
+      }
+    }
+
+    if (latestSolveResult) {
+      solver.updateTransientState(latestSolveResult);
+      simTime += solver.getTimeStep();
+      captureScopeSample(latestSolveResult, forceScopeCapture);
+      return latestSolveResult;
+    }
+  }
+
   updateWaveformSources();
   solver.setElements(elements);
   const result = solver.solve();
@@ -376,6 +514,23 @@ function solveStep(forceScopeCapture = false): ReturnType<MNASolver['solve']> | 
   // timestep, so the worker clock cannot move backwards or stall.
   solver.updateTransientState(result);
   simTime += solver.getTimeStep();
+
+  // Feed MNA result into RP2040 GPIO bridge if loaded but paused/stopped
+  if (rp2040Controller) {
+    const bridge = rp2040Controller.getGpioBridge();
+    if (bridge) {
+      const gpioToNodeMap = new Map<number, number>();
+      for (let i = 0; i < 30; i++) {
+        const resId = bridge.getMnaResistorId(i);
+        const resElem = elements.find((e) => e.id === resId);
+        if (resElem) {
+          gpioToNodeMap.set(i, resElem.nodeB);
+        }
+      }
+      bridge.updateFromMnaResult(result.nodeVoltages, gpioToNodeMap);
+    }
+  }
+
   captureScopeSample(result, forceScopeCapture);
 
   return result;
@@ -405,6 +560,7 @@ function postResult(result: ReturnType<MNASolver['solve']>, stepsThisFrame: numb
   const powerElementIds = resultSubscription?.powerElementIds
     || elements.map((element) => element.id);
   const componentPowerValues = new Float64Array(powerElementIds.length);
+  const componentApparentPowerValues = new Float64Array(powerElementIds.length);
   powerElementIds.forEach((elementId, index) => {
     const elem = elementById.get(elementId);
     if (!elem) return;
@@ -412,10 +568,23 @@ function postResult(result: ReturnType<MNASolver['solve']>, stepsThisFrame: numb
       ? result.nodeVoltages[elem.nodeA] : 0;
     const vb = elem.nodeB > 0 && elem.nodeB < result.nodeVoltages.length
       ? result.nodeVoltages[elem.nodeB] : 0;
-    const voltage = Math.abs(va - vb);
-    const current = Math.abs(result.branchCurrents.get(elem.id) || 0);
+    const voltage = va - vb;
+    const current = result.branchCurrents.get(elem.id) || 0;
+    // Passive sign convention: p = V * I.
+    // For resistors/passives absorbing energy, p > 0.
+    // For sources delivering energy, branchCurrent flows out of positive terminal, so p < 0.
     componentPowerValues[index] = voltage * current;
+    componentApparentPowerValues[index] = Math.abs(voltage) * Math.abs(current);
   });
+
+  let rp2040Snapshot: Rp2040ExecutionSnapshot | undefined = undefined;
+  if (resultSubscription?.rp2040TelemetryEnabled && rp2040Controller) {
+    const now = performance.now();
+    if (now - lastTelemetryPostTime_ms >= TELEMETRY_INTERVAL_MS) {
+      rp2040Snapshot = rp2040Controller.getExecutionSnapshot();
+      lastTelemetryPostTime_ms = now;
+    }
+  }
 
   const resultMsg: WorkerResultMessage = {
     type: 'RESULT',
@@ -425,7 +594,11 @@ function postResult(result: ReturnType<MNASolver['solve']>, stepsThisFrame: numb
       ? { branchCurrentElementIds, branchCurrents: branchCurrentValues }
       : {}),
     ...(powerElementIds.length > 0
-      ? { powerElementIds, componentPower: componentPowerValues }
+      ? {
+          powerElementIds,
+          componentPower: componentPowerValues,
+          componentApparentPower: componentApparentPowerValues,
+        }
       : {}),
     converged: result.converged,
     timestamp: simTime,
@@ -436,6 +609,13 @@ function postResult(result: ReturnType<MNASolver['solve']>, stepsThisFrame: numb
     ...(resultSubscription?.diagnosticsEnabled && latestDiagnostics
       ? { diagnostics: latestDiagnostics }
       : {}),
+    ...(rp2040Controller
+      ? {
+          rp2040GpioStates: rp2040Controller.getGpioBridge()?.getAllDriverStates(),
+          pwmDiagnostics: rp2040Controller.getPwmDiagnostics(),
+        }
+      : {}),
+    ...(rp2040Snapshot ? { rp2040Snapshot } : {}),
   };
 
   const transferables = resultTransferables({
@@ -445,7 +625,7 @@ function postResult(result: ReturnType<MNASolver['solve']>, stepsThisFrame: numb
       ? { branchCurrentElementIds, branchCurrents: branchCurrentValues }
       : {}),
     ...(powerElementIds.length > 0
-      ? { powerElementIds, componentPower: componentPowerValues }
+      ? { powerElementIds, componentPower: componentPowerValues, componentApparentPower: componentApparentPowerValues }
       : {}),
   });
   self.postMessage(resultMsg, { transfer: transferables });
@@ -512,6 +692,21 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
 
   switch (msg.type) {
     case 'INIT': {
+      const telemetryRequired = Boolean(msg.resultSubscription?.rp2040TelemetryEnabled);
+      if (msg.telemetryGenerationId !== undefined) {
+        if (!isValidTelemetryGenerationId(msg.telemetryGenerationId)) {
+          throw new Error(`[SimulationWorker] Invalid telemetryGenerationId on INIT: ${msg.telemetryGenerationId}. Must be a positive integer.`);
+        }
+        currentTelemetryGenerationId = msg.telemetryGenerationId;
+      } else if (telemetryRequired) {
+        throw new Error('[SimulationWorker] Missing required telemetryGenerationId on INIT with telemetry enabled.');
+      } else {
+        currentTelemetryGenerationId = 1;
+      }
+      lastTelemetryPostTime_ms = 0;
+      if (rp2040Controller) {
+        rp2040Controller.setTelemetryGeneration(currentTelemetryGenerationId);
+      }
       solver = new MNASolver(msg.numNodes, msg.dt);
       elements = msg.elements;
       solverNodeCount = msg.numNodes;
@@ -616,9 +811,19 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
     }
 
     case 'START': {
+      if (msg.telemetryGenerationId !== undefined) {
+        if (!isValidTelemetryGenerationId(msg.telemetryGenerationId)) {
+          throw new Error(`[SimulationWorker] Invalid telemetryGenerationId on START: ${msg.telemetryGenerationId}. Must be a positive integer.`);
+        }
+        currentTelemetryGenerationId = msg.telemetryGenerationId;
+        if (rp2040Controller) {
+          rp2040Controller.setTelemetryGeneration(currentTelemetryGenerationId);
+        }
+      }
       if (!backpressureGate.start()) break;
       running = true;
       paused = false;
+      rp2040Controller?.start();
       if (intervalId) clearInterval(intervalId);
       intervalId = setInterval(runSimulationFrame, SIMULATION_MODELS.clock.framePeriod_s * 1000);
       break;
@@ -627,12 +832,16 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
     case 'PAUSE': {
       backpressureGate.pause();
       paused = true;
+      rp2040Controller?.pause();
       if (backpressureGate.hasPendingCredit && latestResult) postResult(latestResult, 0);
       break;
     }
 
     case 'RESUME': {
-      if (running && backpressureGate.resume()) paused = false;
+      if (running && backpressureGate.resume()) {
+        paused = false;
+        rp2040Controller?.resume();
+      }
       break;
     }
 
@@ -655,11 +864,16 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
       running = false;
       paused = false;
       speed = 1;
+      if (rp2040Controller) {
+        rp2040Controller.stop();
+        rp2040Controller = null;
+      }
       backpressureGate.stop();
       latestResult = null;
       resultSubscription = null;
       completedSteps = 0;
       latestDiagnostics = null;
+      lastTelemetryPostTime_ms = 0;
       setScopeChannels({});
       if (intervalId) {
         clearInterval(intervalId);
@@ -673,6 +887,136 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
         ? msg.dt
         : SIMULATION_MODELS.clock.defaultTimeStep_s;
       applyConfiguredTimeStep();
+      break;
+    }
+
+    case 'LOAD_RP2040_FIRMWARE': {
+      const telemetryRequired = Boolean(resultSubscription?.rp2040TelemetryEnabled);
+      if (msg.telemetryGenerationId !== undefined) {
+        if (!isValidTelemetryGenerationId(msg.telemetryGenerationId)) {
+          const reply: WorkerRp2040LoadResultMessage = {
+            type: 'RP2040_LOAD_RESULT',
+            success: false,
+            vectorTable: null,
+            errors: [`Invalid telemetryGenerationId: ${msg.telemetryGenerationId}. Must be a positive integer.`],
+            warnings: [],
+          };
+          self.postMessage(reply);
+          break;
+        }
+        currentTelemetryGenerationId = msg.telemetryGenerationId;
+      } else if (telemetryRequired) {
+        const reply: WorkerRp2040LoadResultMessage = {
+          type: 'RP2040_LOAD_RESULT',
+          success: false,
+          vectorTable: null,
+          errors: ['Missing required telemetryGenerationId on LOAD_RP2040_FIRMWARE when telemetry is subscribed.'],
+          warnings: [],
+        };
+        self.postMessage(reply);
+        break;
+      }
+      rp2040Controller = new RP2040Controller(
+        msg.boardConfig,
+        msg.clockFrequency_Hz,
+        msg.boardComponentId,
+        msg.vddIo
+      );
+      // Adopt authoritative generation on new controller BEFORE loading firmware:
+      rp2040Controller.setTelemetryGeneration(currentTelemetryGenerationId);
+      rp2040Controller.onDriverChange((event) => {
+        const elemSrc = elements.find((e) => e.id === event.sourceId);
+        if (elemSrc) elemSrc.value = event.targetVoltage_V;
+        const elemRes = elements.find((e) => e.id === event.resistorId);
+        if (elemRes) elemRes.value = event.resistance_Ohms;
+      });
+      rp2040Controller.onSerialTransmit((byte, simTime, uartIdx) => {
+        const uart = rp2040Controller?.getUart(uartIdx as 0 | 1);
+        const text = String.fromCharCode(byte);
+        const outMsg: WorkerSerialOutputMessage = {
+          type: 'SERIAL_OUTPUT',
+          text,
+          simulatedTime_s: simTime,
+          uartIndex: uartIdx,
+          baudRate: uart?.baudRate || 115200,
+        };
+        self.postMessage(outMsg);
+      });
+      const res = rp2040Controller.loadFirmware(msg.firmwareBuffer);
+      // Ensure controller retains currentTelemetryGenerationId and sequence is reset to 0:
+      rp2040Controller.setTelemetryGeneration(currentTelemetryGenerationId);
+      const reply: WorkerRp2040LoadResultMessage = {
+        type: 'RP2040_LOAD_RESULT',
+        success: res.success,
+        vectorTable: res.vectorTable,
+        errors: res.errors,
+        warnings: res.warnings,
+      };
+      self.postMessage(reply);
+      break;
+    }
+
+    case 'RP2040_STEP': {
+      if (rp2040Controller) {
+        const stepRes = msg.cycles !== undefined
+          ? rp2040Controller.stepCycles(msg.cycles)
+          : rp2040Controller.step(msg.instructions || 1);
+        const reply: WorkerRp2040StepResultMessage = {
+          type: 'RP2040_STEP_RESULT',
+          ...stepRes,
+        };
+        self.postMessage(reply);
+      }
+      break;
+    }
+
+    case 'RP2040_RESET': {
+      const telemetryRequired = Boolean(resultSubscription?.rp2040TelemetryEnabled);
+      if (msg.telemetryGenerationId !== undefined) {
+        if (!isValidTelemetryGenerationId(msg.telemetryGenerationId)) {
+          self.postMessage({
+            type: 'RP2040_RESET_ERROR',
+            error: `Invalid telemetryGenerationId: ${msg.telemetryGenerationId}. Must be a positive integer.`,
+          });
+          break;
+        }
+        currentTelemetryGenerationId = msg.telemetryGenerationId;
+      } else if (telemetryRequired) {
+        self.postMessage({
+          type: 'RP2040_RESET_ERROR',
+          error: 'Missing required telemetryGenerationId on RP2040_RESET when telemetry is subscribed.',
+        });
+        break;
+      }
+      if (rp2040Controller) {
+        // Adopt generation before reset
+        rp2040Controller.setTelemetryGeneration(currentTelemetryGenerationId);
+        rp2040Controller.reset();
+        // Ensure generation is adopted and sequence counter is reset to 0
+        rp2040Controller.setTelemetryGeneration(currentTelemetryGenerationId);
+        self.postMessage({
+          type: 'RP2040_RESET_COMPLETE',
+          telemetryGenerationId: currentTelemetryGenerationId,
+        });
+      }
+      break;
+    }
+
+    case 'RP2040_GET_SNAPSHOT': {
+      if (rp2040Controller) {
+        const reply: WorkerRp2040SnapshotMessage = {
+          type: 'RP2040_SNAPSHOT',
+          snapshot: rp2040Controller.getExecutionSnapshot(),
+        };
+        self.postMessage(reply);
+      }
+      break;
+    }
+
+    case 'SERIAL_INPUT': {
+      if (rp2040Controller) {
+        rp2040Controller.sendSerialString(msg.text, (msg.uartIndex ?? 0) as 0 | 1);
+      }
       break;
     }
   }

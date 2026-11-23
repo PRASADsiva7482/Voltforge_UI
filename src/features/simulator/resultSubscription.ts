@@ -8,6 +8,7 @@ export interface ResultSubscription {
   branchCurrentElementIds: string[];
   powerElementIds: string[];
   diagnosticsEnabled?: boolean;
+  rp2040TelemetryEnabled?: boolean;
 }
 
 export interface ResultConsumerDemand {
@@ -23,6 +24,7 @@ export interface ResultSubscriptionInput {
   resultDataConsumers: ResultConsumerDemand;
   virtualMeter: VirtualMeterConfiguration;
   diagnosticsEnabled?: boolean;
+  rp2040TelemetryEnabled?: boolean;
 }
 
 export interface ResultBufferPayload {
@@ -32,12 +34,14 @@ export interface ResultBufferPayload {
   branchCurrents?: Float64Array;
   powerElementIds?: string[];
   componentPower?: Float64Array;
+  componentApparentPower?: Float64Array;
 }
 
 export interface MaterializedResultBuffers {
   nodeVoltages: number[];
   branchCurrents: Record<string, number>;
   componentPower: Record<string, number>;
+  componentApparentPower?: Record<string, number>;
 }
 
 function meterMeasurementMode(value: unknown): ResultMeterMeasurementMode {
@@ -60,6 +64,7 @@ export function buildResultSubscription({
   resultDataConsumers,
   virtualMeter,
   diagnosticsEnabled = false,
+  rp2040TelemetryEnabled = false,
 }: ResultSubscriptionInput): ResultSubscription {
   const availableElementIds = new Set(circuit.elements.map((element) => element.id));
   const visibleNodeIds = new Set(nodes.map((node) => node.id));
@@ -124,6 +129,7 @@ export function buildResultSubscription({
     branchCurrentElementIds: [...branchCurrentElementIds].sort(),
     powerElementIds: [...powerElementIds].sort(),
     diagnosticsEnabled,
+    ...(rp2040TelemetryEnabled ? { rp2040TelemetryEnabled: true } : {}),
   };
 }
 
@@ -145,11 +151,13 @@ export function materializeResultBuffers(
   });
 
   const componentPower: Record<string, number> = {};
+  const componentApparentPower: Record<string, number> = {};
   (payload.powerElementIds ?? []).forEach((elementId, index) => {
     componentPower[elementId] = payload.componentPower?.[index] ?? 0;
+    componentApparentPower[elementId] = payload.componentApparentPower?.[index] ?? 0;
   });
 
-  return { nodeVoltages, branchCurrents, componentPower };
+  return { nodeVoltages, branchCurrents, componentPower, componentApparentPower };
 }
 
 /** Returns exactly the numeric buffers that should be transferred. */
@@ -157,6 +165,7 @@ export function resultTransferables(payload: ResultBufferPayload): Transferable[
   const buffers: Transferable[] = [payload.nodeVoltages.buffer];
   if (payload.branchCurrents) buffers.push(payload.branchCurrents.buffer);
   if (payload.componentPower) buffers.push(payload.componentPower.buffer);
+  if (payload.componentApparentPower) buffers.push(payload.componentApparentPower.buffer);
   return buffers;
 }
 

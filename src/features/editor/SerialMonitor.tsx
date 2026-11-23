@@ -10,6 +10,8 @@ export default function SerialMonitor({ onAskAi }: { onAskAi?: (attachment: Exec
   const serialLogs = useSimulationStore((s) => s.serialLogs);
   const baudRate = useSimulationStore((s) => s.baudRate);
   const sendSerialInput = useSimulationStore((s) => s.sendSerialInput);
+  const activeUartPort = useSimulationStore((s) => s.activeUartPort);
+  const setActiveUartPort = useSimulationStore((s) => s.setActiveUartPort);
   const clearSerial = useSimulationStore((s) => s.clearSerial);
   const isOpen = useSimulationStore((s) => s.serialPanelOpen);
   const setSerialPanelOpen = useSimulationStore((s) => s.setSerialPanelOpen);
@@ -65,7 +67,12 @@ export default function SerialMonitor({ onAskAi }: { onAskAi?: (attachment: Exec
       {isOpen && (
         <div className="vf-serial-monitor__body" style={{ height }}>
           <div className="vf-serial-monitor__toolbar">
-            <span role="status" title="Reported by firmware; change Serial.begin() and restart to change baud. Baud mismatch is not emulated.">{Math.round(baudRate)} baud · {label}</span>
+            <span role="status" title="Reported by firmware; change Serial.begin() and restart to change baud. Baud mismatch is not emulated.">{Math.round(baudRate)} baud · {label}</span> { (execution.boardType?.toLowerCase().includes("pico") || execution.boardType?.toLowerCase().includes("rp2040")) && (
+              <div style={{ display: "inline-flex", gap: "3px", marginLeft: "6px" }}>
+                <button type="button" style={{ padding: "1px 5px", fontSize: "10px", borderRadius: "3px", background: activeUartPort === 0 ? "var(--primary, #2563eb)" : "transparent", color: "inherit", border: "1px solid rgba(128,128,128,0.4)", cursor: "pointer" }} onClick={() => setActiveUartPort(0)} title="Select UART0 (GP0 TX / GP1 RX)">UART0</button>
+                <button type="button" style={{ padding: "1px 5px", fontSize: "10px", borderRadius: "3px", background: activeUartPort === 1 ? "var(--primary, #2563eb)" : "transparent", color: "inherit", border: "1px solid rgba(128,128,128,0.4)", cursor: "pointer" }} onClick={() => setActiveUartPort(1)} title="Select UART1 (GP4 TX / GP5 RX)">UART1</button>
+              </div>
+            )}
             {onAskAi && <button onClick={() => onAskAi({ id: crypto.randomUUID(), projectId: execution.projectId!, runId: execution.id, boardType: execution.boardType, phase: execution.phase, baudRate, output: output.slice(-40).map(line => line.slice(-2000)), diagnostic: execution.diagnostic?.slice(0, 8000) || null })} disabled={!execution.projectId || (!output.length && !execution.diagnostic)} aria-label="Ask AI about this output" title="Review this output in AI; context sharing must be enabled before sending"><Sparkles size={13} /></button>}
             <button disabled={!entries.length} aria-label="Copy serial logs" title="Copy serial logs" onClick={() => { void navigator.clipboard.writeText(logText).then(() => addToast('Serial logs copied', 'success')).catch(() => addToast('Clipboard unavailable', 'error')); }}><Copy size={13} /></button>
             <button disabled={!entries.length} aria-label="Export serial logs" title="Export serial logs" onClick={() => { const url = URL.createObjectURL(new Blob([logText], { type: 'text/plain' })); const a = document.createElement('a'); a.href = url; a.download = `voltforge-serial-${execution.id || 'session'}.txt`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }}><Download size={13} /></button>

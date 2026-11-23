@@ -48,6 +48,7 @@ import {
   Copy,
   Binary,
   AlertTriangle,
+  Cpu,
 } from 'lucide-react'
 
 import { createCanvasNodeFromComponent } from '../canvas/componentFactory'
@@ -62,6 +63,7 @@ import { useSimulationStore } from '../../store/simulationStore'
 import { useThemeStore } from '../../store/themeStore'
 import { useToastStore } from '../../store/useToastStore'
 import { useAuth } from '../../auth/useAuth'
+import keycloak from '../../auth/keycloak'
 import { useCollaboration } from '../../hooks/useCollaboration'
 import { EditorDock } from '../../components/ui/EditorDock'
 import { Modal, Button } from '../../components/ui'
@@ -121,6 +123,8 @@ const AiValidatorPanel = lazy(() => import('./AiValidatorPanel'))
 const IotInspectorPanel = lazy(() => import('./IotInspectorPanel'))
 const ProjectSettingsModal = lazy(() => import('./ProjectSettingsModal'))
 const SolverDiagnosticsPanel = lazy(() => import('./SolverDiagnosticsPanel'))
+const PwmInspectorPanel = lazy(() => import('./PwmInspectorPanel'))
+const Rp2040CpuInspectorPanel = lazy(() => import('./Rp2040CpuInspectorPanel'))
 
 type ViewMode = 'canvas' | 'code' | 'split' | 'pcb'
 
@@ -260,6 +264,8 @@ export default function CircuitEditorPage() {
       name: project.name,
       boardType: project.boardType,
       ownerKeycloakId: project.owner?.keycloakId,
+      ownerId: project.owner?.id,
+      ownerUsername: project.owner?.username,
       forkedFromId: project.forkedFromId,
       forkedFromName: project.forkedFromName,
       userForkId: project.userForkId,
@@ -359,6 +365,14 @@ export default function CircuitEditorPage() {
   }, [viewMode])
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const win = window as unknown as Record<string, unknown>
+      win.__vf_canvasStore = useCanvasStore
+      win.__vf_projectStore = useProjectStore
+    }
+  }, [])
+
+  useEffect(() => {
     if (isMobile) {
       setLeftPanelOpen(false)
     }
@@ -423,6 +437,10 @@ export default function CircuitEditorPage() {
   const solverDiagnosticsOpen = useSimulationStore((s) => s.solverDiagnosticsOpen)
   const setSolverDiagnosticsOpen = useSimulationStore((s) => s.setSolverDiagnosticsOpen)
   const clearSolverDiagnostics = useSimulationStore((s) => s.clearSolverDiagnostics)
+  const pwmInspectorOpen = useSimulationStore((s) => s.pwmInspectorOpen)
+  const setPwmInspectorOpen = useSimulationStore((s) => s.setPwmInspectorOpen)
+  const rp2040InspectorOpen = useSimulationStore((s) => s.rp2040InspectorOpen)
+  const setRp2040InspectorOpen = useSimulationStore((s) => s.setRp2040InspectorOpen)
   const toggleMeterProbe = useSimulationStore((s) => s.toggleMeterProbe)
   const oscilloscopePanelOpen = useSimulationStore((s) => s.oscilloscopePanelOpen)
   const setOscilloscopePanelOpen = useSimulationStore((s) => s.setOscilloscopePanelOpen)
@@ -478,8 +496,14 @@ export default function CircuitEditorPage() {
   const isOwner = isPreset || Boolean(
     projectId &&
     projectSummary?.id === projectId &&
-    user &&
-    projectSummary?.ownerKeycloakId === user.keycloakId
+    (
+      (user && (
+        (projectSummary.ownerKeycloakId && user.keycloakId && projectSummary.ownerKeycloakId === user.keycloakId) ||
+        (projectSummary.ownerId && user.id && projectSummary.ownerId === user.id) ||
+        (projectSummary.ownerUsername && user.username && projectSummary.ownerUsername === user.username)
+      )) ||
+      (keycloak.authenticated && keycloak.tokenParsed?.sub && projectSummary?.ownerKeycloakId === keycloak.tokenParsed.sub)
+    )
   )
   const isInteractive = isOwner || isSandbox
 
@@ -787,8 +811,15 @@ export default function CircuitEditorPage() {
   const { mutate: saveProject } = useMutation({
     mutationFn: async (snapshot: NonNullable<ReturnType<typeof captureEditorDocument>>) => {
       const { currentProject } = useProjectStore.getState()
-      if (!currentProject || isPreset || !isOwner || currentProject.id !== projectId
-        || currentProject.owner?.keycloakId !== user?.keycloakId || !isCurrentDocumentSession(snapshot)) return
+      if (!currentProject || isPreset || currentProject.id !== projectId) {
+        throw new Error('Project is not ready to be saved.')
+      }
+      if (!isOwner) {
+        throw new Error('You do not have permission to modify this project.')
+      }
+      if (!isCurrentDocumentSession(snapshot)) {
+        throw new Error('Save cancelled because document session expired.')
+      }
       const response = await projectApi.update(currentProject.id, snapshot.payload)
       return response.data.data
     },
@@ -854,8 +885,29 @@ export default function CircuitEditorPage() {
       return
     }
     const project = useProjectStore.getState()
-    if (isPreset || !isOwner || project.isSaving || project.currentProject?.id !== projectId
-      || project.currentProject?.owner?.keycloakId !== user?.keycloakId) return
+    if (!project.currentProject) {
+      if (manual) addToast('Project is loading. Please wait...', 'info')
+      return
+    }
+    if (project.isSaving) return
+    if (isPreset) {
+      if (manual) addToast('Preset circuits are read-only templates. Fork the project to save your changes.', 'info')
+      return
+    }
+    if (project.currentProject.id !== projectId) {
+      if (manual) addToast('Document session mismatch. Please reload.', 'warning')
+      return
+    }
+    if (!isOwner) {
+      if (manual) {
+        if (!isAuthenticated) {
+          addToast('Please sign in to save your changes.', 'warning')
+        } else {
+          addToast('You do not have permission to edit this project. Fork the project to save.', 'warning')
+        }
+      }
+      return
+    }
     const rejected = rejectedSaveRef.current
     if (manual === false && rejected && isCurrentDocumentSession(rejected) && !hasEditsSince(rejected)) return
     const snapshot = captureEditorDocument()
@@ -865,8 +917,12 @@ export default function CircuitEditorPage() {
       addToast('Save exceeds the 4 MiB limit. Your edits are still in this tab. Reduce the document size and save again.', 'error')
       return
     }
-    if (snapshot) { useProjectStore.getState().setSaveError(null); setSaving(true); saveProject(snapshot) }
-  }, [isPreset, isSandbox, isOwner, projectId, user?.keycloakId, setSaving, saveProject, addToast, remoteConflictRevision])
+    if (snapshot) {
+      useProjectStore.getState().setSaveError(null)
+      setSaving(true)
+      saveProject(snapshot)
+    }
+  }, [isPreset, isSandbox, isOwner, projectId, isAuthenticated, setSaving, saveProject, addToast, remoteConflictRevision])
 
   const handleAutosave = useCallback(() => handleSave(false), [handleSave])
 
@@ -2209,6 +2265,18 @@ export default function CircuitEditorPage() {
                 onClick={() => setSolverDiagnosticsOpen(!solverDiagnosticsOpen)}
                 pressed={solverDiagnosticsOpen}
               />
+              <SecondaryToolButton
+                icon={<Activity size={15} />}
+                label="RP2040 PWM Inspector"
+                onClick={() => setPwmInspectorOpen(!pwmInspectorOpen)}
+                pressed={pwmInspectorOpen}
+              />
+              <SecondaryToolButton
+                icon={<Cpu size={15} />}
+                label="RP2040 Dual-Core CPU Inspector"
+                onClick={() => setRp2040InspectorOpen(!rp2040InspectorOpen)}
+                pressed={rp2040InspectorOpen}
+              />
             </div>
 
             <span className="vf-editor__secondary-divider" />
@@ -2513,6 +2581,24 @@ export default function CircuitEditorPage() {
                   avrCompiledTrace={avrCompiledTrace}
                   onRunAvrCompiledTrace={runAvrCompiledFirmwareTrace}
                   onStopAvrCompiledTrace={stopAvrCompiledFirmwareTrace}
+                />
+              </EditorFeatureBoundary>
+            )}
+            {!isSandbox && pwmInspectorOpen && (
+              <EditorFeatureBoundary label="pwm inspector">
+                <PwmInspectorPanel
+                  isOpen
+                  onClose={() => setPwmInspectorOpen(false)}
+                />
+              </EditorFeatureBoundary>
+            )}
+            {!isSandbox && rp2040InspectorOpen && (
+              <EditorFeatureBoundary label="rp2040 cpu inspector">
+                <Rp2040CpuInspectorPanel
+                  isOpen
+                  isSimulationPaused={isSimulationPaused}
+                  onClose={() => setRp2040InspectorOpen(false)}
+                  onRefresh={() => engineRef.current?.requestRp2040Snapshot()}
                 />
               </EditorFeatureBoundary>
             )}
